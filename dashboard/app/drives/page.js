@@ -415,12 +415,11 @@ function DrivesInner() {
                             <span className="text-xs text-zinc-600 tabular-nums">{formatDuration(d.duration_min)}</span>
                             {startPct != null && endPct != null && (
                               <div className="flex items-center gap-1 text-xs text-zinc-500 tabular-nums">
-                                <span>{startPct}%</span>
-                                <div className="w-12 h-1.5 bg-zinc-800 rounded-sm overflow-hidden relative">
+                                <span>{startPct}<span className="text-zinc-600">{'>'}</span>{endPct}%</span>
+                                <div className="w-20 h-1.5 bg-zinc-800 rounded-sm overflow-hidden relative">
                                   <div className="absolute inset-y-0 rounded-sm bg-blue-400/30" style={{ left: `${endPct}%`, width: `${startPct - endPct}%` }} />
                                   <div className="absolute inset-y-0 rounded-sm bg-green-400/40" style={{ left: 0, width: `${endPct}%` }} />
                                 </div>
-                                <span>{endPct}%</span>
                               </div>
                             )}
                           </div>
