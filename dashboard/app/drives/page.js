@@ -215,10 +215,11 @@ function DrivesInner() {
 
   // 목록/지도 모드
   const [viewMode, setViewMode] = useState(initialId ? 'map' : 'list');
+  const [mapEverShown, setMapEverShown] = useState(!!initialId);
   const selectedIdx = selectedDrive ? drives.findIndex(d => d.id === selectedDrive.id) : -1;
   const eff = selectedDrive ? efficiency(selectedDrive) : null;
 
-  const goToDrive = (d) => { setSelectedDrive(d); setSelectedPlace(null); setViewMode('map'); };
+  const goToDrive = (d) => { setSelectedDrive(d); setSelectedPlace(null); setMapEverShown(true); setViewMode('map'); };
   const goPrev = () => { if (selectedIdx > 0) { setSelectedDrive(drives[selectedIdx - 1]); setSelectedPlace(null); } };
   const goNext = () => { if (selectedIdx < drives.length - 1) { setSelectedDrive(drives[selectedIdx + 1]); setSelectedPlace(null); } };
 
@@ -233,7 +234,7 @@ function DrivesInner() {
             {places.slice(0, 5).map((p, i) => (
               <button
                 key={p.id}
-                onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setViewMode('map'); }}
+                onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMapEverShown(true); setViewMode('map'); }}
                 className={`flex-shrink-0 flex items-start gap-2 border rounded-xl px-3 py-2 w-[170px] text-left transition-colors ${
                   selectedPlace?.id === p.id
                     ? 'bg-amber-500/10 border-amber-500/30'
@@ -287,6 +288,7 @@ function DrivesInner() {
       )}
 
       {/* ── 지도 모드 ── */}
+      {mapEverShown && (
       <div className="flex-1 flex flex-col px-4 pb-4" style={{ display: viewMode === 'map' ? 'flex' : 'none' }}>
           {/* 상단 네비게이션 */}
           <div className="flex items-center justify-between py-2 mb-2">
@@ -348,6 +350,7 @@ function DrivesInner() {
             </div>
           </div>
         </div>
+      )}
 
       {/* ── 목록 모드 ── */}
       <div className="flex-1 flex flex-col px-4 pb-4" style={{ display: viewMode === 'list' ? 'flex' : 'none' }}>
@@ -371,6 +374,9 @@ function DrivesInner() {
                   const dt = new Date(d.start_date);
                   const dateLabel = `${dt.getMonth()+1}/${dt.getDate()}`;
                   const timeLabel = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+                  const startPct = d.start_battery_level ?? null;
+                  const endPct = d.end_battery_level ?? null;
+                  const usedPct = (startPct != null && endPct != null) ? Math.max(0, startPct - endPct) : 0;
 
                   // 날짜 구분선
                   const prevDt = idx > 0 ? new Date(drives[idx - 1].start_date) : null;
@@ -405,7 +411,18 @@ function DrivesInner() {
                           <p className="text-sm text-zinc-300 truncate">
                             {shortAddr(d.start_address) || '?'}<span className="text-zinc-600 mx-1">→</span>{shortAddr(d.end_address) || '?'}
                           </p>
-                          <p className="text-xs text-zinc-600 tabular-nums mt-0.5">{formatDuration(d.duration_min)}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-zinc-600 tabular-nums">{formatDuration(d.duration_min)}</span>
+                            {startPct != null && endPct != null && (
+                              <div className="flex items-center gap-1 text-xs text-zinc-500 tabular-nums">
+                                <span>{startPct}%</span>
+                                <div className="w-10 h-1.5 bg-zinc-700 rounded-sm overflow-hidden relative">
+                                  <div className="absolute inset-y-0 left-0 rounded-sm" style={{ width: `${usedPct}%`, background: 'linear-gradient(90deg, rgba(96,165,250,.5), rgba(248,113,113,.6))' }} />
+                                </div>
+                                <span>{endPct}%</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="text-right flex items-baseline gap-1.5">
                           <span className="text-sm font-bold text-blue-400 tabular-nums">{d.distance}<span className="text-[10px] text-zinc-600 ml-0.5">km</span></span>
