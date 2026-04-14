@@ -313,32 +313,35 @@ function DrivesInner() {
 
           {/* 주행 정보 + 지도 */}
           <div className="flex-1 min-h-0 flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden mb-20">
-            {selectedDrive ? (
-              <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center gap-4 flex-shrink-0">
+            {selectedDrive ? (() => {
+              const sp = selectedDrive.start_battery_level ?? null;
+              const ep = selectedDrive.end_battery_level ?? null;
+              return (
+              <div className="px-4 py-2 border-b border-white/[0.06] flex items-center gap-3 flex-shrink-0">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-zinc-500 mb-0.5 tabular-nums">{formatTimeRange(selectedDrive.start_date, selectedDrive.end_date)}</p>
-                  <p className="text-base text-zinc-300 truncate">
+                  <p className="text-sm text-zinc-500 tabular-nums">{formatTimeRange(selectedDrive.start_date, selectedDrive.end_date)}</p>
+                  <p className="text-sm text-zinc-300 truncate">
                     {shortAddr(selectedDrive.start_address) || '출발지'}&nbsp;→&nbsp;{shortAddr(selectedDrive.end_address) || '도착지'}
                   </p>
                 </div>
-                <div className="flex gap-3 flex-shrink-0 text-right">
-                  <div>
-                    <p className="text-blue-400 font-bold text-base">{selectedDrive.distance} km</p>
-                    <p className="text-zinc-600 text-xs">거리</p>
-                  </div>
-                  <div>
-                    <p className="text-zinc-300 font-semibold text-base">{formatDuration(selectedDrive.duration_min)}</p>
-                    <p className="text-zinc-600 text-xs">시간</p>
-                  </div>
-                  {eff && (
-                    <div>
-                      <p className="text-green-400 font-semibold text-base">{eff.kwh} kWh</p>
-                      <p className="text-zinc-600 text-xs">{eff.perKm} Wh/km</p>
-                    </div>
-                  )}
+                <div className="flex items-center gap-2 flex-shrink-0 text-sm tabular-nums">
+                  <span className="text-blue-400 font-bold">{selectedDrive.distance}<span className="text-[10px] text-zinc-600 ml-0.5">km</span></span>
+                  <span className="text-zinc-400 font-semibold">{formatDuration(selectedDrive.duration_min)}</span>
+                  {eff && <span className="text-green-400 font-semibold">{eff.kwh}<span className="text-[10px] text-zinc-600 ml-0.5">kWh</span></span>}
+                  {eff && <span className="text-amber-400 text-xs">{eff.perKm}<span className="text-zinc-600 ml-0.5">Wh</span></span>}
                 </div>
+                {sp != null && ep != null && (
+                  <div className="flex items-center gap-1 flex-shrink-0 text-xs text-zinc-500 tabular-nums">
+                    <div className="w-16 h-1.5 bg-zinc-800 rounded-sm overflow-hidden relative">
+                      <div className="absolute inset-y-0 rounded-sm bg-blue-400/30" style={{ left: `${ep}%`, width: `${sp - ep}%` }} />
+                      <div className="absolute inset-y-0 rounded-sm bg-green-400/40" style={{ left: 0, width: `${ep}%` }} />
+                    </div>
+                    <span>{sp}<span className="text-zinc-600">{'>'}</span>{ep}%</span>
+                  </div>
+                )}
               </div>
-            ) : selectedPlace ? (
+              );
+            })() : selectedPlace ? (
               <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center gap-3 flex-shrink-0">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
                 <p className="text-base text-zinc-300 truncate flex-1">{selectedPlace.label}</p>
