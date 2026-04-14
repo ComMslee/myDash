@@ -17,7 +17,10 @@ export async function GET() {
               a.latitude,
               a.longitude,
               COUNT(*) AS visit_count,
-              MAX(d.start_date) AS last_visit
+              MAX(d.start_date) AS last_visit,
+              MIN(d.start_date) AS first_visit,
+              COALESCE(AVG(d.distance), 0)::float AS avg_distance,
+              COALESCE(AVG(d.duration_min), 0)::float AS avg_duration
        FROM drives d
        JOIN addresses a ON a.id = d.end_address_id
        WHERE d.car_id = $1 AND d.end_address_id IS NOT NULL
@@ -26,6 +29,29 @@ export async function GET() {
        LIMIT 12`,
       [carId]
     );
+
+    // 주요 출발지 TOP2 per place
+    const placeIds = result.rows.map(p => p.id);
+    let originMap = {};
+    if (placeIds.length > 0) {
+      const originResult = await pool.query(
+        `SELECT end_addr, start_label, cnt FROM (
+           SELECT d.end_address_id AS end_addr,
+                  COALESCE(sa.name, sa.road, sa.display_name) AS start_label,
+                  COUNT(*) AS cnt,
+                  ROW_NUMBER() OVER (PARTITION BY d.end_address_id ORDER BY COUNT(*) DESC) AS rn
+           FROM drives d
+           JOIN addresses sa ON sa.id = d.start_address_id
+           WHERE d.car_id = $1 AND d.end_address_id = ANY($2)
+           GROUP BY d.end_address_id, sa.name, sa.road, sa.display_name
+         ) sub WHERE rn <= 2`,
+        [carId, placeIds]
+      );
+      for (const row of originResult.rows) {
+        if (!originMap[row.end_addr]) originMap[row.end_addr] = [];
+        originMap[row.end_addr].push({ label: row.start_label, count: parseInt(row.cnt) });
+      }
+    }
 
     return Response.json({
       places: result.rows.map(p => ({
@@ -36,6 +62,10 @@ export async function GET() {
         lng: p.longitude ? parseFloat(p.longitude) : null,
         visit_count: parseInt(p.visit_count),
         last_visit: p.last_visit || null,
+        first_visit: p.first_visit || null,
+        avg_distance: parseFloat(p.avg_distance.toFixed(1)),
+        avg_duration: Math.round(p.avg_duration),
+        origins: originMap[p.id] || [],
       })),
     });
   } catch (err) {
