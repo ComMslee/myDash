@@ -23,14 +23,15 @@ function effColor(wh) {
 
 // ── 월별 달력 컴포넌트 ─────────────────────────────────────
 
+const _now = new Date(); // 모듈 로드 시 1회 계산, useMemo deps 안정화용
+
 function MonthlyCalendar({ drives, charges, calLoading, monthlyData }) {
-  const now = new Date();
-  const [viewYear, setViewYear] = useState(now.getFullYear());
-  const [viewMonth, setViewMonth] = useState(now.getMonth()); // 0-11
+  const [viewYear, setViewYear] = useState(_now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(_now.getMonth()); // 0-11
   const [showPicker, setShowPicker] = useState(false);
 
-  const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth();
-  const today = isCurrentMonth ? now.getDate() : -1;
+  const isCurrentMonth = viewYear === _now.getFullYear() && viewMonth === _now.getMonth();
+  const today = isCurrentMonth ? _now.getDate() : -1;
 
   const firstDay = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
@@ -48,12 +49,11 @@ function MonthlyCalendar({ drives, charges, calLoading, monthlyData }) {
     else setViewMonth(m => m + 1);
   };
 
-  // 월 선택 피커: 최근 12개월
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // 월 선택 피커: 최근 12개월 (_now는 모듈 레벨 상수라 deps 불필요)
   const pickerMonths = useMemo(() => {
     const months = [];
     for (let i = 11; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const d = new Date(_now.getFullYear(), _now.getMonth() - i, 1);
       months.push({ year: d.getFullYear(), month: d.getMonth() });
     }
     return months;

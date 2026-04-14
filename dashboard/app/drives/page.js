@@ -131,15 +131,13 @@ function DriveMap({ positions, loading, placeMarker, visible }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     let cancelled = false;
-    let attempts = 0;
-    const tryDraw = () => {
-      if (cancelled || attempts > 50) return;
-      attempts++;
-      (window.L && mapRef.current) ? drawContent() : setTimeout(tryDraw, 200);
-    };
-    tryDraw();
+    loadLeaflet(() => {
+      if (cancelled) return;
+      initMap();
+      drawContent();
+    });
     return () => { cancelled = true; };
-  }, [drawContent]);
+  }, [drawContent, initMap]);
 
   return (
     <div className="relative w-full h-full">
