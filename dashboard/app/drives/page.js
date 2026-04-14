@@ -359,10 +359,10 @@ function DrivesInner() {
                 const endPct   = d.end_battery_level   ?? null;
                 const usedPct  = (startPct != null && endPct != null) ? Math.max(0, startPct - endPct) : 0;
 
-                // 이전 주행과의 대기 시간 계산 (DESC 순서: idx가 클수록 과거)
+                // 다음 주행까지 대기 시간 (DESC: 현재 주행 완료 → 다음(위) 주행 시작)
                 let gapLabel = null;
-                if (idx > 0 && d.end_date && drives[idx - 1].start_date) {
-                  const gapMs = new Date(drives[idx - 1].start_date) - new Date(d.end_date);
+                if (idx < drives.length - 1 && d.start_date && drives[idx + 1].end_date) {
+                  const gapMs = new Date(d.start_date) - new Date(drives[idx + 1].end_date);
                   if (gapMs > 0) {
                     const gapMin = Math.round(gapMs / 60000);
                     gapLabel = formatDuration(gapMin);
