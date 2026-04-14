@@ -1,0 +1,192 @@
+import pool from '@/lib/db';
+import { KWH_PER_KM } from '@/lib/constants';
+
+export const dynamic = 'force-dynamic';
+
+export async function GET() {
+  try {
+    const car = await pool.query(`SELECT id FROM cars LIMIT 1`);
+    if (car.rows.length === 0) {
+      return Response.json({ error: 'No car found' }, { status: 404 });
+    }
+    const carId = car.rows[0].id;
+
+    const now = new Date();
+    const nextStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const sixMonthStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+    const iso = (d) => d.toISOString();
+
+    const monthStats = async (start, end) => {
+      const q = await pool.query(
+        `SELECT
+           COALESCE(SUM(distance), 0)::float AS distance,
+           COUNT(*)::int AS drive_count,
+           COALESCE(SUM(duration_min), 0)::int AS duration_min,
+           COALESCE(MAX(distance), 0)::float AS max_distance,
+           COALESCE(MAX(duration_min), 0)::int AS max_duration,
+           COALESCE(MAX(speed_max), 0)::int AS max_speed,
+           COALESCE(SUM(
+             CASE
+               WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
+               THEN (start_rated_range_km - end_rated_range_km)
+               ELSE 0
+             END
+           ), 0)::float AS total_range_used
+         FROM drives
+         WHERE car_id = $1 AND start_date >= $2 AND start_date < $3`,
+        [carId, iso(start), iso(end)]
+      );
+      const chargeQ = await pool.query(
+        `SELECT
+           COALESCE(SUM(charge_energy_added), 0)::float AS total_kwh,
+           COUNT(*)::int AS charge_count,
+           COALESCE(AVG(charge_energy_added), 0)::float AS avg_kwh,
+           COUNT(*) FILTER (WHERE geofence_id IS NOT NULL)::int AS home_charges,
+           COUNT(*) FILTER (WHERE geofence_id IS NULL)::int AS other_charges
+         FROM charging_processes
+         WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
+           AND charge_energy_added IS NOT NULL`,
+        [carId, iso(start), iso(end)]
+      );
+      return { ...q.rows[0], ...chargeQ.rows[0] };
+    };
+
+    // 최근 6개월 각 월 통계 + 패턴 쿼리 동시 실행
+    const [sixMonthBreakdown, hourly, weekday, chargeHourly, chargeWeekday] = await Promise.all([
+      Promise.all(
+        Array.from({ length: 6 }, (_, i) => {
+          const ms = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+          const me = new Date(now.getFullYear(), now.getMonth() - (5 - i) + 1, 1);
+          return monthStats(ms, me).then(s => ({ year: ms.getFullYear(), month: ms.getMonth() + 1, ...s }));
+        })
+      ),
+      pool.query(
+        `SELECT EXTRACT(HOUR FROM (start_date + INTERVAL '9 hours'))::int AS hour,
+                COUNT(*)::int AS count,
+                COALESCE(SUM(distance), 0)::float AS distance
+         FROM drives
+         WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
+         GROUP BY hour ORDER BY hour`,
+        [carId, iso(sixMonthStart), iso(nextStart)]
+      ),
+      pool.query(
+        `SELECT EXTRACT(DOW FROM (start_date + INTERVAL '9 hours'))::int AS dow,
+                COUNT(*)::int AS count,
+                COALESCE(SUM(distance), 0)::float AS distance
+         FROM drives
+         WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
+         GROUP BY dow ORDER BY dow`,
+        [carId, iso(sixMonthStart), iso(nextStart)]
+      ),
+      pool.query(
+        `SELECT EXTRACT(HOUR FROM (start_date + INTERVAL '9 hours'))::int AS hour,
+                COUNT(*)::int AS count,
+                COALESCE(SUM(charge_energy_added), 0)::float AS kwh
+         FROM charging_processes
+         WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
+           AND charge_energy_added IS NOT NULL
+         GROUP BY hour ORDER BY hour`,
+        [carId, iso(sixMonthStart), iso(nextStart)]
+      ),
+      pool.query(
+        `SELECT EXTRACT(DOW FROM (start_date + INTERVAL '9 hours'))::int AS dow,
+                COUNT(*)::int AS count,
+                COALESCE(SUM(charge_energy_added), 0)::float AS kwh
+         FROM charging_processes
+         WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
+           AND charge_energy_added IS NOT NULL
+         GROUP BY dow ORDER BY dow`,
+        [carId, iso(sixMonthStart), iso(nextStart)]
+      ),
+    ]);
+
+    // 이번달 / 지난달은 6개월 배열에서 추출
+    const current = sixMonthBreakdown[5];
+    const previous = sixMonthBreakdown[4];
+
+    const effCur = current.distance > 0 ? (current.total_range_used * KWH_PER_KM / current.distance * 1000) : 0;
+    const effPrev = previous.distance > 0 ? (previous.total_range_used * KWH_PER_KM / previous.distance * 1000) : 0;
+
+    // 6개월 집계
+    const agg = {
+      distance: sixMonthBreakdown.reduce((s, m) => s + m.distance, 0),
+      drive_count: sixMonthBreakdown.reduce((s, m) => s + m.drive_count, 0),
+      duration_min: sixMonthBreakdown.reduce((s, m) => s + m.duration_min, 0),
+      total_kwh: sixMonthBreakdown.reduce((s, m) => s + m.total_kwh, 0),
+      charge_count: sixMonthBreakdown.reduce((s, m) => s + m.charge_count, 0),
+      home_charges: sixMonthBreakdown.reduce((s, m) => s + m.home_charges, 0),
+      other_charges: sixMonthBreakdown.reduce((s, m) => s + m.other_charges, 0),
+      total_range_used: sixMonthBreakdown.reduce((s, m) => s + m.total_range_used, 0),
+      max_distance: Math.max(0, ...sixMonthBreakdown.map(m => m.max_distance)),
+      max_duration: Math.max(0, ...sixMonthBreakdown.map(m => m.max_duration)),
+      max_speed: Math.max(0, ...sixMonthBreakdown.map(m => m.max_speed)),
+    };
+    const eff6m = agg.distance > 0 ? (agg.total_range_used * KWH_PER_KM / agg.distance * 1000) : 0;
+
+    return Response.json({
+      current: {
+        distance: parseFloat(current.distance.toFixed(1)),
+        drive_count: current.drive_count,
+        duration_min: current.duration_min,
+        total_kwh: parseFloat(current.total_kwh.toFixed(1)),
+        charge_count: current.charge_count,
+        avg_kwh: parseFloat(current.avg_kwh.toFixed(1)),
+        home_charges: current.home_charges,
+        other_charges: current.other_charges,
+        max_distance: parseFloat(current.max_distance.toFixed(1)),
+        max_duration: current.max_duration,
+        max_speed: current.max_speed,
+        efficiency_wh_km: parseFloat(effCur.toFixed(0)),
+      },
+      previous: {
+        distance: parseFloat(previous.distance.toFixed(1)),
+        drive_count: previous.drive_count,
+        total_kwh: parseFloat(previous.total_kwh.toFixed(1)),
+        charge_count: previous.charge_count,
+        efficiency_wh_km: parseFloat(effPrev.toFixed(0)),
+      },
+      sixMonth: {
+        distance: parseFloat(agg.distance.toFixed(1)),
+        drive_count: agg.drive_count,
+        duration_min: agg.duration_min,
+        total_kwh: parseFloat(agg.total_kwh.toFixed(1)),
+        charge_count: agg.charge_count,
+        avg_kwh: agg.charge_count > 0 ? parseFloat((agg.total_kwh / agg.charge_count).toFixed(1)) : 0,
+        home_charges: agg.home_charges,
+        other_charges: agg.other_charges,
+        max_distance: parseFloat(agg.max_distance.toFixed(1)),
+        max_duration: agg.max_duration,
+        max_speed: agg.max_speed,
+        efficiency_wh_km: parseFloat(eff6m.toFixed(0)),
+      },
+      monthlyBreakdown: sixMonthBreakdown.map(m => ({
+        year: m.year,
+        month: m.month,
+        distance: parseFloat(m.distance.toFixed(1)),
+        drive_count: m.drive_count,
+        total_kwh: parseFloat(m.total_kwh.toFixed(1)),
+        charge_count: m.charge_count,
+      })),
+      hourly: Array.from({ length: 24 }, (_, h) => {
+        const row = hourly.rows.find(r => r.hour === h);
+        return { hour: h, count: row?.count || 0, distance: row ? parseFloat(row.distance.toFixed(1)) : 0 };
+      }),
+      weekday: Array.from({ length: 7 }, (_, d) => {
+        const row = weekday.rows.find(r => r.dow === d);
+        return { dow: d, count: row?.count || 0, distance: row ? parseFloat(row.distance.toFixed(1)) : 0 };
+      }),
+      charge_hourly: Array.from({ length: 24 }, (_, h) => {
+        const row = chargeHourly.rows.find(r => r.hour === h);
+        return { hour: h, count: row?.count || 0, kwh: row ? parseFloat(row.kwh.toFixed(1)) : 0 };
+      }),
+      charge_weekday: Array.from({ length: 7 }, (_, d) => {
+        const row = chargeWeekday.rows.find(r => r.dow === d);
+        return { dow: d, count: row?.count || 0, kwh: row ? parseFloat(row.kwh.toFixed(1)) : 0 };
+      }),
+    });
+  } catch (err) {
+    console.error('/api/insights error:', err);
+    return Response.json({ error: 'DB error' }, { status: 500 });
+  }
+}
