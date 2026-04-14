@@ -377,24 +377,24 @@ function DrivesInner() {
                   {selectedPlace.first_visit && (
                     <div className="flex justify-between">
                       <span className="text-zinc-600">첫 방문</span>
-                      <span className="text-zinc-400 tabular-nums">{(() => { const d = new Date(selectedPlace.first_visit); return `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}`; })()}</span>
+                      <span className="text-zinc-400 tabular-nums">{(() => { const d = new Date(selectedPlace.first_visit); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; })()}</span>
                     </div>
                   )}
                   {selectedPlace.last_visit && (
                     <div className="flex justify-between">
                       <span className="text-zinc-600">최근 방문</span>
-                      <span className="text-zinc-400 tabular-nums">{(() => { const d = new Date(selectedPlace.last_visit); return `${d.getMonth()+1}.${d.getDate()}`; })()}</span>
+                      <span className="text-zinc-400 tabular-nums">{(() => { const d = new Date(selectedPlace.last_visit); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; })()}</span>
                     </div>
                   )}
                   {selectedPlace.avg_distance > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-zinc-600">평균 거리</span>
+                      <span className="text-zinc-600">이동 평균</span>
                       <span className="text-blue-400/80 font-semibold tabular-nums">{selectedPlace.avg_distance}km</span>
                     </div>
                   )}
                   {selectedPlace.avg_duration > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-zinc-600">평균 시간</span>
+                      <span className="text-zinc-600">소요시간</span>
                       <span className="text-zinc-400 font-semibold tabular-nums">{formatDuration(selectedPlace.avg_duration)}</span>
                     </div>
                   )}

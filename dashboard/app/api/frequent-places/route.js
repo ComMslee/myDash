@@ -44,7 +44,7 @@ export async function GET() {
            JOIN addresses sa ON sa.id = d.start_address_id
            WHERE d.car_id = $1 AND d.end_address_id = ANY($2)
            GROUP BY d.end_address_id, sa.name, sa.road, sa.display_name
-         ) sub WHERE rn <= 2`,
+         ) sub WHERE rn <= 3`,
         [carId, placeIds]
       );
       for (const row of originResult.rows) {
