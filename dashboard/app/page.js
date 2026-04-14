@@ -124,11 +124,13 @@ function SixMonthCard({ insights }) {
   if (!insights?.sixMonth) return null;
 
   const c = insights.sixMonth;
+  const bd = insights.monthlyBreakdown || [];
 
   const avgKm = c.drive_count > 0 ? (c.distance / c.drive_count).toFixed(0) : 0;
   const avgMin = c.drive_count > 0 ? Math.round(c.duration_min / c.drive_count) : 0;
   const homeRatio = c.charge_count > 0 ? c.home_charges / c.charge_count : 0;
   const otherRatio = c.charge_count > 0 ? c.other_charges / c.charge_count : 0;
+  const maxBdDist = bd.length > 0 ? Math.max(1, ...bd.map(m => m.distance)) : 1;
 
   return (
     <Card className="!p-0 overflow-hidden">
@@ -156,48 +158,49 @@ function SixMonthCard({ insights }) {
         </div>
       </div>
 
-      {/* 최고 기록 */}
-      <div className="px-4 py-2 border-t border-white/[0.06]">
-        <p className="text-xs text-zinc-700 uppercase tracking-wider mb-2">최고 기록</p>
-        <div className="grid grid-cols-3 gap-2">
-          <div className="text-center">
-            <p className="text-white font-bold text-base tabular-nums">{c.max_distance}<span className="text-zinc-600 text-xs ml-0.5">km</span></p>
-            <p className="text-zinc-600 text-xs">최장 거리</p>
-          </div>
-          <div className="text-center">
-            <p className="text-white font-bold text-base tabular-nums">{formatDuration(c.max_duration)}</p>
-            <p className="text-zinc-600 text-xs">최장 시간</p>
-          </div>
-          <div className="text-center">
-            <p className="text-white font-bold text-base tabular-nums">{c.avg_speed}<span className="text-zinc-600 text-xs ml-0.5">km/h</span></p>
-            <p className="text-zinc-600 text-xs">평균 속도</p>
-          </div>
-        </div>
-      </div>
-
-      {/* 충전 통계 — 3열 그리드 */}
-      <div className="grid grid-cols-3 divide-x divide-white/[0.06] border-t border-white/[0.06]">
-        <div className="text-center px-2 py-3">
-          <p className="text-zinc-600 text-xs mb-1.5">충전</p>
-          <p className="text-white font-bold text-lg tabular-nums">{c.charge_count}<span className="text-zinc-600 text-xs ml-0.5">회</span></p>
-        </div>
-        <div className="text-center px-2 py-3">
-          <p className="text-zinc-600 text-xs mb-1.5">총 충전량</p>
-          <p className="text-green-400 font-bold text-lg tabular-nums">{c.total_kwh}<span className="text-zinc-600 text-xs ml-0.5">kWh</span></p>
-        </div>
-        <div className="text-center px-2 py-3">
-          <p className="text-zinc-600 text-xs mb-1.5">회당 평균</p>
-          <p className="text-green-400 font-bold text-lg tabular-nums">{c.avg_kwh}<span className="text-zinc-600 text-xs ml-0.5">kWh</span></p>
-        </div>
-      </div>
-
-      {/* 집/외부 충전 비율 */}
+      {/* 최고 기록 — 한 줄 요약 + 월별 미니 바 차트 */}
       <div className="px-4 py-3 border-t border-white/[0.06]">
+        <div className="flex items-center justify-center gap-4 text-xs tabular-nums">
+          <span className="text-zinc-500">최장 <span className="text-zinc-300 font-bold">{c.max_distance}</span><span className="text-zinc-600 ml-0.5">km</span></span>
+          <span className="text-zinc-700">·</span>
+          <span className="text-zinc-500">최장 <span className="text-zinc-300 font-bold">{formatDuration(c.max_duration)}</span></span>
+          <span className="text-zinc-700">·</span>
+          <span className="text-zinc-500">평균 <span className="text-zinc-300 font-bold">{c.avg_speed}</span><span className="text-zinc-600 ml-0.5">km/h</span></span>
+        </div>
+        {bd.length > 0 && (
+          <div className="flex items-end gap-1 mt-3 h-10">
+            {bd.map(m => {
+              const pct = maxBdDist > 0 ? (m.distance / maxBdDist) * 100 : 0;
+              return (
+                <div key={`${m.year}-${m.month}`} className="flex-1 flex flex-col items-center justify-end h-full gap-0.5">
+                  <div className="w-full rounded-sm overflow-hidden bg-zinc-800/40 relative" style={{ height: '100%' }}>
+                    <div
+                      className="absolute bottom-0 inset-x-0 bg-blue-500 rounded-sm transition-all"
+                      style={{ height: `${pct}%`, opacity: 0.3 + (pct / 100) * 0.7 }}
+                    />
+                  </div>
+                  <span className="text-[9px] text-zinc-600 tabular-nums">{m.month}월</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 충전 요약 + 비율 바 통합 */}
+      <div className="px-4 py-3 border-t border-white/[0.06]">
+        <div className="flex items-baseline justify-between mb-2.5">
+          <div className="flex items-baseline gap-3">
+            <span className="text-white font-bold text-base tabular-nums">{c.charge_count}<span className="text-zinc-600 text-xs ml-0.5">회</span></span>
+            <span className="text-green-400 font-bold text-base tabular-nums">{c.total_kwh}<span className="text-zinc-600 text-xs ml-0.5">kWh</span></span>
+          </div>
+          <span className="text-zinc-500 text-xs tabular-nums">평균 <span className="text-green-400/85 font-semibold">{c.avg_kwh}</span> kWh/회</span>
+        </div>
         <div className="flex justify-between text-xs mb-1.5">
           <span className="text-emerald-400">집충전 {c.home_charges}회</span>
           <span className="text-amber-400">외부충전 {c.other_charges}회</span>
         </div>
-        <div className="h-3 bg-zinc-800 rounded-full overflow-hidden flex">
+        <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden flex">
           <div className="h-full bg-emerald-500 transition-all" style={{ width: `${homeRatio * 100}%` }} />
           <div className="h-full bg-amber-500 transition-all" style={{ width: `${otherRatio * 100}%` }} />
         </div>
