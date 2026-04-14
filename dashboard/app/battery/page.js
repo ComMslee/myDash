@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import HealthScoreCard from './HealthScoreCard';
-import CycleCard from './CycleCard';
 import WeeklyCard from './WeeklyCard';
+import IdleDrainCard from './IdleDrainCard';
 import { DailyRecordsCard, LevelHabitCard } from './RecordsHabit';
 
 function Spinner() {
@@ -61,11 +61,6 @@ export default function BatteryPage() {
             </div>
 
             <div>
-              <SectionLabel title="배터리 사이클" />
-              <CycleCard data={data.cycle} />
-            </div>
-
-            <div>
               <SectionLabel title="주간 패턴" />
               <WeeklyCard weeks={data.weekly} />
             </div>
@@ -73,6 +68,11 @@ export default function BatteryPage() {
             <div>
               <SectionLabel title="일간 레코드" />
               <DailyRecordsCard records={data.daily_records} />
+            </div>
+
+            <div>
+              <SectionLabel title="대기 중 배터리 소모" />
+              <IdleDrainCard records={data.idle_drain} />
             </div>
 
             <div>

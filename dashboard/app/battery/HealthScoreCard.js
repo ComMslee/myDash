@@ -120,7 +120,6 @@ export default function HealthScoreCard({ data }) {
       <div className="px-4 py-3 border-b border-white/[0.06]">
         <div className="flex items-center gap-1.5 mb-2.5">
           <span className="text-[10px] font-semibold text-zinc-400">SOC 체류 분포</span>
-          <span className="text-[9px] text-zinc-600">({total_readings.toLocaleString()}개 측정)</span>
         </div>
         {/* 50% 이상적 라인 표시 + 바 */}
         <div className="relative">

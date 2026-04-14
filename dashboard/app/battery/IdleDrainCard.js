@@ -1,0 +1,95 @@
+'use client';
+
+function formatDuration(hours) {
+  if (hours < 1) return `${Math.round(hours * 60)}분`;
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return m > 0 ? `${h}시간 ${m}분` : `${h}시간`;
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr);
+  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  const mm = kst.getUTCMonth() + 1;
+  const dd = kst.getUTCDate();
+  const hh = String(kst.getUTCHours()).padStart(2, '0');
+  const mi = String(kst.getUTCMinutes()).padStart(2, '0');
+  return `${mm}/${dd} ${hh}:${mi}`;
+}
+
+export default function IdleDrainCard({ records }) {
+  if (!records || records.length === 0) {
+    return (
+      <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-6 text-center">
+        <div className="text-zinc-600 text-sm">대기 중 배터리 소모 데이터가 아직 없습니다</div>
+      </div>
+    );
+  }
+
+  const withDrain = records.filter(r => r.soc_drop > 0);
+  const totalIdleHours = records.reduce((s, r) => s + r.idle_hours, 0);
+  const totalDrop = records.reduce((s, r) => s + r.soc_drop, 0);
+  const avgDrainPerDay = totalIdleHours > 0 ? (totalDrop / totalIdleHours * 24).toFixed(1) : '0';
+  const maxDrain = records.reduce((max, r) => r.soc_drop > max.soc_drop ? r : max, records[0]);
+
+  return (
+    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
+      {/* 요약 */}
+      <div className="grid grid-cols-3 border-b border-white/[0.06]">
+        <div className="text-center py-3 border-r border-white/[0.06]">
+          <div className="text-[10px] text-zinc-600 mb-1">일평균 손실</div>
+          <div className="text-sm font-extrabold tabular-nums text-amber-400">{avgDrainPerDay}%</div>
+          <div className="text-[9px] text-zinc-600 mt-0.5">/일</div>
+        </div>
+        <div className="text-center py-3 border-r border-white/[0.06]">
+          <div className="text-[10px] text-zinc-600 mb-1">총 대기</div>
+          <div className="text-sm font-extrabold tabular-nums text-zinc-300">{formatDuration(totalIdleHours)}</div>
+          <div className="text-[9px] text-zinc-600 mt-0.5">{records.length}회</div>
+        </div>
+        <div className="text-center py-3">
+          <div className="text-[10px] text-zinc-600 mb-1">총 손실</div>
+          <div className="text-sm font-extrabold tabular-nums text-red-400">{totalDrop}%</div>
+          <div className="text-[9px] text-zinc-600 mt-0.5">드레인 {withDrain.length}회</div>
+        </div>
+      </div>
+
+      {/* 최근 기록 리스트 */}
+      {records.slice(0, 8).map((r, i) => {
+        const drainRate = r.idle_hours > 0 ? (r.soc_drop / r.idle_hours).toFixed(2) : '0';
+        const barWidth = maxDrain.soc_drop > 0 ? (r.soc_drop / maxDrain.soc_drop * 100) : 0;
+
+        return (
+          <div
+            key={i}
+            className="grid items-center gap-2 px-4 py-2.5 border-t border-white/[0.04]"
+            style={{ gridTemplateColumns: '80px 1fr 50px' }}
+          >
+            <div className="min-w-0">
+              <div className="text-[11px] text-zinc-400 whitespace-nowrap">{formatDate(r.idle_start)}</div>
+              <div className="text-[9px] text-zinc-600 mt-0.5">{formatDuration(r.idle_hours)}</div>
+            </div>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-[10px] tabular-nums text-zinc-500 flex-shrink-0 w-[52px] text-right">
+                {r.soc_start}→{r.soc_end}%
+              </span>
+              <div className="flex-1 h-1.5 bg-white/[0.04] rounded-full overflow-hidden min-w-0">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: Math.max(barWidth, 2) + '%',
+                    background: r.soc_drop === 0 ? '#10b981' : r.soc_drop <= 2 ? '#f59e0b' : '#ef4444',
+                  }}
+                />
+              </div>
+            </div>
+            <div className="text-right">
+              <span className={`text-[11px] font-bold tabular-nums ${r.soc_drop === 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {r.soc_drop === 0 ? '0%' : `-${r.soc_drop}%`}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

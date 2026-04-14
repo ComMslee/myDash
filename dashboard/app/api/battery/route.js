@@ -55,6 +55,7 @@ export async function GET() {
       histStartResult,
       histEndResult,
       socDistResult,
+      idleDrainResult,
     ] = await Promise.all([
       // 배터리 용량 추정 1순위: 충전 세션 역산
       pool.query(`
@@ -229,6 +230,38 @@ export async function GET() {
         FROM positions
         WHERE car_id = $1 AND battery_level IS NOT NULL
         GROUP BY battery_level ORDER BY battery_level
+      `, [carId]),
+
+      // 대기 중 배터리 소모 (뱀파이어 드레인)
+      pool.query(`
+        WITH timeline AS (
+          SELECT start_date AS ts, end_date AS te,
+            (SELECT battery_level FROM positions WHERE id = start_position_id) AS start_soc,
+            (SELECT battery_level FROM positions WHERE id = end_position_id) AS end_soc
+          FROM drives WHERE car_id = $1 AND end_date IS NOT NULL AND end_position_id IS NOT NULL
+          UNION ALL
+          SELECT start_date, end_date, start_battery_level::int, end_battery_level::int
+          FROM charging_processes WHERE car_id = $1 AND end_date IS NOT NULL AND end_battery_level IS NOT NULL
+          ORDER BY ts
+        ),
+        idle AS (
+          SELECT
+            te AS idle_start,
+            LEAD(ts) OVER (ORDER BY ts) AS idle_end,
+            end_soc AS soc_start,
+            LEAD(start_soc) OVER (ORDER BY ts) AS soc_end
+          FROM timeline
+        )
+        SELECT idle_start, idle_end,
+          soc_start, soc_end,
+          GREATEST(soc_start - soc_end, 0) AS soc_drop,
+          ROUND(EXTRACT(EPOCH FROM idle_end - idle_start) / 3600, 1)::float AS idle_hours
+        FROM idle
+        WHERE idle_end IS NOT NULL
+          AND EXTRACT(EPOCH FROM idle_end - idle_start) > 1800
+          AND soc_start IS NOT NULL AND soc_end IS NOT NULL
+        ORDER BY idle_start DESC
+        LIMIT 20
       `, [carId]),
     ]);
 
@@ -461,18 +494,14 @@ export async function GET() {
         },
         tips,
       },
-      cycle: {
-        total_kwh: parseFloat(totalKwhEffective.toFixed(1)),
-        battery_capacity_kwh: batteryCapacity,
-        total_cycles: totalCycles,
-        this_week_kwh: parseFloat(thisWeekKwhEffective.toFixed(1)),
-        this_week_cycles: thisWeekCycles,
-        this_month_kwh: parseFloat(thisMonthKwhEffective.toFixed(1)),
-        this_month_cycles: thisMonthCycles,
-        avg_monthly_cycles: avgMonthlyCycles,
-        odometer_km: Math.round(odometer),
-        is_estimated: isEstimated,
-      },
+      idle_drain: idleDrainResult.rows.map(r => ({
+        idle_start: r.idle_start,
+        idle_end: r.idle_end,
+        soc_start: parseInt(r.soc_start),
+        soc_end: parseInt(r.soc_end),
+        soc_drop: parseInt(r.soc_drop),
+        idle_hours: parseFloat(r.idle_hours),
+      })),
     });
   } catch (err) {
     console.error('/api/battery error:', err);
