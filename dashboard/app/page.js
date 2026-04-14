@@ -73,17 +73,16 @@ function DrivesSection({ drives, loading, error }) {
             const dt = new Date(d.start_date);
             const dateLabel = `${dt.getMonth()+1}/${dt.getDate()}`;
             const timeLabel = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
-            const endTimeLabel = d.end_date ? `${String(new Date(d.end_date).getHours()).padStart(2,'0')}:${String(new Date(d.end_date).getMinutes()).padStart(2,'0')}` : null;
             return (
               <Link
                 key={d.id}
                 href={`/drives?id=${d.id}`}
                 className="grid grid-cols-[52px_1fr_auto] items-center gap-2 px-3.5 py-2.5 border-b border-white/[0.06] last:border-0 hover:bg-white/[0.025] transition-colors"
               >
-                {/* 좌측: 시각 */}
+                {/* 좌측: 날짜 + 시각 */}
                 <div className="text-xs text-zinc-500 leading-tight tabular-nums">
                   <p className="text-zinc-300 font-bold text-sm">{dateLabel}</p>
-                  <p>{timeLabel}{endTimeLabel && `~${endTimeLabel}`}</p>
+                  <p>{timeLabel}</p>
                 </div>
                 {/* 중앙: 경로 + 메타 */}
                 <div className="min-w-0">
