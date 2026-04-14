@@ -26,7 +26,7 @@ export async function GET(request) {
     }
 
     const posResult = await pool.query(
-      `SELECT latitude, longitude, date
+      `SELECT latitude, longitude, date, speed
        FROM positions
        WHERE drive_id = $1
        ORDER BY date ASC`,
@@ -39,6 +39,7 @@ export async function GET(request) {
         lat: parseFloat(p.latitude),
         lng: parseFloat(p.longitude),
         date: p.date,
+        speed: p.speed != null ? Math.round(parseFloat(p.speed)) : null,
       })),
     });
   } catch (err) {
