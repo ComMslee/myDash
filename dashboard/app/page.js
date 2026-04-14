@@ -158,12 +158,12 @@ function SixMonthCard({ insights }) {
 
       {/* 최고 기록 — 한 줄 요약 + 월별 미니 바 차트 */}
       <div className="px-4 py-3 border-t border-white/[0.06]">
-        <div className="flex items-center justify-center gap-4 text-xs tabular-nums">
-          <span className="text-zinc-500">최장 <span className="text-zinc-300 font-bold">{c.max_distance}</span><span className="text-zinc-600 ml-0.5">km</span></span>
+        <div className="flex items-center justify-center gap-4 text-sm tabular-nums">
+          <span className="text-zinc-500">최장 <span className="text-zinc-200 font-bold">{c.max_distance}</span><span className="text-zinc-600 text-xs ml-0.5">km</span></span>
           <span className="text-zinc-700">·</span>
-          <span className="text-zinc-500">최장 <span className="text-zinc-300 font-bold">{formatDuration(c.max_duration)}</span></span>
+          <span className="text-zinc-500">최장 <span className="text-zinc-200 font-bold">{formatDuration(c.max_duration)}</span></span>
           <span className="text-zinc-700">·</span>
-          <span className="text-zinc-500">평균 <span className="text-zinc-300 font-bold">{c.avg_speed}</span><span className="text-zinc-600 ml-0.5">km/h</span></span>
+          <span className="text-zinc-500">평균 <span className="text-zinc-200 font-bold">{c.avg_speed}</span><span className="text-zinc-600 text-xs ml-0.5">km/h</span></span>
         </div>
         {bd.length > 0 && (
           <div className="flex items-end gap-1 mt-3 h-10">
