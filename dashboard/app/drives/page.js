@@ -312,7 +312,7 @@ function DrivesInner() {
           </div>
 
           {/* 주행 정보 + 지도 */}
-          <div className="flex-1 flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
+          <div className="flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden" style={{ height: 'calc(100vh - 200px)' }}>
             {selectedDrive ? (
               <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center gap-4 flex-shrink-0">
                 <div className="flex-1 min-w-0">
@@ -345,7 +345,7 @@ function DrivesInner() {
                 <span className="text-amber-400 text-sm tabular-nums flex-shrink-0">{selectedPlace.visit_count}회</span>
               </div>
             ) : null}
-            <div className="flex-1 p-2 min-h-[300px]">
+            <div className="flex-1 p-2">
               <DriveMap positions={positions} loading={loadingRoute} placeMarker={selectedPlace} visible={viewMode === 'map'} />
             </div>
           </div>
