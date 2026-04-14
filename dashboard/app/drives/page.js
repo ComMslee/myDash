@@ -312,7 +312,7 @@ function DrivesInner() {
           </div>
 
           {/* 주행 정보 + 지도 */}
-          <div className="flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden" style={{ height: 'calc(100vh - 200px)' }}>
+          <div className="flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden" style={{ height: 'calc(100vh - 260px)' }}>
             {selectedDrive ? (
               <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center gap-4 flex-shrink-0">
                 <div className="flex-1 min-w-0">
