@@ -175,9 +175,9 @@ export default function HealthScoreCard({ data }) {
             { key: 'good', label: '양호', color: '#3b82f6' },
             { key: 'ideal', label: '이상', color: '#10b981' },
           ].map(({ key, label, color }) => (
-            <div key={key} className="flex flex-col items-center gap-0.5">
-              <span className="text-[10px] font-black tabular-nums" style={{ color }}>{zone_pct[key]}%</span>
-              <span className="text-[8px] font-semibold" style={{ color: color + 'aa' }}>{label}</span>
+            <div key={key} className="flex items-center gap-1">
+              <span className="text-xs font-semibold" style={{ color: color + 'cc' }}>{label}</span>
+              <span className="text-sm font-black tabular-nums" style={{ color }}>{zone_pct[key]}%</span>
             </div>
           ))}
         </div>
