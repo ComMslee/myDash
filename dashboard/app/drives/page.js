@@ -225,7 +225,7 @@ function DrivesInner() {
 
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white">
-      <div className="max-w-2xl mx-auto flex flex-col" style={{ minHeight: 'calc(100vh - 57px)' }}>
+      <div className="max-w-2xl mx-auto flex flex-col" style={{ height: 'calc(100dvh - 57px - env(safe-area-inset-bottom, 0px))' }}>
 
       {/* 자주 방문하는 장소 */}
       {places.length > 0 && (
@@ -312,7 +312,7 @@ function DrivesInner() {
           </div>
 
           {/* 주행 정보 + 지도 */}
-          <div className="flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden" style={{ height: 'calc(100dvh - 57px - 65px - 60px - env(safe-area-inset-bottom))' }}>
+          <div className="flex-1 min-h-0 flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden mb-20">
             {selectedDrive ? (
               <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center gap-4 flex-shrink-0">
                 <div className="flex-1 min-w-0">
