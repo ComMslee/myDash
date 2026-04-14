@@ -41,7 +41,7 @@ function DrivesSection({ drives, loading, error }) {
   ];
 
   return (
-    <Card className="!p-0 overflow-hidden">
+    <>
       {/* 거리 통계 — 2×2 그리드 */}
       <div className="grid grid-cols-2">
         {stats.map((s, i) => (
@@ -114,7 +114,7 @@ function DrivesSection({ drives, loading, error }) {
           })}
         </div>
       )}
-    </Card>
+    </>
   );
 }
 
@@ -137,9 +137,9 @@ function SixMonthCard({ insights }) {
   const homeRatio = c.charge_count > 0 ? c.home_charges / c.charge_count : 0;
   const otherRatio = c.charge_count > 0 ? c.other_charges / c.charge_count : 0;
   return (
-    <Card className="!p-0 overflow-hidden">
-      {/* 탭 바 */}
-      <div className="flex border-b border-white/[0.06]">
+    <>
+      {/* 6개월 탭 바 */}
+      <div className="flex border-y border-white/[0.06]">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -247,7 +247,7 @@ function SixMonthCard({ insights }) {
         </div>
       )}
 
-    </Card>
+    </>
   );
 }
 
@@ -306,20 +306,16 @@ export default function Dashboard() {
     <div className="min-h-screen bg-[#0f0f0f]">
       <main className="max-w-2xl mx-auto px-4 py-5 pb-12 space-y-6">
 
-        {/* 1. 최근 주행 */}
         <div>
           <SectionHeader title="최근 주행" />
-          <DrivesSection
-            drives={displayDrives}
-            loading={displayLoading.drives}
-            error={!isMock && errors.drives}
-          />
-        </div>
-
-        {/* 2. 최근 6개월 */}
-        <div>
-          <SectionHeader title="최근 6개월" />
-          <SixMonthCard insights={displayInsights} />
+          <Card className="!p-0 overflow-hidden">
+            <DrivesSection
+              drives={displayDrives}
+              loading={displayLoading.drives}
+              error={!isMock && errors.drives}
+            />
+            <SixMonthCard insights={displayInsights} />
+          </Card>
         </div>
 
       </main>
