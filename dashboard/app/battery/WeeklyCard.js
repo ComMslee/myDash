@@ -54,7 +54,7 @@ export default function WeeklyCard({ weeks }) {
           <div
             key={week.iso_year + '-' + week.iso_week}
             className={'grid items-center gap-2 px-4 py-2.5 border-t border-white/[0.04]' + (isEmpty ? ' opacity-40' : '')}
-            style={{ gridTemplateColumns: '56px 1fr 64px' }}
+            style={{ gridTemplateColumns: '52px 1fr auto' }}
           >
             {/* 주 라벨 */}
             <div className="min-w-0">
@@ -70,29 +70,18 @@ export default function WeeklyCard({ weeks }) {
 
             {/* 바 */}
             <div className="flex flex-col gap-1 min-w-0">
-              <div className="flex items-center gap-1">
-                <div className="flex-1 h-1.5 bg-white/[0.04] rounded-full overflow-hidden min-w-0">
-                  <div className="h-full rounded-full bg-emerald-400" style={{ width: chargeWidth + '%' }} />
-                </div>
-                <span className="text-[10px] tabular-nums text-emerald-400 text-right whitespace-nowrap w-[58px] flex-shrink-0">
-                  +{week.charge_kwh.toFixed(1)} kWh
-                </span>
+              <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                <div className="h-full rounded-full bg-emerald-400" style={{ width: chargeWidth + '%' }} />
               </div>
-              <div className="flex items-center gap-1">
-                <div className="flex-1 h-1.5 bg-white/[0.04] rounded-full overflow-hidden min-w-0">
-                  <div className="h-full rounded-full bg-blue-400" style={{ width: consumeWidth + '%' }} />
-                </div>
-                <span className="text-[10px] tabular-nums text-blue-400 text-right whitespace-nowrap w-[58px] flex-shrink-0">
-                  -{week.consume_kwh.toFixed(1)} kWh
-                </span>
+              <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                <div className="h-full rounded-full bg-blue-400" style={{ width: consumeWidth + '%' }} />
               </div>
             </div>
 
-            {/* 순 */}
-            <div className="flex items-center justify-end">
-              <span className={'text-[10px] tabular-nums font-semibold whitespace-nowrap ' + (netPositive ? 'text-emerald-400' : 'text-red-400')}>
-                {netPositive ? '+' : '−'}{Math.abs(parseFloat(net)).toFixed(1)} kWh
-              </span>
+            {/* 값 */}
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-[10px] tabular-nums text-emerald-400 whitespace-nowrap">+{week.charge_kwh.toFixed(1)}</span>
+              <span className="text-[10px] tabular-nums text-blue-400 whitespace-nowrap">−{week.consume_kwh.toFixed(1)}</span>
             </div>
           </div>
         );
