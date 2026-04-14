@@ -6,7 +6,7 @@ import { useMock, MOCK_DATA } from './context/mock';
 import { KWH_PER_KM, RATED_RANGE_MAX_KM } from '../lib/constants';
 import { formatDuration, shortAddr } from '../lib/format';
 import { Card } from './components/PageLayout';
-import { HourlyHeatmap, WeekdayBars } from './components/ChartWidgets';
+import { HourlyHeatmap, WeekdayBars, CombinedHourlyHeatmap, CombinedWeekdayBars } from './components/ChartWidgets';
 
 const REFRESH_INTERVAL = 30000;
 
@@ -122,67 +122,43 @@ function SixMonthCard({ insights }) {
   if (!insights?.sixMonth) return null;
 
   const c = insights.sixMonth;
-  const bd = insights.monthlyBreakdown || [];
 
-  const avgKm = c.drive_count > 0 ? (c.distance / c.drive_count).toFixed(0) : 0;
-  const avgMin = c.drive_count > 0 ? Math.round(c.duration_min / c.drive_count) : 0;
   const homeRatio = c.charge_count > 0 ? c.home_charges / c.charge_count : 0;
   const otherRatio = c.charge_count > 0 ? c.other_charges / c.charge_count : 0;
-  const maxBdDist = bd.length > 0 ? Math.max(1, ...bd.map(m => m.distance)) : 1;
 
   return (
     <Card className="!p-0 overflow-hidden">
-      {/* 주행 통계 — 4열 그리드 */}
-      <div className="grid grid-cols-4 divide-x divide-white/[0.06]">
-        <div className="px-2 py-4 text-center">
+      {/* 주행 통계 — 3×2 그리드 */}
+      <div className="grid grid-cols-3">
+        <div className="px-2 py-4 text-center border-r border-b border-white/[0.06]">
           <p className="text-zinc-600 text-xs mb-1.5">횟수</p>
           <p className="text-white font-bold text-lg leading-none tabular-nums">{c.drive_count}</p>
           <p className="text-zinc-600 text-xs mt-1.5">회</p>
         </div>
-        <div className="px-2 py-4 text-center">
+        <div className="px-2 py-4 text-center border-r border-b border-white/[0.06]">
           <p className="text-zinc-600 text-xs mb-1.5">거리</p>
           <p className="text-blue-400 font-bold text-lg leading-none tabular-nums">{c.distance}</p>
           <p className="text-zinc-600 text-xs mt-1.5">km</p>
         </div>
-        <div className="px-2 py-4 text-center">
-          <p className="text-zinc-600 text-xs mb-1.5">평균 트립</p>
-          <p className="text-zinc-300 font-bold text-lg leading-none tabular-nums">{avgKm}<span className="text-zinc-600 text-xs ml-0.5">km</span></p>
-          <p className="text-zinc-300 font-bold text-base leading-none tabular-nums mt-1.5">{avgMin}<span className="text-zinc-600 text-xs ml-0.5">분</span></p>
-        </div>
-        <div className="px-2 py-4 text-center">
+        <div className="px-2 py-4 text-center border-b border-white/[0.06]">
           <p className="text-zinc-600 text-xs mb-1.5">효율</p>
           <p className="text-amber-400 font-bold text-lg leading-none tabular-nums">{c.efficiency_wh_km || '—'}</p>
           <p className="text-zinc-600 text-xs mt-1.5">Wh/km</p>
         </div>
-      </div>
-
-      {/* 최고 기록 — 한 줄 요약 + 월별 미니 바 차트 */}
-      <div className="px-4 py-3 border-t border-white/[0.06]">
-        <div className="flex items-center justify-center gap-4 text-sm tabular-nums">
-          <span className="text-zinc-500">최장 <span className="text-zinc-200 font-bold">{c.max_distance}</span><span className="text-zinc-600 text-xs ml-0.5">km</span></span>
-          <span className="text-zinc-700">·</span>
-          <span className="text-zinc-500">최장 <span className="text-zinc-200 font-bold">{formatDuration(c.max_duration)}</span></span>
-          <span className="text-zinc-700">·</span>
-          <span className="text-zinc-500">평균 <span className="text-zinc-200 font-bold">{c.avg_speed}</span><span className="text-zinc-600 text-xs ml-0.5">km/h</span></span>
+        <div className="px-2 py-4 text-center border-r border-white/[0.06]">
+          <p className="text-zinc-600 text-xs mb-1.5">최장 거리</p>
+          <p className="text-blue-400/80 font-bold text-lg leading-none tabular-nums">{c.max_distance}</p>
+          <p className="text-zinc-600 text-xs mt-1.5">km</p>
         </div>
-        {bd.length > 0 && (
-          <div className="flex items-end gap-1 mt-3 h-10">
-            {bd.map(m => {
-              const pct = maxBdDist > 0 ? (m.distance / maxBdDist) * 100 : 0;
-              return (
-                <div key={`${m.year}-${m.month}`} className="flex-1 flex flex-col items-center justify-end h-full gap-0.5">
-                  <div className="w-full rounded-sm overflow-hidden bg-zinc-800/40 relative" style={{ height: '100%' }}>
-                    <div
-                      className="absolute bottom-0 inset-x-0 bg-blue-500 rounded-sm transition-all"
-                      style={{ height: `${pct}%`, opacity: 0.3 + (pct / 100) * 0.7 }}
-                    />
-                  </div>
-                  <span className="text-[11px] text-zinc-600 tabular-nums">{m.month}월</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <div className="px-2 py-4 text-center border-r border-white/[0.06]">
+          <p className="text-zinc-600 text-xs mb-1.5">최장 시간</p>
+          <p className="text-zinc-300 font-bold text-lg leading-none tabular-nums">{formatDuration(c.max_duration)}</p>
+        </div>
+        <div className="px-2 py-4 text-center">
+          <p className="text-zinc-600 text-xs mb-1.5">평균 속도</p>
+          <p className="text-zinc-300 font-bold text-lg leading-none tabular-nums">{c.avg_speed}</p>
+          <p className="text-zinc-600 text-xs mt-1.5">km/h</p>
+        </div>
       </div>
 
       {/* 충전 요약 + 비율 바 통합 */}
@@ -231,21 +207,13 @@ function SixMonthCard({ insights }) {
         })()}
       </div>
 
-      {/* 시간대/요일 패턴 */}
-      {insights.hourly && (
+      {/* 시간대/요일 패턴 — 주행(blue)/충전(green) 통합 */}
+      {insights.hourly && insights.charge_hourly && (
         <div className="px-4 pt-4 pb-4 border-t border-white/[0.06]">
-          <p className="text-[11px] text-zinc-600 uppercase tracking-wider mb-1.5">시간대별 주행</p>
-          <HourlyHeatmap data={insights.hourly} hexColor="#3b82f6" valueKey="count" />
-          <p className="text-[11px] text-zinc-600 uppercase tracking-wider mt-4 mb-1.5">요일별 주행</p>
-          <WeekdayBars data={insights.weekday} hexColor="#3b82f6" valueKey="count" />
-        </div>
-      )}
-      {insights.charge_hourly && (
-        <div className="px-4 pt-4 pb-4 border-t border-white/[0.06]">
-          <p className="text-[11px] text-zinc-600 uppercase tracking-wider mb-1.5">시간대별 충전</p>
-          <HourlyHeatmap data={insights.charge_hourly} hexColor="#22c55e" valueKey="count" />
-          <p className="text-[11px] text-zinc-600 uppercase tracking-wider mt-4 mb-1.5">요일별 충전</p>
-          <WeekdayBars data={insights.charge_weekday} hexColor="#22c55e" valueKey="count" />
+          <p className="text-[11px] text-zinc-600 uppercase tracking-wider mb-2">시간대</p>
+          <CombinedHourlyHeatmap driveData={insights.hourly} chargeData={insights.charge_hourly} />
+          <p className="text-[11px] text-zinc-600 uppercase tracking-wider mt-4 mb-2">요일</p>
+          <CombinedWeekdayBars driveData={insights.weekday} chargeData={insights.charge_weekday} />
         </div>
       )}
     </Card>
