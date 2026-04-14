@@ -202,6 +202,10 @@ function SixMonthCard({ insights }) {
           <div className="h-full bg-emerald-500 transition-all" style={{ width: `${homeRatio * 100}%` }} />
           <div className="h-full bg-amber-500 transition-all" style={{ width: `${otherRatio * 100}%` }} />
         </div>
+        <div className="flex justify-between text-xs text-zinc-600 mt-1">
+          <span>{(homeRatio * 100).toFixed(0)}%</span>
+          <span>{(otherRatio * 100).toFixed(0)}%</span>
+        </div>
         {(() => {
           const slow = c.slow_charges || 0;
           const fast = c.fast_charges || 0;
