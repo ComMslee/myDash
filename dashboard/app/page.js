@@ -41,7 +41,7 @@ function DrivesSection({ drives, loading, error }) {
   ];
 
   return (
-    <>
+    <Card className="!p-0 overflow-hidden">
       {/* 거리 통계 — 2×2 그리드 */}
       <div className="grid grid-cols-2">
         {stats.map((s, i) => (
@@ -114,140 +114,117 @@ function DrivesSection({ drives, loading, error }) {
           })}
         </div>
       )}
-    </>
+    </Card>
   );
 }
 
 // ── 최근 6개월 통합 카드 ────────────────────────────────────
 
 function SixMonthCard({ insights }) {
-  const [tab, setTab] = useState('drive');
   if (!insights?.sixMonth) return null;
 
   const c = insights.sixMonth;
-  const bd = insights.monthlyBreakdown || [];
-
-  const tabs = [
-    { id: 'drive', label: '주행' },
-    { id: 'charge', label: '충전' },
-  ];
 
   const avgKm = c.drive_count > 0 ? (c.distance / c.drive_count).toFixed(0) : 0;
   const avgMin = c.drive_count > 0 ? Math.round(c.duration_min / c.drive_count) : 0;
   const homeRatio = c.charge_count > 0 ? c.home_charges / c.charge_count : 0;
   const otherRatio = c.charge_count > 0 ? c.other_charges / c.charge_count : 0;
+
   return (
-    <>
-      {/* 6개월 탭 바 */}
-      <div className="flex border-y border-white/[0.06]">
-        {tabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex-1 py-4 text-xs font-semibold transition-colors ${tab === t.id ? 'text-white border-b-2 border-blue-500' : 'text-zinc-600 hover:text-zinc-400'}`}
-          >
-            {t.label}
-          </button>
-        ))}
+    <Card className="!p-0 overflow-hidden">
+      {/* 주행 통계 — 4열 그리드 */}
+      <div className="grid grid-cols-4 divide-x divide-white/[0.06]">
+        <div className="px-2 py-4 text-center">
+          <p className="text-zinc-600 text-xs mb-1.5">횟수</p>
+          <p className="text-white font-bold text-lg leading-none tabular-nums">{c.drive_count}</p>
+          <p className="text-zinc-600 text-xs mt-1.5">회</p>
+        </div>
+        <div className="px-2 py-4 text-center">
+          <p className="text-zinc-600 text-xs mb-1.5">거리</p>
+          <p className="text-blue-400 font-bold text-lg leading-none tabular-nums">{c.distance}</p>
+          <p className="text-zinc-600 text-xs mt-1.5">km</p>
+        </div>
+        <div className="px-2 py-4 text-center">
+          <p className="text-zinc-600 text-xs mb-1.5">평균 트립</p>
+          <p className="text-zinc-300 font-bold text-lg leading-none tabular-nums">{avgKm}</p>
+          <p className="text-zinc-600 text-xs mt-1.5">km · {avgMin}분</p>
+        </div>
+        <div className="px-2 py-4 text-center">
+          <p className="text-zinc-600 text-xs mb-1.5">효율</p>
+          <p className="text-amber-400 font-bold text-lg leading-none tabular-nums">{c.efficiency_wh_km || '—'}</p>
+          <p className="text-zinc-600 text-xs mt-1.5">Wh/km</p>
+        </div>
       </div>
 
-      {/* 주행 탭 */}
-      {tab === 'drive' && (
-        <div>
-          <div className="grid grid-cols-4 divide-x divide-white/[0.06]">
-            <div className="px-2 py-4 text-center">
-              <p className="text-zinc-600 text-xs mb-1.5">횟수</p>
-              <p className="text-white font-bold text-lg leading-none tabular-nums">{c.drive_count}</p>
-              <p className="text-zinc-600 text-xs mt-1.5">회</p>
-            </div>
-            <div className="px-2 py-4 text-center">
-              <p className="text-zinc-600 text-xs mb-1.5">거리</p>
-              <p className="text-blue-400 font-bold text-lg leading-none tabular-nums">{c.distance}</p>
-              <p className="text-zinc-600 text-xs mt-1.5">km</p>
-            </div>
-            <div className="px-2 py-4 text-center">
-              <p className="text-zinc-600 text-xs mb-1.5">평균 트립</p>
-              <p className="text-zinc-300 font-bold text-lg leading-none tabular-nums">{avgKm}</p>
-              <p className="text-zinc-600 text-xs mt-1.5">km · {avgMin}분</p>
-            </div>
-            <div className="px-2 py-4 text-center">
-              <p className="text-zinc-600 text-xs mb-1.5">효율</p>
-              <p className="text-amber-400 font-bold text-lg leading-none tabular-nums">{c.efficiency_wh_km || '—'}</p>
-              <p className="text-zinc-600 text-xs mt-1.5">Wh/km</p>
-            </div>
+      {/* 최고 기록 */}
+      <div className="px-4 py-2 border-t border-white/[0.06]">
+        <p className="text-xs text-zinc-700 uppercase tracking-wider mb-2">최고 기록</p>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="text-center">
+            <p className="text-white font-bold text-base tabular-nums">{c.max_distance}<span className="text-zinc-600 text-xs ml-0.5">km</span></p>
+            <p className="text-zinc-600 text-xs">최장 거리</p>
           </div>
-          <div className="px-4 py-2 border-t border-white/[0.06]">
-            <p className="text-xs text-zinc-700 uppercase tracking-wider mb-2">최고 기록</p>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="text-center">
-                <p className="text-white font-bold text-base tabular-nums">{c.max_distance}<span className="text-zinc-600 text-xs ml-0.5">km</span></p>
-                <p className="text-zinc-600 text-xs">최장 거리</p>
-              </div>
-              <div className="text-center">
-                <p className="text-white font-bold text-base tabular-nums">{formatDuration(c.max_duration)}</p>
-                <p className="text-zinc-600 text-xs">최장 시간</p>
-              </div>
-              <div className="text-center">
-                <p className="text-white font-bold text-base tabular-nums">{c.avg_speed}<span className="text-zinc-600 text-xs ml-0.5">km/h</span></p>
-                <p className="text-zinc-600 text-xs">평균 속도</p>
-              </div>
-            </div>
+          <div className="text-center">
+            <p className="text-white font-bold text-base tabular-nums">{formatDuration(c.max_duration)}</p>
+            <p className="text-zinc-600 text-xs">최장 시간</p>
           </div>
-          {insights.hourly && (
-            <div className="px-4 pt-4 pb-4 border-t border-white/[0.06]">
-              <p className="text-[9px] text-zinc-600 uppercase tracking-wider mb-1.5">시간대별 주행</p>
-              <HourlyHeatmap data={insights.hourly} hexColor="#3b82f6" valueKey="count" />
-              <p className="text-[9px] text-zinc-600 uppercase tracking-wider mt-4 mb-1.5">요일별 주행</p>
-              <WeekdayBars data={insights.weekday} hexColor="#3b82f6" valueKey="count" />
-            </div>
-          )}
+          <div className="text-center">
+            <p className="text-white font-bold text-base tabular-nums">{c.avg_speed}<span className="text-zinc-600 text-xs ml-0.5">km/h</span></p>
+            <p className="text-zinc-600 text-xs">평균 속도</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 충전 통계 — 3열 그리드 */}
+      <div className="grid grid-cols-3 divide-x divide-white/[0.06] border-t border-white/[0.06]">
+        <div className="text-center px-2 py-3">
+          <p className="text-zinc-600 text-xs mb-1.5">충전</p>
+          <p className="text-white font-bold text-lg tabular-nums">{c.charge_count}<span className="text-zinc-600 text-xs ml-0.5">회</span></p>
+        </div>
+        <div className="text-center px-2 py-3">
+          <p className="text-zinc-600 text-xs mb-1.5">총 충전량</p>
+          <p className="text-green-400 font-bold text-lg tabular-nums">{c.total_kwh}<span className="text-zinc-600 text-xs ml-0.5">kWh</span></p>
+        </div>
+        <div className="text-center px-2 py-3">
+          <p className="text-zinc-600 text-xs mb-1.5">회당 평균</p>
+          <p className="text-green-400 font-bold text-lg tabular-nums">{c.avg_kwh}<span className="text-zinc-600 text-xs ml-0.5">kWh</span></p>
+        </div>
+      </div>
+
+      {/* 집/외부 충전 비율 */}
+      <div className="px-4 py-3 border-t border-white/[0.06]">
+        <div className="flex justify-between text-xs mb-1.5">
+          <span className="text-emerald-400">집충전 {c.home_charges}회</span>
+          <span className="text-amber-400">외부충전 {c.other_charges}회</span>
+        </div>
+        <div className="h-3 bg-zinc-800 rounded-full overflow-hidden flex">
+          <div className="h-full bg-emerald-500 transition-all" style={{ width: `${homeRatio * 100}%` }} />
+          <div className="h-full bg-amber-500 transition-all" style={{ width: `${otherRatio * 100}%` }} />
+        </div>
+        <div className="flex justify-between text-xs text-zinc-600 mt-1">
+          <span>{(homeRatio * 100).toFixed(0)}%</span>
+          <span>{(otherRatio * 100).toFixed(0)}%</span>
+        </div>
+      </div>
+
+      {/* 시간대/요일 패턴 */}
+      {insights.hourly && (
+        <div className="px-4 pt-4 pb-4 border-t border-white/[0.06]">
+          <p className="text-[9px] text-zinc-600 uppercase tracking-wider mb-1.5">시간대별 주행</p>
+          <HourlyHeatmap data={insights.hourly} hexColor="#3b82f6" valueKey="count" />
+          <p className="text-[9px] text-zinc-600 uppercase tracking-wider mt-4 mb-1.5">요일별 주행</p>
+          <WeekdayBars data={insights.weekday} hexColor="#3b82f6" valueKey="count" />
         </div>
       )}
-
-      {/* 충전 탭 */}
-      {tab === 'charge' && (
-        <div className="px-4 py-3">
-          <div className="grid grid-cols-3 divide-x divide-white/[0.06] mb-4">
-            <div className="text-center px-2 py-1">
-              <p className="text-zinc-600 text-xs mb-1.5">충전횟수</p>
-              <p className="text-white font-bold text-lg tabular-nums">{c.charge_count}회</p>
-            </div>
-            <div className="text-center px-2 py-1">
-              <p className="text-zinc-600 text-xs mb-1.5">총 충전량</p>
-              <p className="text-green-400 font-bold text-lg tabular-nums">{c.total_kwh}kWh</p>
-            </div>
-            <div className="text-center px-2 py-1">
-              <p className="text-zinc-600 text-xs mb-1.5">회당 평균</p>
-              <p className="text-green-400 font-bold text-lg tabular-nums">{c.avg_kwh}kWh</p>
-            </div>
-          </div>
-          {/* 집/외부 프로그레스 바 */}
-          <div>
-            <div className="flex justify-between text-xs mb-1.5">
-              <span className="text-emerald-400">집충전 {c.home_charges}회</span>
-              <span className="text-amber-400">외부충전 {c.other_charges}회</span>
-            </div>
-            <div className="h-3 bg-zinc-800 rounded-full overflow-hidden flex">
-              <div className="h-full bg-emerald-500 transition-all" style={{ width: `${homeRatio * 100}%` }} />
-              <div className="h-full bg-amber-500 transition-all" style={{ width: `${otherRatio * 100}%` }} />
-            </div>
-            <div className="flex justify-between text-xs text-zinc-600 mt-1">
-              <span>{(homeRatio * 100).toFixed(0)}%</span>
-              <span>{(otherRatio * 100).toFixed(0)}%</span>
-            </div>
-          </div>
-          {insights.charge_hourly && (
-            <div className="pt-4 border-t border-white/[0.06] mt-4">
-              <p className="text-[9px] text-zinc-600 uppercase tracking-wider mb-1.5">시간대별 충전</p>
-              <HourlyHeatmap data={insights.charge_hourly} hexColor="#22c55e" valueKey="count" />
-              <p className="text-[9px] text-zinc-600 uppercase tracking-wider mt-4 mb-1.5">요일별 충전</p>
-              <WeekdayBars data={insights.charge_weekday} hexColor="#22c55e" valueKey="count" />
-            </div>
-          )}
+      {insights.charge_hourly && (
+        <div className="px-4 pt-4 pb-4 border-t border-white/[0.06]">
+          <p className="text-[9px] text-zinc-600 uppercase tracking-wider mb-1.5">시간대별 충전</p>
+          <HourlyHeatmap data={insights.charge_hourly} hexColor="#22c55e" valueKey="count" />
+          <p className="text-[9px] text-zinc-600 uppercase tracking-wider mt-4 mb-1.5">요일별 충전</p>
+          <WeekdayBars data={insights.charge_weekday} hexColor="#22c55e" valueKey="count" />
         </div>
       )}
-
-    </>
+    </Card>
   );
 }
 
@@ -306,16 +283,20 @@ export default function Dashboard() {
     <div className="min-h-screen bg-[#0f0f0f]">
       <main className="max-w-2xl mx-auto px-4 py-5 pb-12 space-y-6">
 
+        {/* 1. 최근 주행 */}
         <div>
           <SectionHeader title="최근 주행" />
-          <Card className="!p-0 overflow-hidden">
-            <DrivesSection
-              drives={displayDrives}
-              loading={displayLoading.drives}
-              error={!isMock && errors.drives}
-            />
-            <SixMonthCard insights={displayInsights} />
-          </Card>
+          <DrivesSection
+            drives={displayDrives}
+            loading={displayLoading.drives}
+            error={!isMock && errors.drives}
+          />
+        </div>
+
+        {/* 2. 최근 6개월 */}
+        <div>
+          <SectionHeader title="최근 6개월" />
+          <SixMonthCard insights={displayInsights} />
         </div>
 
       </main>
