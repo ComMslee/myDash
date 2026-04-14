@@ -317,27 +317,27 @@ function DrivesInner() {
               const sp = selectedDrive.start_battery_level ?? null;
               const ep = selectedDrive.end_battery_level ?? null;
               return (
-              <div className="px-4 py-2 border-b border-white/[0.06] flex items-center gap-3 flex-shrink-0">
-                <div className="flex-1 min-w-0">
+              <div className="px-4 py-2 border-b border-white/[0.06] flex-shrink-0">
+                <div className="flex items-center justify-between">
                   <p className="text-sm text-zinc-500 tabular-nums">{formatTimeRange(selectedDrive.start_date, selectedDrive.end_date)} <span className="text-zinc-600">({formatDuration(selectedDrive.duration_min)})</span></p>
-                  <p className="text-sm text-zinc-300 truncate">
-                    {shortAddr(selectedDrive.start_address) || '출발지'}&nbsp;→&nbsp;{shortAddr(selectedDrive.end_address) || '도착지'}
-                  </p>
+                  {sp != null && ep != null && (
+                    <div className="flex items-center gap-1 text-xs text-zinc-500 tabular-nums">
+                      <div className="w-16 h-1.5 bg-zinc-800 rounded-sm overflow-hidden relative">
+                        <div className="absolute inset-y-0 rounded-sm bg-blue-400/30" style={{ left: `${ep}%`, width: `${sp - ep}%` }} />
+                        <div className="absolute inset-y-0 rounded-sm bg-green-400/40" style={{ left: 0, width: `${ep}%` }} />
+                      </div>
+                      <span>{sp}<span className="text-zinc-600">{'>'}</span>{ep}%</span>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0 text-sm tabular-nums">
+                <p className="text-sm text-zinc-300 truncate">
+                  {shortAddr(selectedDrive.start_address) || '출발지'}&nbsp;→&nbsp;{shortAddr(selectedDrive.end_address) || '도착지'}
+                </p>
+                <div className="flex items-center gap-3 mt-0.5 text-sm tabular-nums">
                   <span className="text-blue-400 font-bold">{selectedDrive.distance}<span className="text-[10px] text-zinc-600 ml-0.5">km</span></span>
                   {eff && <span className="text-green-400 font-semibold">{eff.kwh}<span className="text-[10px] text-zinc-600 ml-0.5">kWh</span></span>}
-                  {eff && <span className="text-amber-400 text-xs">{eff.perKm}<span className="text-zinc-600 ml-0.5">Wh</span></span>}
+                  {eff && <span className="text-amber-400 text-xs">{eff.perKm}<span className="text-zinc-600 ml-0.5">Wh/km</span></span>}
                 </div>
-                {sp != null && ep != null && (
-                  <div className="flex items-center gap-1 flex-shrink-0 text-xs text-zinc-500 tabular-nums">
-                    <div className="w-16 h-1.5 bg-zinc-800 rounded-sm overflow-hidden relative">
-                      <div className="absolute inset-y-0 rounded-sm bg-blue-400/30" style={{ left: `${ep}%`, width: `${sp - ep}%` }} />
-                      <div className="absolute inset-y-0 rounded-sm bg-green-400/40" style={{ left: 0, width: `${ep}%` }} />
-                    </div>
-                    <span>{sp}<span className="text-zinc-600">{'>'}</span>{ep}%</span>
-                  </div>
-                )}
               </div>
               );
             })() : selectedPlace ? (
@@ -426,9 +426,9 @@ function DrivesInner() {
                             )}
                           </div>
                         </div>
-                        <div className="text-right flex items-baseline gap-1.5">
-                          <span className="text-sm font-bold text-blue-400 tabular-nums">{d.distance}<span className="text-[10px] text-zinc-600 ml-0.5">km</span></span>
-                          {eff && <span className="text-[10px] text-green-400/80 tabular-nums">{eff.kwh}kWh</span>}
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-blue-400 tabular-nums">{d.distance}<span className="text-[10px] font-medium text-zinc-600 ml-0.5">km</span></p>
+                          {eff && <p className="text-[10px] text-green-400/80 tabular-nums">{eff.kwh}<span className="ml-0.5">kWh</span></p>}
                         </div>
                       </button>
                       {gapLabel && (
