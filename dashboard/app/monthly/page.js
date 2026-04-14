@@ -133,7 +133,6 @@ function MonthlyCalendar({ drives, charges, calLoading, monthlyData }) {
         </button>
         <div className="flex-1 flex items-center justify-end gap-2 text-xs">
           <span className="text-blue-400 tabular-nums font-bold">{summary.totalKm.toFixed(1)}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
-          {curMonthData && <span className="text-blue-400/70 tabular-nums font-bold">{curMonthData.drive_count}<span className="text-zinc-600 text-[10px] ml-0.5">회</span></span>}
           <span className="text-green-400 tabular-nums font-bold">{summary.totalKwh.toFixed(1)}<span className="text-zinc-600 text-[10px] ml-0.5">kWh</span></span>
           {curMonthData?.avg_wh_km != null && (
             <span className="tabular-nums font-bold" style={{ color: effColor(curMonthData.avg_wh_km) }}>{curMonthData.avg_wh_km.toFixed(0)}<span className="text-zinc-600 text-[10px] ml-0.5">Wh</span></span>
@@ -388,7 +387,7 @@ export default function MonthlyPage() {
                           </div>
                           <span className="text-white font-bold text-sm tabular-nums flex-shrink-0">{m.total_distance_km}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
                           <span className="text-zinc-600 text-[10px] tabular-nums flex-shrink-0"><span className="text-blue-400/70">{m.drive_count}</span>회</span>
-                          <span className="text-zinc-600 text-[10px] tabular-nums flex-shrink-0"><span className="text-green-400/70">{m.total_energy_kwh}</span>kWh</span>
+                          <span className="text-zinc-600 text-[10px] tabular-nums flex-shrink-0"><span className="text-green-400/70">{m.total_energy_kwh}</span>kWh<span className="text-zinc-700 mx-0.5">·</span><span className="text-green-400/70">{m.charge_count}</span>회</span>
                           <span className="text-[10px] font-semibold tabular-nums w-12 text-right flex-shrink-0" style={{ color: whColor }}>
                             {wh != null ? `${wh.toFixed(0)}` : '—'}<span className="text-zinc-700 ml-0.5">Wh</span>
                           </span>
