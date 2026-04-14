@@ -207,20 +207,27 @@ function DrivesInner() {
       });
   }, [selectedDrive?.id, isMock, refreshSignal]);
 
+  // 목록/지도 모드
+  const [viewMode, setViewMode] = useState(initialId ? 'map' : 'list');
+  const selectedIdx = selectedDrive ? drives.findIndex(d => d.id === selectedDrive.id) : -1;
   const eff = selectedDrive ? efficiency(selectedDrive) : null;
+
+  const goToDrive = (d) => { setSelectedDrive(d); setSelectedPlace(null); setViewMode('map'); };
+  const goPrev = () => { if (selectedIdx > 0) { setSelectedDrive(drives[selectedIdx - 1]); setSelectedPlace(null); } };
+  const goNext = () => { if (selectedIdx < drives.length - 1) { setSelectedDrive(drives[selectedIdx + 1]); setSelectedPlace(null); } };
 
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white">
       <div className="max-w-2xl mx-auto flex flex-col" style={{ minHeight: 'calc(100vh - 57px)' }}>
 
-      {/* 자주 방문하는 장소 (좌우 스크롤, 최대 5개 + 더보기) */}
+      {/* 자주 방문하는 장소 */}
       {places.length > 0 && (
         <div className="flex-shrink-0 px-4 pt-3 pb-2">
           <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
             {places.slice(0, 5).map((p, i) => (
               <button
                 key={p.id}
-                onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); }}
+                onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setViewMode('map'); }}
                 className={`flex-shrink-0 flex items-start gap-2 border rounded-xl px-3 py-2 w-[170px] text-left transition-colors ${
                   selectedPlace?.id === p.id
                     ? 'bg-amber-500/10 border-amber-500/30'
@@ -247,40 +254,22 @@ function DrivesInner() {
 
       {/* 자주 가는 곳 전체 랭킹 모달 */}
       {showAllPlaces && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60"
-          onClick={() => setShowAllPlaces(false)}
-        >
-          <div
-            className="w-full max-w-2xl bg-[#161618] border border-white/[0.08] rounded-t-2xl pb-safe"
-            onClick={e => e.stopPropagation()}
-          >
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={() => setShowAllPlaces(false)}>
+          <div className="w-full max-w-2xl bg-[#161618] border border-white/[0.08] rounded-t-2xl pb-safe" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/[0.06]">
               <span className="text-sm font-bold text-zinc-300">자주 가는 곳 랭킹</span>
-              <button
-                onClick={() => setShowAllPlaces(false)}
-                className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-zinc-300"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button onClick={() => setShowAllPlaces(false)} className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-zinc-300">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="overflow-y-auto" style={{ maxHeight: '60vh' }}>
               {places.map((p, i) => (
-                <button
-                  key={p.id}
-                  onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setShowAllPlaces(false); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.03] transition-colors text-left"
-                >
-                  <span className={`text-sm font-black w-7 text-center flex-shrink-0 ${i < 3 ? 'text-amber-400' : 'text-zinc-600'}`}>
-                    {i + 1}
-                  </span>
+                <button key={p.id} onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setShowAllPlaces(false); setViewMode('map'); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.03] transition-colors text-left">
+                  <span className={`text-sm font-black w-7 text-center flex-shrink-0 ${i < 3 ? 'text-amber-400' : 'text-zinc-600'}`}>{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-zinc-300 text-sm truncate">{p.label || p.city || '—'}</p>
-                    {p.city && p.label !== p.city && (
-                      <p className="text-zinc-600 text-xs truncate">{p.city}</p>
-                    )}
+                    {p.city && p.label !== p.city && <p className="text-zinc-600 text-xs truncate">{p.city}</p>}
                   </div>
                   <span className="text-zinc-400 text-sm tabular-nums flex-shrink-0">{p.visit_count}회</span>
                 </button>
@@ -291,137 +280,147 @@ function DrivesInner() {
         </div>
       )}
 
-      {/* Body: map + list */}
-      <div className="flex-1 flex flex-col gap-4 px-4 pb-4 min-h-0">
+      {/* ── 지도 모드 ── */}
+      {viewMode === 'map' && (
+        <div className="flex-1 flex flex-col px-4 pb-4">
+          {/* 상단 네비게이션 */}
+          <div className="flex items-center justify-between py-2 mb-2">
+            <button onClick={() => setViewMode('list')} className="flex items-center gap-1 text-sm text-zinc-400 hover:text-white transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              목록
+            </button>
+            {selectedDrive && (
+              <div className="flex items-center gap-3">
+                <button onClick={goPrev} disabled={selectedIdx <= 0}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <span className="text-xs text-zinc-600 tabular-nums">{selectedIdx + 1} / {drives.length}</span>
+                <button onClick={goNext} disabled={selectedIdx >= drives.length - 1}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                </button>
+              </div>
+            )}
+          </div>
 
-        {/* Map panel */}
-        <div className="flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden min-h-[200px]" style={{ height: '45vh' }}>
-          {selectedDrive ? (
-            <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center gap-4 flex-shrink-0">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-zinc-500 mb-0.5 tabular-nums">{formatTimeRange(selectedDrive.start_date, selectedDrive.end_date)}</p>
-                <p className="text-base text-zinc-300 truncate">
-                  {shortAddr(selectedDrive.start_address) || '출발지'}&nbsp;→&nbsp;{shortAddr(selectedDrive.end_address) || '도착지'}
-                </p>
-              </div>
-              <div className="flex gap-3 flex-shrink-0 text-right">
-                <div>
-                  <p className="text-blue-400 font-bold text-base">{selectedDrive.distance} km</p>
-                  <p className="text-zinc-600 text-xs">거리</p>
+          {/* 주행 정보 + 지도 */}
+          <div className="flex-1 flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
+            {selectedDrive ? (
+              <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center gap-4 flex-shrink-0">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-zinc-500 mb-0.5 tabular-nums">{formatTimeRange(selectedDrive.start_date, selectedDrive.end_date)}</p>
+                  <p className="text-base text-zinc-300 truncate">
+                    {shortAddr(selectedDrive.start_address) || '출발지'}&nbsp;→&nbsp;{shortAddr(selectedDrive.end_address) || '도착지'}
+                  </p>
                 </div>
-                <div>
-                  <p className="text-zinc-300 font-semibold text-base">{formatDuration(selectedDrive.duration_min)}</p>
-                  <p className="text-zinc-600 text-xs">시간</p>
-                </div>
-                {eff && (
+                <div className="flex gap-3 flex-shrink-0 text-right">
                   <div>
-                    <p className="text-green-400 font-semibold text-base">{eff.kwh} kWh</p>
-                    <p className="text-zinc-600 text-xs">{eff.perKm} Wh/km</p>
+                    <p className="text-blue-400 font-bold text-base">{selectedDrive.distance} km</p>
+                    <p className="text-zinc-600 text-xs">거리</p>
                   </div>
-                )}
+                  <div>
+                    <p className="text-zinc-300 font-semibold text-base">{formatDuration(selectedDrive.duration_min)}</p>
+                    <p className="text-zinc-600 text-xs">시간</p>
+                  </div>
+                  {eff && (
+                    <div>
+                      <p className="text-green-400 font-semibold text-base">{eff.kwh} kWh</p>
+                      <p className="text-zinc-600 text-xs">{eff.perKm} Wh/km</p>
+                    </div>
+                  )}
+                </div>
               </div>
+            ) : selectedPlace ? (
+              <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center gap-3 flex-shrink-0">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
+                <p className="text-base text-zinc-300 truncate flex-1">{selectedPlace.label}</p>
+                <span className="text-amber-400 text-sm tabular-nums flex-shrink-0">{selectedPlace.visit_count}회</span>
+              </div>
+            ) : null}
+            <div className="flex-1 p-2 min-h-[300px]">
+              <DriveMap positions={positions} loading={loadingRoute} placeMarker={selectedPlace} />
             </div>
-          ) : selectedPlace ? (
-            <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center gap-3 flex-shrink-0">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
-              <p className="text-base text-zinc-300 truncate flex-1">{selectedPlace.label}</p>
-              <span className="text-amber-400 text-sm tabular-nums flex-shrink-0">{selectedPlace.visit_count}회</span>
-            </div>
-          ) : null}
-          <div className="flex-1 p-2">
-            <DriveMap positions={positions} loading={loadingRoute} placeMarker={selectedPlace} />
           </div>
         </div>
+      )}
 
-        {/* Drive list */}
-        <div className="w-full flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-          <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center justify-between flex-shrink-0">
+      {/* ── 목록 모드 ── */}
+      {viewMode === 'list' && (
+        <div className="flex-1 flex flex-col px-4 pb-4">
+          <div className="flex items-center justify-between py-2 mb-1">
             <span className="text-xs font-bold tracking-widest text-zinc-500 uppercase">주행 이력</span>
             <span className="text-zinc-600 text-sm">{loadingDrives ? '…' : `${drives.length}건`}</span>
           </div>
-          <div className="overflow-y-auto" style={{ maxHeight: '40vh' }}>
-            {loadingDrives ? (
-              <div className="flex items-center justify-center h-24">
-                <div className="w-6 h-6 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
-              </div>
-            ) : error ? (
-              <p className="text-red-400 text-sm text-center py-4">{error}</p>
-            ) : !drives.length ? (
-              <p className="text-zinc-500 text-sm text-center py-4">주행 기록이 없습니다</p>
-            ) : (
-              drives.map((d, idx) => {
-                const isSelected = selectedDrive?.id === d.id;
-                const eff = efficiency(d);
-                const dt = new Date(d.start_date);
-                const dateLabel = `${dt.getMonth()+1}/${dt.getDate()}`;
-                const timeLabel = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
-                const startPct = d.start_battery_level ?? null;
-                const endPct   = d.end_battery_level   ?? null;
-                const usedPct  = (startPct != null && endPct != null) ? Math.max(0, startPct - endPct) : 0;
+          <div className="flex-1 bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
+              {loadingDrives ? (
+                <div className="flex items-center justify-center h-24">
+                  <div className="w-6 h-6 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
+                </div>
+              ) : error ? (
+                <p className="text-red-400 text-sm text-center py-4">{error}</p>
+              ) : !drives.length ? (
+                <p className="text-zinc-500 text-sm text-center py-4">주행 기록이 없습니다</p>
+              ) : (
+                drives.map((d, idx) => {
+                  const eff = efficiency(d);
+                  const dt = new Date(d.start_date);
+                  const dateLabel = `${dt.getMonth()+1}/${dt.getDate()}`;
+                  const timeLabel = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
 
-                // 다음 주행까지 대기 시간 (DESC: 현재 주행 완료 → 다음(위) 주행 시작)
-                let gapLabel = null;
-                if (idx < drives.length - 1 && d.start_date && drives[idx + 1].end_date) {
-                  const gapMs = new Date(d.start_date) - new Date(drives[idx + 1].end_date);
-                  if (gapMs > 0) {
-                    const gapMin = Math.round(gapMs / 60000);
-                    gapLabel = formatDuration(gapMin);
+                  // 날짜 구분선
+                  const prevDt = idx > 0 ? new Date(drives[idx - 1].start_date) : null;
+                  const showDateHeader = !prevDt || dt.toDateString() !== prevDt.toDateString();
+
+                  // 대기 시간
+                  let gapLabel = null;
+                  if (idx < drives.length - 1 && d.start_date && drives[idx + 1].end_date) {
+                    const gapMs = new Date(d.start_date) - new Date(drives[idx + 1].end_date);
+                    if (gapMs > 0) {
+                      const gapMin = Math.round(gapMs / 60000);
+                      gapLabel = formatDuration(gapMin);
+                    }
                   }
-                }
 
-                return (
-                  <div key={d.id}>
-                    <button
-                      onClick={() => { setSelectedDrive(d); setSelectedPlace(null); }}
-                      className={`w-full text-left grid grid-cols-[62px_1fr_auto] items-center gap-2.5 px-4 py-3 border-b border-white/[0.06] last:border-0 transition-all ${
-                        isSelected ? 'bg-blue-500/10 border-l-2 border-l-blue-500' : 'hover:bg-white/[0.025] border-l-2 border-l-transparent'
-                      }`}
-                    >
-                      {/* 좌측: 날짜 + 시각 */}
-                      <div className="text-xs text-zinc-500 leading-tight tabular-nums">
-                        <p className="text-zinc-300 font-bold text-sm">{dateLabel}</p>
-                        <p>{timeLabel}</p>
-                      </div>
-                      {/* 중앙: 경로 + 메타 */}
-                      <div className="min-w-0">
-                        <p className={`text-sm truncate ${isSelected ? 'text-white' : 'text-zinc-300'}`}>
-                          {shortAddr(d.start_address) || '?'}<span className="text-zinc-500 mx-1">→</span>{shortAddr(d.end_address) || '?'}
-                        </p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-zinc-600 tabular-nums">{formatDuration(d.duration_min)}</span>
-                          {startPct != null && endPct != null && (
-                            <div className="flex items-center gap-1 text-xs text-zinc-500 tabular-nums">
-                              <span>{startPct}%</span>
-                              <div className="w-11 h-1.5 bg-zinc-700 rounded-sm overflow-hidden relative">
-                                <div className="absolute inset-y-0 left-0 rounded-sm" style={{ width: `${usedPct}%`, background: 'linear-gradient(90deg, rgba(96,165,250,.5), rgba(248,113,113,.6))' }} />
-                              </div>
-                              <span>{endPct}%</span>
-                            </div>
-                          )}
+                  return (
+                    <div key={d.id}>
+                      {showDateHeader && (
+                        <div className="px-4 py-1.5 bg-white/[0.02] border-b border-white/[0.06]">
+                          <span className="text-[11px] font-bold text-zinc-500">{dt.getMonth()+1}월 {dt.getDate()}일</span>
                         </div>
-                      </div>
-                      {/* 우측: km + kWh */}
-                      <div className="text-right">
-                        <p className={`text-base font-bold tabular-nums ${isSelected ? 'text-blue-400' : 'text-white/80'}`}>
-                          {d.distance}<span className="text-xs font-medium text-zinc-600 ml-0.5">km</span>
+                      )}
+                      <button
+                        onClick={() => goToDrive(d)}
+                        className="w-full text-left grid grid-cols-[40px_1fr_auto] items-center gap-2 px-4 py-2.5 border-b border-white/[0.06] last:border-0 hover:bg-white/[0.025] active:bg-blue-500/10 transition-all"
+                      >
+                        <div className="text-xs text-zinc-500 tabular-nums">
+                          <p>{timeLabel}</p>
+                        </div>
+                        <p className="text-sm text-zinc-300 truncate">
+                          {shortAddr(d.start_address) || '?'}<span className="text-zinc-600 mx-1">→</span>{shortAddr(d.end_address) || '?'}
                         </p>
-                        {eff && <p className="text-xs text-green-400/85 tabular-nums">{eff.kwh}<span className="text-[10px] ml-0.5">kWh</span></p>}
-                      </div>
-                    </button>
-                    {gapLabel && (
-                      <div className="flex items-center gap-2 px-4 py-1 bg-[#111]">
-                        <div className="flex-1 h-px bg-white/[0.04]" />
-                        <span className="text-[10px] text-zinc-600 tabular-nums">{gapLabel}</span>
-                        <div className="flex-1 h-px bg-white/[0.04]" />
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
+                        <div className="text-right flex items-baseline gap-1.5">
+                          <span className="text-sm font-bold text-blue-400 tabular-nums">{d.distance}<span className="text-[10px] text-zinc-600 ml-0.5">km</span></span>
+                          {eff && <span className="text-[10px] text-green-400/80 tabular-nums">{eff.kwh}kWh</span>}
+                        </div>
+                      </button>
+                      {gapLabel && (
+                        <div className="flex items-center gap-2 px-4 py-0.5 bg-[#111]">
+                          <div className="flex-1 h-px bg-white/[0.04]" />
+                          <span className="text-[10px] text-zinc-600 tabular-nums">{gapLabel}</span>
+                          <div className="flex-1 h-px bg-white/[0.04]" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
       </div>
     </main>
   );
