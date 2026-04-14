@@ -5,6 +5,7 @@ import HealthScoreCard from './HealthScoreCard';
 import IdleDrainCard from './IdleDrainCard';
 import { LevelHabitCard } from './RecordsHabit';
 import MonthlyChargeCard from './MonthlyChargeCard';
+import FastChargeCard from './FastChargeCard';
 import { CapacityTrendCard, HabitTrendCard } from './BatteryTrendCard';
 import { Spinner, SectionLabel } from '@/app/components/PageLayout';
 
@@ -56,6 +57,12 @@ export default function BatteryPage() {
               <LevelHabitCard histogram={data.histogram} />
               <HabitTrendCard data={trend} />
               <MonthlyChargeCard />
+            </div>
+
+            {/* 급속 충전 */}
+            <div className="flex flex-col gap-3">
+              <SectionLabel title="급속 충전" />
+              <FastChargeCard />
             </div>
 
             {/* 대기 소모 */}
