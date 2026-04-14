@@ -416,8 +416,9 @@ function DrivesInner() {
                             {startPct != null && endPct != null && (
                               <div className="flex items-center gap-1 text-xs text-zinc-500 tabular-nums">
                                 <span>{startPct}%</span>
-                                <div className="w-10 h-1.5 bg-zinc-700 rounded-sm overflow-hidden relative">
-                                  <div className="absolute inset-y-0 left-0 rounded-sm" style={{ width: `${usedPct}%`, background: 'linear-gradient(90deg, rgba(96,165,250,.5), rgba(248,113,113,.6))' }} />
+                                <div className="w-12 h-1.5 bg-zinc-800 rounded-sm overflow-hidden relative">
+                                  <div className="absolute inset-y-0 rounded-sm bg-blue-400/30" style={{ left: `${endPct}%`, width: `${startPct - endPct}%` }} />
+                                  <div className="absolute inset-y-0 rounded-sm bg-green-400/40" style={{ left: 0, width: `${endPct}%` }} />
                                 </div>
                                 <span>{endPct}%</span>
                               </div>
