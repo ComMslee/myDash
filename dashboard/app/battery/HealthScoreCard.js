@@ -80,24 +80,21 @@ export default function HealthScoreCard({ data }) {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1 mt-0.5">
-            <span className="text-[9px] text-zinc-600">등급</span>
-            <span className="text-sm font-black tabular-nums" style={{ color: arcColor }}>{grade}</span>
-          </div>
+          <div className="mt-0.5" />
         </div>
 
         {/* 오른쪽: 핵심 수치 + 팁 */}
         <div className="flex-1 flex flex-col gap-2 min-w-0">
           <div className="flex items-center justify-between gap-1">
-            <span className="text-[10px] text-zinc-600 flex-shrink-0">평균 SOC</span>
+            <span className="text-[10px] text-zinc-600 flex-shrink-0">평균 SOC <span className="text-zinc-700">({battery_type})</span></span>
             <span className="text-[13px] font-bold tabular-nums text-white">
               {avg_soc}%
             </span>
           </div>
           <div className="flex items-center justify-between gap-1">
-            <span className="text-[10px] text-zinc-600 flex-shrink-0">배터리</span>
-            <span className="text-[13px] font-bold tabular-nums text-zinc-400">
-              {battery_type}
+            <span className="text-[10px] text-zinc-600 flex-shrink-0">등급</span>
+            <span className="text-[13px] font-black tabular-nums" style={{ color: arcColor }}>
+              {grade}
             </span>
           </div>
           {/* 팁 */}
