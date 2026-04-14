@@ -23,7 +23,7 @@ function effColor(wh) {
 
 // ── 월별 달력 컴포넌트 ─────────────────────────────────────
 
-function MonthlyCalendar({ drives, charges, calLoading }) {
+function MonthlyCalendar({ drives, charges, calLoading, monthlyData }) {
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth()); // 0-11
@@ -108,6 +108,9 @@ function MonthlyCalendar({ drives, charges, calLoading }) {
   const monthLabel = `${String(viewYear).slice(2)}/${String(viewMonth + 1).padStart(2, '0')}`;
   const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
 
+  // monthly-history에서 현재 보고 있는 달의 상세 데이터 조회
+  const curMonthData = (monthlyData || []).find(m => m.year === viewYear && m.month === viewMonth + 1);
+
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       {/* 헤더 + 월 요약 통합 */}
@@ -128,10 +131,13 @@ function MonthlyCalendar({ drives, charges, calLoading }) {
           {monthLabel}
           <span className="text-[10px] text-zinc-600">{showPicker ? '▲' : '▼'}</span>
         </button>
-        <div className="flex-1 flex items-center justify-end gap-3 text-xs">
+        <div className="flex-1 flex items-center justify-end gap-2 text-xs">
           <span className="text-blue-400 tabular-nums font-bold">{summary.totalKm.toFixed(1)}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
+          {curMonthData && <span className="text-blue-400/70 tabular-nums font-bold">{curMonthData.drive_count}<span className="text-zinc-600 text-[10px] ml-0.5">회</span></span>}
           <span className="text-green-400 tabular-nums font-bold">{summary.totalKwh.toFixed(1)}<span className="text-zinc-600 text-[10px] ml-0.5">kWh</span></span>
-          <span className="text-zinc-300 tabular-nums font-bold">{summary.activeDays}<span className="text-zinc-600 text-[10px] ml-0.5">일</span></span>
+          {curMonthData?.avg_wh_km != null && (
+            <span className="tabular-nums font-bold" style={{ color: effColor(curMonthData.avg_wh_km) }}>{curMonthData.avg_wh_km.toFixed(0)}<span className="text-zinc-600 text-[10px] ml-0.5">Wh</span></span>
+          )}
         </div>
         <button
           onClick={goForward}
@@ -285,9 +291,15 @@ export default function MonthlyPage() {
   }, [isMock, refreshSignal]);
 
   const months = data?.months || [];
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth() + 1;
+
+  // 오늘이 포함된 달은 달력에서 표시하므로 하단 리스트에서 제외
+  const listMonths = months.filter(m => !(m.year === curYear && m.month === curMonth));
 
   const byYear = {};
-  for (const m of months) {
+  for (const m of listMonths) {
     if (!byYear[m.year]) byYear[m.year] = [];
     byYear[m.year].push(m);
   }
@@ -311,7 +323,7 @@ export default function MonthlyPage() {
     };
   }
 
-  const maxDist = months.length > 0 ? Math.max(...months.map(m => m.total_distance_km)) : 1;
+  const maxDist = listMonths.length > 0 ? Math.max(...listMonths.map(m => m.total_distance_km)) : 1;
 
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white">
@@ -323,6 +335,7 @@ export default function MonthlyPage() {
             drives={drives}
             charges={charges}
             calLoading={calLoading}
+            monthlyData={months}
           />
         </div>
 
