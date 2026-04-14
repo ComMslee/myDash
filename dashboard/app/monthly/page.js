@@ -14,32 +14,11 @@ function StatBar({ val, max, color }) {
   );
 }
 
-function YearSummaryCard({ t }) {
-  return (
-    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3 mb-3">
-      <div className="grid grid-cols-4 gap-3">
-        <div className="text-center">
-          <p className="text-white font-bold text-lg tabular-nums">{t.total_distance_km}</p>
-          <p className="text-zinc-600 text-xs">km</p>
-        </div>
-        <div className="text-center">
-          <p className="text-blue-400 font-bold text-lg tabular-nums">{t.drive_count}</p>
-          <p className="text-zinc-600 text-xs">주행</p>
-        </div>
-        <div className="text-center">
-          <p className="text-green-400 font-bold text-lg tabular-nums">{t.total_energy_kwh}</p>
-          <p className="text-zinc-600 text-xs">kWh</p>
-        </div>
-        <div className="text-center">
-          <p className="text-amber-400 font-bold text-lg tabular-nums">{t.charge_count}</p>
-          <p className="text-zinc-600 text-xs">충전</p>
-        </div>
-      </div>
-      <div className="mt-2 pt-2 border-t border-white/5 text-center">
-        <span className="text-zinc-500 text-[11px]">월평균 <span className="text-zinc-300 font-medium">{t.avg_monthly_km}</span> km</span>
-      </div>
-    </div>
-  );
+function effColor(wh) {
+  if (wh == null) return '#3f3f46';
+  if (wh < 220) return '#10b981';
+  if (wh < 260) return '#eab308';
+  return '#f97316';
 }
 
 // ── 월별 달력 컴포넌트 ─────────────────────────────────────
@@ -273,14 +252,12 @@ export default function MonthlyPage() {
   const [drives, setDrives] = useState(null);
   const [charges, setCharges] = useState(null);
   const [calLoading, setCalLoading] = useState(true);
-  const [insights, setInsights] = useState(null);
 
   useEffect(() => {
     if (isMock) {
       setData(MOCK_DATA.monthlyHistory);
       setDrives(MOCK_DATA.drives);
       setCharges(MOCK_DATA.charges);
-      setInsights(MOCK_DATA.insights);
       setLoading(false);
       setCalLoading(false);
       return;
@@ -296,15 +273,13 @@ export default function MonthlyPage() {
       .then(d => { setData(d); setLoading(false); })
       .catch(() => { setError('월별 데이터를 불러오지 못했습니다.'); setLoading(false); });
 
-    // 달력용 상세 데이터 + 인사이트
+    // 달력용 상세 데이터
     Promise.all([
       fetch('/api/drives').then(r => r.json()).catch(() => null),
       fetch('/api/charges').then(r => r.json()).catch(() => null),
-      fetch('/api/insights').then(r => r.json()).catch(() => null),
-    ]).then(([drivesData, chargesData, insightsData]) => {
+    ]).then(([drivesData, chargesData]) => {
       setDrives(drivesData);
       setCharges(chargesData);
-      setInsights(insightsData);
       setCalLoading(false);
     });
   }, [isMock, refreshSignal]);
@@ -348,106 +323,7 @@ export default function MonthlyPage() {
           />
         </div>
 
-        {/* 최근 6개월 추이 (주행거리 + 충전량 통합) */}
-        {insights?.monthlyBreakdown?.length > 0 && (() => {
-          const bd = insights.monthlyBreakdown;
-          const maxDist6 = Math.max(1, ...bd.map(m => m.distance));
-          const maxKwh6 = Math.max(1, ...bd.map(m => m.total_kwh));
-          const BAR_H = 100;
-          return (
-            <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 pt-3 pb-3 mb-5">
-              <div className="flex items-center gap-4 mb-3">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-1.5 rounded-sm bg-blue-500" />
-                  <span className="text-[10px] text-zinc-500">주행거리</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-1.5 rounded-sm bg-green-500" />
-                  <span className="text-[10px] text-zinc-500">충전량</span>
-                </div>
-              </div>
-              <div className="flex items-end gap-1.5" style={{ height: BAR_H + 40 }}>
-                {bd.map(m => {
-                  const distPct = maxDist6 > 0 ? (m.distance / maxDist6) * 100 : 0;
-                  const kwhPct = maxKwh6 > 0 ? (m.total_kwh / maxKwh6) * 100 : 0;
-                  return (
-                    <div key={m.month} className="flex-1 flex flex-col items-center justify-end gap-0.5">
-                      <div className="flex items-end gap-0.5 w-full justify-center" style={{ height: BAR_H }}>
-                        <div className="flex-1 flex flex-col items-center justify-end h-full">
-                          {m.distance > 0 && (
-                            <span className="text-[8px] text-blue-400/80 tabular-nums leading-none mb-0.5">{m.distance}</span>
-                          )}
-                          <div className="w-full bg-zinc-800/40 rounded-sm overflow-hidden relative" style={{ height: BAR_H }}>
-                            <div
-                              className="absolute bottom-0 inset-x-0 bg-blue-500 rounded-sm transition-all duration-500"
-                              style={{ height: `${distPct}%`, opacity: 0.25 + (distPct / 100) * 0.75 }}
-                            />
-                          </div>
-                        </div>
-                        <div className="flex-1 flex flex-col items-center justify-end h-full">
-                          {m.total_kwh > 0 && (
-                            <span className="text-[8px] text-green-400/80 tabular-nums leading-none mb-0.5">{m.total_kwh}</span>
-                          )}
-                          <div className="w-full bg-zinc-800/40 rounded-sm overflow-hidden relative" style={{ height: BAR_H }}>
-                            <div
-                              className="absolute bottom-0 inset-x-0 bg-green-500 rounded-sm transition-all duration-500"
-                              style={{ height: `${kwhPct}%`, opacity: 0.25 + (kwhPct / 100) * 0.75 }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      <span className="text-[10px] text-zinc-600 mt-1">{m.month}월</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* 월별 효율 트렌드 */}
-        {!loading && months.length > 0 && (() => {
-          const recent = months.slice(0, 12).reverse();
-          const validWh = recent.filter(m => m.avg_wh_km != null).map(m => m.avg_wh_km);
-          if (validWh.length === 0) return null;
-          const maxWh = Math.max(...validWh);
-          const getColor = wh => {
-            if (wh < 220) return '#10b981'; // emerald
-            if (wh < 260) return '#eab308'; // yellow
-            return '#f97316'; // orange
-          };
-          return (
-            <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 pt-3 pb-4 mb-5">
-              <p className="text-xs font-bold text-zinc-400 mb-3">월별 효율 트렌드</p>
-              <div className="space-y-2">
-                {recent.map(m => {
-                  const label = `${String(m.year).slice(2)}/${String(m.month).padStart(2, '0')}`;
-                  const wh = m.avg_wh_km;
-                  const pct = wh != null && maxWh > 0 ? Math.min(100, (wh / maxWh) * 100) : 0;
-                  const color = wh != null ? getColor(wh) : '#3f3f46';
-                  return (
-                    <div key={label} className="flex items-center gap-2">
-                      <span className="text-[11px] text-zinc-500 w-10 flex-shrink-0 tabular-nums">{label}</span>
-                      <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                        {wh != null && (
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{ width: `${pct}%`, background: color }}
-                          />
-                        )}
-                      </div>
-                      <span className="text-[11px] tabular-nums w-14 text-right flex-shrink-0" style={{ color: wh != null ? color : '#52525b' }}>
-                        {wh != null ? `${wh.toFixed(0)} Wh/km` : '—'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* 기존 연도별 통계 */}
+        {/* 연도별 월간 통계 */}
         {error ? (
           <p className="text-red-400 text-sm text-center py-8">{error}</p>
         ) : !loading && !data ? (
@@ -456,29 +332,33 @@ export default function MonthlyPage() {
         {loading ? <Spinner /> : !error && months.length === 0 ? (
           <p className="text-center text-zinc-600 py-16">데이터가 없습니다</p>
         ) : !error && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {years.map(year => {
               const t = yearTotals[year];
               return (
-                <div key={year}>
-                  {/* 연도 헤더 */}
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="text-sm font-bold text-zinc-500">{year}</span>
-                    <div className="flex-1 h-px bg-white/5" />
+                <div key={year} className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
+                  {/* 연도 헤더 + 합계 한 줄 */}
+                  <div className="px-4 py-3 border-b border-white/[0.06]">
+                    <div className="flex items-baseline gap-3">
+                      <span className="text-base font-bold text-zinc-300">{year}</span>
+                      <div className="flex items-baseline gap-2.5 text-xs tabular-nums">
+                        <span className="text-white font-bold">{t.total_distance_km}<span className="text-zinc-600 ml-0.5">km</span></span>
+                        <span className="text-blue-400/70">{t.drive_count}<span className="text-zinc-600 ml-0.5">회</span></span>
+                        <span className="text-green-400/70">{t.total_energy_kwh}<span className="text-zinc-600 ml-0.5">kWh</span></span>
+                      </div>
+                      <div className="flex-1" />
+                      <span className="text-zinc-600 text-[11px]">월평균 <span className="text-zinc-400 font-medium">{t.avg_monthly_km}</span>km</span>
+                    </div>
                   </div>
 
-                  {/* 연간 합계 카드 */}
-                  <YearSummaryCard t={t} />
-
                   {/* 월별 목록 */}
-                  <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-                    {byYear[year].map((m, i) => (
+                  {byYear[year].map((m, i) => {
+                    const wh = m.avg_wh_km;
+                    const whColor = effColor(wh);
+                    return (
                       <div
                         key={`${m.year}-${m.month}`}
-                        className={`px-4 py-4 cursor-pointer hover:bg-white/5 transition-colors rounded ${i < byYear[year].length - 1 ? 'border-b border-white/[0.06]' : ''}`}
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`${m.month_label || `${String(m.year).slice(2)}/${String(m.month).padStart(2, '0')}`} 상세 보기`}
+                        className={`px-4 py-3 hover:bg-white/[0.03] transition-colors ${i < byYear[year].length - 1 ? 'border-b border-white/[0.06]' : ''}`}
                       >
                         <div className="flex items-center gap-2">
                           <span className="text-zinc-200 font-bold text-sm w-7 flex-shrink-0">{m.month}월</span>
@@ -488,10 +368,13 @@ export default function MonthlyPage() {
                           <span className="text-white font-bold text-sm tabular-nums flex-shrink-0">{m.total_distance_km}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
                           <span className="text-zinc-600 text-[10px] tabular-nums flex-shrink-0"><span className="text-blue-400/70">{m.drive_count}</span>회</span>
                           <span className="text-zinc-600 text-[10px] tabular-nums flex-shrink-0"><span className="text-green-400/70">{m.total_energy_kwh}</span>kWh</span>
+                          <span className="text-[10px] font-semibold tabular-nums w-12 text-right flex-shrink-0" style={{ color: whColor }}>
+                            {wh != null ? `${wh.toFixed(0)}` : '—'}<span className="text-zinc-700 ml-0.5">Wh</span>
+                          </span>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               );
             })}
