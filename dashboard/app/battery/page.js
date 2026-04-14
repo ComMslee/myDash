@@ -56,6 +56,11 @@ export default function BatteryPage() {
               <SectionLabel title="충전 습관" />
               <LevelHabitCard histogram={data.histogram} />
               <HabitTrendCard data={trend} />
+            </div>
+
+            {/* 충전 통계 */}
+            <div className="flex flex-col gap-3">
+              <SectionLabel title="충전 통계" />
               <MonthlyChargeCard />
             </div>
 

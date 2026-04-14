@@ -29,12 +29,6 @@ export default function MonthlyChargeCard() {
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      {/* 헤더 */}
-      <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
-        <span className="text-xs font-bold text-zinc-200">충전 통계</span>
-        <span className="text-[10px] text-zinc-600">전체 주기</span>
-      </div>
-
       <div className="px-4 py-3">
         {/* 3열 요약 */}
         <div className="grid grid-cols-3 divide-x divide-white/[0.06] mb-4 -mx-4 px-4">
