@@ -131,13 +131,13 @@ function MonthlyCalendar({ drives, charges, calLoading, monthlyData }) {
           className="text-sm font-bold text-zinc-200 hover:text-white transition-colors flex items-center gap-1"
         >
           {monthLabel}
-          <span className="text-[10px] text-zinc-600">{showPicker ? '▲' : '▼'}</span>
+          <span className="text-xs text-zinc-600">{showPicker ? '▲' : '▼'}</span>
         </button>
         <div className="flex-1 flex items-center justify-end gap-2 text-xs">
-          <span className="text-blue-400 tabular-nums font-bold">{summary.totalKm.toFixed(1)}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
-          <span className="text-green-400 tabular-nums font-bold">{summary.totalKwh.toFixed(1)}<span className="text-zinc-600 text-[10px] ml-0.5">kWh</span></span>
+          <span className="text-blue-400 tabular-nums font-bold">{summary.totalKm.toFixed(1)}<span className="text-zinc-600 text-xs ml-0.5">km</span></span>
+          <span className="text-green-400 tabular-nums font-bold">{summary.totalKwh.toFixed(1)}<span className="text-zinc-600 text-xs ml-0.5">kWh</span></span>
           {curMonthData?.avg_wh_km != null && (
-            <span className="tabular-nums font-bold" style={{ color: effColor(curMonthData.avg_wh_km) }}>{curMonthData.avg_wh_km.toFixed(0)}<span className="text-zinc-600 text-[10px] ml-0.5">Wh</span></span>
+            <span className="tabular-nums font-bold" style={{ color: effColor(curMonthData.avg_wh_km) }}>{curMonthData.avg_wh_km.toFixed(0)}<span className="text-zinc-600 text-xs ml-0.5">Wh</span></span>
           )}
         </div>
         <button
@@ -226,17 +226,17 @@ function MonthlyCalendar({ drives, charges, calLoading, monthlyData }) {
                   {isCur && (d.drives > 0 || d.charges > 0) && (
                     <div className="absolute top-1 right-1 flex items-center gap-0.5">
                       {d.drives > 0 && (
-                        <span className="text-[10px] font-bold text-blue-400/80 tabular-nums leading-none">{d.drives}</span>
+                        <span className="text-xs font-bold text-blue-400/80 tabular-nums leading-none">{d.drives}</span>
                       )}
                       {d.charges > 0 && (
-                        <span className="text-[10px] font-bold text-green-400/80 tabular-nums leading-none">{d.charges}</span>
+                        <span className="text-xs font-bold text-green-400/80 tabular-nums leading-none">{d.charges}</span>
                       )}
                     </div>
                   )}
                   {/* km 숫자 — 우하단 */}
                   {hasKm && (
                     <span className="absolute bottom-1 right-1.5 text-xs font-black text-blue-400 tabular-nums leading-none">
-                      {d.km.toFixed(0)}<span className="text-[9px] font-medium text-blue-400/50 ml-0.5">km</span>
+                      {d.km.toFixed(0)}<span className="text-[11px] font-medium text-blue-400/50 ml-0.5">km</span>
                     </span>
                   )}
                 </div>
@@ -391,10 +391,10 @@ export default function MonthlyPage() {
                           <div className="flex-1 min-w-0">
                             <StatBar val={m.total_distance_km} max={maxDist} color="#3b82f6" />
                           </div>
-                          <span className="text-white font-bold text-sm tabular-nums flex-shrink-0">{m.total_distance_km}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
-                          <span className="text-zinc-600 text-[10px] tabular-nums flex-shrink-0"><span className="text-blue-400/70">{m.drive_count}</span>회</span>
-                          <span className="text-zinc-600 text-[10px] tabular-nums flex-shrink-0"><span className="text-green-400/70">{m.total_energy_kwh}</span>kWh<span className="text-zinc-700 mx-0.5">·</span><span className="text-green-400/70">{m.charge_count}</span>회</span>
-                          <span className="text-[10px] font-semibold tabular-nums w-12 text-right flex-shrink-0" style={{ color: whColor }}>
+                          <span className="text-white font-bold text-sm tabular-nums flex-shrink-0">{m.total_distance_km}<span className="text-zinc-600 text-xs ml-0.5">km</span></span>
+                          <span className="text-zinc-600 text-xs tabular-nums flex-shrink-0"><span className="text-blue-400/70">{m.drive_count}</span>회</span>
+                          <span className="text-zinc-600 text-xs tabular-nums flex-shrink-0"><span className="text-green-400/70">{m.total_energy_kwh}</span>kWh<span className="text-zinc-700 mx-0.5">·</span><span className="text-green-400/70">{m.charge_count}</span>회</span>
+                          <span className="text-xs font-semibold tabular-nums w-12 text-right flex-shrink-0" style={{ color: whColor }}>
                             {wh != null ? `${wh.toFixed(0)}` : '—'}<span className="text-zinc-700 ml-0.5">Wh</span>
                           </span>
                         </div>

@@ -49,7 +49,7 @@ function DrivesSection({ drives, loading, error }) {
             <p className="text-xs text-zinc-500 mb-1 tracking-wide">{s.label}</p>
             <div className="flex items-baseline justify-center gap-1.5">
               <p className={`text-4xl font-black tabular-nums leading-none ${s.color}`}>{s.km}<span className="text-xs font-semibold text-zinc-600 ml-0.5">km</span></p>
-              <p className="text-xs text-green-400/85 tabular-nums">{s.kwh}<span className="text-[10px] ml-0.5">kWh</span></p>
+              <p className="text-xs text-green-400/85 tabular-nums">{s.kwh}<span className="text-xs ml-0.5">kWh</span></p>
             </div>
           </div>
         ))}
@@ -104,8 +104,8 @@ function DrivesSection({ drives, loading, error }) {
                 </div>
                 {/* 우측: km + kWh */}
                 <div className="text-right">
-                  <p className="text-sm font-bold text-blue-400 tabular-nums">{d.distance}<span className="text-[10px] font-medium text-zinc-600 ml-0.5">km</span></p>
-                  {kwh && <p className="text-[10px] text-green-400/80 tabular-nums">{kwh}<span className="text-[10px] ml-0.5">kWh</span></p>}
+                  <p className="text-sm font-bold text-blue-400 tabular-nums">{d.distance}<span className="text-xs font-medium text-zinc-600 ml-0.5">km</span></p>
+                  {kwh && <p className="text-xs text-green-400/80 tabular-nums">{kwh}<span className="text-xs ml-0.5">kWh</span></p>}
                 </div>
               </Link>
             );
@@ -177,7 +177,7 @@ function SixMonthCard({ insights }) {
                       style={{ height: `${pct}%`, opacity: 0.3 + (pct / 100) * 0.7 }}
                     />
                   </div>
-                  <span className="text-[9px] text-zinc-600 tabular-nums">{m.month}월</span>
+                  <span className="text-[11px] text-zinc-600 tabular-nums">{m.month}월</span>
                 </div>
               );
             })}
@@ -224,17 +224,17 @@ function SixMonthCard({ insights }) {
       {/* 시간대/요일 패턴 */}
       {insights.hourly && (
         <div className="px-4 pt-4 pb-4 border-t border-white/[0.06]">
-          <p className="text-[9px] text-zinc-600 uppercase tracking-wider mb-1.5">시간대별 주행</p>
+          <p className="text-[11px] text-zinc-600 uppercase tracking-wider mb-1.5">시간대별 주행</p>
           <HourlyHeatmap data={insights.hourly} hexColor="#3b82f6" valueKey="count" />
-          <p className="text-[9px] text-zinc-600 uppercase tracking-wider mt-4 mb-1.5">요일별 주행</p>
+          <p className="text-[11px] text-zinc-600 uppercase tracking-wider mt-4 mb-1.5">요일별 주행</p>
           <WeekdayBars data={insights.weekday} hexColor="#3b82f6" valueKey="count" />
         </div>
       )}
       {insights.charge_hourly && (
         <div className="px-4 pt-4 pb-4 border-t border-white/[0.06]">
-          <p className="text-[9px] text-zinc-600 uppercase tracking-wider mb-1.5">시간대별 충전</p>
+          <p className="text-[11px] text-zinc-600 uppercase tracking-wider mb-1.5">시간대별 충전</p>
           <HourlyHeatmap data={insights.charge_hourly} hexColor="#22c55e" valueKey="count" />
-          <p className="text-[9px] text-zinc-600 uppercase tracking-wider mt-4 mb-1.5">요일별 충전</p>
+          <p className="text-[11px] text-zinc-600 uppercase tracking-wider mt-4 mb-1.5">요일별 충전</p>
           <WeekdayBars data={insights.charge_weekday} hexColor="#22c55e" valueKey="count" />
         </div>
       )}

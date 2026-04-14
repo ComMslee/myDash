@@ -361,8 +361,8 @@ function DrivesInner() {
                   )}
                 </div>
                 <div className="flex-shrink-0 text-right tabular-nums">
-                  <p className="text-sm font-bold text-blue-400">{selectedDrive.distance}<span className="text-[10px] text-zinc-600 ml-0.5">km</span></p>
-                  {eff && <p className="text-sm font-semibold text-green-400">{eff.kwh}<span className="text-[10px] text-zinc-600 ml-0.5">kWh</span></p>}
+                  <p className="text-sm font-bold text-blue-400">{selectedDrive.distance}<span className="text-xs text-zinc-600 ml-0.5">km</span></p>
+                  {eff && <p className="text-sm font-semibold text-green-400">{eff.kwh}<span className="text-xs text-zinc-600 ml-0.5">kWh</span></p>}
                   {eff && <p className="text-xs text-amber-400">{eff.perKm}<span className="text-zinc-600 ml-0.5">Wh/km</span></p>}
                 </div>
               </div>
@@ -490,14 +490,14 @@ function DrivesInner() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-bold text-blue-400 tabular-nums">{d.distance}<span className="text-[10px] font-medium text-zinc-600 ml-0.5">km</span></p>
-                          {eff && <p className="text-[10px] text-green-400/80 tabular-nums">{eff.kwh}<span className="ml-0.5">kWh</span></p>}
+                          <p className="text-sm font-bold text-blue-400 tabular-nums">{d.distance}<span className="text-xs font-medium text-zinc-600 ml-0.5">km</span></p>
+                          {eff && <p className="text-xs text-green-400/80 tabular-nums">{eff.kwh}<span className="ml-0.5">kWh</span></p>}
                         </div>
                       </button>
                       {gapLabel && (
                         <div className="flex items-center gap-2 px-4 py-0.5 bg-[#111]">
                           <div className="flex-1 h-px bg-white/[0.04]" />
-                          <span className="text-[10px] text-zinc-600 tabular-nums">{gapLabel}</span>
+                          <span className="text-xs text-zinc-600 tabular-nums">{gapLabel}</span>
                           <div className="flex-1 h-px bg-white/[0.04]" />
                         </div>
                       )}
