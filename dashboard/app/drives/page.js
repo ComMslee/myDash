@@ -343,7 +343,12 @@ function DrivesInner() {
             })() : selectedPlace ? (
               <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center gap-3 flex-shrink-0">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
-                <p className="text-base text-zinc-300 truncate flex-1">{selectedPlace.label}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-base text-zinc-300 truncate">{selectedPlace.label}</p>
+                  {selectedPlace.last_visit && (
+                    <p className="text-xs text-zinc-600 tabular-nums">최근 {(() => { const d = new Date(selectedPlace.last_visit); return `${d.getMonth()+1}/${d.getDate()}`; })()}</p>
+                  )}
+                </div>
                 <span className="text-amber-400 text-sm tabular-nums flex-shrink-0">{selectedPlace.visit_count}회</span>
               </div>
             ) : null}
