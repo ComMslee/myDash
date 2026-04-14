@@ -368,32 +368,44 @@ function DrivesInner() {
               );
             })() : selectedPlace ? (
               <div className="px-4 py-2.5 border-b border-white/[0.06] flex-shrink-0">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 mb-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
                   <p className="text-base text-zinc-300 truncate flex-1">{selectedPlace.label}</p>
-                  <span className="text-amber-400 text-sm font-bold tabular-nums flex-shrink-0">{selectedPlace.visit_count}회</span>
+                  <span className="text-amber-400 text-sm font-bold tabular-nums flex-shrink-0">{selectedPlace.visit_count}회 방문</span>
                 </div>
-                <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500 tabular-nums pl-5">
-                  {selectedPlace.first_visit && selectedPlace.last_visit && (
-                    <span>
-                      {(() => { const d = new Date(selectedPlace.first_visit); return `${d.getMonth()+1}/${d.getDate()}`; })()}
-                      <span className="text-zinc-700 mx-0.5">~</span>
-                      {(() => { const d = new Date(selectedPlace.last_visit); return `${d.getMonth()+1}/${d.getDate()}`; })()}
-                    </span>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 pl-5 text-xs">
+                  {selectedPlace.first_visit && (
+                    <div className="flex justify-between">
+                      <span className="text-zinc-600">첫 방문</span>
+                      <span className="text-zinc-400 tabular-nums">{(() => { const d = new Date(selectedPlace.first_visit); return `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}`; })()}</span>
+                    </div>
+                  )}
+                  {selectedPlace.last_visit && (
+                    <div className="flex justify-between">
+                      <span className="text-zinc-600">최근 방문</span>
+                      <span className="text-zinc-400 tabular-nums">{(() => { const d = new Date(selectedPlace.last_visit); return `${d.getMonth()+1}.${d.getDate()}`; })()}</span>
+                    </div>
                   )}
                   {selectedPlace.avg_distance > 0 && (
-                    <span>평균 <span className="text-blue-400/80 font-semibold">{selectedPlace.avg_distance}</span>km</span>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-600">평균 거리</span>
+                      <span className="text-blue-400/80 font-semibold tabular-nums">{selectedPlace.avg_distance}km</span>
+                    </div>
                   )}
                   {selectedPlace.avg_duration > 0 && (
-                    <span><span className="text-zinc-400 font-semibold">{formatDuration(selectedPlace.avg_duration)}</span></span>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-600">평균 시간</span>
+                      <span className="text-zinc-400 font-semibold tabular-nums">{formatDuration(selectedPlace.avg_duration)}</span>
+                    </div>
                   )}
                 </div>
                 {selectedPlace.origins?.length > 0 && (
-                  <p className="text-[11px] text-zinc-600 mt-1 pl-5">
-                    주로 {selectedPlace.origins.map((o, i) => (
-                      <span key={i}>{i > 0 && ', '}<span className="text-zinc-400">{shortAddr(o.label)}</span></span>
-                    ))}에서 출발
-                  </p>
+                  <div className="flex items-center gap-1 mt-2 pl-5 text-[11px]">
+                    <span className="text-zinc-600">주요 출발지</span>
+                    {selectedPlace.origins.map((o, i) => (
+                      <span key={i} className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">{shortAddr(o.label)}</span>
+                    ))}
+                  </div>
                 )}
               </div>
             ) : null}
