@@ -355,57 +355,53 @@ export default function MonthlyPage() {
           />
         </div>
 
-        {/* 최근 6개월 추이 */}
+        {/* 최근 6개월 추이 (주행거리 + 충전량 통합) */}
         {insights?.monthlyBreakdown?.length > 0 && (() => {
           const bd = insights.monthlyBreakdown;
           const maxDist6 = Math.max(1, ...bd.map(m => m.distance));
           const maxKwh6 = Math.max(1, ...bd.map(m => m.total_kwh));
-          const BAR_H = 80;
+          const BAR_H = 100;
           return (
             <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 pt-3 pb-3 mb-5">
-              {/* 주행거리 차트 */}
-              <div className="flex items-center gap-1.5 mb-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                <span className="text-[9px] text-zinc-500 uppercase tracking-wider">주행거리</span>
+              <div className="flex items-center gap-4 mb-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-1.5 rounded-sm bg-blue-500" />
+                  <span className="text-[10px] text-zinc-500">주행거리</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-1.5 rounded-sm bg-green-500" />
+                  <span className="text-[10px] text-zinc-500">충전량</span>
+                </div>
               </div>
-              <div className="flex items-end gap-1" style={{ height: BAR_H + 32 }}>
+              <div className="flex items-end gap-1.5" style={{ height: BAR_H + 40 }}>
                 {bd.map(m => {
-                  const pct = maxDist6 > 0 ? (m.distance / maxDist6) * 100 : 0;
+                  const distPct = maxDist6 > 0 ? (m.distance / maxDist6) * 100 : 0;
+                  const kwhPct = maxKwh6 > 0 ? (m.total_kwh / maxKwh6) * 100 : 0;
                   return (
-                    <div key={`d-${m.month}`} className="flex-1 flex flex-col items-center justify-end gap-0.5">
-                      <span className="text-[9px] text-blue-400/80 tabular-nums leading-none mb-0.5">
-                        {m.distance > 0 ? m.distance : ''}
-                      </span>
-                      <div className="w-full bg-zinc-800/50 rounded-sm overflow-hidden relative" style={{ height: BAR_H }}>
-                        <div
-                          className="absolute bottom-0 inset-x-0 bg-blue-500/70 rounded-sm transition-all duration-500"
-                          style={{ height: `${pct}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-zinc-600 mt-1">{m.month}월</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* 충전량 차트 */}
-              <div className="flex items-center gap-1.5 mt-4 mb-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                <span className="text-[9px] text-zinc-500 uppercase tracking-wider">충전량</span>
-              </div>
-              <div className="flex items-end gap-1" style={{ height: BAR_H + 32 }}>
-                {bd.map(m => {
-                  const pct = maxKwh6 > 0 ? (m.total_kwh / maxKwh6) * 100 : 0;
-                  return (
-                    <div key={`c-${m.month}`} className="flex-1 flex flex-col items-center justify-end gap-0.5">
-                      <span className="text-[9px] text-green-400/80 tabular-nums leading-none mb-0.5">
-                        {m.total_kwh > 0 ? m.total_kwh : ''}
-                      </span>
-                      <div className="w-full bg-zinc-800/50 rounded-sm overflow-hidden relative" style={{ height: BAR_H }}>
-                        <div
-                          className="absolute bottom-0 inset-x-0 bg-green-500/70 rounded-sm transition-all duration-500"
-                          style={{ height: `${pct}%` }}
-                        />
+                    <div key={m.month} className="flex-1 flex flex-col items-center justify-end gap-0.5">
+                      <div className="flex items-end gap-0.5 w-full justify-center" style={{ height: BAR_H }}>
+                        <div className="flex-1 flex flex-col items-center justify-end h-full">
+                          {m.distance > 0 && (
+                            <span className="text-[8px] text-blue-400/80 tabular-nums leading-none mb-0.5">{m.distance}</span>
+                          )}
+                          <div className="w-full bg-zinc-800/40 rounded-sm overflow-hidden relative" style={{ height: BAR_H }}>
+                            <div
+                              className="absolute bottom-0 inset-x-0 bg-blue-500/70 rounded-sm transition-all duration-500"
+                              style={{ height: `${distPct}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex-1 flex flex-col items-center justify-end h-full">
+                          {m.total_kwh > 0 && (
+                            <span className="text-[8px] text-green-400/80 tabular-nums leading-none mb-0.5">{m.total_kwh}</span>
+                          )}
+                          <div className="w-full bg-zinc-800/40 rounded-sm overflow-hidden relative" style={{ height: BAR_H }}>
+                            <div
+                              className="absolute bottom-0 inset-x-0 bg-green-500/70 rounded-sm transition-all duration-500"
+                              style={{ height: `${kwhPct}%` }}
+                            />
+                          </div>
+                        </div>
                       </div>
                       <span className="text-[10px] text-zinc-600 mt-1">{m.month}월</span>
                     </div>
