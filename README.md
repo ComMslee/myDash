@@ -74,7 +74,7 @@ docker compose -p teslamate up -d
 | Docker Desktop | Windows 레지스트리 Run 키 (자동 설치됨) |
 | TeslaMate / DB / Mosquitto / Dashboard | `restart: always` |
 | Tailscale VPN | Windows 서비스 (자동 시작) |
-| GitHub Actions Runner | Windows 레지스트리 Run 키 |
+| GitHub Actions Runner | 시작프로그램 폴더 (자동 재시작 스크립트) |
 
 ## CI/CD (GitHub Actions)
 
@@ -87,10 +87,15 @@ git push → GitHub Actions → self-hosted runner → docker compose build & up
 ### Self-hosted Runner 설정 (Windows)
 
 1. `C:\actions-runner`에 runner 설치 및 설정
-2. 로그인 시 자동 시작 (레지스트리 Run 키):
-   ```
-   HKCU\Software\Microsoft\Windows\CurrentVersion\Run
-   GitHubActionsRunner = powershell.exe -WindowStyle Hidden ...
+2. 로그인 시 자동 시작 + **runner 비정상 종료 시 자동 재시작**:
+   - `C:\actions-runner\restart-runner.ps1` — 무한 루프로 Runner.Listener.exe 관리
+   - 종료 코드별 대기 후 재시작 (정상/세션충돌 10초, 에러 15초, retryable 5초, 업데이트 30초)
+   - 재시작 이력은 `C:\actions-runner\auto-restart.log`에 기록
+   - `C:\Users\lg\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\GitHubActionsRunner.lnk`로 로그인 시 자동 실행
+
+   수동으로 다시 시작하려면:
+   ```powershell
+   Start-Process powershell.exe -ArgumentList '-NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\actions-runner\restart-runner.ps1' -WorkingDirectory 'C:\actions-runner'
    ```
 
 ### GitHub Secrets 설정
