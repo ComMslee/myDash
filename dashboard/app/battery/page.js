@@ -51,17 +51,17 @@ export default function BatteryPage() {
               <CapacityTrendCard data={trend} />
             </div>
 
+            {/* 충전 통계 */}
+            <div className="flex flex-col gap-3">
+              <SectionLabel title="충전 통계" />
+              <MonthlyChargeCard />
+            </div>
+
             {/* 충전 습관 */}
             <div className="flex flex-col gap-3">
               <SectionLabel title="충전 습관" />
               <LevelHabitCard histogram={data.histogram} />
               <HabitTrendCard data={trend} />
-            </div>
-
-            {/* 충전 통계 */}
-            <div className="flex flex-col gap-3">
-              <SectionLabel title="충전 통계" />
-              <MonthlyChargeCard />
             </div>
 
             {/* 급속 충전 */}
