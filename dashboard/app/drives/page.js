@@ -94,11 +94,37 @@ function DriveMap({ positions, loading, placeMarker, visible }) {
 
     if (!positions || positions.length < 2) return;
     const latlngs = positions.map(p => [p.lat, p.lng]);
-    polyRef.current = L.polyline(latlngs, { color: '#3b82f6', weight: 5, opacity: 0.85 }).addTo(map);
+    const hasSpeed = positions.some(p => p.speed != null);
+
+    if (hasSpeed) {
+      // 속도별 구간 색상 — ~15개 청크로 분할
+      const CHUNKS = Math.min(15, Math.ceil(positions.length / 3));
+      const chunkSize = Math.ceil(positions.length / CHUNKS);
+      const speedColor = (spd) => {
+        if (spd <= 30) return '#22c55e';   // 저속 — 초록
+        if (spd <= 60) return '#3b82f6';   // 시내 — 파랑
+        if (spd <= 90) return '#f59e0b';   // 중속 — 노랑
+        return '#ef4444';                   // 고속 — 빨강
+      };
+      const group = L.layerGroup().addTo(map);
+      for (let i = 0; i < CHUNKS; i++) {
+        const start = i * chunkSize;
+        const end = Math.min(start + chunkSize + 1, positions.length);
+        const segment = positions.slice(start, end);
+        if (segment.length < 2) continue;
+        const avgSpd = segment.reduce((s, p) => s + (p.speed || 0), 0) / segment.length;
+        const segLatLngs = segment.map(p => [p.lat, p.lng]);
+        L.polyline(segLatLngs, { color: speedColor(avgSpd), weight: 5, opacity: 0.85 }).addTo(group);
+      }
+      polyRef.current = group;
+    } else {
+      polyRef.current = L.polyline(latlngs, { color: '#3b82f6', weight: 5, opacity: 0.85 }).addTo(map);
+    }
+
     const mkStart = L.circleMarker(latlngs[0], { radius: 7, fillColor: '#22c55e', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
     const mkEnd = L.circleMarker(latlngs[latlngs.length - 1], { radius: 7, fillColor: '#ef4444', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
     markersRef.current = [mkStart, mkEnd];
-    map.fitBounds(polyRef.current.getBounds(), { padding: [50, 50] });
+    map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50] });
   }, [positions, placeMarker]);
 
   useEffect(() => {
