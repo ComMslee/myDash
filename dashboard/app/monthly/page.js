@@ -221,16 +221,18 @@ function MonthlyCalendar({ drives, charges, calLoading, monthlyData }) {
                   key={idx}
                   className={`relative aspect-square rounded-lg overflow-hidden flex flex-col ${bgClass} ${isToday ? 'ring-1 ring-amber-400/80 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.3)]' : ''}`}
                 >
-                  {/* 날짜 + 주행/충전 횟수 — 상단 */}
-                  <div className="absolute top-1 left-1.5 right-1 flex items-center gap-0.5">
-                    <span className={`text-xs font-bold tabular-nums leading-none ${dayColor}`}>{day}</span>
-                    {isCur && d.drives > 0 && (
-                      <span className="text-[8px] font-bold text-blue-400/70 tabular-nums leading-none">{d.drives}</span>
-                    )}
-                    {isCur && d.charges > 0 && (
-                      <span className="text-[8px] font-bold text-green-400/70 tabular-nums leading-none">{d.charges}</span>
-                    )}
-                  </div>
+                  {/* 날짜(좌) + 주행/충전 횟수(우) — 상단 */}
+                  <span className={`absolute top-1 left-1.5 text-xs font-bold tabular-nums leading-none ${dayColor}`}>{day}</span>
+                  {isCur && (d.drives > 0 || d.charges > 0) && (
+                    <div className="absolute top-1 right-1 flex items-center gap-0.5">
+                      {d.drives > 0 && (
+                        <span className="text-[10px] font-bold text-blue-400/80 tabular-nums leading-none">{d.drives}</span>
+                      )}
+                      {d.charges > 0 && (
+                        <span className="text-[10px] font-bold text-green-400/80 tabular-nums leading-none">{d.charges}</span>
+                      )}
+                    </div>
+                  )}
                   {/* km 숫자 — 우하단 */}
                   {hasKm && (
                     <span className="absolute bottom-1 right-1.5 text-xs font-black text-blue-400 tabular-nums leading-none">
