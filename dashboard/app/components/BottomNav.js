@@ -34,6 +34,15 @@ export default function BottomNav() {
         </svg>
       ),
     },
+    {
+      href: '/battery',
+      label: '배터리',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2h-2M9 3a1 1 0 011-1h4a1 1 0 011 1v0a1 1 0 01-1 1H10a1 1 0 01-1-1v0zM9 12h6M9 16h4" />
+        </svg>
+      ),
+    },
   ];
 
   return (
