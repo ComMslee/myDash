@@ -59,14 +59,16 @@ export default function IdleDrainCard({ records }) {
         return (
           <div
             key={i}
-            className="flex items-center gap-2 px-4 py-2 border-t border-white/[0.04]"
+            className="flex items-center justify-between px-4 py-2.5 border-t border-white/[0.04]"
           >
             <span className="text-[10px] text-zinc-400 tabular-nums whitespace-nowrap">{formatDate(r.idle_start)}</span>
-            <span className="text-[10px] text-zinc-600 tabular-nums whitespace-nowrap">{formatDuration(r.idle_hours)}</span>
-            <span className="text-[10px] text-zinc-600 tabular-nums">{r.soc_start}→{r.soc_end}%</span>
-            <span className={`text-[10px] font-bold tabular-nums ml-auto ${r.soc_drop === 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {r.soc_drop === 0 ? '0%' : `-${r.soc_drop}%`}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] text-zinc-600 tabular-nums whitespace-nowrap">{formatDuration(r.idle_hours)}</span>
+              <span className="text-[10px] text-zinc-600 tabular-nums">{r.soc_start}→{r.soc_end}%</span>
+              <span className={`text-[10px] font-bold tabular-nums ${r.soc_drop === 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {r.soc_drop === 0 ? '0%' : `-${r.soc_drop}%`}
+              </span>
+            </div>
           </div>
         );
       })}
