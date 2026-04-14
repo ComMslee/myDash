@@ -6,18 +6,26 @@ import { formatDuration, shortAddr } from '@/lib/format';
 export default function FastChargeCard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     fetch('/api/fast-charges')
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch(() => { setError(true); setLoading(false); });
   }, []);
 
   if (loading) {
     return (
       <div className="bg-[#161618] border border-white/[0.06] rounded-2xl flex items-center justify-center py-10">
         <div className="w-5 h-5 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-6 text-center">
+        <p className="text-zinc-500 text-sm">데이터를 불러올 수 없습니다</p>
       </div>
     );
   }
