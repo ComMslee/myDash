@@ -34,6 +34,10 @@ export async function GET() {
     // KST 기준 이번달 시작 (UTC)
     const thisMonthStartUTC = new Date(Date.UTC(nowKST.getUTCFullYear(), nowKST.getUTCMonth(), 1) - KST);
 
+    // 최근 1달 / 6개월 필터
+    const oneMonthAgoUTC = new Date(now.getTime() - 30 * 86400000);
+    const sixMonthsAgoUTC = new Date(now.getTime() - 180 * 86400000);
+
     const [
       capacityFromChargeResult,
       capacityFromPositionsResult,
@@ -56,6 +60,14 @@ export async function GET() {
       histEndResult,
       socDistResult,
       idleDrainResult,
+      dailyMaxCharge1mResult,
+      dailyMinCharge1mResult,
+      dailyMaxDrive1mResult,
+      dailyMinDrive1mResult,
+      dailyMaxCharge6mResult,
+      dailyMinCharge6mResult,
+      dailyMaxDrive6mResult,
+      dailyMinDrive6mResult,
     ] = await Promise.all([
       // 배터리 용량 추정 1순위: 충전 세션 역산
       pool.query(`
@@ -263,6 +275,78 @@ export async function GET() {
         ORDER BY idle_start DESC
         LIMIT 20
       `, [carId]),
+
+      // 최근 1달 일간 레코드
+      pool.query(`
+        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
+               SUM(CASE WHEN end_battery_level IS NOT NULL AND start_battery_level IS NOT NULL
+                        THEN GREATEST(end_battery_level - start_battery_level, 0) ELSE 0 END)::int AS charge_pct,
+               SUM(charge_energy_added)::float AS kwh
+        FROM charging_processes
+        WHERE car_id = $1 AND charge_energy_added IS NOT NULL AND start_date >= $2
+        GROUP BY day ORDER BY kwh DESC LIMIT 1
+      `, [carId, oneMonthAgoUTC]),
+      pool.query(`
+        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
+               SUM(CASE WHEN end_battery_level IS NOT NULL AND start_battery_level IS NOT NULL
+                        THEN GREATEST(end_battery_level - start_battery_level, 0) ELSE 0 END)::int AS charge_pct,
+               SUM(charge_energy_added)::float AS kwh
+        FROM charging_processes
+        WHERE car_id = $1 AND charge_energy_added IS NOT NULL AND start_date >= $2
+        GROUP BY day HAVING SUM(charge_energy_added) >= 1
+        ORDER BY kwh ASC LIMIT 1
+      `, [carId, oneMonthAgoUTC]),
+      pool.query(`
+        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
+               SUM(CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
+                        THEN GREATEST(start_rated_range_km - end_rated_range_km, 0) ELSE 0 END)::float AS range_used_km
+        FROM drives WHERE car_id = $1 AND start_date >= $2
+        GROUP BY day ORDER BY range_used_km DESC LIMIT 1
+      `, [carId, oneMonthAgoUTC]),
+      pool.query(`
+        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
+               SUM(CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
+                        THEN GREATEST(start_rated_range_km - end_rated_range_km, 0) ELSE 0 END)::float AS range_used_km
+        FROM drives WHERE car_id = $1 AND start_date >= $2
+        GROUP BY day HAVING SUM(distance) > 0
+        ORDER BY range_used_km ASC LIMIT 1
+      `, [carId, oneMonthAgoUTC]),
+
+      // 최근 6개월 일간 레코드
+      pool.query(`
+        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
+               SUM(CASE WHEN end_battery_level IS NOT NULL AND start_battery_level IS NOT NULL
+                        THEN GREATEST(end_battery_level - start_battery_level, 0) ELSE 0 END)::int AS charge_pct,
+               SUM(charge_energy_added)::float AS kwh
+        FROM charging_processes
+        WHERE car_id = $1 AND charge_energy_added IS NOT NULL AND start_date >= $2
+        GROUP BY day ORDER BY kwh DESC LIMIT 1
+      `, [carId, sixMonthsAgoUTC]),
+      pool.query(`
+        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
+               SUM(CASE WHEN end_battery_level IS NOT NULL AND start_battery_level IS NOT NULL
+                        THEN GREATEST(end_battery_level - start_battery_level, 0) ELSE 0 END)::int AS charge_pct,
+               SUM(charge_energy_added)::float AS kwh
+        FROM charging_processes
+        WHERE car_id = $1 AND charge_energy_added IS NOT NULL AND start_date >= $2
+        GROUP BY day HAVING SUM(charge_energy_added) >= 1
+        ORDER BY kwh ASC LIMIT 1
+      `, [carId, sixMonthsAgoUTC]),
+      pool.query(`
+        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
+               SUM(CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
+                        THEN GREATEST(start_rated_range_km - end_rated_range_km, 0) ELSE 0 END)::float AS range_used_km
+        FROM drives WHERE car_id = $1 AND start_date >= $2
+        GROUP BY day ORDER BY range_used_km DESC LIMIT 1
+      `, [carId, sixMonthsAgoUTC]),
+      pool.query(`
+        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
+               SUM(CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
+                        THEN GREATEST(start_rated_range_km - end_rated_range_km, 0) ELSE 0 END)::float AS range_used_km
+        FROM drives WHERE car_id = $1 AND start_date >= $2
+        GROUP BY day HAVING SUM(distance) > 0
+        ORDER BY range_used_km ASC LIMIT 1
+      `, [carId, sixMonthsAgoUTC]),
     ]);
 
     // 배터리 용량: 1순위 충전역산, 2순위 positions역산, 3순위 상수
@@ -465,10 +549,24 @@ export async function GET() {
     return Response.json({
       weekly,
       daily_records: {
-        max_charge: fmtCharge(dailyMaxChargeResult.rows[0]),
-        min_charge: fmtCharge(dailyMinChargeResult.rows[0]),
-        max_consume: fmtDrive(dailyMaxDriveResult.rows[0]),
-        min_consume: fmtDrive(dailyMinDriveResult.rows[0]),
+        all: {
+          max_charge: fmtCharge(dailyMaxChargeResult.rows[0]),
+          min_charge: fmtCharge(dailyMinChargeResult.rows[0]),
+          max_consume: fmtDrive(dailyMaxDriveResult.rows[0]),
+          min_consume: fmtDrive(dailyMinDriveResult.rows[0]),
+        },
+        month: {
+          max_charge: fmtCharge(dailyMaxCharge1mResult.rows[0]),
+          min_charge: fmtCharge(dailyMinCharge1mResult.rows[0]),
+          max_consume: fmtDrive(dailyMaxDrive1mResult.rows[0]),
+          min_consume: fmtDrive(dailyMinDrive1mResult.rows[0]),
+        },
+        six_month: {
+          max_charge: fmtCharge(dailyMaxCharge6mResult.rows[0]),
+          min_charge: fmtCharge(dailyMinCharge6mResult.rows[0]),
+          max_consume: fmtDrive(dailyMaxDrive6mResult.rows[0]),
+          min_consume: fmtDrive(dailyMinDrive6mResult.rows[0]),
+        },
       },
       histogram: {
         start_level: histStart,

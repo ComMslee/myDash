@@ -122,6 +122,7 @@ export async function GET() {
       max_duration: Math.max(0, ...sixMonthBreakdown.map(m => m.max_duration)),
       max_speed: Math.max(0, ...sixMonthBreakdown.map(m => m.max_speed)),
     };
+    const avg_speed6m = agg.duration_min > 0 ? parseFloat((agg.distance / Math.max(1, agg.duration_min) * 60).toFixed(1)) : 0;
     const eff6m = agg.distance > 0 ? (agg.total_range_used * KWH_PER_KM / agg.distance * 1000) : 0;
 
     return Response.json({
@@ -158,6 +159,7 @@ export async function GET() {
         max_distance: parseFloat(agg.max_distance.toFixed(1)),
         max_duration: agg.max_duration,
         max_speed: agg.max_speed,
+        avg_speed: avg_speed6m,
         efficiency_wh_km: parseFloat(eff6m.toFixed(0)),
       },
       monthlyBreakdown: sixMonthBreakdown.map(m => ({

@@ -2,40 +2,28 @@
 
 import { useState, useEffect } from 'react';
 import HealthScoreCard from './HealthScoreCard';
-import WeeklyCard from './WeeklyCard';
 import IdleDrainCard from './IdleDrainCard';
-import { DailyRecordsCard, LevelHabitCard } from './RecordsHabit';
-
-function Spinner() {
-  return (
-    <div className="flex items-center justify-center py-20">
-      <div className="w-7 h-7 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
-    </div>
-  );
-}
-
-function SectionLabel({ title }) {
-  return (
-    <div className="flex items-center px-0.5 mb-2">
-      <span className="text-[10px] font-bold tracking-widest uppercase text-zinc-600">{title}</span>
-    </div>
-  );
-}
-
-// ── 메인 페이지 ───────────────────────────────────────────
+import { LevelHabitCard } from './RecordsHabit';
+import MonthlyChargeCard from './MonthlyChargeCard';
+import { CapacityTrendCard, HabitTrendCard } from './BatteryTrendCard';
+import { Spinner, SectionLabel } from '@/app/components/PageLayout';
 
 export default function BatteryPage() {
   const [data, setData] = useState(null);
+  const [trend, setTrend] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     setLoading(true);
-    fetch('/api/battery')
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) throw new Error(d.error);
-        setData(d);
+    Promise.all([
+      fetch('/api/battery').then(r => r.json()),
+      fetch('/api/battery-trend').then(r => r.json()),
+    ])
+      .then(([batteryData, trendData]) => {
+        if (batteryData.error) throw new Error(batteryData.error);
+        setData(batteryData);
+        setTrend(trendData.error ? null : trendData);
         setLoading(false);
       })
       .catch(e => {
@@ -55,29 +43,25 @@ export default function BatteryPage() {
           </div>
         ) : data ? (
           <>
-            <div>
-              <SectionLabel title="배터리 관리 점수" />
+            {/* 배터리 상태 */}
+            <div className="flex flex-col gap-3">
+              <SectionLabel title="배터리 상태" />
               <HealthScoreCard data={data.health} />
+              <CapacityTrendCard data={trend} />
             </div>
 
-            <div>
-              <SectionLabel title="주간 패턴" />
-              <WeeklyCard weeks={data.weekly} />
-            </div>
-
-            <div>
-              <SectionLabel title="일간 레코드" />
-              <DailyRecordsCard records={data.daily_records} />
-            </div>
-
-            <div>
-              <SectionLabel title="대기 중 배터리 소모" />
-              <IdleDrainCard records={data.idle_drain} />
-            </div>
-
-            <div>
-              <SectionLabel title="충전 레벨 습관" />
+            {/* 충전 습관 */}
+            <div className="flex flex-col gap-3">
+              <SectionLabel title="충전 습관" />
               <LevelHabitCard histogram={data.histogram} />
+              <HabitTrendCard data={trend} />
+              <MonthlyChargeCard />
+            </div>
+
+            {/* 대기 소모 */}
+            <div className="flex flex-col gap-3">
+              <SectionLabel title="대기 소모" />
+              <IdleDrainCard records={data.idle_drain} />
             </div>
           </>
         ) : null}

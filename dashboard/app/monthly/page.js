@@ -3,14 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useMock, MOCK_DATA } from '../context/mock';
 import { formatDuration } from '../../lib/format';
-
-function Spinner() {
-  return (
-    <div className="flex items-center justify-center py-16">
-      <div className="w-7 h-7 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
-    </div>
-  );
-}
+import { Spinner } from '@/app/components/PageLayout';
 
 function StatBar({ val, max, color }) {
   const pct = max > 0 ? Math.min(100, (val / max) * 100) : 0;
@@ -404,6 +397,48 @@ export default function MonthlyPage() {
                         </div>
                       </div>
                       <span className="text-[10px] text-zinc-600 mt-1">{m.month}월</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* 월별 효율 트렌드 */}
+        {!loading && months.length > 0 && (() => {
+          const recent = months.slice(0, 12).reverse();
+          const validWh = recent.filter(m => m.avg_wh_km != null).map(m => m.avg_wh_km);
+          if (validWh.length === 0) return null;
+          const maxWh = Math.max(...validWh);
+          const getColor = wh => {
+            if (wh < 220) return '#10b981'; // emerald
+            if (wh < 260) return '#eab308'; // yellow
+            return '#f97316'; // orange
+          };
+          return (
+            <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 pt-3 pb-4 mb-5">
+              <p className="text-xs font-bold text-zinc-400 mb-3">월별 효율 트렌드</p>
+              <div className="space-y-2">
+                {recent.map(m => {
+                  const label = `${String(m.year).slice(2)}/${String(m.month).padStart(2, '0')}`;
+                  const wh = m.avg_wh_km;
+                  const pct = wh != null && maxWh > 0 ? Math.min(100, (wh / maxWh) * 100) : 0;
+                  const color = wh != null ? getColor(wh) : '#3f3f46';
+                  return (
+                    <div key={label} className="flex items-center gap-2">
+                      <span className="text-[11px] text-zinc-500 w-10 flex-shrink-0 tabular-nums">{label}</span>
+                      <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                        {wh != null && (
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${pct}%`, background: color }}
+                          />
+                        )}
+                      </div>
+                      <span className="text-[11px] tabular-nums w-14 text-right flex-shrink-0" style={{ color: wh != null ? color : '#52525b' }}>
+                        {wh != null ? `${wh.toFixed(0)} Wh/km` : '—'}
+                      </span>
                     </div>
                   );
                 })}

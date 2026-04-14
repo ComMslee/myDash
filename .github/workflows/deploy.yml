@@ -1,0 +1,30 @@
+name: Deploy Dashboard
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Write .env
+        shell: bash
+        run: |
+          printf 'TM_DB_USER=%s\n' "${{ secrets.TM_DB_USER }}" > .env
+          printf 'TM_DB_PASS=%s\n' "${{ secrets.TM_DB_PASS }}" >> .env
+          printf 'TM_DB_NAME=%s\n' "${{ secrets.TM_DB_NAME }}" >> .env
+          printf 'ENCRYPTION_KEY=%s\n' "${{ secrets.ENCRYPTION_KEY }}" >> .env
+
+      - name: Build dashboard
+        shell: bash
+        run: docker compose -p teslamate build dashboard
+
+      - name: Restart dashboard
+        shell: bash
+        run: docker compose -p teslamate up -d dashboard

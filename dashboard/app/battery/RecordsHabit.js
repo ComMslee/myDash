@@ -1,14 +1,6 @@
 // RecordsHabit.js
-
-function formatKorDate(dateStr) {
-  if (!dateStr) return null;
-  const parts = String(dateStr).split('T')[0].split('-');
-  const year = parseInt(parts[0]);
-  const mm = String(parseInt(parts[1])).padStart(2, '0');
-  const dd = String(parseInt(parts[2])).padStart(2, '0');
-  const currentYear = new Date().getFullYear();
-  return year !== currentYear ? `${String(year).slice(2)}/${mm}/${dd}` : `${mm}/${dd}`;
-}
+import { useState } from 'react';
+import { formatKorDate } from '@/lib/format';
 
 function HistBar({ counts, color }) {
   const total = counts.reduce((a, b) => a + b, 0);
@@ -50,41 +42,50 @@ function HistBar({ counts, color }) {
   );
 }
 
+const PERIODS = [
+  { key: 'all', label: '전체' },
+  { key: 'six_month', label: '6개월' },
+  { key: 'month', label: '1달' },
+];
+
 export function DailyRecordsCard({ records }) {
+  const [period, setPeriod] = useState('all');
+  const r = records[period] || records.all || records;
+
   const cells = [
     {
       icon: '🔋',
       label: '가장 많이 충전',
-      data: records.max_charge,
-      mainVal: records.max_charge ? `${records.max_charge.kwh} kWh` : null,
-      subVal: records.max_charge ? `+${records.max_charge.charge_pct}%` : null,
+      data: r.max_charge,
+      mainVal: r.max_charge ? `${r.max_charge.kwh} kWh` : null,
+      subVal: r.max_charge ? `+${r.max_charge.charge_pct}%` : null,
       valClass: 'text-emerald-400',
       accentClass: 'bg-emerald-500',
     },
     {
       icon: '⚡',
       label: '가장 많이 소비',
-      data: records.max_consume,
-      mainVal: records.max_consume ? `${records.max_consume.consume_kwh} kWh` : null,
-      subVal: records.max_consume ? `-${records.max_consume.consume_pct}%` : null,
+      data: r.max_consume,
+      mainVal: r.max_consume ? `${r.max_consume.consume_kwh} kWh` : null,
+      subVal: r.max_consume ? `-${r.max_consume.consume_pct}%` : null,
       valClass: 'text-blue-400',
       accentClass: 'bg-blue-500',
     },
     {
       icon: '💤',
       label: '가장 적게 충전',
-      data: records.min_charge,
-      mainVal: records.min_charge ? `${records.min_charge.kwh} kWh` : null,
-      subVal: records.min_charge ? `+${records.min_charge.charge_pct}%` : null,
+      data: r.min_charge,
+      mainVal: r.min_charge ? `${r.min_charge.kwh} kWh` : null,
+      subVal: r.min_charge ? `+${r.min_charge.charge_pct}%` : null,
       valClass: 'text-emerald-300',
       accentClass: 'bg-emerald-500',
     },
     {
       icon: '🛑',
       label: '가장 적게 소비',
-      data: records.min_consume,
-      mainVal: records.min_consume ? `${records.min_consume.consume_kwh} kWh` : null,
-      subVal: records.min_consume ? `-${records.min_consume.consume_pct}%` : null,
+      data: r.min_consume,
+      mainVal: r.min_consume ? `${r.min_consume.consume_kwh} kWh` : null,
+      subVal: r.min_consume ? `-${r.min_consume.consume_pct}%` : null,
       valClass: 'text-blue-300',
       accentClass: 'bg-blue-500',
     },
@@ -92,8 +93,23 @@ export function DailyRecordsCard({ records }) {
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center gap-2">
+      <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center justify-between">
         <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">일간 최고 기록</span>
+        <div className="flex items-center gap-1">
+          {PERIODS.map(p => (
+            <button
+              key={p.key}
+              onClick={() => setPeriod(p.key)}
+              className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                period === p.key
+                  ? 'bg-blue-400/[0.15] border-blue-400/30 text-blue-300'
+                  : 'border-white/[0.08] text-zinc-600 hover:text-zinc-400'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="grid grid-cols-2">
         {cells.map((c, i) => {

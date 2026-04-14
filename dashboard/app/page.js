@@ -5,18 +5,12 @@ import Link from 'next/link';
 import { useMock, MOCK_DATA } from './context/mock';
 import { KWH_PER_KM, RATED_RANGE_MAX_KM } from '../lib/constants';
 import { formatDuration, shortAddr } from '../lib/format';
+import { Card } from './components/PageLayout';
+import { HourlyHeatmap, WeekdayBars } from './components/ChartWidgets';
 
 const REFRESH_INTERVAL = 30000;
 
 // ── 공통 컴포넌트 ──────────────────────────────────────────
-
-function Card({ children, className = '' }) {
-  return (
-    <div className={`bg-[#161618] border border-white/[0.06] rounded-2xl shadow-lg ${className}`}>
-      {children}
-    </div>
-  );
-}
 
 function SectionHeader({ title }) {
   return (
@@ -124,53 +118,6 @@ function DrivesSection({ drives, loading, error }) {
   );
 }
 
-// ── 인사이트 공통 컴포넌트 ──────────────────────────────────
-
-function HourlyHeatmap({ data, hexColor, valueKey = 'count' }) {
-  const max = Math.max(1, ...data.map(h => h[valueKey]));
-  return (
-    <div>
-      <div className="flex gap-0.5 h-4">
-        {data.map(h => {
-          const ratio = h[valueKey] / max;
-          return (
-            <div key={h.hour} className="flex-1 rounded-[3px]"
-              style={{ background: hexColor, opacity: 0.18 + ratio * 0.82 }}
-              title={`${h.hour}시: ${h[valueKey]}회`} />
-          );
-        })}
-      </div>
-      <div className="flex justify-between mt-1 text-xs text-zinc-500 px-px" aria-hidden="true">
-        <span className="font-semibold">0시</span><span>6</span><span>12</span><span>18</span><span>23시</span>
-      </div>
-    </div>
-  );
-}
-
-function WeekdayBars({ data, barClass, valueKey = 'count' }) {
-  const max = Math.max(1, ...data.map(d => d[valueKey]));
-  const weekdayLabels = ['일', '월', '화', '수', '목', '금', '토'];
-  return (
-    <div className="grid grid-cols-7 gap-1">
-      {data.map(d => {
-        const pct = (d[valueKey] / max) * 100;
-        return (
-          <div key={d.dow} className="flex flex-col items-center gap-0.5" title={`${weekdayLabels[d.dow]}: ${d[valueKey]}회`}>
-            <div className="w-full h-9 bg-zinc-800/40 rounded-sm relative overflow-hidden">
-              <div
-                className={`absolute bottom-0 inset-x-0 rounded-sm transition-all ${barClass}`}
-                style={{ height: `${pct}%`, opacity: 0.5 + (pct / 100) * 0.5 }}
-              />
-            </div>
-            <span className="text-xs font-semibold text-zinc-500">{weekdayLabels[d.dow]}</span>
-            <span className="text-zinc-600 text-xs tabular-nums">{d[valueKey]}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 // ── 최근 6개월 통합 카드 ────────────────────────────────────
 
 function SixMonthCard({ insights }) {
@@ -241,8 +188,8 @@ function SixMonthCard({ insights }) {
                 <p className="text-zinc-600 text-xs">최장 시간</p>
               </div>
               <div className="text-center">
-                <p className="text-white font-bold text-base tabular-nums">{c.max_speed}<span className="text-zinc-600 text-xs ml-0.5">km/h</span></p>
-                <p className="text-zinc-600 text-xs">최고 속도</p>
+                <p className="text-white font-bold text-base tabular-nums">{c.avg_speed}<span className="text-zinc-600 text-xs ml-0.5">km/h</span></p>
+                <p className="text-zinc-600 text-xs">평균 속도</p>
               </div>
             </div>
           </div>
@@ -251,7 +198,7 @@ function SixMonthCard({ insights }) {
               <p className="text-[9px] text-zinc-600 uppercase tracking-wider mb-1.5">시간대별 주행</p>
               <HourlyHeatmap data={insights.hourly} hexColor="#3b82f6" valueKey="count" />
               <p className="text-[9px] text-zinc-600 uppercase tracking-wider mt-4 mb-1.5">요일별 주행</p>
-              <WeekdayBars data={insights.weekday} barClass="bg-blue-500" valueKey="count" />
+              <WeekdayBars data={insights.weekday} hexColor="#3b82f6" valueKey="count" />
             </div>
           )}
         </div>
@@ -294,7 +241,7 @@ function SixMonthCard({ insights }) {
               <p className="text-[9px] text-zinc-600 uppercase tracking-wider mb-1.5">시간대별 충전</p>
               <HourlyHeatmap data={insights.charge_hourly} hexColor="#22c55e" valueKey="count" />
               <p className="text-[9px] text-zinc-600 uppercase tracking-wider mt-4 mb-1.5">요일별 충전</p>
-              <WeekdayBars data={insights.charge_weekday} barClass="bg-green-500" valueKey="count" />
+              <WeekdayBars data={insights.charge_weekday} hexColor="#22c55e" valueKey="count" />
             </div>
           )}
         </div>
