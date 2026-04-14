@@ -67,23 +67,23 @@ function DrivesSection({ drives, loading, error }) {
           {list.slice(0, 3).map((d) => {
             const startPct = d.start_battery_level ?? (d.start_rated_range_km != null ? Math.min(100, Math.round(d.start_rated_range_km / RATED_RANGE_MAX_KM * 100)) : null);
             const endPct   = d.end_battery_level   ?? (d.end_rated_range_km   != null ? Math.min(100, Math.round(d.end_rated_range_km   / RATED_RANGE_MAX_KM * 100)) : null);
-            const usedPct = startPct != null && endPct != null ? Math.max(0, startPct - endPct) : 0;
             const kwh = (d.start_rated_range_km != null && d.end_rated_range_km != null)
               ? ((d.start_rated_range_km - d.end_rated_range_km) * KWH_PER_KM).toFixed(1)
               : null;
             const dt = new Date(d.start_date);
             const dateLabel = `${dt.getMonth()+1}/${dt.getDate()}`;
             const timeLabel = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+            const endTimeLabel = d.end_date ? `${String(new Date(d.end_date).getHours()).padStart(2,'0')}:${String(new Date(d.end_date).getMinutes()).padStart(2,'0')}` : null;
             return (
               <Link
                 key={d.id}
                 href={`/drives?id=${d.id}`}
-                className="grid grid-cols-[62px_1fr_auto] items-center gap-2.5 px-3.5 py-3 border-b border-white/[0.06] last:border-0 hover:bg-white/[0.025] transition-colors"
+                className="grid grid-cols-[52px_1fr_auto] items-center gap-2 px-3.5 py-2.5 border-b border-white/[0.06] last:border-0 hover:bg-white/[0.025] transition-colors"
               >
-                {/* 좌측: 날짜 + 시각 */}
+                {/* 좌측: 시각 */}
                 <div className="text-xs text-zinc-500 leading-tight tabular-nums">
                   <p className="text-zinc-300 font-bold text-sm">{dateLabel}</p>
-                  <p>{timeLabel}</p>
+                  <p>{timeLabel}{endTimeLabel && `~${endTimeLabel}`}</p>
                 </div>
                 {/* 중앙: 경로 + 메타 */}
                 <div className="min-w-0">
@@ -92,12 +92,12 @@ function DrivesSection({ drives, loading, error }) {
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs text-zinc-600 tabular-nums">{formatDuration(d.duration_min)}</span>
-                    {/* 배터리 막대 */}
                     {startPct != null && endPct != null && (
                       <div className="flex items-center gap-1 text-xs text-zinc-500 tabular-nums">
                         <span>{startPct}%</span>
-                        <div className="w-11 h-1.5 bg-zinc-700 rounded-sm overflow-hidden relative">
-                          <div className="absolute inset-y-0 left-0 rounded-sm" style={{ width: `${usedPct}%`, background: 'linear-gradient(90deg, rgba(96,165,250,.5), rgba(248,113,113,.6))' }} />
+                        <div className="w-12 h-1.5 bg-zinc-800 rounded-sm overflow-hidden relative">
+                          <div className="absolute inset-y-0 rounded-sm bg-blue-400/30" style={{ left: `${endPct}%`, width: `${startPct - endPct}%` }} />
+                          <div className="absolute inset-y-0 rounded-sm bg-green-400/40" style={{ left: 0, width: `${endPct}%` }} />
                         </div>
                         <span>{endPct}%</span>
                       </div>
@@ -106,8 +106,8 @@ function DrivesSection({ drives, loading, error }) {
                 </div>
                 {/* 우측: km + kWh */}
                 <div className="text-right">
-                  <p className="text-base font-bold text-blue-400 tabular-nums">{d.distance}<span className="text-xs font-medium text-zinc-600 ml-0.5">km</span></p>
-                  {kwh && <p className="text-xs text-green-400/85 tabular-nums">{kwh}<span className="text-[10px] ml-0.5">kWh</span></p>}
+                  <p className="text-sm font-bold text-blue-400 tabular-nums">{d.distance}<span className="text-[10px] font-medium text-zinc-600 ml-0.5">km</span></p>
+                  {kwh && <p className="text-[10px] text-green-400/80 tabular-nums">{kwh}<span className="text-[10px] ml-0.5">kWh</span></p>}
                 </div>
               </Link>
             );
