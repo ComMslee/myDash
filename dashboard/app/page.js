@@ -202,10 +202,23 @@ function SixMonthCard({ insights }) {
           <div className="h-full bg-emerald-500 transition-all" style={{ width: `${homeRatio * 100}%` }} />
           <div className="h-full bg-amber-500 transition-all" style={{ width: `${otherRatio * 100}%` }} />
         </div>
-        <div className="flex justify-between text-xs text-zinc-600 mt-1">
-          <span>{(homeRatio * 100).toFixed(0)}%</span>
-          <span>{(otherRatio * 100).toFixed(0)}%</span>
-        </div>
+        {(c.slow_charges > 0 || c.fast_charges > 0) && (() => {
+          const total = (c.slow_charges || 0) + (c.fast_charges || 0);
+          const slowPct = total > 0 ? (c.slow_charges || 0) / total : 0;
+          const fastPct = total > 0 ? (c.fast_charges || 0) / total : 0;
+          return (
+            <>
+              <div className="flex justify-between text-xs mb-1.5 mt-3">
+                <span className="text-cyan-400">완속 {c.slow_charges || 0}회</span>
+                <span className="text-rose-400">급속 {c.fast_charges || 0}회</span>
+              </div>
+              <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden flex">
+                <div className="h-full bg-cyan-500 transition-all" style={{ width: `${slowPct * 100}%` }} />
+                <div className="h-full bg-rose-500 transition-all" style={{ width: `${fastPct * 100}%` }} />
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* 시간대/요일 패턴 */}
