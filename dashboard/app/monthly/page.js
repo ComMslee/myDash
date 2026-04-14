@@ -298,6 +298,8 @@ export default function MonthlyPage() {
     const ms = byYear[y];
     const monthCount = ms.length;
     const totalKm = parseFloat(ms.reduce((s, m) => s + Number(m.total_distance_km || 0), 0).toFixed(1));
+    const validWh = ms.filter(m => m.avg_wh_km != null).map(m => m.avg_wh_km);
+    const avgWhKm = validWh.length > 0 ? validWh.reduce((s, v) => s + v, 0) / validWh.length : null;
     yearTotals[y] = {
       drive_count: ms.reduce((s, m) => s + Number(m.drive_count || 0), 0),
       total_distance_km: totalKm,
@@ -305,6 +307,7 @@ export default function MonthlyPage() {
       charge_count: ms.reduce((s, m) => s + Number(m.charge_count || 0), 0),
       total_energy_kwh: parseFloat(ms.reduce((s, m) => s + Number(m.total_energy_kwh || 0), 0).toFixed(1)),
       avg_monthly_km: monthCount > 0 ? Math.round(totalKm / monthCount) : 0,
+      avg_wh_km: avgWhKm,
     };
   }
 
@@ -347,6 +350,11 @@ export default function MonthlyPage() {
                         <span className="text-green-400/70">{t.total_energy_kwh}<span className="text-zinc-600 ml-0.5">kWh</span></span>
                       </div>
                       <div className="flex-1" />
+                      {t.avg_wh_km != null && (
+                        <span className="text-[11px] font-semibold tabular-nums" style={{ color: effColor(t.avg_wh_km) }}>
+                          {t.avg_wh_km.toFixed(0)}<span className="text-zinc-700 ml-0.5">Wh/km</span>
+                        </span>
+                      )}
                       <span className="text-zinc-600 text-[11px]">월평균 <span className="text-zinc-400 font-medium">{t.avg_monthly_km}</span>km</span>
                     </div>
                   </div>
