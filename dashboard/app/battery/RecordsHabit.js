@@ -3,7 +3,11 @@
 function formatKorDate(dateStr) {
   if (!dateStr) return null;
   const parts = String(dateStr).split('T')[0].split('-');
-  return `${parts[0]}년 ${parseInt(parts[1])}월 ${parseInt(parts[2])}일`;
+  const year = parseInt(parts[0]);
+  const mm = String(parseInt(parts[1])).padStart(2, '0');
+  const dd = String(parseInt(parts[2])).padStart(2, '0');
+  const currentYear = new Date().getFullYear();
+  return year !== currentYear ? `${String(year).slice(2)}/${mm}/${dd}` : `${mm}/${dd}`;
 }
 
 function HistBar({ counts, color }) {

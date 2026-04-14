@@ -133,7 +133,7 @@ function MonthlyCalendar({ drives, charges, calLoading }) {
     cells.push({ day: nextDay++, type: 'next' });
   }
 
-  const monthLabel = `${viewYear}년 ${viewMonth + 1}월`;
+  const monthLabel = `${String(viewYear).slice(2)}/${String(viewMonth + 1).padStart(2, '0')}`;
   const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
 
   return (
@@ -443,7 +443,7 @@ export default function MonthlyPage() {
                         className={`px-4 py-4 cursor-pointer hover:bg-white/5 transition-colors rounded ${i < byYear[year].length - 1 ? 'border-b border-white/[0.06]' : ''}`}
                         role="button"
                         tabIndex={0}
-                        aria-label={`${m.month_label || `${m.year}년 ${m.month}월`} 상세 보기`}
+                        aria-label={`${m.month_label || `${String(m.year).slice(2)}/${String(m.month).padStart(2, '0')}`} 상세 보기`}
                       >
                         <div className="flex items-center gap-3 mb-2">
                           <span className="text-zinc-200 font-bold text-base w-8">{m.month}월</span>

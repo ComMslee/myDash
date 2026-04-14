@@ -45,7 +45,7 @@ export async function GET() {
       const date = new Date(d.month);
       const c = chargesByMonth[date.toISOString()] || {};
       return {
-        month_label: `${date.getFullYear()}년 ${date.getMonth() + 1}월`,
+        month_label: `${String(date.getFullYear()).slice(2)}/${String(date.getMonth() + 1).padStart(2, '0')}`,
         year: date.getFullYear(),
         month: date.getMonth() + 1,
         drive_count: parseInt(d.drive_count),

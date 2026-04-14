@@ -10,11 +10,14 @@ function formatDuration(hours) {
 function formatDate(dateStr) {
   const d = new Date(dateStr);
   const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-  const mm = kst.getUTCMonth() + 1;
-  const dd = kst.getUTCDate();
+  const year = kst.getUTCFullYear();
+  const mm = String(kst.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(kst.getUTCDate()).padStart(2, '0');
   const hh = String(kst.getUTCHours()).padStart(2, '0');
   const mi = String(kst.getUTCMinutes()).padStart(2, '0');
-  return `${mm}/${dd} ${hh}:${mi}`;
+  const currentYear = new Date().getFullYear();
+  const prefix = year !== currentYear ? `${String(year).slice(2)}/` : '';
+  return `${prefix}${mm}/${dd} ${hh}:${mi}`;
 }
 
 export default function IdleDrainCard({ records }) {
