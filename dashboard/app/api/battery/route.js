@@ -450,17 +450,17 @@ export async function GET() {
     // 팁 생성 (LFP 맞춤)
     const tips = [];
     if (isLFP) {
-      if (avgSoc < 50) tips.push('LFP 배터리는 높은 SOC를 유지해도 수명 영향이 적습니다. Tesla는 100% 충전을 권장합니다');
-      if (avgSoc >= 50 && avgSoc <= 80) tips.push('LFP 배터리는 주기적으로 100% 충전하면 BMS 캘리브레이션에 도움됩니다');
-      if (avgSoc > 80) tips.push('LFP 배터리에 이상적인 관리입니다. 20% 이하 방전만 피하면 됩니다');
-      if (avgSoc < 20) tips.push('20% 이하로 자주 방전하면 셀 스트레스가 증가합니다');
+      if (avgSoc < 50) tips.push('LFP는 100% 충전 권장, SOC를 높이세요');
+      if (avgSoc >= 50 && avgSoc <= 80) tips.push('주기적 100% 충전으로 BMS 캘리브레이션');
+      if (avgSoc > 80) tips.push('이상적인 관리! 20% 이하 방전만 주의');
+      if (avgSoc < 20) tips.push('20% 이하 방전은 셀 스트레스 증가');
     } else {
-      if (avgSoc > 80) tips.push('충전 상한을 80%로 낮추면 배터리 수명이 크게 향상됩니다');
-      if (avgSoc < 20) tips.push('배터리를 20% 이하로 자주 방전하면 셀 스트레스가 증가합니다');
-      if (tips.length === 0) tips.push('20~80% 범위 내에서 충전하면 배터리 건강에 좋습니다');
+      if (avgSoc > 80) tips.push('충전 상한 80%로 수명 향상');
+      if (avgSoc < 20) tips.push('20% 이하 방전은 셀 스트레스 증가');
+      if (tips.length === 0) tips.push('20~80% 범위 유지 권장');
     }
-    if (zoneCounts.ideal > totalReadings * 0.5 && tips.length === 0) tips.push('이상적인 배터리 관리를 하고 있습니다!');
-    if (tips.length === 0) tips.push(`${RANGE_LOW}~${RANGE_HIGH}% 범위 내에서 사용하면 배터리 건강에 좋습니다`);
+    if (zoneCounts.ideal > totalReadings * 0.5 && tips.length === 0) tips.push('이상적인 배터리 관리 중!');
+    if (tips.length === 0) tips.push(`${RANGE_LOW}~${RANGE_HIGH}% 범위 유지 권장`);
 
     return Response.json({
       weekly,

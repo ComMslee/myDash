@@ -75,10 +75,9 @@ export default function HealthScoreCard({ data }) {
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ paddingTop: 8 }}>
               <div className="flex items-baseline gap-0.5">
-                <span className="text-[28px] font-black leading-none tabular-nums text-white">{score}</span>
-                <span className="text-xs text-zinc-600 ml-0.5">점</span>
+                <span className="text-[26px] font-black leading-none tabular-nums text-white">{score}</span>
+                <span className="text-[10px] text-zinc-600 ml-0.5">점</span>
               </div>
-              <div className="text-[9px] text-zinc-600 mt-0.5">배터리 관리</div>
             </div>
           </div>
           <div className="flex items-center gap-1 mt-0.5">
@@ -93,12 +92,6 @@ export default function HealthScoreCard({ data }) {
             <span className="text-[10px] text-zinc-600 flex-shrink-0">평균 SOC</span>
             <span className="text-[13px] font-bold tabular-nums text-white">
               {avg_soc}%
-            </span>
-          </div>
-          <div className="flex items-center justify-between gap-1">
-            <span className="text-[10px] text-zinc-600 flex-shrink-0">이상 범위</span>
-            <span className="text-[13px] font-bold tabular-nums text-emerald-400">
-              {range_low}~{range_high}%
             </span>
           </div>
           <div className="flex items-center justify-between gap-1">
@@ -158,29 +151,32 @@ export default function HealthScoreCard({ data }) {
           </div>
         </div>
         <div className="flex justify-between mt-1">
-          {['0', '10', '20', '30', '40', '50', '60', '70', '80', '90', '100%'].map((l, i) => (
-            <span key={i} className="text-[8px] tabular-nums" style={{ color: i === 5 ? '#10b981' : '#3f3f46' }}>{l}</span>
-          ))}
-        </div>
-      </div>
-
-      {/* 구간 비율 */}
-      <div className="px-4 py-3">
-        <div className="flex gap-1 h-2 rounded-full overflow-hidden mb-2">
-          {zones.map(z => (
-            z.pct > 0 && (
-              <div key={z.key} className="h-full rounded-full transition-all" style={{ width: z.pct + '%', background: z.color }} />
-            )
-          ))}
-        </div>
-        <div className="flex justify-between">
-          {zones.map(z => (
-            <div key={z.key} className="flex items-center gap-1">
-              <div className="w-1.5 h-1.5 rounded-full" style={{ background: z.color }} />
-              <span className="text-[9px] text-zinc-600">{z.label}</span>
-              <span className="text-[9px] font-bold tabular-nums" style={{ color: z.color }}>{z.pct}%</span>
-            </div>
-          ))}
+          {soc_histogram.map((_, i) => {
+            const bucketMid = i * 10 + 5;
+            const halfRange = (range_high - range_low) / 2;
+            let zoneColor, zoneLabel;
+            if (bucketMid >= range_low && bucketMid <= range_high) {
+              const distPct = Math.abs(bucketMid - optimal_center) / halfRange;
+              if (distPct <= 0.4) { zoneColor = '#10b981'; zoneLabel = i === Math.round(optimal_center / 10) ? '이상' : ''; }
+              else { zoneColor = '#3b82f6'; zoneLabel = ''; }
+            } else if (bucketMid >= 10 && bucketMid <= 90) {
+              zoneColor = '#f59e0b'; zoneLabel = '';
+            } else {
+              zoneColor = '#ef4444'; zoneLabel = '';
+            }
+            // 구간 경계에 라벨 표시
+            if (i === 0) zoneLabel = '위험';
+            if (i === 1) zoneLabel = '주의';
+            if (i === 2) zoneLabel = '양호';
+            if (i === 4) zoneLabel = '이상';
+            if (i === 8 && range_high <= 80) zoneLabel = '주의';
+            return (
+              <span key={i} className="text-[7px] font-medium text-center" style={{ color: zoneColor, flex: 1 }}>
+                {zoneLabel || `${i * 10}`}
+              </span>
+            );
+          })}
+          <span className="text-[7px] text-zinc-600">100%</span>
         </div>
       </div>
     </div>
