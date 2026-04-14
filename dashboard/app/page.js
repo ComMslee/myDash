@@ -148,8 +148,8 @@ function SixMonthCard({ insights }) {
         </div>
         <div className="px-2 py-4 text-center">
           <p className="text-zinc-600 text-xs mb-1.5">평균 트립</p>
-          <p className="text-zinc-300 font-bold text-lg leading-none tabular-nums">{avgKm}</p>
-          <p className="text-zinc-600 text-xs mt-1.5">km · {avgMin}분</p>
+          <p className="text-zinc-300 font-bold text-lg leading-none tabular-nums">{avgKm}<span className="text-zinc-600 text-xs ml-0.5">km</span></p>
+          <p className="text-zinc-300 font-bold text-base leading-none tabular-nums mt-1.5">{avgMin}<span className="text-zinc-600 text-xs ml-0.5">분</span></p>
         </div>
         <div className="px-2 py-4 text-center">
           <p className="text-zinc-600 text-xs mb-1.5">효율</p>
