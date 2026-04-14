@@ -92,7 +92,7 @@ function DriveMap({ positions, loading, placeMarker }) {
     const mkStart = L.circleMarker(latlngs[0], { radius: 7, fillColor: '#22c55e', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
     const mkEnd = L.circleMarker(latlngs[latlngs.length - 1], { radius: 7, fillColor: '#ef4444', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
     markersRef.current = [mkStart, mkEnd];
-    map.fitBounds(polyRef.current.getBounds(), { padding: [40, 40] });
+    map.fitBounds(polyRef.current.getBounds(), { padding: [50, 50] });
   }, [positions, placeMarker]);
 
   useEffect(() => {
@@ -295,7 +295,7 @@ function DrivesInner() {
       <div className="flex-1 flex flex-col gap-4 px-4 pb-4 min-h-0">
 
         {/* Map panel */}
-        <div className="flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden min-h-[200px]" style={{ height: '35vh' }}>
+        <div className="flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden min-h-[200px]" style={{ height: '45vh' }}>
           {selectedDrive ? (
             <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center gap-4 flex-shrink-0">
               <div className="flex-1 min-w-0">
@@ -349,7 +349,7 @@ function DrivesInner() {
             ) : !drives.length ? (
               <p className="text-zinc-500 text-sm text-center py-4">주행 기록이 없습니다</p>
             ) : (
-              drives.map((d) => {
+              drives.map((d, idx) => {
                 const isSelected = selectedDrive?.id === d.id;
                 const eff = efficiency(d);
                 const dt = new Date(d.start_date);
@@ -358,45 +358,64 @@ function DrivesInner() {
                 const startPct = d.start_battery_level ?? null;
                 const endPct   = d.end_battery_level   ?? null;
                 const usedPct  = (startPct != null && endPct != null) ? Math.max(0, startPct - endPct) : 0;
+
+                // 이전 주행과의 대기 시간 계산 (DESC 순서: idx가 클수록 과거)
+                let gapLabel = null;
+                if (idx > 0 && d.end_date && drives[idx - 1].start_date) {
+                  const gapMs = new Date(drives[idx - 1].start_date) - new Date(d.end_date);
+                  if (gapMs > 0) {
+                    const gapMin = Math.round(gapMs / 60000);
+                    gapLabel = formatDuration(gapMin);
+                  }
+                }
+
                 return (
-                  <button
-                    key={d.id}
-                    onClick={() => { setSelectedDrive(d); setSelectedPlace(null); }}
-                    className={`w-full text-left grid grid-cols-[62px_1fr_auto] items-center gap-2.5 px-4 py-3 border-b border-white/[0.06] last:border-0 transition-all ${
-                      isSelected ? 'bg-blue-500/10 border-l-2 border-l-blue-500' : 'hover:bg-white/[0.025] border-l-2 border-l-transparent'
-                    }`}
-                  >
-                    {/* 좌측: 날짜 + 시각 */}
-                    <div className="text-xs text-zinc-500 leading-tight tabular-nums">
-                      <p className="text-zinc-300 font-bold text-sm">{dateLabel}</p>
-                      <p>{timeLabel}</p>
-                    </div>
-                    {/* 중앙: 경로 + 메타 */}
-                    <div className="min-w-0">
-                      <p className={`text-sm truncate ${isSelected ? 'text-white' : 'text-zinc-300'}`}>
-                        {shortAddr(d.start_address) || '?'}<span className="text-zinc-500 mx-1">→</span>{shortAddr(d.end_address) || '?'}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-zinc-600 tabular-nums">{formatDuration(d.duration_min)}</span>
-                        {startPct != null && endPct != null && (
-                          <div className="flex items-center gap-1 text-xs text-zinc-500 tabular-nums">
-                            <span>{startPct}%</span>
-                            <div className="w-11 h-1.5 bg-zinc-700 rounded-sm overflow-hidden relative">
-                              <div className="absolute inset-y-0 left-0 rounded-sm" style={{ width: `${usedPct}%`, background: 'linear-gradient(90deg, rgba(96,165,250,.5), rgba(248,113,113,.6))' }} />
-                            </div>
-                            <span>{endPct}%</span>
-                          </div>
-                        )}
+                  <div key={d.id}>
+                    <button
+                      onClick={() => { setSelectedDrive(d); setSelectedPlace(null); }}
+                      className={`w-full text-left grid grid-cols-[62px_1fr_auto] items-center gap-2.5 px-4 py-3 border-b border-white/[0.06] last:border-0 transition-all ${
+                        isSelected ? 'bg-blue-500/10 border-l-2 border-l-blue-500' : 'hover:bg-white/[0.025] border-l-2 border-l-transparent'
+                      }`}
+                    >
+                      {/* 좌측: 날짜 + 시각 */}
+                      <div className="text-xs text-zinc-500 leading-tight tabular-nums">
+                        <p className="text-zinc-300 font-bold text-sm">{dateLabel}</p>
+                        <p>{timeLabel}</p>
                       </div>
-                    </div>
-                    {/* 우측: km + kWh */}
-                    <div className="text-right">
-                      <p className={`text-base font-bold tabular-nums ${isSelected ? 'text-blue-400' : 'text-white/80'}`}>
-                        {d.distance}<span className="text-xs font-medium text-zinc-600 ml-0.5">km</span>
-                      </p>
-                      {eff && <p className="text-xs text-green-400/85 tabular-nums">{eff.kwh}<span className="text-[10px] ml-0.5">kWh</span></p>}
-                    </div>
-                  </button>
+                      {/* 중앙: 경로 + 메타 */}
+                      <div className="min-w-0">
+                        <p className={`text-sm truncate ${isSelected ? 'text-white' : 'text-zinc-300'}`}>
+                          {shortAddr(d.start_address) || '?'}<span className="text-zinc-500 mx-1">→</span>{shortAddr(d.end_address) || '?'}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-zinc-600 tabular-nums">{formatDuration(d.duration_min)}</span>
+                          {startPct != null && endPct != null && (
+                            <div className="flex items-center gap-1 text-xs text-zinc-500 tabular-nums">
+                              <span>{startPct}%</span>
+                              <div className="w-11 h-1.5 bg-zinc-700 rounded-sm overflow-hidden relative">
+                                <div className="absolute inset-y-0 left-0 rounded-sm" style={{ width: `${usedPct}%`, background: 'linear-gradient(90deg, rgba(96,165,250,.5), rgba(248,113,113,.6))' }} />
+                              </div>
+                              <span>{endPct}%</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {/* 우측: km + kWh */}
+                      <div className="text-right">
+                        <p className={`text-base font-bold tabular-nums ${isSelected ? 'text-blue-400' : 'text-white/80'}`}>
+                          {d.distance}<span className="text-xs font-medium text-zinc-600 ml-0.5">km</span>
+                        </p>
+                        {eff && <p className="text-xs text-green-400/85 tabular-nums">{eff.kwh}<span className="text-[10px] ml-0.5">kWh</span></p>}
+                      </div>
+                    </button>
+                    {gapLabel && (
+                      <div className="flex items-center gap-2 px-4 py-1 bg-[#111]">
+                        <div className="flex-1 h-px bg-white/[0.04]" />
+                        <span className="text-[10px] text-zinc-600 tabular-nums">{gapLabel}</span>
+                        <div className="flex-1 h-px bg-white/[0.04]" />
+                      </div>
+                    )}
+                  </div>
                 );
               })
             )}
