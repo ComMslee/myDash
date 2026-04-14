@@ -112,8 +112,10 @@ export function DailyRecordsCard({ records }) {
               <div
                 className={`absolute top-0 ${isLeft ? 'left-0 right-0' : 'left-0 right-0'} h-[2px] ${c.accentClass} opacity-60`}
               />
-              <div className={`text-base mb-1.5 ${!hasData ? 'grayscale' : ''}`}>{c.icon}</div>
-              <div className="text-[9px] uppercase tracking-wider text-zinc-600 mb-1.5">{c.label}</div>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className={`text-base ${!hasData ? 'grayscale' : ''}`}>{c.icon}</span>
+                <span className="text-[9px] uppercase tracking-wider text-zinc-600">{c.label}</span>
+              </div>
               {hasData ? (
                 <>
                   <div className="text-[11px] text-zinc-400 mb-0.5 tabular-nums">{date}</div>
