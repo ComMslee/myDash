@@ -20,7 +20,7 @@ export async function GET() {
           COUNT(*) FILTER (WHERE is_fast IS DISTINCT FROM true)::int AS slow_charges
         FROM (
           SELECT cp.charge_energy_added, cp.geofence_id,
-                 BOOL_OR(c.fast_charger_present) AS is_fast
+                 COALESCE(BOOL_OR(c.fast_charger_present), false) AS is_fast
           FROM charging_processes cp
           LEFT JOIN charges c ON c.charging_process_id = cp.id
           WHERE cp.car_id = $1 AND cp.charge_energy_added IS NOT NULL
