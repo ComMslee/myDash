@@ -62,17 +62,19 @@ function MonthlyCalendar({ drives, charges, calLoading, monthlyData }) {
   // 일별 집계
   const daily = useMemo(() => {
     const map = {};
-    for (let d = 1; d <= daysInMonth; d++) map[d] = { km: 0, kwh: 0 };
+    for (let d = 1; d <= daysInMonth; d++) map[d] = { km: 0, kwh: 0, drives: 0, charges: 0 };
     (drives?.recent_drives || []).forEach(d => {
       const dt = new Date(d.start_date);
       if (dt.getFullYear() === viewYear && dt.getMonth() === viewMonth) {
         map[dt.getDate()].km += parseFloat(d.distance) || 0;
+        map[dt.getDate()].drives++;
       }
     });
     (charges?.history || []).forEach(c => {
       const dt = new Date(c.start_date);
       if (dt.getFullYear() === viewYear && dt.getMonth() === viewMonth) {
         map[dt.getDate()].kwh += parseFloat(c.charge_energy_added) || 0;
+        map[dt.getDate()].charges++;
       }
     });
     return map;
@@ -197,7 +199,7 @@ function MonthlyCalendar({ drives, charges, calLoading, monthlyData }) {
             {cells.map((cell, idx) => {
               const { day, type } = cell;
               const isCur = type === 'cur';
-              const d = isCur ? (daily[day] || { km: 0, kwh: 0 }) : { km: 0, kwh: 0 };
+              const d = isCur ? (daily[day] || { km: 0, kwh: 0, drives: 0, charges: 0 }) : { km: 0, kwh: 0, drives: 0, charges: 0 };
               const isToday = isCur && day === today;
               const dow = idx % 7;
               const hasKm = isCur && d.km > 0;
@@ -219,14 +221,16 @@ function MonthlyCalendar({ drives, charges, calLoading, monthlyData }) {
                   key={idx}
                   className={`relative aspect-square rounded-lg overflow-hidden flex flex-col ${bgClass} ${isToday ? 'ring-1 ring-amber-400/80 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.3)]' : ''}`}
                 >
-                  {/* 충전 표시 — 우상단 녹색 점 */}
-                  {hasKwh && (
-                    <span className="absolute top-1 right-1 w-[5px] h-[5px] rounded-full bg-green-400" aria-hidden="true" />
-                  )}
-                  {/* 날짜 숫자 — 좌상단 */}
-                  <span className={`absolute top-1 left-1.5 text-xs font-bold tabular-nums leading-none ${dayColor}`}>
-                    {day}
-                  </span>
+                  {/* 날짜 + 주행/충전 횟수 — 상단 */}
+                  <div className="absolute top-1 left-1.5 right-1 flex items-center gap-0.5">
+                    <span className={`text-xs font-bold tabular-nums leading-none ${dayColor}`}>{day}</span>
+                    {isCur && d.drives > 0 && (
+                      <span className="text-[8px] font-bold text-blue-400/70 tabular-nums leading-none">{d.drives}</span>
+                    )}
+                    {isCur && d.charges > 0 && (
+                      <span className="text-[8px] font-bold text-green-400/70 tabular-nums leading-none">{d.charges}</span>
+                    )}
+                  </div>
                   {/* km 숫자 — 우하단 */}
                   {hasKm && (
                     <span className="absolute bottom-1 right-1.5 text-xs font-black text-blue-400 tabular-nums leading-none">
