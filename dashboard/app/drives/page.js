@@ -41,7 +41,7 @@ function loadLeaflet(cb) {
   document.head.appendChild(script);
 }
 
-function DriveMap({ positions, loading, placeMarker }) {
+function DriveMap({ positions, loading, placeMarker, visible }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -68,6 +68,12 @@ function DriveMap({ positions, loading, placeMarker }) {
       mapRef.current = null;
     };
   }, [initMap]);
+
+  useEffect(() => {
+    if (visible && mapInstanceRef.current) {
+      setTimeout(() => mapInstanceRef.current?.invalidateSize(), 50);
+    }
+  }, [visible]);
 
   const drawContent = useCallback(() => {
     const map = mapRef.current;
@@ -338,7 +344,7 @@ function DrivesInner() {
               </div>
             ) : null}
             <div className="flex-1 p-2 min-h-[300px]">
-              <DriveMap positions={positions} loading={loadingRoute} placeMarker={selectedPlace} />
+              <DriveMap positions={positions} loading={loadingRoute} placeMarker={selectedPlace} visible={viewMode === 'map'} />
             </div>
           </div>
         </div>
