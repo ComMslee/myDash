@@ -97,19 +97,14 @@ export default function HealthScoreCard({ data }) {
               {grade}
             </span>
           </div>
-          {/* 팁 */}
-          <div className="mt-1 pt-2 border-t border-white/[0.04]">
-            <p className="text-[10px] text-zinc-500 leading-relaxed">
-              💡 {tips[0]}
-            </p>
-          </div>
         </div>
       </div>
 
       {/* SOC 분포 히스토그램 */}
       <div className="px-4 py-3 border-b border-white/[0.06]">
-        <div className="flex items-center gap-1.5 mb-2.5">
-          <span className="text-[10px] font-semibold text-zinc-400">SOC 체류 분포</span>
+        <div className="flex items-center justify-between mb-2.5">
+          <span className="text-xs font-semibold text-zinc-400">SOC 체류 분포</span>
+          {tips?.[0] && <span className="text-[11px] text-zinc-500">💡 {tips[0]}</span>}
         </div>
         {/* 50% 이상적 라인 표시 + 바 */}
         <div className="relative">
