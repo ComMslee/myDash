@@ -58,13 +58,16 @@ export default function WeeklyCard({ weeks }) {
           >
             {/* 주 라벨 */}
             <div className="min-w-0">
-              <div className="text-[11px] text-zinc-400 font-medium whitespace-nowrap">
-                {week.is_current ? '이번주' : week.iso_week + '주차'}
-              </div>
               {week.is_current ? (
-                <div className="text-[9px] mt-0.5 text-blue-400">진행 중</div>
+                <div className="flex items-center gap-1 whitespace-nowrap">
+                  <span className="text-[11px] text-zinc-400 font-medium">이번주</span>
+                  <span className="text-[9px] text-blue-400">진행 중</span>
+                </div>
               ) : (
-                <div className="text-[9px] mt-0.5 text-zinc-600 whitespace-nowrap">{week.date_range}</div>
+                <>
+                  <div className="text-[11px] text-zinc-400 font-medium whitespace-nowrap">{week.iso_week}주차</div>
+                  <div className="text-[9px] mt-0.5 text-zinc-600 whitespace-nowrap">{week.date_range}</div>
+                </>
               )}
             </div>
 
