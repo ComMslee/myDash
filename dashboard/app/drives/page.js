@@ -101,10 +101,10 @@ function DriveMap({ positions, loading, placeMarker, visible }) {
       const CHUNKS = Math.min(15, Math.ceil(positions.length / 3));
       const chunkSize = Math.ceil(positions.length / CHUNKS);
       const speedColor = (spd) => {
-        if (spd <= 30) return '#22c55e';   // 저속 — 초록
-        if (spd <= 60) return '#3b82f6';   // 시내 — 파랑
-        if (spd <= 90) return '#f59e0b';   // 중속 — 노랑
-        return '#ef4444';                   // 고속 — 빨강
+        if (spd <= 20) return '#ef4444';   // 정체 — 빨강
+        if (spd <= 40) return '#f59e0b';   // 서행 — 노랑
+        if (spd <= 80) return '#22c55e';   // 원활 — 초록
+        return '#3b82f6';                   // 고속 — 파랑
       };
       const group = L.layerGroup().addTo(map);
       for (let i = 0; i < CHUNKS; i++) {
