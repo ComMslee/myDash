@@ -210,8 +210,8 @@ function SixMonthCard({ insights }) {
           const slow = c.slow_charges || 0;
           const fast = c.fast_charges || 0;
           const total = slow + fast;
-          const slowPct = total > 0 ? slow / total : 0.5;
-          const fastPct = total > 0 ? fast / total : 0.5;
+          const slowPct = total > 0 ? slow / total : 0;
+          const fastPct = total > 0 ? fast / total : 0;
           return (
             <>
               <div className="flex justify-between text-xs mb-1.5 mt-3">
