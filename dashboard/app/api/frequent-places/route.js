@@ -16,7 +16,8 @@ export async function GET() {
               a.city,
               a.latitude,
               a.longitude,
-              COUNT(*) AS visit_count
+              COUNT(*) AS visit_count,
+              MAX(d.start_date) AS last_visit
        FROM drives d
        JOIN addresses a ON a.id = d.end_address_id
        WHERE d.car_id = $1 AND d.end_address_id IS NOT NULL
@@ -34,6 +35,7 @@ export async function GET() {
         lat: p.latitude ? parseFloat(p.latitude) : null,
         lng: p.longitude ? parseFloat(p.longitude) : null,
         visit_count: parseInt(p.visit_count),
+        last_visit: p.last_visit || null,
       })),
     });
   } catch (err) {
