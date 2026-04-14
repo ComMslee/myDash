@@ -58,7 +58,7 @@ export default function MonthlyChargeCard() {
             <span className="text-emerald-400">집충전 {data.home_charges}회</span>
             <span className="text-amber-400">외부충전 {data.other_charges}회</span>
           </div>
-          <div className="h-3 bg-zinc-800 rounded-full overflow-hidden flex">
+          <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden flex">
             <div className="h-full bg-emerald-500 transition-all" style={{ width: `${homeRatio * 100}%` }} />
             <div className="h-full bg-amber-500 transition-all" style={{ width: `${otherRatio * 100}%` }} />
           </div>
@@ -74,7 +74,7 @@ export default function MonthlyChargeCard() {
             <span className="text-blue-400">완속 {data.slow_charges}회</span>
             <span className="text-rose-400">급속 {data.fast_charges}회</span>
           </div>
-          <div className="h-3 bg-zinc-800 rounded-full overflow-hidden flex">
+          <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden flex">
             <div className="h-full bg-blue-500 transition-all" style={{ width: `${slowRatio * 100}%` }} />
             <div className="h-full bg-rose-500 transition-all" style={{ width: `${fastRatio * 100}%` }} />
           </div>
