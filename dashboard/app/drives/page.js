@@ -319,14 +319,13 @@ function DrivesInner() {
               return (
               <div className="px-4 py-2 border-b border-white/[0.06] flex items-center gap-3 flex-shrink-0">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-zinc-500 tabular-nums">{formatTimeRange(selectedDrive.start_date, selectedDrive.end_date)}</p>
+                  <p className="text-sm text-zinc-500 tabular-nums">{formatTimeRange(selectedDrive.start_date, selectedDrive.end_date)} <span className="text-zinc-600">({formatDuration(selectedDrive.duration_min)})</span></p>
                   <p className="text-sm text-zinc-300 truncate">
                     {shortAddr(selectedDrive.start_address) || '출발지'}&nbsp;→&nbsp;{shortAddr(selectedDrive.end_address) || '도착지'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0 text-sm tabular-nums">
                   <span className="text-blue-400 font-bold">{selectedDrive.distance}<span className="text-[10px] text-zinc-600 ml-0.5">km</span></span>
-                  <span className="text-zinc-400 font-semibold">{formatDuration(selectedDrive.duration_min)}</span>
                   {eff && <span className="text-green-400 font-semibold">{eff.kwh}<span className="text-[10px] text-zinc-600 ml-0.5">kWh</span></span>}
                   {eff && <span className="text-amber-400 text-xs">{eff.perKm}<span className="text-zinc-600 ml-0.5">Wh</span></span>}
                 </div>
