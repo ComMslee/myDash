@@ -150,33 +150,38 @@ export default function HealthScoreCard({ data }) {
             <div className="w-px h-full bg-emerald-400/40 border-dashed" />
           </div>
         </div>
+        {/* 퍼센트 숫자 */}
         <div className="flex justify-between mt-1">
+          {['0', '10', '20', '30', '40', '50', '60', '70', '80', '90', '100%'].map((l, i) => (
+            <span key={i} className="text-[8px] tabular-nums text-zinc-600">{l}</span>
+          ))}
+        </div>
+        {/* 구간 라벨 */}
+        <div className="flex mt-0.5">
           {soc_histogram.map((_, i) => {
             const bucketMid = i * 10 + 5;
             const halfRange = (range_high - range_low) / 2;
-            let zoneColor, zoneLabel;
+            let zoneColor;
             if (bucketMid >= range_low && bucketMid <= range_high) {
               const distPct = Math.abs(bucketMid - optimal_center) / halfRange;
-              if (distPct <= 0.4) { zoneColor = '#10b981'; zoneLabel = i === Math.round(optimal_center / 10) ? '이상' : ''; }
-              else { zoneColor = '#3b82f6'; zoneLabel = ''; }
+              zoneColor = distPct <= 0.4 ? '#10b981' : '#3b82f6';
             } else if (bucketMid >= 10 && bucketMid <= 90) {
-              zoneColor = '#f59e0b'; zoneLabel = '';
+              zoneColor = '#f59e0b';
             } else {
-              zoneColor = '#ef4444'; zoneLabel = '';
+              zoneColor = '#ef4444';
             }
-            // 구간 경계에 라벨 표시
+            let zoneLabel = '';
             if (i === 0) zoneLabel = '위험';
             if (i === 1) zoneLabel = '주의';
             if (i === 2) zoneLabel = '양호';
-            if (i === 4) zoneLabel = '이상';
+            if (i === Math.round(optimal_center / 10)) zoneLabel = '이상';
             if (i === 8 && range_high <= 80) zoneLabel = '주의';
             return (
-              <span key={i} className="text-[7px] font-medium text-center" style={{ color: zoneColor, flex: 1 }}>
-                {zoneLabel || `${i * 10}`}
+              <span key={i} className="text-[7px] font-bold text-center" style={{ color: zoneColor, flex: 1 }}>
+                {zoneLabel}
               </span>
             );
           })}
-          <span className="text-[7px] text-zinc-600">100%</span>
         </div>
       </div>
     </div>
