@@ -386,8 +386,8 @@ export default function MonthlyPage() {
                           )}
                           <div className="w-full bg-zinc-800/40 rounded-sm overflow-hidden relative" style={{ height: BAR_H }}>
                             <div
-                              className="absolute bottom-0 inset-x-0 bg-blue-500/70 rounded-sm transition-all duration-500"
-                              style={{ height: `${distPct}%` }}
+                              className="absolute bottom-0 inset-x-0 bg-blue-500 rounded-sm transition-all duration-500"
+                              style={{ height: `${distPct}%`, opacity: 0.25 + (distPct / 100) * 0.75 }}
                             />
                           </div>
                         </div>
@@ -397,8 +397,8 @@ export default function MonthlyPage() {
                           )}
                           <div className="w-full bg-zinc-800/40 rounded-sm overflow-hidden relative" style={{ height: BAR_H }}>
                             <div
-                              className="absolute bottom-0 inset-x-0 bg-green-500/70 rounded-sm transition-all duration-500"
-                              style={{ height: `${kwhPct}%` }}
+                              className="absolute bottom-0 inset-x-0 bg-green-500 rounded-sm transition-all duration-500"
+                              style={{ height: `${kwhPct}%`, opacity: 0.25 + (kwhPct / 100) * 0.75 }}
                             />
                           </div>
                         </div>
@@ -445,18 +445,14 @@ export default function MonthlyPage() {
                         tabIndex={0}
                         aria-label={`${m.month_label || `${String(m.year).slice(2)}/${String(m.month).padStart(2, '0')}`} 상세 보기`}
                       >
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="text-zinc-200 font-bold text-base w-8">{m.month}월</span>
-                          <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-zinc-200 font-bold text-sm w-7 flex-shrink-0">{m.month}월</span>
+                          <div className="flex-1 min-w-0">
                             <StatBar val={m.total_distance_km} max={maxDist} color="#3b82f6" />
                           </div>
-                          <span className="text-white font-bold text-base tabular-nums w-20 text-right">{m.total_distance_km} km</span>
-                        </div>
-                        <div className="flex items-center gap-4 pl-11 text-xs">
-                          <span className="text-zinc-500"><span className="text-blue-400/70 font-medium">{m.drive_count}</span> 주행</span>
-                          <span className="text-zinc-500">{formatDuration(m.total_duration_min)}</span>
-                          <span className="text-zinc-500"><span className="text-green-400/70 font-medium">{m.total_energy_kwh}</span> kWh</span>
-                          <span className="text-zinc-500"><span className="text-amber-400/70 font-medium">{m.charge_count}</span> 충전</span>
+                          <span className="text-white font-bold text-sm tabular-nums flex-shrink-0">{m.total_distance_km}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
+                          <span className="text-zinc-600 text-[10px] tabular-nums flex-shrink-0"><span className="text-blue-400/70">{m.drive_count}</span>회</span>
+                          <span className="text-zinc-600 text-[10px] tabular-nums flex-shrink-0"><span className="text-green-400/70">{m.total_energy_kwh}</span>kWh</span>
                         </div>
                       </div>
                     ))}

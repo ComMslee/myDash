@@ -121,16 +121,13 @@ export function DailyRecordsCard({ records }) {
                 <span className="text-[9px] uppercase tracking-wider text-zinc-600">{c.label}</span>
               </div>
               {hasData ? (
-                <>
-                  <div className="text-[11px] text-zinc-400 mb-0.5 tabular-nums">{date}</div>
-                  <div className={`text-xl font-black leading-none tabular-nums ${c.valClass}`}>{c.mainVal}</div>
-                  <div className="text-[10px] text-zinc-500 mt-1 tabular-nums">{c.subVal}</div>
-                </>
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <span className="text-[10px] text-zinc-500 tabular-nums">{date}</span>
+                  <span className={`text-base font-black leading-none tabular-nums ${c.valClass}`}>{c.mainVal}</span>
+                  <span className="text-[10px] text-zinc-500 tabular-nums">{c.subVal}</span>
+                </div>
               ) : (
-                <>
-                  <div className="text-[10px] text-zinc-600 mb-0.5">기록 없음</div>
-                  <div className="text-xl font-black leading-none text-zinc-700">—</div>
-                </>
+                <div className="text-[10px] text-zinc-700">—</div>
               )}
             </div>
           );
