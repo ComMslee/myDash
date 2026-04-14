@@ -43,10 +43,18 @@ export async function GET() {
            COUNT(*)::int AS charge_count,
            COALESCE(AVG(charge_energy_added), 0)::float AS avg_kwh,
            COUNT(*) FILTER (WHERE geofence_id IS NOT NULL)::int AS home_charges,
-           COUNT(*) FILTER (WHERE geofence_id IS NULL)::int AS other_charges
-         FROM charging_processes
-         WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
-           AND charge_energy_added IS NOT NULL`,
+           COUNT(*) FILTER (WHERE geofence_id IS NULL)::int AS other_charges,
+           COUNT(*) FILTER (WHERE is_fast = true)::int AS fast_charges,
+           COUNT(*) FILTER (WHERE is_fast IS DISTINCT FROM true)::int AS slow_charges
+         FROM (
+           SELECT cp.charge_energy_added, cp.geofence_id,
+                  BOOL_OR(c.fast_charger_present) AS is_fast
+           FROM charging_processes cp
+           LEFT JOIN charges c ON c.charging_process_id = cp.id
+           WHERE cp.car_id = $1 AND cp.start_date >= $2 AND cp.start_date < $3
+             AND cp.charge_energy_added IS NOT NULL
+           GROUP BY cp.id, cp.charge_energy_added, cp.geofence_id
+         ) sub`,
         [carId, iso(start), iso(end)]
       );
       return { ...q.rows[0], ...chargeQ.rows[0] };
@@ -117,6 +125,8 @@ export async function GET() {
       charge_count: sixMonthBreakdown.reduce((s, m) => s + m.charge_count, 0),
       home_charges: sixMonthBreakdown.reduce((s, m) => s + m.home_charges, 0),
       other_charges: sixMonthBreakdown.reduce((s, m) => s + m.other_charges, 0),
+      fast_charges: sixMonthBreakdown.reduce((s, m) => s + (m.fast_charges || 0), 0),
+      slow_charges: sixMonthBreakdown.reduce((s, m) => s + (m.slow_charges || 0), 0),
       total_range_used: sixMonthBreakdown.reduce((s, m) => s + m.total_range_used, 0),
       max_distance: Math.max(0, ...sixMonthBreakdown.map(m => m.max_distance)),
       max_duration: Math.max(0, ...sixMonthBreakdown.map(m => m.max_duration)),
@@ -156,6 +166,8 @@ export async function GET() {
         avg_kwh: agg.charge_count > 0 ? parseFloat((agg.total_kwh / agg.charge_count).toFixed(1)) : 0,
         home_charges: agg.home_charges,
         other_charges: agg.other_charges,
+        fast_charges: agg.fast_charges,
+        slow_charges: agg.slow_charges,
         max_distance: parseFloat(agg.max_distance.toFixed(1)),
         max_duration: agg.max_duration,
         max_speed: agg.max_speed,
