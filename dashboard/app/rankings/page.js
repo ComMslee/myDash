@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { formatDuration, shortAddr } from '@/lib/format';
+import { formatDuration, shortAddr, formatKorDateTime, formatKorDay } from '@/lib/format';
 
 const TYPE_LABELS = {
   drive_distance: { title: '최장거리 (단일 주행)', unit: 'km', color: 'text-blue-400' },
@@ -11,23 +11,6 @@ const TYPE_LABELS = {
   day_distance:   { title: '최장거리 (일간 합계)', unit: 'km', color: 'text-blue-400' },
   day_duration:   { title: '최장시간 (일간 합계)', unit: '', color: 'text-zinc-200' },
 };
-
-function fmtDateTime(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  const y = String(d.getFullYear()).slice(2);
-  const m = d.getMonth() + 1;
-  const dd = d.getDate();
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${y}/${m}/${dd} ${hh}:${mm}`;
-}
-
-function fmtDay(day) {
-  if (!day) return '—';
-  const [y, m, d] = day.split('-');
-  return `${y.slice(2)}/${parseInt(m)}/${parseInt(d)}`;
-}
 
 function RankingsInner() {
   const params = useSearchParams();
@@ -129,7 +112,7 @@ function RankingsInner() {
                   >
                     <span className={`text-sm font-black tabular-nums text-center ${rankColor}`}>{idx + 1}</span>
                     <div className="min-w-0">
-                      <p className="text-xs text-zinc-500 tabular-nums">{fmtDateTime(it.start_date)}</p>
+                      <p className="text-xs text-zinc-500 tabular-nums">{formatKorDateTime(it.start_date)}</p>
                       <p className="text-sm text-zinc-300 truncate">
                         {shortAddr(it.start_address) || '?'}
                         <span className="text-zinc-600 mx-1">→</span>
@@ -171,7 +154,7 @@ function RankingsInner() {
                 >
                   <span className={`text-sm font-black tabular-nums text-center ${rankColor}`}>{idx + 1}</span>
                   <div className="min-w-0">
-                    <p className="text-sm text-zinc-300 tabular-nums">{fmtDay(it.day)}</p>
+                    <p className="text-sm text-zinc-300 tabular-nums">{formatKorDay(it.day)}</p>
                     <p className="text-xs text-zinc-500">{it.drive_count}회 주행</p>
                   </div>
                   <div className="text-right tabular-nums">
