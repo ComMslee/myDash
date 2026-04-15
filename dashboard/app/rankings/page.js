@@ -181,16 +181,17 @@ function RankingsInner() {
                 );
               }
 
-              // day_*
+              // day_* — 단일 주행과 UI 통일, 해당 날짜로 로드트립 이동
               return (
-                <div
+                <Link
                   key={it.day}
-                  className="grid grid-cols-[28px_1fr_auto] items-center gap-2 px-4 py-3 border-b border-white/[0.05] last:border-0"
+                  href={`/roadtrips?date=${it.day}`}
+                  className="grid grid-cols-[28px_1fr_auto] items-center gap-2 px-4 py-3 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.03] transition-colors"
                 >
                   <span className={`text-sm font-black tabular-nums text-center ${rankColor}`}>{idx + 1}</span>
                   <div className="min-w-0">
-                    <p className="text-sm text-zinc-300 tabular-nums">{formatKorDay(it.day)}</p>
-                    <p className="text-xs text-zinc-500">{it.drive_count}회 주행</p>
+                    <p className="text-xs text-zinc-500 tabular-nums">{formatKorDay(it.day)}</p>
+                    <p className="text-sm text-zinc-300">{it.drive_count}회 주행</p>
                   </div>
                   <div className="text-right tabular-nums">
                     {isDistance ? (
@@ -215,7 +216,7 @@ function RankingsInner() {
                       </>
                     )}
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>

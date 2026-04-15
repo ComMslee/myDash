@@ -183,11 +183,27 @@ function DriveMap({ positions, loading, placeMarker, visible }) {
 
 // ── Page Inner ─────────────────────────────────────────────
 
+// 'YYYY-MM-DD' 형식 검증
+function isValidDateStr(s) {
+  return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
 function DrivesInner() {
   const { isMock, refreshSignal } = useMock();
   const searchParams = useSearchParams();
   const rawId = parseInt(searchParams.get('id') || '');
   const initialId = Number.isFinite(rawId) ? rawId : null;
+  const dateParamRaw = searchParams.get('date');
+  const initialDate = isValidDateStr(dateParamRaw) ? dateParamRaw : null;
+
+  // 주행의 KST 날짜 문자열 계산 (YYYY-MM-DD)
+  const driveDayStr = (d) => {
+    const dt = new Date(d.start_date);
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  };
 
   const [drives, setDrives] = useState([]);
   const [selectedDrive, setSelectedDrive] = useState(null);
@@ -201,14 +217,26 @@ function DrivesInner() {
   const [error, setError] = useState(null);
   const abortRef = useRef(null);
 
+  // 진입 쿼리(id/date)에 맞는 주행을 선택 — id > date > 첫 항목
+  const pickPreselect = (list) => {
+    if (initialId) {
+      const found = list.find(d => d.id === initialId);
+      if (found) return found;
+    }
+    if (initialDate) {
+      const found = list.find(d => driveDayStr(d) === initialDate);
+      if (found) return found;
+    }
+    return list[0];
+  };
+
   useEffect(() => {
     if (isMock) {
       const list = MOCK_DATA.drives.recent_drives;
       setDrives(list);
       setPlaces(MOCK_DATA.frequentPlaces);
       setLoadingDrives(false);
-      const preselect = initialId ? list.find(d => d.id === initialId) : null;
-      setSelectedDrive(preselect || list[0]);
+      setSelectedDrive(pickPreselect(list));
       return;
     }
     setLoadingDrives(true);
@@ -225,11 +253,10 @@ function DrivesInner() {
       setPlaces(placesData.places || []);
       setLoadingDrives(false);
       if (list.length > 0) {
-        const preselect = initialId ? list.find(d => d.id === initialId) : null;
-        setSelectedDrive(preselect || list[0]);
+        setSelectedDrive(pickPreselect(list));
       }
     });
-  }, [isMock, refreshSignal, initialId]);
+  }, [isMock, refreshSignal, initialId, initialDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!selectedDrive) return;
@@ -259,9 +286,10 @@ function DrivesInner() {
       });
   }, [selectedDrive?.id, isMock, refreshSignal]);
 
-  // 목록/지도 모드
-  const [viewMode, setViewMode] = useState(initialId ? 'map' : 'list');
-  const [mapEverShown, setMapEverShown] = useState(!!initialId);
+  // 목록/지도 모드 — id 또는 date로 진입하면 지도 뷰로 바로
+  const entryInMapView = !!initialId || !!initialDate;
+  const [viewMode, setViewMode] = useState(entryInMapView ? 'map' : 'list');
+  const [mapEverShown, setMapEverShown] = useState(entryInMapView);
   const selectedIdx = selectedDrive ? drives.findIndex(d => d.id === selectedDrive.id) : -1;
   const eff = selectedDrive ? efficiency(selectedDrive) : null;
 
