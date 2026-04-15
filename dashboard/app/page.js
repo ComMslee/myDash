@@ -104,6 +104,7 @@ function DrivesSection({ drives, loading, error, lastCharge, estimatedCharge }) 
           {list.slice(0, 3).map((d) => {
             const startPct = d.start_battery_level ?? (d.start_rated_range_km != null ? Math.min(100, Math.round(d.start_rated_range_km / RATED_RANGE_MAX_KM * 100)) : null);
             const endPct   = d.end_battery_level   ?? (d.end_rated_range_km   != null ? Math.min(100, Math.round(d.end_rated_range_km   / RATED_RANGE_MAX_KM * 100)) : null);
+            const usedPct = (startPct != null && endPct != null) ? Math.max(0, startPct - endPct) : 0;
             const kwh = (d.start_rated_range_km != null && d.end_rated_range_km != null)
               ? ((d.start_rated_range_km - d.end_rated_range_km) * KWH_PER_KM).toFixed(1)
               : null;
@@ -139,7 +140,12 @@ function DrivesSection({ drives, loading, error, lastCharge, estimatedCharge }) 
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-blue-400 tabular-nums">{d.distance}<span className="text-xs font-medium text-zinc-600 ml-0.5">km</span></p>
-                  {kwh && <p className="text-xs text-green-400/80 tabular-nums">{kwh}<span className="text-xs ml-0.5">kWh</span></p>}
+                  {kwh && (
+                    <p className="text-xs text-green-400/80 tabular-nums">
+                      {kwh}<span className="text-xs ml-0.5">kWh</span>
+                      {usedPct > 0 && <span className="text-zinc-500 ml-1">({usedPct}%)</span>}
+                    </p>
+                  )}
                 </div>
               </Link>
             );
