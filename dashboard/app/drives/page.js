@@ -70,9 +70,9 @@ function PeriodStats({ drives }) {
 function RecordCell({ label, value, valueClass = 'text-zinc-200', rankType, borderRight }) {
   const content = (
     <>
-      <p className="text-zinc-600 text-[10px] mb-1.5">{label}</p>
+      <p className="text-zinc-500 text-[11px] mb-1.5">{label}</p>
       <p className={`font-bold text-lg leading-none tabular-nums ${valueClass}`}>{value}</p>
-      <p className="text-[9px] text-zinc-700 mt-1">{rankType ? 'TOP 50 ›' : '\u00A0'}</p>
+      <p className="text-[10px] text-zinc-500 mt-1">{rankType ? 'TOP 50 ›' : '\u00A0'}</p>
     </>
   );
   const baseClass = `px-2 py-4 text-center ${borderRight ? 'border-r border-white/[0.06]' : ''}`;
@@ -104,7 +104,7 @@ function RecordsCard({ allTime }) {
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       <div className="px-3 py-2 border-b border-white/[0.06]">
-        <span className="text-[10px] font-bold tracking-widest uppercase text-zinc-600">단일 주행 기준 · 전체 기간</span>
+        <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">단일 주행 기준 · 전체 기간</span>
       </div>
       <div className="grid grid-cols-3">
         <RecordCell label="최장 거리" value={km(allTime.max_distance)}       valueClass="text-blue-400"  rankType="drive_distance" borderRight />
@@ -113,7 +113,7 @@ function RecordsCard({ allTime }) {
       </div>
 
       <div className="px-3 py-2 border-t border-b border-white/[0.06]">
-        <span className="text-[10px] font-bold tracking-widest uppercase text-zinc-600">일 기준 · 전체 기간</span>
+        <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">일 기준 · 전체 기간</span>
       </div>
       <div className="grid grid-cols-2">
         <RecordCell label="일 최장 거리" value={km(allTime.max_day_distance)}        valueClass="text-blue-400"  rankType="day_distance" borderRight />
@@ -129,8 +129,8 @@ function PatternCard({ hourly, weekday }) {
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       <div className="px-3 py-2 border-b border-white/[0.06] flex items-center justify-between">
-        <span className="text-[10px] font-bold tracking-widest uppercase text-zinc-600">주행 패턴</span>
-        <span className="text-[10px] text-zinc-600">전체 기간</span>
+        <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">주행 패턴</span>
+        <span className="text-[11px] text-zinc-500">전체 기간</span>
       </div>
       <div className="px-4 pt-4 pb-4">
         <p className="text-[11px] text-zinc-600 uppercase tracking-wider mb-2">시간대</p>
@@ -233,19 +233,7 @@ export default function DrivesPage() {
           {loading.drives ? <Spinner /> : <PeriodStats drives={drives} />}
         </div>
 
-        {/* 2. 기록 */}
-        <div>
-          <SectionLabel title="기록" />
-          <RecordsCard allTime={insights?.allTime} />
-        </div>
-
-        {/* 3. 주행 패턴 */}
-        <div>
-          <SectionLabel title="주행 패턴" />
-          <PatternCard hourly={insights?.hourly} weekday={insights?.weekday} />
-        </div>
-
-        {/* 4. 연간 히트맵 — 주행만, 최신 왼쪽 */}
+        {/* 2. 연간 히트맵 — 1년 시각적 요약 (주행만, 최신 왼쪽) */}
         <div>
           <SectionLabel title="연간 히트맵" />
           <YearHeatmap
@@ -257,6 +245,18 @@ export default function DrivesPage() {
             legendLabel="주행"
             latestLeft
           />
+        </div>
+
+        {/* 3. 주행 패턴 — 시간대/요일 반복 패턴 */}
+        <div>
+          <SectionLabel title="주행 패턴" />
+          <PatternCard hourly={insights?.hourly} weekday={insights?.weekday} />
+        </div>
+
+        {/* 4. 기록 — 랭킹 진입점 */}
+        <div>
+          <SectionLabel title="기록" />
+          <RecordsCard allTime={insights?.allTime} />
         </div>
 
         {/* 5. 연도별 월간 통계 */}

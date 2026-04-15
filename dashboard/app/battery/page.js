@@ -59,10 +59,11 @@ export default function BatteryPage() {
               <CapacityTrendCard data={trend} />
             </div>
 
-            {/* 연간 충전 히트맵 (최신 왼쪽, 충전만) */}
+            {/* 충전 습관 */}
             <div className="flex flex-col gap-3">
-              <SectionLabel title="연간 충전 히트맵" />
-              <ChargeHeatmap />
+              <SectionLabel title="충전 습관" />
+              <LevelHabitCard histogram={data.histogram} />
+              <HabitTrendCard data={trend} />
             </div>
 
             {/* 충전 통계 */}
@@ -71,11 +72,10 @@ export default function BatteryPage() {
               <MonthlyChargeCard />
             </div>
 
-            {/* 충전 습관 */}
+            {/* 연간 충전 히트맵 (최신 왼쪽, 충전만) */}
             <div className="flex flex-col gap-3">
-              <SectionLabel title="충전 습관" />
-              <LevelHabitCard histogram={data.histogram} />
-              <HabitTrendCard data={trend} />
+              <SectionLabel title="연간 충전 히트맵" />
+              <ChargeHeatmap />
             </div>
 
             {/* 급속 충전 */}
