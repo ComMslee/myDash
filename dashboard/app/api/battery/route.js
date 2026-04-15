@@ -487,6 +487,8 @@ export async function GET() {
     let avgSoc = 0;
     const zoneCounts = { ideal: 0, good: 0, caution: 0, stress: 0 };
     const socHist = Array.from({ length: 10 }, () => 0);
+    // 5% 단위 세분화 히스토그램 (20칸: 0-5, 5-10, ..., 95-100)
+    const socHist5 = Array.from({ length: 20 }, () => 0);
 
     if (totalReadings > 0) {
       let weightedSoc = 0;
@@ -522,6 +524,8 @@ export async function GET() {
         }
         const bucket = Math.min(Math.floor(level / 10), 9);
         socHist[bucket] += cnt;
+        const bucket5 = Math.min(Math.floor(level / 5), 19);
+        socHist5[bucket5] += cnt;
       }
       avgSoc = parseFloat((weightedSoc / totalReadings).toFixed(1));
       healthScore = Math.round(weightedScore / totalReadings);
@@ -585,6 +589,7 @@ export async function GET() {
         battery_type: isLFP ? 'LFP' : 'NCA/NMC',
         total_readings: totalReadings,
         soc_histogram: socHist,
+        soc_histogram_5: socHist5,
         zone_pct: {
           ideal: totalReadings > 0 ? Math.round(zoneCounts.ideal / totalReadings * 100) : 0,
           good: totalReadings > 0 ? Math.round(zoneCounts.good / totalReadings * 100) : 0,

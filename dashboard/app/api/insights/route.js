@@ -60,8 +60,11 @@ export async function GET() {
       return { ...q.rows[0], ...chargeQ.rows[0] };
     };
 
-    // 12개월 각 월 통계 + 패턴 쿼리 동시 실행
-    const [twelveMonthBreakdown, hourly, weekday, chargeHourly, chargeWeekday] = await Promise.all([
+    // 12개월 각 월 통계 + 패턴 쿼리 동시 실행 (패턴은 전체 기간)
+    const [
+      twelveMonthBreakdown, hourly, weekday, chargeHourly, chargeWeekday,
+      allTimeDrive, allTimeCharge, dayMaxResult,
+    ] = await Promise.all([
       Promise.all(
         Array.from({ length: 12 }, (_, i) => {
           const ms = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
@@ -69,43 +72,101 @@ export async function GET() {
           return monthStats(ms, me).then(s => ({ year: ms.getFullYear(), month: ms.getMonth() + 1, ...s }));
         })
       ),
+      // 시간대 주행 (전체 기간)
       pool.query(
         `SELECT EXTRACT(HOUR FROM (start_date + INTERVAL '9 hours'))::int AS hour,
                 COUNT(*)::int AS count,
                 COALESCE(SUM(distance), 0)::float AS distance
          FROM drives
-         WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
+         WHERE car_id = $1
          GROUP BY hour ORDER BY hour`,
-        [carId, iso(twelveMonthStart), iso(nextStart)]
+        [carId]
       ),
+      // 요일 주행 (전체 기간)
       pool.query(
         `SELECT EXTRACT(DOW FROM (start_date + INTERVAL '9 hours'))::int AS dow,
                 COUNT(*)::int AS count,
                 COALESCE(SUM(distance), 0)::float AS distance
          FROM drives
-         WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
+         WHERE car_id = $1
          GROUP BY dow ORDER BY dow`,
-        [carId, iso(twelveMonthStart), iso(nextStart)]
+        [carId]
       ),
+      // 시간대 충전 (전체 기간)
       pool.query(
         `SELECT EXTRACT(HOUR FROM (start_date + INTERVAL '9 hours'))::int AS hour,
                 COUNT(*)::int AS count,
                 COALESCE(SUM(charge_energy_added), 0)::float AS kwh
          FROM charging_processes
-         WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
+         WHERE car_id = $1
            AND charge_energy_added IS NOT NULL
          GROUP BY hour ORDER BY hour`,
-        [carId, iso(twelveMonthStart), iso(nextStart)]
+        [carId]
       ),
+      // 요일 충전 (전체 기간)
       pool.query(
         `SELECT EXTRACT(DOW FROM (start_date + INTERVAL '9 hours'))::int AS dow,
                 COUNT(*)::int AS count,
                 COALESCE(SUM(charge_energy_added), 0)::float AS kwh
          FROM charging_processes
-         WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
+         WHERE car_id = $1
            AND charge_energy_added IS NOT NULL
          GROUP BY dow ORDER BY dow`,
-        [carId, iso(twelveMonthStart), iso(nextStart)]
+        [carId]
+      ),
+      // 전체 기간 주행 집계
+      pool.query(
+        `SELECT
+           COALESCE(SUM(distance), 0)::float AS distance,
+           COUNT(*)::int AS drive_count,
+           COALESCE(SUM(duration_min), 0)::int AS duration_min,
+           COALESCE(MAX(distance), 0)::float AS max_distance,
+           COALESCE(MAX(duration_min), 0)::int AS max_duration,
+           COALESCE(MAX(speed_max), 0)::int AS max_speed,
+           COALESCE(SUM(
+             CASE
+               WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
+               THEN (start_rated_range_km - end_rated_range_km)
+               ELSE 0
+             END
+           ), 0)::float AS total_range_used
+         FROM drives
+         WHERE car_id = $1`,
+        [carId]
+      ),
+      // 전체 기간 충전 집계
+      pool.query(
+        `SELECT
+           COALESCE(SUM(charge_energy_added), 0)::float AS total_kwh,
+           COUNT(*)::int AS charge_count,
+           COALESCE(AVG(charge_energy_added), 0)::float AS avg_kwh,
+           COUNT(*) FILTER (WHERE geofence_id IS NOT NULL)::int AS home_charges,
+           COUNT(*) FILTER (WHERE geofence_id IS NULL)::int AS other_charges,
+           COUNT(*) FILTER (WHERE is_fast = true)::int AS fast_charges,
+           COUNT(*) FILTER (WHERE is_fast IS DISTINCT FROM true)::int AS slow_charges
+         FROM (
+           SELECT cp.charge_energy_added, cp.geofence_id,
+                  COALESCE(BOOL_OR(c.fast_charger_present), false) AS is_fast
+           FROM charging_processes cp
+           LEFT JOIN charges c ON c.charging_process_id = cp.id
+           WHERE cp.car_id = $1 AND cp.charge_energy_added IS NOT NULL
+           GROUP BY cp.id, cp.charge_energy_added, cp.geofence_id
+         ) sub`,
+        [carId]
+      ),
+      // 전체 기간 일별 최대 거리/시간
+      pool.query(
+        `SELECT MAX(day_distance)::float AS max_day_distance,
+                MAX(day_duration)::int AS max_day_duration
+         FROM (
+           SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
+                  SUM(distance)::float AS day_distance,
+                  SUM(duration_min)::int AS day_duration
+           FROM drives
+           WHERE car_id = $1
+           GROUP BY day
+         ) sub`,
+        [carId]
       ),
     ]);
 
@@ -154,6 +215,33 @@ export async function GET() {
       };
     };
 
+    // 전체 기간 집계
+    const at = allTimeDrive.rows[0];
+    const ac = allTimeCharge.rows[0];
+    const dayMax = dayMaxResult.rows[0] || {};
+    const allTimeAvgSpeed = at.duration_min > 0 ? parseFloat((at.distance / Math.max(1, at.duration_min) * 60).toFixed(1)) : 0;
+    const allTimeEff = at.distance > 0 ? (at.total_range_used * KWH_PER_KM / at.distance * 1000) : 0;
+
+    const allTime = {
+      distance: parseFloat(at.distance.toFixed(1)),
+      drive_count: at.drive_count,
+      duration_min: at.duration_min,
+      total_kwh: parseFloat(ac.total_kwh.toFixed(1)),
+      charge_count: ac.charge_count,
+      avg_kwh: ac.charge_count > 0 ? parseFloat((ac.total_kwh / ac.charge_count).toFixed(1)) : 0,
+      home_charges: ac.home_charges,
+      other_charges: ac.other_charges,
+      fast_charges: ac.fast_charges,
+      slow_charges: ac.slow_charges,
+      max_distance: parseFloat(at.max_distance.toFixed(1)),
+      max_duration: at.max_duration,
+      max_speed: at.max_speed,
+      avg_speed: allTimeAvgSpeed,
+      efficiency_wh_km: parseFloat(allTimeEff.toFixed(0)),
+      max_day_distance: dayMax.max_day_distance != null ? parseFloat(parseFloat(dayMax.max_day_distance).toFixed(1)) : 0,
+      max_day_duration: dayMax.max_day_duration != null ? parseInt(dayMax.max_day_duration) : 0,
+    };
+
     return Response.json({
       current: {
         distance: parseFloat(current.distance.toFixed(1)),
@@ -179,6 +267,7 @@ export async function GET() {
       threeMonth: aggregate(twelveMonthBreakdown.slice(9)),
       sixMonth:   aggregate(twelveMonthBreakdown.slice(6)),
       twelveMonth: aggregate(twelveMonthBreakdown),
+      allTime,
       monthlyBreakdown: twelveMonthBreakdown.map(m => ({
         year: m.year,
         month: m.month,
