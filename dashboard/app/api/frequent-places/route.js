@@ -47,11 +47,14 @@ export async function GET() {
     let originMap = {};
     if (placeKeys.length > 0) {
       const originResult = await pool.query(
-        `SELECT place_key, start_label, cnt FROM (
+        `SELECT place_key, start_label, start_geofence_name, start_lat, start_lng, cnt FROM (
            SELECT
              ROUND(COALESCE(eg.latitude, ea.latitude)::numeric, 3)::text || ',' ||
              ROUND(COALESCE(eg.longitude, ea.longitude)::numeric, 3)::text AS place_key,
              COALESCE(sg.name, NULLIF(TRIM(CONCAT_WS(' ', sa.road, sa.house_number)), '')) AS start_label,
+             sg.name AS start_geofence_name,
+             AVG(COALESCE(sg.latitude, sa.latitude))::float AS start_lat,
+             AVG(COALESCE(sg.longitude, sa.longitude))::float AS start_lng,
              COUNT(*) AS cnt,
              ROW_NUMBER() OVER (
                PARTITION BY
@@ -69,13 +72,26 @@ export async function GET() {
            GROUP BY
              ROUND(COALESCE(eg.latitude, ea.latitude)::numeric, 3)::text || ',' ||
              ROUND(COALESCE(eg.longitude, ea.longitude)::numeric, 3)::text,
-             COALESCE(sg.name, NULLIF(TRIM(CONCAT_WS(' ', sa.road, sa.house_number)), ''))
+             COALESCE(sg.name, NULLIF(TRIM(CONCAT_WS(' ', sa.road, sa.house_number)), '')),
+             sg.name
          ) sub WHERE rn <= 3`,
         [carId]
       );
-      for (const row of originResult.rows) {
+
+      // 지오펜스 이름이 없는 출발지들만 모아서 Kakao 한국어 주소로 일괄 변환
+      const originRows = originResult.rows;
+      const originCoords = originRows.map(r => ({
+        lat: !r.start_geofence_name && r.start_lat ? parseFloat(r.start_lat) : null,
+        lng: !r.start_geofence_name && r.start_lng ? parseFloat(r.start_lng) : null,
+      }));
+      const originKakaoLabels = await batchReverseGeocode(originCoords);
+
+      for (let i = 0; i < originRows.length; i++) {
+        const row = originRows[i];
+        // 지오펜스 이름 > Kakao 한국어 주소 > OSM fallback
+        const label = row.start_geofence_name || originKakaoLabels[i] || row.start_label;
         if (!originMap[row.place_key]) originMap[row.place_key] = [];
-        originMap[row.place_key].push({ label: row.start_label, count: parseInt(row.cnt) });
+        originMap[row.place_key].push({ label, count: parseInt(row.cnt) });
       }
     }
 
