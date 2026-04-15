@@ -78,12 +78,13 @@ function RecordsCard({ allTime }) {
   const km  = (v) => <>{v}<span className="text-zinc-600 text-[11px] ml-0.5 font-normal">km</span></>;
   const kmh = (v) => <>{v}<span className="text-zinc-600 text-[11px] ml-0.5 font-normal">km/h</span></>;
 
-  // 지표(행) × 기준(열) 구성
+  // 지표(행) × 기준(열) 구성 — 라벨은 짧게("거리/시간/속도")
+  // 단일 주행 = 최장값, 일 합계 = 최장값. 속도는 단일=평균, 일=일 평균속도 중 최대.
   const rows = [
     {
-      label: '최장 거리',
+      label: '거리',
       icon: (
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
         </svg>
       ),
@@ -92,9 +93,9 @@ function RecordsCard({ allTime }) {
       day:   { value: km(allTime.max_day_distance), rankType: 'day_distance'   },
     },
     {
-      label: '최장 시간',
+      label: '시간',
       icon: (
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
@@ -103,9 +104,9 @@ function RecordsCard({ allTime }) {
       day:   { value: formatDuration(allTime.max_day_duration), rankType: 'day_duration'   },
     },
     {
-      label: '평균 속도',
+      label: '속도',
       icon: (
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
       ),
@@ -126,20 +127,20 @@ function RecordsCard({ allTime }) {
       </div>
 
       {/* 컬럼 헤더 */}
-      <div className="grid grid-cols-[82px_1fr_1fr] bg-white/[0.02]">
+      <div className="grid grid-cols-[72px_1fr_1fr] bg-white/[0.02]">
         <div className="px-3 py-2 border-b border-white/[0.06]" />
         <div className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500 border-b border-l border-white/[0.06]">단일 주행</div>
         <div className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500 border-b border-l border-white/[0.06]">일 합계</div>
       </div>
 
       {/* 데이터 행들 */}
-      <div className="grid grid-cols-[82px_1fr_1fr]">
+      <div className="grid grid-cols-[72px_1fr_1fr]">
         {rows.flatMap((r, i) => {
           const rowBorder = i < rows.length - 1 ? 'border-b border-white/[0.06]' : '';
           return [
-            <div key={`l-${i}`} className={`px-3 py-3.5 flex items-center gap-1.5 ${rowBorder} ${r.color}`}>
+            <div key={`l-${i}`} className={`px-3 py-3.5 flex items-center gap-1.5 whitespace-nowrap ${rowBorder} ${r.color}`}>
               {r.icon}
-              <span className="text-[11px] text-zinc-300 font-semibold">{r.label}</span>
+              <span className="text-xs text-zinc-300 font-semibold">{r.label}</span>
             </div>,
             <Link
               key={`d-${i}`}
