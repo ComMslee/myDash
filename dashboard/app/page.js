@@ -30,7 +30,7 @@ function Spinner() {
 
 // ── 주행거리 섹션 ───────────────────────────────────────────
 
-function DrivesSection({ drives, loading, error, lastCharge }) {
+function DrivesSection({ drives, loading, error, lastCharge, estimatedCharge }) {
   const list = drives?.recent_drives;
 
   const stats = [
@@ -174,6 +174,26 @@ function DrivesSection({ drives, loading, error, lastCharge }) {
                   </>
                 : <span className="text-zinc-700">—</span>
               }
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 추천 충전일 — 최근 14일 평균 소모율 기준 */}
+      {(() => {
+        const ec = estimatedCharge;
+        if (!ec) return null;
+        const target = new Date(ec.date);
+        const dateLabel = `${target.getMonth() + 1}/${target.getDate()}`;
+        const daysLabel = ec.days_until === 0 ? '곧' : `${ec.days_until}일 후`;
+        const urgent = ec.days_until <= 2;
+        return (
+          <div className="px-4 py-2.5 border-t border-white/[0.06] flex items-center justify-between">
+            <span className="text-xs text-zinc-600">추천 충전일</span>
+            <div className="flex items-center gap-2 text-xs tabular-nums">
+              <span className={`font-medium ${urgent ? 'text-rose-400' : 'text-amber-400'}`}>{daysLabel}</span>
+              <span className="text-zinc-500">{dateLabel}</span>
+              <span className="text-zinc-600">{ec.threshold_pct}% 도달</span>
             </div>
           </div>
         );
@@ -362,7 +382,8 @@ export default function Dashboard() {
             drives={displayDrives}
             loading={displayLoading.drives}
             error={!isMock && errors.drives}
-            lastCharge={carData?.last_charge ?? null}
+            lastCharge={isMock ? (MOCK_DATA.car?.last_charge ?? null) : (carData?.last_charge ?? null)}
+            estimatedCharge={isMock ? (MOCK_DATA.car?.estimated_charge ?? null) : (carData?.estimated_charge ?? null)}
           />
         </div>
 

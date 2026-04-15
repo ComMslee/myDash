@@ -5,7 +5,18 @@ import { createContext, useContext, useState, useCallback, useMemo } from 'react
 const now = () => Date.now();
 
 export const MOCK_DATA = {
-  car: { name: 'Model 3', battery_level: 72, est_battery_range: 287, state: 'parked', last_seen: '2026-04-14T14:25:00.000Z' },
+  car: {
+    name: 'Model 3', battery_level: 72, est_battery_range: 287, state: 'parked',
+    last_seen: '2026-04-14T14:25:00.000Z',
+    last_charge: {
+      end_date: new Date(now() - 6 * 3600 * 1000).toISOString(),
+      soc_start: 58, soc_end: 82, location: '집',
+    },
+    estimated_charge: {
+      date: new Date(now() + 5 * 86400 * 1000).toISOString(),
+      days_until: 5, threshold_pct: 20,
+    },
+  },
   chargingStatus: {
     charging: true, battery_level: 72, charge_limit_soc: 90, charger_power: 11,
     time_to_full_charge: 1.5, charge_energy_added: 18.4,
