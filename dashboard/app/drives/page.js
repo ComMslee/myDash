@@ -281,21 +281,23 @@ function DrivesInner() {
               <button
                 key={p.id}
                 onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMapEverShown(true); setViewMode('map'); }}
-                className={`flex-shrink-0 flex items-start gap-2 border rounded-xl px-3 py-2 w-[170px] text-left transition-colors ${
+                className={`flex-shrink-0 flex flex-col gap-1.5 border rounded-xl px-3 py-3 w-[130px] text-left transition-colors ${
                   selectedPlace?.id === p.id
                     ? 'bg-amber-500/10 border-amber-500/30'
                     : 'bg-zinc-800/60 border-white/[0.06] hover:bg-zinc-800/90'
                 }`}
               >
-                <span className="text-zinc-600 text-sm font-bold mt-0.5">#{i + 1}</span>
-                <p className="text-zinc-300 text-xs leading-snug flex-1 line-clamp-2">{p.label || p.city || '—'}</p>
-                <span className="text-zinc-500 text-xs flex-shrink-0 mt-0.5">{p.visit_count}회</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-600 text-sm font-bold leading-none">#{i + 1}</span>
+                  <span className="text-zinc-500 text-xs leading-none">{p.visit_count}회</span>
+                </div>
+                <p className="text-zinc-300 text-xs leading-snug line-clamp-3 flex-1">{p.label || p.city || '—'}</p>
               </button>
             ))}
             {places.length > 5 && (
               <button
                 onClick={() => setShowAllPlaces(true)}
-                className="flex-shrink-0 flex flex-col items-center justify-center gap-1 border border-white/[0.06] rounded-xl px-3 py-2 w-[80px] bg-zinc-800/40 hover:bg-zinc-800/70 transition-colors"
+                className="flex-shrink-0 flex flex-col items-center justify-center gap-1 border border-white/[0.06] rounded-xl px-3 py-3 w-[64px] bg-zinc-800/40 hover:bg-zinc-800/70 transition-colors"
               >
                 <span className="text-zinc-400 text-lg font-bold leading-none">···</span>
                 <span className="text-zinc-500 text-xs">더보기</span>
@@ -461,11 +463,7 @@ function DrivesInner() {
       )}
 
       {/* ── 목록 모드 ── */}
-      <div className="flex-1 flex flex-col px-4 pb-4" style={{ display: viewMode === 'list' ? 'flex' : 'none' }}>
-          <div className="flex items-center justify-between py-3 mb-2">
-            <span className="text-xs font-bold tracking-widest text-zinc-500 uppercase">주행 이력</span>
-            <span className="text-zinc-600 text-sm">{loadingDrives ? '…' : `${drives.length}건`}</span>
-          </div>
+      <div className="flex-1 flex flex-col px-4 pb-4 pt-3" style={{ display: viewMode === 'list' ? 'flex' : 'none' }}>
           <div className="flex-1 bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
             <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
               {loadingDrives ? (
