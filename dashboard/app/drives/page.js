@@ -1,18 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useMock, MOCK_DATA } from '../context/mock';
 import { formatDuration } from '../../lib/format';
+import { effColor } from '../../lib/effColor';
 import { Spinner, SectionLabel } from '@/app/components/PageLayout';
 import { HourlyHeatmap, WeekdayBars } from '@/app/components/ChartWidgets';
-
-function effColor(wh) {
-  if (wh == null) return '#3f3f46';
-  if (wh < 220) return '#10b981';
-  if (wh < 260) return '#eab308';
-  return '#f97316';
-}
+import YearHeatmap from '@/app/components/YearHeatmap';
 
 // ── 기간별 통계 섹션 (오늘/이번주/저번주) ─────────────────
 function PeriodStats({ drives }) {
@@ -70,6 +65,30 @@ function PeriodStats({ drives }) {
 }
 
 // ── 기록 카드 (최장거리/시간/평균속도) ─────────────────────
+
+// rankType이 지정되면 해당 랭킹 페이지로 링크되는 클릭 가능한 셀
+function RecordCell({ label, value, valueClass = 'text-zinc-200', rankType, borderRight }) {
+  const content = (
+    <>
+      <p className="text-zinc-600 text-[10px] mb-1.5">{label}</p>
+      <p className={`font-bold text-lg leading-none tabular-nums ${valueClass}`}>{value}</p>
+      <p className="text-[9px] text-zinc-700 mt-1">{rankType ? 'TOP 50 ›' : '\u00A0'}</p>
+    </>
+  );
+  const baseClass = `px-2 py-4 text-center ${borderRight ? 'border-r border-white/[0.06]' : ''}`;
+  if (rankType) {
+    return (
+      <Link
+        href={`/rankings?type=${rankType}`}
+        className={`${baseClass} hover:bg-white/[0.03] active:bg-blue-500/10 transition-colors`}
+      >
+        {content}
+      </Link>
+    );
+  }
+  return <div className={baseClass}>{content}</div>;
+}
+
 function RecordsCard({ allTime }) {
   if (!allTime) {
     return (
@@ -79,65 +98,26 @@ function RecordsCard({ allTime }) {
     );
   }
 
+  const km = (v) => <>{v}<span className="text-zinc-600 text-xs ml-0.5">km</span></>;
+  const kmh = (v) => <>{v}<span className="text-zinc-600 text-xs ml-0.5">km/h</span></>;
+
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       <div className="px-3 py-2 border-b border-white/[0.06]">
         <span className="text-[10px] font-bold tracking-widest uppercase text-zinc-600">단일 주행 기준 · 전체 기간</span>
       </div>
       <div className="grid grid-cols-3">
-        <Link
-          href="/rankings?type=drive_distance"
-          className="px-2 py-4 text-center border-r border-white/[0.06] hover:bg-white/[0.03] active:bg-blue-500/10 transition-colors"
-        >
-          <p className="text-zinc-600 text-[10px] mb-1.5">최장 거리</p>
-          <p className="text-blue-400 font-bold text-lg leading-none tabular-nums">
-            {allTime.max_distance}<span className="text-zinc-600 text-xs ml-0.5">km</span>
-          </p>
-          <p className="text-[9px] text-zinc-700 mt-1">TOP 50 ›</p>
-        </Link>
-        <Link
-          href="/rankings?type=drive_duration"
-          className="px-2 py-4 text-center border-r border-white/[0.06] hover:bg-white/[0.03] active:bg-blue-500/10 transition-colors"
-        >
-          <p className="text-zinc-600 text-[10px] mb-1.5">최장 시간</p>
-          <p className="text-zinc-200 font-bold text-base leading-none tabular-nums">
-            {formatDuration(allTime.max_duration)}
-          </p>
-          <p className="text-[9px] text-zinc-700 mt-1">TOP 50 ›</p>
-        </Link>
-        <div className="px-2 py-4 text-center">
-          <p className="text-zinc-600 text-[10px] mb-1.5">평균 속도</p>
-          <p className="text-zinc-200 font-bold text-lg leading-none tabular-nums">
-            {allTime.avg_speed}<span className="text-zinc-600 text-xs ml-0.5">km/h</span>
-          </p>
-          <p className="text-[9px] text-zinc-700 mt-1">&nbsp;</p>
-        </div>
+        <RecordCell label="최장 거리" value={km(allTime.max_distance)}       valueClass="text-blue-400"  rankType="drive_distance" borderRight />
+        <RecordCell label="최장 시간" value={formatDuration(allTime.max_duration)} valueClass="text-zinc-200 text-base" rankType="drive_duration" borderRight />
+        <RecordCell label="평균 속도" value={kmh(allTime.avg_speed)}          valueClass="text-zinc-200" />
       </div>
 
       <div className="px-3 py-2 border-t border-b border-white/[0.06]">
         <span className="text-[10px] font-bold tracking-widest uppercase text-zinc-600">일 기준 · 전체 기간</span>
       </div>
       <div className="grid grid-cols-2">
-        <Link
-          href="/rankings?type=day_distance"
-          className="px-2 py-4 text-center border-r border-white/[0.06] hover:bg-white/[0.03] active:bg-blue-500/10 transition-colors"
-        >
-          <p className="text-zinc-600 text-[10px] mb-1.5">일 최장 거리</p>
-          <p className="text-blue-400 font-bold text-lg leading-none tabular-nums">
-            {allTime.max_day_distance}<span className="text-zinc-600 text-xs ml-0.5">km</span>
-          </p>
-          <p className="text-[9px] text-zinc-700 mt-1">TOP 50 ›</p>
-        </Link>
-        <Link
-          href="/rankings?type=day_duration"
-          className="px-2 py-4 text-center hover:bg-white/[0.03] active:bg-blue-500/10 transition-colors"
-        >
-          <p className="text-zinc-600 text-[10px] mb-1.5">일 최장 시간</p>
-          <p className="text-zinc-200 font-bold text-base leading-none tabular-nums">
-            {formatDuration(allTime.max_day_duration)}
-          </p>
-          <p className="text-[9px] text-zinc-700 mt-1">TOP 50 ›</p>
-        </Link>
+        <RecordCell label="일 최장 거리" value={km(allTime.max_day_distance)}        valueClass="text-blue-400"  rankType="day_distance" borderRight />
+        <RecordCell label="일 최장 시간" value={formatDuration(allTime.max_day_duration)} valueClass="text-zinc-200 text-base" rankType="day_duration" />
       </div>
     </div>
   );
@@ -158,117 +138,6 @@ function PatternCard({ hourly, weekday }) {
         <p className="text-[11px] text-zinc-600 uppercase tracking-wider mt-4 mb-2">요일</p>
         <WeekdayBars data={weekday} hexColor="#3b82f6" />
       </div>
-    </div>
-  );
-}
-
-// ── 연간 히트맵 — 주행만, 최신이 왼쪽 ─────────────────────
-function intensity(val, max) {
-  if (!val || val <= 0 || !max) return 0;
-  const ratio = Math.min(1, val / max);
-  if (ratio <= 0.05) return 0.2;
-  if (ratio <= 0.2)  return 0.4;
-  if (ratio <= 0.5)  return 0.6;
-  if (ratio <= 0.8)  return 0.8;
-  return 1.0;
-}
-
-function YearHeatmap({ data, loading }) {
-  // 최신이 왼쪽 — 이번 주부터 52주 전까지 역순 (왼쪽=최신)
-  const weeks = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const currentSunday = new Date(today);
-    currentSunday.setDate(today.getDate() - today.getDay());
-
-    const weeksArr = [];
-    for (let w = 0; w <= 52; w++) {
-      const weekStart = new Date(currentSunday);
-      weekStart.setDate(weekStart.getDate() - w * 7);
-      const days = [];
-      for (let d = 0; d < 7; d++) {
-        const day = new Date(weekStart);
-        day.setDate(weekStart.getDate() + d);
-        const future = day > today;
-        days.push({ date: day, future });
-      }
-      weeksArr.push(days);
-    }
-    return weeksArr;
-  }, []);
-
-  const daysMap = data?.days || {};
-  const maxKm = data?.max_km || 0;
-
-  const fmtDate = (d) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${dd}`;
-  };
-
-  // 월 라벨
-  const monthLabels = weeks.map((week) => {
-    const first = week[0].date;
-    return first.getDate() <= 7 ? first.getMonth() + 1 : null;
-  });
-
-  return (
-    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-3">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-bold text-zinc-400">지난 1년 주행</span>
-        <div className="flex items-center gap-1 text-[10px] text-zinc-500">
-          <span className="text-zinc-600">최신 ←</span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-sm bg-blue-500" />주행
-          </span>
-        </div>
-      </div>
-      {loading ? (
-        <div className="h-24 flex items-center justify-center">
-          <div className="w-5 h-5 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
-        </div>
-      ) : (
-        <div className="overflow-x-auto no-scrollbar">
-          <div className="flex flex-col gap-[3px] min-w-fit">
-            <div className="flex gap-[3px] pl-[18px] text-[9px] text-zinc-600 tabular-nums h-3">
-              {monthLabels.map((m, i) => (
-                <div key={i} className="w-[10px] text-left leading-none">
-                  {m != null ? `${m}` : ''}
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-[3px]">
-              <div className="flex flex-col gap-[3px] text-[9px] text-zinc-600 pr-[3px] w-[15px]">
-                {['', '월', '', '수', '', '금', ''].map((d, i) => (
-                  <div key={i} className="h-[10px] leading-none">{d}</div>
-                ))}
-              </div>
-              {weeks.map((week, wi) => (
-                <div key={wi} className="flex flex-col gap-[3px]">
-                  {week.map(({ date, future }, di) => {
-                    if (future) {
-                      return <div key={di} className="w-[10px] h-[10px]" />;
-                    }
-                    const key = fmtDate(date);
-                    const d = daysMap[key] || { km: 0 };
-                    const op = intensity(d.km, maxKm);
-                    const title = `${date.getMonth()+1}/${date.getDate()} · ${d.km||0}km`;
-                    return (
-                      <div
-                        key={di}
-                        title={title}
-                        className="w-[10px] h-[10px] rounded-[2px] bg-zinc-800/60"
-                        style={op > 0 ? { background: '#3b82f6', opacity: op } : {}}
-                      />
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -379,7 +248,15 @@ export default function DrivesPage() {
         {/* 4. 연간 히트맵 — 주행만, 최신 왼쪽 */}
         <div>
           <SectionLabel title="연간 히트맵" />
-          <YearHeatmap data={yearHeatmap} loading={loading.heatmap} />
+          <YearHeatmap
+            data={yearHeatmap}
+            loading={loading.heatmap}
+            title="지난 1년 주행"
+            metric="km"
+            color="#3b82f6"
+            legendLabel="주행"
+            latestLeft
+          />
         </div>
 
         {/* 5. 연도별 월간 통계 */}

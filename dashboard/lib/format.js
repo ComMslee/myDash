@@ -33,3 +33,22 @@ export function formatKorDate(dateStr) {
   const currentYear = new Date().getFullYear();
   return year !== currentYear ? `${String(year).slice(2)}/${mm}/${dd}` : `${mm}/${dd}`;
 }
+
+/** ISO 날짜 + 시간 → "YY/M/D HH:MM" */
+export function formatKorDateTime(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  const y = String(d.getFullYear()).slice(2);
+  const m = d.getMonth() + 1;
+  const dd = d.getDate();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${y}/${m}/${dd} ${hh}:${mm}`;
+}
+
+/** "YYYY-MM-DD" → "YY/M/D" (day API 응답용) */
+export function formatKorDay(day) {
+  if (!day) return '—';
+  const [y, m, d] = String(day).split('-');
+  return `${y.slice(2)}/${parseInt(m)}/${parseInt(d)}`;
+}
