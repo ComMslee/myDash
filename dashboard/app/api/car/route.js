@@ -14,7 +14,7 @@ export async function GET() {
 
     const [posResult, stateResult] = await Promise.all([
       pool.query(
-        `SELECT battery_level, est_battery_range_km, date
+        `SELECT battery_level, est_battery_range_km, rated_battery_range_km, date
          FROM positions WHERE car_id = $1 ORDER BY date DESC LIMIT 1`,
         [carId]
       ),
@@ -32,6 +32,7 @@ export async function GET() {
       name: car.name,
       battery_level: pos?.battery_level ?? null,
       est_battery_range: pos?.est_battery_range_km ? parseFloat(pos.est_battery_range_km).toFixed(0) : null,
+      rated_battery_range: pos?.rated_battery_range_km ? parseFloat(pos.rated_battery_range_km).toFixed(0) : null,
       state: currentState,
       last_seen: pos?.date ?? null,
     });
