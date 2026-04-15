@@ -29,13 +29,16 @@ export default function MonthlyChargeCard() {
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      <div className="px-4 py-3">
-        {/* 회당 평균만 표시 */}
-        <div className="mb-4 text-center">
-          <p className="text-zinc-600 text-xs mb-1">회당 평균</p>
-          <p className="text-emerald-400 font-bold text-lg tabular-nums">{data.avg_kwh}<span className="text-zinc-600 text-xs ml-0.5">kWh</span></p>
-        </div>
+      {/* 헤더 — 회당 평균을 헤더 부속으로 */}
+      <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center justify-between">
+        <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">전체 충전 요약</span>
+        <span className="text-[11px] text-zinc-500 tabular-nums">
+          회당 평균 <span className="text-emerald-400 font-bold">{data.avg_kwh}</span>
+          <span className="text-zinc-600 ml-0.5">kWh</span>
+        </span>
+      </div>
 
+      <div className="px-4 py-3">
         {/* 집충전 / 외부충전 */}
         <div className="mb-4">
           <div className="flex justify-between text-xs mb-1.5">
@@ -70,9 +73,9 @@ export default function MonthlyChargeCard() {
 
         {/* 시간대별 / 요일별 */}
         <div className="pt-4 border-t border-white/[0.06]">
-          <p className="text-[9px] text-zinc-600 uppercase tracking-wider mb-1.5">시간대별 충전</p>
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">시간대별 충전</p>
           <HourlyHeatmap data={data.charge_hourly} hexColor="#22c55e" />
-          <p className="text-[9px] text-zinc-600 uppercase tracking-wider mt-4 mb-1.5">요일별 충전</p>
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wider mt-4 mb-1.5">요일별 충전</p>
           <WeekdayBars data={data.charge_weekday} hexColor="#22c55e" />
         </div>
       </div>

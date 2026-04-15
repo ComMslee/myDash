@@ -99,24 +99,24 @@ export default function YearHeatmap({
       ) : (
         <div className="overflow-x-auto no-scrollbar">
           <div className="flex flex-col gap-[3px] min-w-fit">
-            <div className="flex gap-[3px] pl-[18px] text-[9px] text-zinc-600 tabular-nums h-3">
+            <div className="flex gap-[3px] pl-[18px] text-[10px] text-zinc-500 tabular-nums h-3.5">
               {monthLabels.map((m, i) => (
-                <div key={i} className="w-[10px] text-left leading-none">
+                <div key={i} className="w-[13px] text-left leading-none">
                   {m != null ? `${m}` : ''}
                 </div>
               ))}
             </div>
             <div className="flex gap-[3px]">
-              <div className="flex flex-col gap-[3px] text-[9px] text-zinc-600 pr-[3px] w-[15px]">
+              <div className="flex flex-col gap-[3px] text-[10px] text-zinc-500 pr-[3px] w-[15px]">
                 {['', '월', '', '수', '', '금', ''].map((d, i) => (
-                  <div key={i} className="h-[10px] leading-none">{d}</div>
+                  <div key={i} className="h-[13px] leading-none">{d}</div>
                 ))}
               </div>
               {weeks.map((week, wi) => (
                 <div key={wi} className="flex flex-col gap-[3px]">
                   {week.map(({ date, future }, di) => {
                     if (future) {
-                      return <div key={di} className="w-[10px] h-[10px]" />;
+                      return <div key={di} className="w-[13px] h-[13px]" />;
                     }
                     const key = fmtDate(date);
                     const d = daysMap[key] || {};
@@ -130,7 +130,7 @@ export default function YearHeatmap({
                           key={di}
                           title={title}
                           onClick={() => onSelectMonth(date.getFullYear(), date.getMonth())}
-                          className="w-[10px] h-[10px] rounded-[2px] bg-zinc-800/60 hover:ring-1 hover:ring-white/40 transition-shadow"
+                          className="w-[13px] h-[13px] rounded-[2px] bg-zinc-800/60 hover:ring-1 hover:ring-white/40 transition-shadow"
                           style={cellStyle}
                         />
                       );
@@ -139,7 +139,7 @@ export default function YearHeatmap({
                       <div
                         key={di}
                         title={title}
-                        className="w-[10px] h-[10px] rounded-[2px] bg-zinc-800/60"
+                        className="w-[13px] h-[13px] rounded-[2px] bg-zinc-800/60"
                         style={cellStyle}
                       />
                     );
