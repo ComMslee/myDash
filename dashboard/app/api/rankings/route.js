@@ -76,8 +76,21 @@ export async function GET(request) {
       });
     }
 
-    if (type === 'day_distance' || type === 'day_duration') {
-      const sumCol = type === 'day_distance' ? 'SUM(distance)' : 'SUM(duration_min)';
+    if (type === 'day_distance' || type === 'day_duration' || type === 'day_avg_speed') {
+      // 정렬 기준: 일 평균속도는 SUM(distance)/SUM(duration_min)*60
+      // 일 평균속도는 짧은 주행만 있는 날은 이상치 유발 → distance >= 10km 필터
+      let orderExpr, havingExpr;
+      if (type === 'day_distance') {
+        orderExpr = 'SUM(distance)';
+        havingExpr = 'SUM(distance) > 0';
+      } else if (type === 'day_duration') {
+        orderExpr = 'SUM(duration_min)';
+        havingExpr = 'SUM(duration_min) > 0';
+      } else {
+        orderExpr = 'SUM(distance) / NULLIF(SUM(duration_min), 0) * 60';
+        havingExpr = 'SUM(distance) >= 10 AND SUM(duration_min) > 0';
+      }
+
       const rows = await pool.query(
         `SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
                 COALESCE(SUM(distance), 0)::float AS total_distance,
@@ -86,20 +99,26 @@ export async function GET(request) {
          FROM drives
          WHERE car_id = $1
          GROUP BY day
-         HAVING ${sumCol} > 0
-         ORDER BY ${sumCol} DESC
+         HAVING ${havingExpr}
+         ORDER BY ${orderExpr} DESC
          LIMIT $2`,
         [carId, limit]
       );
 
       return Response.json({
         type,
-        items: rows.rows.map(r => ({
-          day: r.day,
-          total_distance: parseFloat(r.total_distance.toFixed(1)),
-          total_duration: r.total_duration,
-          drive_count: r.drive_count,
-        })),
+        items: rows.rows.map(r => {
+          const dist = parseFloat(r.total_distance.toFixed(1));
+          const dur  = r.total_duration;
+          const avgSpeed = dist > 0 && dur > 0 ? parseFloat((dist / dur * 60).toFixed(1)) : null;
+          return {
+            day: r.day,
+            total_distance: dist,
+            total_duration: dur,
+            avg_speed: avgSpeed,
+            drive_count: r.drive_count,
+          };
+        }),
       });
     }
 
