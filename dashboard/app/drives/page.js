@@ -532,7 +532,12 @@ function DrivesInner() {
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-bold text-blue-400 tabular-nums">{d.distance}<span className="text-xs font-medium text-zinc-600 ml-0.5">km</span></p>
-                          {eff && <p className="text-xs text-green-400/80 tabular-nums">{eff.kwh}<span className="ml-0.5">kWh</span></p>}
+                          {eff && (
+                            <p className="text-xs text-green-400/80 tabular-nums">
+                              {eff.kwh}<span className="ml-0.5">kWh</span>
+                              {usedPct > 0 && <span className="text-zinc-500 ml-1">({usedPct}%)</span>}
+                            </p>
+                          )}
                         </div>
                       </button>
                       {gapLabel && (
