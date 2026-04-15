@@ -155,11 +155,11 @@ export default function GlobalHeader() {
         ) : (
           <div className="flex items-center gap-2">
             {effectiveState && <StateBadge state={effectiveState} />}
-            <BatteryBar level={lvl} color={color} charging={false} />
             <div className="flex flex-col items-end leading-none">
-              {ratedRange && <span className="text-zinc-400 text-xs tabular-nums">{ratedRange}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>}
-              {estRange && <span className="text-zinc-600 text-[10px] tabular-nums mt-0.5">예측 {estRange}km</span>}
+              {estRange && <span className="text-zinc-400 text-xs tabular-nums">예측 {estRange}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>}
+              {ratedRange && <span className="text-zinc-600 text-[10px] tabular-nums mt-0.5">정규 {ratedRange}km</span>}
             </div>
+            <BatteryBar level={lvl} color={color} charging={false} />
           </div>
         )}
 
