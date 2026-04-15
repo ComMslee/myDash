@@ -504,7 +504,8 @@ export async function GET() {
         } else {
           // 범위 밖: 급격히 감점
           const overLow = level < RANGE_LOW ? (RANGE_LOW - level) / RANGE_LOW : 0;
-          const overHigh = level > RANGE_HIGH ? (level - RANGE_HIGH) / (100 - RANGE_HIGH) : 0;
+          const denomHigh = 100 - RANGE_HIGH;
+          const overHigh = level > RANGE_HIGH && denomHigh > 0 ? (level - RANGE_HIGH) / denomHigh : 0;
           const over = Math.max(overLow, overHigh);
           pointScore = Math.max(0, 60 - over * 100);
         }

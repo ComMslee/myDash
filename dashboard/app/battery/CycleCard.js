@@ -1,17 +1,17 @@
 // CycleCard.js - default export
 export default function CycleCard({ data }) {
   const {
-    total_kwh,
-    battery_capacity_kwh,
-    total_cycles,
-    this_week_kwh,
-    this_week_cycles,
-    this_month_kwh,
-    this_month_cycles,
-    avg_monthly_cycles,
+    total_kwh = 0,
+    battery_capacity_kwh = 0,
+    total_cycles = 0,
+    this_week_kwh = 0,
+    this_week_cycles = 0,
+    this_month_kwh = 0,
+    this_month_cycles = 0,
+    avg_monthly_cycles = 0,
     odometer_km = 0,
     is_estimated = false,
-  } = data;
+  } = data || {};
 
   const MAX_CYCLES = 1500;
   const progress = Math.min(total_cycles / MAX_CYCLES, 1);

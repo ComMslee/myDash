@@ -11,7 +11,7 @@ export async function GET() {
     }
     const carId = carResult.rows[0].id;
 
-    const [drivesResult, chargesResult, effResult] = await Promise.all([
+    const [drivesResult, chargesResult, effResult, driveDaysResult, seasonalResult] = await Promise.all([
       pool.query(
         `SELECT
            date_trunc('month', start_date) AS month,
@@ -51,6 +51,35 @@ export async function GET() {
          ORDER BY month DESC`,
         [carId, KWH_PER_KM]
       ),
+      pool.query(
+        `SELECT
+           EXTRACT(YEAR FROM start_date + INTERVAL '9 hours')::int AS yr,
+           COUNT(DISTINCT DATE(start_date + INTERVAL '9 hours'))::int AS drive_days
+         FROM drives
+         WHERE car_id = $1
+         GROUP BY yr
+         ORDER BY yr DESC`,
+        [carId]
+      ),
+      pool.query(
+        `SELECT
+           CASE
+             WHEN EXTRACT(MONTH FROM start_date + INTERVAL '9 hours') IN (3,4,5) THEN '봄'
+             WHEN EXTRACT(MONTH FROM start_date + INTERVAL '9 hours') IN (6,7,8) THEN '여름'
+             WHEN EXTRACT(MONTH FROM start_date + INTERVAL '9 hours') IN (9,10,11) THEN '가을'
+             ELSE '겨울'
+           END AS season,
+           AVG(
+             (start_rated_range_km - end_rated_range_km) * $2 / NULLIF(distance, 0) * 1000
+           )::float AS wh_per_km
+         FROM drives
+         WHERE car_id = $1
+           AND start_rated_range_km IS NOT NULL
+           AND end_rated_range_km IS NOT NULL
+           AND distance > 1
+         GROUP BY season`,
+        [carId, KWH_PER_KM]
+      ),
     ]);
 
     const chargesByMonth = {};
@@ -87,7 +116,17 @@ export async function GET() {
       };
     });
 
-    return Response.json({ months });
+    const driveDaysByYear = {};
+    for (const row of driveDaysResult.rows) {
+      driveDaysByYear[row.yr] = row.drive_days;
+    }
+
+    const seasonalEff = {};
+    for (const row of seasonalResult.rows) {
+      if (row.wh_per_km != null) seasonalEff[row.season] = parseFloat(row.wh_per_km.toFixed(1));
+    }
+
+    return Response.json({ months, driveDaysByYear, seasonalEff });
   } catch (err) {
     console.error('/api/monthly-history error:', err);
     return Response.json({ error: 'DB error', detail: err.message }, { status: 500 });

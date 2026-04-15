@@ -14,7 +14,7 @@ const REFRESH_INTERVAL = 30000;
 
 function SectionHeader({ title }) {
   return (
-    <div className="flex items-center justify-between mb-2 px-1">
+    <div className="flex items-center justify-between mb-3 px-1">
       <span className="text-xs font-bold tracking-widest text-zinc-500 uppercase">{title}</span>
     </div>
   );
@@ -30,7 +30,7 @@ function Spinner() {
 
 // ── 주행거리 섹션 ───────────────────────────────────────────
 
-function DrivesSection({ drives, loading, error }) {
+function DrivesSection({ drives, loading, error, lastCharge }) {
   const list = drives?.recent_drives;
 
   const stats = [
@@ -42,39 +42,54 @@ function DrivesSection({ drives, loading, error }) {
 
   return (
     <Card className="!p-0 overflow-hidden">
-      {/* 4칸 통계 — 헤더 + km + kWh + 효율 */}
-      <div className="grid grid-cols-4 border-b border-white/[0.06]">
-        {/* 라벨 행 */}
-        {stats.map((s, i) => (
-          <div key={s.label} className={`pt-3 pb-1 text-center ${i < 3 ? 'border-r border-white/[0.06]' : ''}`}>
-            <p className="text-[11px] text-zinc-500 tracking-wide">{s.label}</p>
-          </div>
-        ))}
-        {/* km 행 */}
-        {stats.map((s, i) => (
-          <div key={`km-${s.label}`} className={`py-1 text-center ${i < 3 ? 'border-r border-white/[0.06]' : ''}`}>
-            <p className="text-xl font-black tabular-nums leading-none text-blue-400">
-              {s.km}<span className="text-[10px] font-semibold text-zinc-600 ml-0.5">km</span>
-            </p>
-          </div>
-        ))}
-        {/* kWh 행 */}
-        {stats.map((s, i) => (
-          <div key={`kwh-${s.label}`} className={`py-1 text-center ${i < 3 ? 'border-r border-white/[0.06]' : ''}`}>
-            <p className="text-sm font-bold tabular-nums leading-none text-green-400">
-              {s.kwh}<span className="text-[10px] font-medium text-zinc-600 ml-0.5">kWh</span>
-            </p>
-          </div>
-        ))}
-        {/* 효율 행 */}
-        {stats.map((s, i) => (
-          <div key={`eff-${s.label}`} className={`pb-3 pt-1 text-center ${i < 3 ? 'border-r border-white/[0.06]' : ''}`}>
-            <p className="text-sm font-bold tabular-nums leading-none text-amber-400">
-              {s.km > 0 && s.kwh > 0 ? (s.kwh / s.km * 1000).toFixed(0) : 0}
-              <span className="text-[10px] font-medium text-zinc-600 ml-0.5">Wh/k</span>
-            </p>
-          </div>
-        ))}
+      {/* 기간별 통계 — 행=기간, 열=거리·충전·효율 */}
+      <div className="border-b border-white/[0.06] pt-1">
+        {/* 데이터 행 */}
+        {stats.map((s, i) => {
+          const eff = s.km > 0 && s.kwh > 0 ? (s.kwh / s.km * 1000).toFixed(0) : null;
+          const isEmpty = s.km === 0 && s.kwh === 0;
+          return (
+            <div key={s.label} className={`grid grid-cols-4 px-4 py-3 items-center ${i < stats.length - 1 ? 'border-b border-white/[0.04]' : 'pb-4'}`}>
+              {/* 기간 라벨 */}
+              <div>
+                <span className="text-xs font-bold text-zinc-400">{s.label}</span>
+              </div>
+              {/* 거리 */}
+              <div className="text-center">
+                {isEmpty ? (
+                  <span className="text-base font-black tabular-nums text-zinc-700">—</span>
+                ) : (
+                  <>
+                    <span className="text-lg font-black tabular-nums leading-none text-blue-400">{s.km}</span>
+                    <span className="text-[10px] text-zinc-600 ml-0.5">km</span>
+                  </>
+                )}
+              </div>
+              {/* 충전 */}
+              <div className="text-center">
+                {isEmpty ? (
+                  <span className="text-sm font-bold tabular-nums text-zinc-700">—</span>
+                ) : (
+                  <>
+                    <span className="text-sm font-bold tabular-nums leading-none text-green-400">{s.kwh}</span>
+                    <span className="text-[10px] text-zinc-600 ml-0.5">kWh</span>
+                  </>
+                )}
+              </div>
+              {/* 효율 */}
+              <div className="text-center">
+                {!eff ? (
+                  <span className="text-sm font-bold tabular-nums text-zinc-700">—</span>
+                ) : (
+                  <>
+                    <span className="text-sm font-bold tabular-nums leading-none text-amber-400">{eff}</span>
+                    <span className="text-[10px] text-zinc-600 ml-0.5">Wh/km</span>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* 주행 목록 */}
@@ -131,6 +146,38 @@ function DrivesSection({ drives, loading, error }) {
           })}
         </div>
       )}
+
+      {/* 마지막 충전 경과시간 */}
+      {(() => {
+        const lc = lastCharge;
+        const elapsed = lc ? (() => {
+          const diffMs = Date.now() - new Date(lc.end_date).getTime();
+          const diffMin = Math.floor(diffMs / 60000);
+          if (diffMin < 60) return `${diffMin}분 전`;
+          const diffH = Math.floor(diffMin / 60);
+          if (diffH < 24) return `${diffH}시간 전`;
+          const diffD = Math.floor(diffH / 24);
+          const remH = diffH % 24;
+          return remH > 0 ? `${diffD}일 ${remH}시간 전` : `${diffD}일 전`;
+        })() : null;
+        return (
+          <div className="px-4 py-2.5 border-t border-white/[0.06] flex items-center justify-between">
+            <span className="text-xs text-zinc-600">마지막 충전</span>
+            <div className="flex items-center gap-2 text-xs tabular-nums">
+              {elapsed
+                ? <>
+                    <span className="text-zinc-400 font-medium">{elapsed}</span>
+                    {lc.location && <span className="text-zinc-600">{lc.location}</span>}
+                    {lc.soc_start != null && lc.soc_end != null && (
+                      <span className="text-zinc-500">{lc.soc_start}→{lc.soc_end}%</span>
+                    )}
+                  </>
+                : <span className="text-zinc-700">—</span>
+              }
+            </div>
+          </div>
+        );
+      })()}
     </Card>
   );
 }
@@ -184,23 +231,19 @@ function PeriodCard({ insights }) {
           <div className="grid grid-cols-3">
             <div className="px-2 py-4 text-center border-r border-b border-white/[0.06]">
               <p className="text-zinc-600 text-xs mb-1.5">횟수</p>
-              <p className="text-white font-bold text-lg leading-none tabular-nums">{c.drive_count}</p>
-              <p className="text-zinc-600 text-xs mt-1.5">회</p>
+              <p className="text-white font-bold text-lg leading-none tabular-nums">{c.drive_count}<span className="text-zinc-600 text-xs ml-0.5">회</span></p>
             </div>
             <div className="px-2 py-4 text-center border-r border-b border-white/[0.06]">
               <p className="text-zinc-600 text-xs mb-1.5">거리</p>
-              <p className="text-blue-400 font-bold text-lg leading-none tabular-nums">{c.distance}</p>
-              <p className="text-zinc-600 text-xs mt-1.5">km</p>
+              <p className="text-blue-400 font-bold text-lg leading-none tabular-nums">{c.distance}<span className="text-zinc-600 text-xs ml-0.5">km</span></p>
             </div>
             <div className="px-2 py-4 text-center border-b border-white/[0.06]">
               <p className="text-zinc-600 text-xs mb-1.5">효율</p>
-              <p className="text-amber-400 font-bold text-lg leading-none tabular-nums">{c.efficiency_wh_km || '—'}</p>
-              <p className="text-zinc-600 text-xs mt-1.5">Wh/km</p>
+              <p className="text-amber-400 font-bold text-lg leading-none tabular-nums">{c.efficiency_wh_km || '—'}<span className="text-zinc-600 text-xs ml-0.5">Wh/km</span></p>
             </div>
             <div className="px-2 py-4 text-center border-r border-white/[0.06]">
               <p className="text-zinc-600 text-xs mb-1.5">최장 거리</p>
-              <p className="text-blue-400/80 font-bold text-lg leading-none tabular-nums">{c.max_distance}</p>
-              <p className="text-zinc-600 text-xs mt-1.5">km</p>
+              <p className="text-blue-400/80 font-bold text-lg leading-none tabular-nums">{c.max_distance}<span className="text-zinc-600 text-xs ml-0.5">km</span></p>
             </div>
             <div className="px-2 py-4 text-center border-r border-white/[0.06]">
               <p className="text-zinc-600 text-xs mb-1.5">최장 시간</p>
@@ -208,8 +251,7 @@ function PeriodCard({ insights }) {
             </div>
             <div className="px-2 py-4 text-center">
               <p className="text-zinc-600 text-xs mb-1.5">평균 속도</p>
-              <p className="text-zinc-300 font-bold text-lg leading-none tabular-nums">{c.avg_speed}</p>
-              <p className="text-zinc-600 text-xs mt-1.5">km/h</p>
+              <p className="text-zinc-300 font-bold text-lg leading-none tabular-nums">{c.avg_speed}<span className="text-zinc-600 text-xs ml-0.5">km/h</span></p>
             </div>
           </div>
 
@@ -270,6 +312,7 @@ export default function Dashboard() {
 
   const [drives, setDrives] = useState(null);
   const [insights, setInsights] = useState(null);
+  const [carData, setCarData] = useState(null);
   const [loading, setLoading] = useState({ drives: true, insights: true });
   const [errors, setErrors] = useState({});
 
@@ -289,6 +332,7 @@ export default function Dashboard() {
     await Promise.all([
       fetcher('/api/drives', 'drives', setDrives),
       fetcher('/api/insights', 'insights', setInsights),
+      fetcher('/api/car', 'car', setCarData),
     ]);
     setLastRefresh(new Date());
   }, [isMock, setLastRefresh]);
@@ -318,6 +362,7 @@ export default function Dashboard() {
             drives={displayDrives}
             loading={displayLoading.drives}
             error={!isMock && errors.drives}
+            lastCharge={carData?.last_charge ?? null}
           />
         </div>
 

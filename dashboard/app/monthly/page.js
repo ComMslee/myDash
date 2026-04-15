@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useMock, MOCK_DATA } from '../context/mock';
 import { formatDuration } from '../../lib/format';
-import { Spinner } from '@/app/components/PageLayout';
+import { Spinner, SectionLabel } from '@/app/components/PageLayout';
 
 function StatBar({ val, max, color }) {
   const pct = max > 0 ? Math.min(100, (val / max) * 100) : 0;
@@ -158,7 +158,7 @@ function MonthlyCalendar({ drives, charges, calLoading, monthlyData }) {
           <div className="grid grid-cols-4 gap-1">
             {pickerMonths.map(({ year, month }) => {
               const isSelected = year === viewYear && month === viewMonth;
-              const label = year !== now.getFullYear()
+              const label = year !== _now.getFullYear()
                 ? `${String(year).slice(2)}·${month + 1}월`
                 : `${month + 1}월`;
               return (
@@ -296,6 +296,8 @@ export default function MonthlyPage() {
   }, [isMock, refreshSignal]);
 
   const months = data?.months || [];
+  const driveDaysByYear = data?.driveDaysByYear || {};
+  const seasonalEff = data?.seasonalEff || {};
   const now = new Date();
   const curYear = now.getFullYear();
   const curMonth = now.getMonth() + 1;
@@ -335,7 +337,7 @@ export default function MonthlyPage() {
       <div className="max-w-2xl mx-auto px-4 py-5 pb-20">
 
         {/* 달력 */}
-        <div className="mb-5">
+        <div className="mb-6">
           <MonthlyCalendar
             drives={drives}
             charges={charges}
@@ -353,9 +355,17 @@ export default function MonthlyPage() {
         {loading ? <Spinner /> : !error && months.length === 0 ? (
           <p className="text-center text-zinc-600 py-16">데이터가 없습니다</p>
         ) : !error && (
-          <div className="space-y-4">
+          <>
+          <div className="space-y-5">
             {years.map(year => {
               const t = yearTotals[year];
+              const yr = parseInt(year);
+              const isCurrentYear = yr === curYear;
+              const totalDays = isCurrentYear
+                ? Math.floor((Date.now() - new Date(`${yr}-01-01`).getTime()) / 86400000) + 1
+                : (yr % 4 === 0 && (yr % 100 !== 0 || yr % 400 === 0)) ? 366 : 365;
+              const driveDays = driveDaysByYear?.[yr] ?? 0;
+              const noDriverDays = totalDays - driveDays;
               return (
                 <div key={year} className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
                   {/* 연도 헤더 + 합계 한 줄 */}
@@ -374,6 +384,10 @@ export default function MonthlyPage() {
                         </span>
                       )}
                       <span className="text-zinc-600 text-[11px]">월평균 <span className="text-zinc-400 font-medium">{t.avg_monthly_km}</span>km</span>
+                    </div>
+                    <div className="flex items-center justify-between mt-1.5">
+                      <span className="text-[10px] text-zinc-600">미운행</span>
+                      <span className="text-[11px] font-bold tabular-nums text-zinc-500">{noDriverDays}일</span>
                     </div>
                   </div>
 
@@ -405,6 +419,55 @@ export default function MonthlyPage() {
               );
             })}
           </div>
+
+          {/* 계절별 효율 */}
+          {seasonalEff && Object.keys(seasonalEff).length > 0 && (
+            <div>
+              <SectionLabel title="계절별 효율" />
+              <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
+                {(() => {
+                  const SEASONS = [
+                    { key: '봄', months: '3–5월', emoji: '🌸' },
+                    { key: '여름', months: '6–8월', emoji: '☀️' },
+                    { key: '가을', months: '9–11월', emoji: '🍂' },
+                    { key: '겨울', months: '12–2월', emoji: '❄️' },
+                  ];
+                  const values = SEASONS.map(s => seasonalEff[s.key]).filter(v => v != null);
+                  const minWh = values.length ? Math.min(...values) : 0;
+                  const maxWh = values.length ? Math.max(...values) : 0;
+                  const getColor = (wh) => {
+                    if (wh == null) return 'text-zinc-700';
+                    if (wh <= minWh + (maxWh - minWh) * 0.25) return 'text-emerald-400';
+                    if (wh <= minWh + (maxWh - minWh) * 0.75) return 'text-amber-400';
+                    return 'text-red-400';
+                  };
+                  return (
+                    <div className="grid grid-cols-2">
+                      {SEASONS.map((s, i) => {
+                        const wh = seasonalEff[s.key];
+                        const borderR = i % 2 === 0 ? 'border-r border-white/[0.06]' : '';
+                        const borderB = i < 2 ? 'border-b border-white/[0.06]' : '';
+                        return (
+                          <div key={s.key} className={`text-center py-3 ${borderR} ${borderB}`}>
+                            <div className="text-[10px] text-zinc-600 mb-1">{s.key} <span className="text-zinc-700">{s.months}</span></div>
+                            {wh != null ? (
+                              <>
+                                <div className={`text-sm font-extrabold tabular-nums ${getColor(wh)}`}>{wh}</div>
+                                <div className="text-[9px] text-zinc-600 mt-0.5">Wh/km</div>
+                              </>
+                            ) : (
+                              <div className="text-sm font-bold text-zinc-700">—</div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+          </>
         )}
       </div>
     </main>
