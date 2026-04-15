@@ -9,7 +9,7 @@ import FastChargeCard from './FastChargeCard';
 import { CapacityTrendCard, HabitTrendCard } from './BatteryTrendCard';
 import ChargeSummaryCard from './ChargeSummaryCard';
 import ChargeHeatmap from './ChargeHeatmap';
-import { Spinner, SectionLabel } from '@/app/components/PageLayout';
+import { Spinner } from '@/app/components/PageLayout';
 
 export default function BatteryPage() {
   const [data, setData] = useState(null);
@@ -46,49 +46,28 @@ export default function BatteryPage() {
           </div>
         ) : data ? (
           <>
-            {/* 마지막 충전 · 예측 충전일 */}
-            <div className="flex flex-col gap-3">
-              <SectionLabel title="충전 현황" />
-              <ChargeSummaryCard />
-            </div>
+            {/* 충전 현황 — 타임라인 */}
+            <ChargeSummaryCard />
 
-            {/* 배터리 상태 */}
-            <div className="flex flex-col gap-3">
-              <SectionLabel title="배터리 상태" />
-              <HealthScoreCard data={data.health} />
-              <CapacityTrendCard data={trend} />
-            </div>
+            {/* 배터리 상태 — 헬스 + 용량 트렌드 */}
+            <HealthScoreCard data={data.health} />
+            <CapacityTrendCard data={trend} />
 
             {/* 충전 습관 */}
-            <div className="flex flex-col gap-3">
-              <SectionLabel title="충전 습관" />
-              <LevelHabitCard histogram={data.histogram} />
-              <HabitTrendCard data={trend} />
-            </div>
+            <LevelHabitCard histogram={data.histogram} />
+            <HabitTrendCard data={trend} />
 
             {/* 충전 통계 */}
-            <div className="flex flex-col gap-3">
-              <SectionLabel title="충전 통계" />
-              <MonthlyChargeCard />
-            </div>
+            <MonthlyChargeCard />
 
             {/* 연간 충전 히트맵 (최신 왼쪽, 충전만) */}
-            <div className="flex flex-col gap-3">
-              <SectionLabel title="연간 충전 히트맵" />
-              <ChargeHeatmap />
-            </div>
+            <ChargeHeatmap />
 
             {/* 급속 충전 */}
-            <div className="flex flex-col gap-3">
-              <SectionLabel title="급속 충전" />
-              <FastChargeCard />
-            </div>
+            <FastChargeCard />
 
             {/* 대기 소모 */}
-            <div className="flex flex-col gap-3">
-              <SectionLabel title="대기 소모" />
-              <IdleDrainCard records={data.idle_drain} />
-            </div>
+            <IdleDrainCard records={data.idle_drain} />
           </>
         ) : null}
       </div>

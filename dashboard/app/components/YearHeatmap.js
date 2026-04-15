@@ -97,9 +97,9 @@ export default function YearHeatmap({
           <div className="w-5 h-5 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
         </div>
       ) : (
-        <div className="overflow-x-auto no-scrollbar">
+        <div className="overflow-x-auto overflow-y-hidden no-scrollbar">
           <div className="flex flex-col gap-[3px] min-w-fit">
-            <div className="flex gap-[3px] pl-[30px] text-[10px] text-zinc-500 tabular-nums h-3.5">
+            <div className="flex gap-[3px] pl-[36px] text-[10px] text-zinc-500 tabular-nums h-3.5">
               {monthLabels.map((m, i) => (
                 <div key={i} className="w-[15px] text-left leading-none">
                   {m != null ? `${m}` : ''}
@@ -107,7 +107,7 @@ export default function YearHeatmap({
               ))}
             </div>
             <div className="flex gap-[3px]">
-              <div className="flex flex-col gap-[3px] text-[9px] text-zinc-500 pr-[3px] w-[27px] text-right">
+              <div className="flex flex-col gap-[3px] text-[9px] text-zinc-500 pr-[6px] w-[33px] text-right shrink-0">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, i) => (
                   <div key={i} className="h-[15px] leading-[15px]">{d}</div>
                 ))}

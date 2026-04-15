@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useMock, MOCK_DATA } from '../context/mock';
 import { formatDuration } from '../../lib/format';
 import { effColor } from '../../lib/effColor';
-import { Spinner, SectionLabel } from '@/app/components/PageLayout';
+import { Spinner } from '@/app/components/PageLayout';
 import { HourlyHeatmap, WeekdayBars } from '@/app/components/ChartWidgets';
 import YearHeatmap from '@/app/components/YearHeatmap';
 
@@ -268,35 +268,25 @@ export default function DrivesPage() {
 
         {/* 1. 기간별 통계 */}
         <div>
-          <SectionLabel title="최근 주행" />
           {loading.drives ? <Spinner /> : <PeriodStats drives={drives} />}
         </div>
 
         {/* 2. 연간 히트맵 — 1년 시각적 요약 (주행만, 최신 왼쪽) */}
-        <div>
-          <SectionLabel title="연간 히트맵" />
-          <YearHeatmap
-            data={yearHeatmap}
-            loading={loading.heatmap}
-            title="지난 1년 주행"
-            metric="km"
-            color="#3b82f6"
-            legendLabel="주행"
-            latestLeft
-          />
-        </div>
+        <YearHeatmap
+          data={yearHeatmap}
+          loading={loading.heatmap}
+          title="지난 1년 주행"
+          metric="km"
+          color="#3b82f6"
+          legendLabel="주행"
+          latestLeft
+        />
 
         {/* 3. 주행 패턴 — 시간대/요일 반복 패턴 */}
-        <div>
-          <SectionLabel title="주행 패턴" />
-          <PatternCard hourly={insights?.hourly} weekday={insights?.weekday} />
-        </div>
+        <PatternCard hourly={insights?.hourly} weekday={insights?.weekday} />
 
         {/* 4. 기록 — 랭킹 진입점 */}
-        <div>
-          <SectionLabel title="기록" />
-          <RecordsCard allTime={insights?.allTime} />
-        </div>
+        <RecordsCard allTime={insights?.allTime} />
 
         {/* 5. 연도별 월간 통계 */}
         {error ? (
@@ -306,7 +296,6 @@ export default function DrivesPage() {
         ) : (
           <>
           <div className="space-y-4">
-            <SectionLabel title="월별" />
             {years.map(year => {
               const t = yearTotals[year];
               const yr = parseInt(year);
@@ -373,8 +362,10 @@ export default function DrivesPage() {
 
           {seasonalEff && Object.keys(seasonalEff).length > 0 && (
             <div>
-              <SectionLabel title="계절별 효율" />
               <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
+                <div className="px-3 py-2 border-b border-white/[0.06]">
+                  <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">계절별 효율</span>
+                </div>
                 {(() => {
                   const SEASONS = [
                     { key: '봄', months: '3–5월' },
