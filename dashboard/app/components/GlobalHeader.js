@@ -84,7 +84,6 @@ export default function GlobalHeader() {
   const lvl = isCharging ? (charging.battery_level ?? car?.battery_level ?? 0) : (car?.battery_level ?? 0);
   const limitLvl = charging?.charge_limit_soc ?? null;
   const estRange = car?.est_battery_range ?? null;
-  const ratedRange = car?.rated_battery_range ?? null;
   const color = lvl > 50 ? '#22c55e' : lvl > 20 ? '#f59e0b' : '#ef4444';
 
   const timeLabel = lastRefresh
@@ -155,10 +154,9 @@ export default function GlobalHeader() {
         ) : (
           <div className="flex items-center gap-2">
             {effectiveState && <StateBadge state={effectiveState} />}
-            <div className="flex flex-col items-end leading-none">
-              {estRange && <span className="text-zinc-400 text-xs tabular-nums">예측 {estRange}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>}
-              {ratedRange && <span className="text-zinc-600 text-[10px] tabular-nums mt-0.5">정규 {ratedRange}km</span>}
-            </div>
+            {estRange && (
+              <span className="text-zinc-400 text-xs tabular-nums">예측 {estRange}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
+            )}
             <BatteryBar level={lvl} color={color} charging={false} />
           </div>
         )}
