@@ -83,10 +83,10 @@ function YearHeatmap({ data, loading, onSelectMonth }) {
         <span className="text-xs font-bold text-zinc-400">지난 1년</span>
         <div className="flex items-center gap-2 text-[10px] text-zinc-500">
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-sm bg-green-500" />주행
+            <span className="w-2 h-2 rounded-sm bg-blue-500" />주행
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-sm bg-blue-500" />충전
+            <span className="w-2 h-2 rounded-sm bg-green-500" />충전
           </span>
         </div>
       </div>
@@ -122,9 +122,9 @@ function YearHeatmap({ data, loading, onSelectMonth }) {
                     }
                     const key = fmtDate(date);
                     const d = daysMap[key] || { km: 0, kwh: 0 };
-                    const gOp = intensity(d.km, maxKm);
-                    const bOp = intensity(d.kwh, maxKwh);
-                    const hasData = gOp > 0 || bOp > 0;
+                    const driveOp = intensity(d.km, maxKm);
+                    const chargeOp = intensity(d.kwh, maxKwh);
+                    const hasData = driveOp > 0 || chargeOp > 0;
                     const title = `${date.getMonth()+1}/${date.getDate()} · ${d.km||0}km · ${d.kwh||0}kWh`;
                     return (
                       <button
@@ -135,8 +135,8 @@ function YearHeatmap({ data, loading, onSelectMonth }) {
                       >
                         {hasData && (
                           <>
-                            <div className="absolute inset-x-0 top-0 h-1/2 bg-green-500" style={{ opacity: gOp }} />
-                            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-blue-500" style={{ opacity: bOp }} />
+                            <div className="absolute inset-x-0 top-0 h-1/2 bg-blue-500" style={{ opacity: driveOp }} />
+                            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-green-500" style={{ opacity: chargeOp }} />
                           </>
                         )}
                       </button>
