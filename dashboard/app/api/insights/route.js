@@ -13,7 +13,7 @@ export async function GET() {
 
     const now = new Date();
     const nextStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const sixMonthStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const twelveMonthStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
 
     const iso = (d) => d.toISOString();
 
@@ -60,12 +60,12 @@ export async function GET() {
       return { ...q.rows[0], ...chargeQ.rows[0] };
     };
 
-    // 최근 6개월 각 월 통계 + 패턴 쿼리 동시 실행
-    const [sixMonthBreakdown, hourly, weekday, chargeHourly, chargeWeekday] = await Promise.all([
+    // 12개월 각 월 통계 + 패턴 쿼리 동시 실행
+    const [twelveMonthBreakdown, hourly, weekday, chargeHourly, chargeWeekday] = await Promise.all([
       Promise.all(
-        Array.from({ length: 6 }, (_, i) => {
-          const ms = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-          const me = new Date(now.getFullYear(), now.getMonth() - (5 - i) + 1, 1);
+        Array.from({ length: 12 }, (_, i) => {
+          const ms = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+          const me = new Date(now.getFullYear(), now.getMonth() - (11 - i) + 1, 1);
           return monthStats(ms, me).then(s => ({ year: ms.getFullYear(), month: ms.getMonth() + 1, ...s }));
         })
       ),
@@ -76,7 +76,7 @@ export async function GET() {
          FROM drives
          WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
          GROUP BY hour ORDER BY hour`,
-        [carId, iso(sixMonthStart), iso(nextStart)]
+        [carId, iso(twelveMonthStart), iso(nextStart)]
       ),
       pool.query(
         `SELECT EXTRACT(DOW FROM (start_date + INTERVAL '9 hours'))::int AS dow,
@@ -85,7 +85,7 @@ export async function GET() {
          FROM drives
          WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
          GROUP BY dow ORDER BY dow`,
-        [carId, iso(sixMonthStart), iso(nextStart)]
+        [carId, iso(twelveMonthStart), iso(nextStart)]
       ),
       pool.query(
         `SELECT EXTRACT(HOUR FROM (start_date + INTERVAL '9 hours'))::int AS hour,
@@ -95,7 +95,7 @@ export async function GET() {
          WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
            AND charge_energy_added IS NOT NULL
          GROUP BY hour ORDER BY hour`,
-        [carId, iso(sixMonthStart), iso(nextStart)]
+        [carId, iso(twelveMonthStart), iso(nextStart)]
       ),
       pool.query(
         `SELECT EXTRACT(DOW FROM (start_date + INTERVAL '9 hours'))::int AS dow,
@@ -105,35 +105,54 @@ export async function GET() {
          WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
            AND charge_energy_added IS NOT NULL
          GROUP BY dow ORDER BY dow`,
-        [carId, iso(sixMonthStart), iso(nextStart)]
+        [carId, iso(twelveMonthStart), iso(nextStart)]
       ),
     ]);
 
-    // 이번달 / 지난달은 6개월 배열에서 추출
-    const current = sixMonthBreakdown[5];
-    const previous = sixMonthBreakdown[4];
+    // 이번달 / 지난달
+    const current = twelveMonthBreakdown[11];
+    const previous = twelveMonthBreakdown[10];
 
     const effCur = current.distance > 0 ? (current.total_range_used * KWH_PER_KM / current.distance * 1000) : 0;
     const effPrev = previous.distance > 0 ? (previous.total_range_used * KWH_PER_KM / previous.distance * 1000) : 0;
 
-    // 6개월 집계
-    const agg = {
-      distance: sixMonthBreakdown.reduce((s, m) => s + m.distance, 0),
-      drive_count: sixMonthBreakdown.reduce((s, m) => s + m.drive_count, 0),
-      duration_min: sixMonthBreakdown.reduce((s, m) => s + m.duration_min, 0),
-      total_kwh: sixMonthBreakdown.reduce((s, m) => s + m.total_kwh, 0),
-      charge_count: sixMonthBreakdown.reduce((s, m) => s + m.charge_count, 0),
-      home_charges: sixMonthBreakdown.reduce((s, m) => s + m.home_charges, 0),
-      other_charges: sixMonthBreakdown.reduce((s, m) => s + m.other_charges, 0),
-      fast_charges: sixMonthBreakdown.reduce((s, m) => s + (m.fast_charges || 0), 0),
-      slow_charges: sixMonthBreakdown.reduce((s, m) => s + (m.slow_charges || 0), 0),
-      total_range_used: sixMonthBreakdown.reduce((s, m) => s + m.total_range_used, 0),
-      max_distance: Math.max(0, ...sixMonthBreakdown.map(m => m.max_distance)),
-      max_duration: Math.max(0, ...sixMonthBreakdown.map(m => m.max_duration)),
-      max_speed: Math.max(0, ...sixMonthBreakdown.map(m => m.max_speed)),
+    // 기간별 집계 헬퍼
+    const aggregate = (months) => {
+      const agg = {
+        distance: months.reduce((s, m) => s + m.distance, 0),
+        drive_count: months.reduce((s, m) => s + m.drive_count, 0),
+        duration_min: months.reduce((s, m) => s + m.duration_min, 0),
+        total_kwh: months.reduce((s, m) => s + m.total_kwh, 0),
+        charge_count: months.reduce((s, m) => s + m.charge_count, 0),
+        home_charges: months.reduce((s, m) => s + m.home_charges, 0),
+        other_charges: months.reduce((s, m) => s + m.other_charges, 0),
+        fast_charges: months.reduce((s, m) => s + (m.fast_charges || 0), 0),
+        slow_charges: months.reduce((s, m) => s + (m.slow_charges || 0), 0),
+        total_range_used: months.reduce((s, m) => s + m.total_range_used, 0),
+        max_distance: Math.max(0, ...months.map(m => m.max_distance)),
+        max_duration: Math.max(0, ...months.map(m => m.max_duration)),
+        max_speed: Math.max(0, ...months.map(m => m.max_speed)),
+      };
+      const avg_speed = agg.duration_min > 0 ? parseFloat((agg.distance / Math.max(1, agg.duration_min) * 60).toFixed(1)) : 0;
+      const eff = agg.distance > 0 ? (agg.total_range_used * KWH_PER_KM / agg.distance * 1000) : 0;
+      return {
+        distance: parseFloat(agg.distance.toFixed(1)),
+        drive_count: agg.drive_count,
+        duration_min: agg.duration_min,
+        total_kwh: parseFloat(agg.total_kwh.toFixed(1)),
+        charge_count: agg.charge_count,
+        avg_kwh: agg.charge_count > 0 ? parseFloat((agg.total_kwh / agg.charge_count).toFixed(1)) : 0,
+        home_charges: agg.home_charges,
+        other_charges: agg.other_charges,
+        fast_charges: agg.fast_charges,
+        slow_charges: agg.slow_charges,
+        max_distance: parseFloat(agg.max_distance.toFixed(1)),
+        max_duration: agg.max_duration,
+        max_speed: agg.max_speed,
+        avg_speed,
+        efficiency_wh_km: parseFloat(eff.toFixed(0)),
+      };
     };
-    const avg_speed6m = agg.duration_min > 0 ? parseFloat((agg.distance / Math.max(1, agg.duration_min) * 60).toFixed(1)) : 0;
-    const eff6m = agg.distance > 0 ? (agg.total_range_used * KWH_PER_KM / agg.distance * 1000) : 0;
 
     return Response.json({
       current: {
@@ -157,24 +176,10 @@ export async function GET() {
         charge_count: previous.charge_count,
         efficiency_wh_km: parseFloat(effPrev.toFixed(0)),
       },
-      sixMonth: {
-        distance: parseFloat(agg.distance.toFixed(1)),
-        drive_count: agg.drive_count,
-        duration_min: agg.duration_min,
-        total_kwh: parseFloat(agg.total_kwh.toFixed(1)),
-        charge_count: agg.charge_count,
-        avg_kwh: agg.charge_count > 0 ? parseFloat((agg.total_kwh / agg.charge_count).toFixed(1)) : 0,
-        home_charges: agg.home_charges,
-        other_charges: agg.other_charges,
-        fast_charges: agg.fast_charges,
-        slow_charges: agg.slow_charges,
-        max_distance: parseFloat(agg.max_distance.toFixed(1)),
-        max_duration: agg.max_duration,
-        max_speed: agg.max_speed,
-        avg_speed: avg_speed6m,
-        efficiency_wh_km: parseFloat(eff6m.toFixed(0)),
-      },
-      monthlyBreakdown: sixMonthBreakdown.map(m => ({
+      threeMonth: aggregate(twelveMonthBreakdown.slice(9)),
+      sixMonth:   aggregate(twelveMonthBreakdown.slice(6)),
+      twelveMonth: aggregate(twelveMonthBreakdown),
+      monthlyBreakdown: twelveMonthBreakdown.map(m => ({
         year: m.year,
         month: m.month,
         distance: parseFloat(m.distance.toFixed(1)),
