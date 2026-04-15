@@ -1,8 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { useMock, MOCK_DATA } from '../context/mock';
 import { formatDuration } from '../../lib/format';
+
+// GlobalHeader를 숨길 경로 (서브/상세 페이지)
+const HIDDEN_ROUTES = ['/rankings'];
 
 function StateBadge({ state }) {
   const map = {
@@ -52,14 +56,17 @@ function BatteryBar({ level, limitLevel, color, charging }) {
 }
 
 export default function GlobalHeader() {
+  const pathname = usePathname();
   const { isMock, toggleMock, isMockCharging, toggleMockCharging, lastRefresh, mockData } = useMock();
   const [car, setCar] = useState(null);
   const [charging, setCharging] = useState(null);
   const [carFetchedAt, setCarFetchedAt] = useState(null);
 
   const activeMockData = mockData || MOCK_DATA;
+  const hidden = HIDDEN_ROUTES.some(p => pathname === p || pathname.startsWith(p + '/'));
 
   useEffect(() => {
+    if (hidden) return;
     if (isMock) {
       setCar(activeMockData.car);
       setCharging(isMockCharging ? activeMockData.chargingStatus : null);
@@ -78,7 +85,9 @@ export default function GlobalHeader() {
     fetchData();
     const id = setInterval(fetchData, 30000);
     return () => clearInterval(id);
-  }, [isMock, isMockCharging, activeMockData]);
+  }, [hidden, isMock, isMockCharging, activeMockData]);
+
+  if (hidden) return null;
 
   const isCharging = !!charging;
   const effectiveState = (isMock && isMockCharging) ? 'charging' : car?.state;
