@@ -122,7 +122,7 @@ function RecordsCard({ allTime }) {
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       {/* 헤더 — 공통 TOP 50 힌트 */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
-        <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">전체 기간 기록</span>
+        <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">기록</span>
         <span className="text-[10px] text-zinc-500">TOP 50 ›</span>
       </div>
 
@@ -168,9 +168,8 @@ function PatternCard({ hourly, weekday }) {
   if (!hourly || !weekday) return null;
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      <div className="px-3 py-2 border-b border-white/[0.06] flex items-center justify-between">
+      <div className="px-3 py-2 border-b border-white/[0.06]">
         <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">주행 패턴</span>
-        <span className="text-[11px] text-zinc-500">전체 기간</span>
       </div>
       <div className="px-4 pt-4 pb-4">
         <p className="text-[11px] text-zinc-600 uppercase tracking-wider mb-2">시간대</p>
