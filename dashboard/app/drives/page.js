@@ -383,7 +383,14 @@ function DrivesInner() {
                 </div>
                 <div className="flex-shrink-0 text-right tabular-nums">
                   <p className="text-sm font-bold text-blue-400">{selectedDrive.distance}<span className="text-xs text-zinc-600 ml-0.5">km</span></p>
-                  {eff && <p className="text-sm font-semibold text-green-400">{eff.kwh}<span className="text-xs text-zinc-600 ml-0.5">kWh</span></p>}
+                  {eff && (
+                    <p className="text-sm font-semibold text-green-400">
+                      {eff.kwh}<span className="text-xs text-zinc-600 ml-0.5">kWh</span>
+                      {sp != null && ep != null && sp > ep && (
+                        <span className="text-zinc-500 text-xs ml-1">({sp - ep}%)</span>
+                      )}
+                    </p>
+                  )}
                   {eff && <p className="text-xs text-amber-400">{eff.perKm}<span className="text-zinc-600 ml-0.5">Wh/km</span></p>}
                 </div>
               </div>
