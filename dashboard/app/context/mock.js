@@ -14,7 +14,8 @@ export const MOCK_DATA = {
     },
     estimated_charge: {
       date: new Date(now() + 5 * 86400 * 1000).toISOString(),
-      days_until: 5, threshold_pct: 20,
+      days_until: 5, threshold_pct: 27, threshold_source: 'learned',
+      daily_consumption_pct: 4.1,
     },
   },
   chargingStatus: {

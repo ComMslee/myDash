@@ -179,7 +179,7 @@ function DrivesSection({ drives, loading, error, lastCharge, estimatedCharge }) 
         );
       })()}
 
-      {/* 추천 충전일 — 최근 14일 평균 소모율 기준 */}
+      {/* 추천 충전일 — 유휴 포함 + 최근 가중 + 임계값 학습 */}
       {(() => {
         const ec = estimatedCharge;
         if (!ec) return null;
@@ -187,13 +187,16 @@ function DrivesSection({ drives, loading, error, lastCharge, estimatedCharge }) 
         const dateLabel = `${target.getMonth() + 1}/${target.getDate()}`;
         const daysLabel = ec.days_until === 0 ? '곧' : `${ec.days_until}일 후`;
         const urgent = ec.days_until <= 2;
+        const thresholdLabel = ec.threshold_source === 'learned'
+          ? `${ec.threshold_pct}% 습관`
+          : `${ec.threshold_pct}% 도달`;
         return (
           <div className="px-4 py-2.5 border-t border-white/[0.06] flex items-center justify-between">
             <span className="text-xs text-zinc-600">추천 충전일</span>
             <div className="flex items-center gap-2 text-xs tabular-nums">
               <span className={`font-medium ${urgent ? 'text-rose-400' : 'text-amber-400'}`}>{daysLabel}</span>
               <span className="text-zinc-500">{dateLabel}</span>
-              <span className="text-zinc-600">{ec.threshold_pct}% 도달</span>
+              <span className="text-zinc-600">{thresholdLabel}</span>
             </div>
           </div>
         );
