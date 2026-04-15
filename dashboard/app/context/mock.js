@@ -124,6 +124,30 @@ export const MOCK_DATA = {
     { id: 3, label: '경기 성남시 분당구 판교로 256', city: '경기 성남시', visit_count: 12 },
     { id: 4, label: '인천 연수구 송도국제대로 68', city: '인천 연수구', visit_count: 8 },
   ],
+  yearHeatmap: (() => {
+    // 365일 랜덤 Mock — 평일 주행 많고 주말 적은 패턴, 충전은 2~3일 간격
+    const days = {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let maxKm = 0, maxKwh = 0;
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dow = d.getDay();
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const driveRoll = Math.random();
+      const chargeRoll = Math.random();
+      const weekend = dow === 0 || dow === 6;
+      let km = 0, kwh = 0;
+      if (!weekend && driveRoll < 0.85) km = Math.round((10 + Math.random() * 90) * 10) / 10;
+      else if (weekend && driveRoll < 0.45) km = Math.round((5 + Math.random() * 70) * 10) / 10;
+      if (chargeRoll < 0.3) kwh = Math.round((8 + Math.random() * 25) * 10) / 10;
+      if (km > 0 || kwh > 0) days[key] = { km, kwh, drives: km > 0 ? 1 + Math.floor(Math.random()*3) : 0, charges: kwh > 0 ? 1 : 0 };
+      if (km > maxKm) maxKm = km;
+      if (kwh > maxKwh) maxKwh = kwh;
+    }
+    return { days, max_km: maxKm, max_kwh: maxKwh };
+  })(),
   routePositions: [
     { lat: 37.5012, lng: 127.0396 }, { lat: 37.4980, lng: 127.0421 },
     { lat: 37.4950, lng: 127.0480 }, { lat: 37.4923, lng: 127.0551 },

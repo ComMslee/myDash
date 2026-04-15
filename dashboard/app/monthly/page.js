@@ -21,13 +21,140 @@ function effColor(wh) {
   return '#f97316';
 }
 
-// ── 월별 달력 컴포넌트 ─────────────────────────────────────
+// ── 연간 히트맵 (GitHub 스타일, 초록=주행 / 파랑=충전) ──────
 
 const _now = new Date(); // 모듈 로드 시 1회 계산, useMemo deps 안정화용
 
-function MonthlyCalendar({ drives, charges, calLoading, monthlyData }) {
-  const [viewYear, setViewYear] = useState(_now.getFullYear());
-  const [viewMonth, setViewMonth] = useState(_now.getMonth()); // 0-11
+// 로그 스케일 기반 5단계 intensity (0~1 opacity)
+function intensity(val, max) {
+  if (!val || val <= 0 || !max) return 0;
+  const ratio = Math.min(1, val / max);
+  if (ratio <= 0.05) return 0.2;
+  if (ratio <= 0.2)  return 0.4;
+  if (ratio <= 0.5)  return 0.6;
+  if (ratio <= 0.8)  return 0.8;
+  return 1.0;
+}
+
+function YearHeatmap({ data, loading, onSelectMonth }) {
+  // 오늘 기준 52주 전부터 이번 주까지 — 53열 × 7행
+  const weeks = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const currentSunday = new Date(today);
+    currentSunday.setDate(today.getDate() - today.getDay());
+
+    const weeksArr = [];
+    for (let w = 52; w >= 0; w--) {
+      const weekStart = new Date(currentSunday);
+      weekStart.setDate(weekStart.getDate() - w * 7);
+      const days = [];
+      for (let d = 0; d < 7; d++) {
+        const day = new Date(weekStart);
+        day.setDate(weekStart.getDate() + d);
+        const future = day > today;
+        days.push({ date: day, future });
+      }
+      weeksArr.push(days);
+    }
+    return weeksArr;
+  }, []);
+
+  const daysMap = data?.days || {};
+  const maxKm = data?.max_km || 0;
+  const maxKwh = data?.max_kwh || 0;
+
+  const fmtDate = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  };
+
+  // 월 라벨: 각 주(column)의 일요일이 해당 월의 첫 7일 이내면 월명 표시
+  const monthLabels = weeks.map((week) => {
+    const first = week[0].date;
+    return first.getDate() <= 7 ? first.getMonth() + 1 : null;
+  });
+
+  return (
+    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-bold text-zinc-400">지난 1년</span>
+        <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-sm bg-green-500" />주행
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-sm bg-blue-500" />충전
+          </span>
+        </div>
+      </div>
+      {loading ? (
+        <div className="h-24 flex items-center justify-center">
+          <div className="w-5 h-5 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
+        </div>
+      ) : (
+        <div className="overflow-x-auto no-scrollbar">
+          <div className="flex flex-col gap-[3px] min-w-fit">
+            {/* 월 라벨 행 */}
+            <div className="flex gap-[3px] pl-[18px] text-[9px] text-zinc-600 tabular-nums h-3">
+              {monthLabels.map((m, i) => (
+                <div key={i} className="w-[10px] text-left leading-none">
+                  {m != null ? `${m}` : ''}
+                </div>
+              ))}
+            </div>
+            {/* DoW 라벨 + 주 컬럼 */}
+            <div className="flex gap-[3px]">
+              {/* 요일 라벨 (월/수/금만 표시) */}
+              <div className="flex flex-col gap-[3px] text-[9px] text-zinc-600 pr-[3px] w-[15px]">
+                {['', '월', '', '수', '', '금', ''].map((d, i) => (
+                  <div key={i} className="h-[10px] leading-none">{d}</div>
+                ))}
+              </div>
+              {/* 53주 그리드 */}
+              {weeks.map((week, wi) => (
+                <div key={wi} className="flex flex-col gap-[3px]">
+                  {week.map(({ date, future }, di) => {
+                    if (future) {
+                      return <div key={di} className="w-[10px] h-[10px]" />;
+                    }
+                    const key = fmtDate(date);
+                    const d = daysMap[key] || { km: 0, kwh: 0 };
+                    const gOp = intensity(d.km, maxKm);
+                    const bOp = intensity(d.kwh, maxKwh);
+                    const hasData = gOp > 0 || bOp > 0;
+                    const title = `${date.getMonth()+1}/${date.getDate()} · ${d.km||0}km · ${d.kwh||0}kWh`;
+                    return (
+                      <button
+                        key={di}
+                        onClick={() => onSelectMonth?.(date.getFullYear(), date.getMonth())}
+                        title={title}
+                        className="w-[10px] h-[10px] rounded-[2px] relative overflow-hidden bg-zinc-800/60 hover:ring-1 hover:ring-white/40 transition-shadow"
+                      >
+                        {hasData && (
+                          <>
+                            <div className="absolute inset-x-0 top-0 h-1/2 bg-green-500" style={{ opacity: gOp }} />
+                            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-blue-500" style={{ opacity: bOp }} />
+                          </>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── 월별 달력 컴포넌트 ─────────────────────────────────────
+
+function MonthlyCalendar({ drives, charges, calLoading, monthlyData, viewYear, setViewYear, viewMonth, setViewMonth }) {
   const [showPicker, setShowPicker] = useState(false);
 
   const isCurrentMonth = viewYear === _now.getFullYear() && viewMonth === _now.getMonth();
@@ -264,19 +391,35 @@ export default function MonthlyPage() {
   const [charges, setCharges] = useState(null);
   const [calLoading, setCalLoading] = useState(true);
 
+  // 연간 히트맵용 365일 집계
+  const [yearHeatmap, setYearHeatmap] = useState(null);
+  const [heatmapLoading, setHeatmapLoading] = useState(true);
+
+  // 월 뷰 선택 (히트맵과 달력이 공유)
+  const [viewYear, setViewYear] = useState(_now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(_now.getMonth());
+
   useEffect(() => {
     if (isMock) {
       setData(MOCK_DATA.monthlyHistory);
       setDrives(MOCK_DATA.drives);
       setCharges(MOCK_DATA.charges);
+      setYearHeatmap(MOCK_DATA.yearHeatmap || null);
       setLoading(false);
       setCalLoading(false);
+      setHeatmapLoading(false);
       return;
     }
 
     setLoading(true);
     setCalLoading(true);
+    setHeatmapLoading(true);
     setError(null);
+
+    fetch('/api/year-heatmap')
+      .then(r => r.json())
+      .then(d => { setYearHeatmap(d); setHeatmapLoading(false); })
+      .catch(() => { setYearHeatmap(null); setHeatmapLoading(false); });
 
     // 연도별 히스토리
     fetch('/api/monthly-history')
@@ -336,6 +479,15 @@ export default function MonthlyPage() {
     <main className="min-h-screen bg-[#0f0f0f] text-white">
       <div className="max-w-2xl mx-auto px-4 py-5 pb-20">
 
+        {/* 연간 히트맵 (GitHub 스타일) */}
+        <div className="mb-3">
+          <YearHeatmap
+            data={yearHeatmap}
+            loading={heatmapLoading}
+            onSelectMonth={(y, m) => { setViewYear(y); setViewMonth(m); }}
+          />
+        </div>
+
         {/* 달력 */}
         <div className="mb-6">
           <MonthlyCalendar
@@ -343,6 +495,10 @@ export default function MonthlyPage() {
             charges={charges}
             calLoading={calLoading}
             monthlyData={months}
+            viewYear={viewYear}
+            setViewYear={setViewYear}
+            viewMonth={viewMonth}
+            setViewMonth={setViewMonth}
           />
         </div>
 
