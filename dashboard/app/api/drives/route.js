@@ -57,11 +57,13 @@ export async function GET(request) {
                 d.start_rated_range_km, d.end_rated_range_km,
                 sp.battery_level AS start_battery_level,
                 ep.battery_level AS end_battery_level,
-                COALESCE(sa.name, sa.road, sa.display_name) AS start_address,
-                COALESCE(ea.name, ea.road, ea.display_name) AS end_address
+                COALESCE(sg.name, NULLIF(TRIM(CONCAT_WS(' ', sa.road, sa.house_number)), '')) AS start_address,
+                COALESCE(eg.name, NULLIF(TRIM(CONCAT_WS(' ', ea.road, ea.house_number)), '')) AS end_address
          FROM drives d
          LEFT JOIN addresses sa ON sa.id = d.start_address_id
          LEFT JOIN addresses ea ON ea.id = d.end_address_id
+         LEFT JOIN geofences sg ON sg.id = d.start_geofence_id
+         LEFT JOIN geofences eg ON eg.id = d.end_geofence_id
          LEFT JOIN positions sp ON sp.id = d.start_position_id
          LEFT JOIN positions ep ON ep.id = d.end_position_id
          WHERE d.car_id = $1${rangeClause}

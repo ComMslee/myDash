@@ -44,6 +44,7 @@ services:
       - TM_DB_PASS=${TM_DB_PASS}
       - TM_DB_NAME=${TM_DB_NAME}
       - DB_HOST=database
+      - KAKAO_REST_API_KEY=${KAKAO_REST_API_KEY}
     ports:
       - 5000:5000
     depends_on:
