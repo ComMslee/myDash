@@ -33,6 +33,20 @@ export async function GET(request) {
       [driveId]
     );
 
+    const validSpeeds = posResult.rows.filter(p => p.speed != null);
+    const total = validSpeeds.length;
+    const maxSpeedKmh = total > 0
+      ? Math.round(Math.max(...validSpeeds.map(p => parseFloat(p.speed))))
+      : null;
+
+    // 4구간 퍼센트 (카카오/네이버 교통정보 기준)
+    const speedBands = total > 0 ? {
+      jam:   Math.round(validSpeeds.filter(p => parseFloat(p.speed) <= 30).length / total * 100),
+      slow:  Math.round(validSpeeds.filter(p => parseFloat(p.speed) > 30 && parseFloat(p.speed) <= 60).length / total * 100),
+      flow:  Math.round(validSpeeds.filter(p => parseFloat(p.speed) > 60 && parseFloat(p.speed) <= 80).length / total * 100),
+      fast:  Math.round(validSpeeds.filter(p => parseFloat(p.speed) > 80).length / total * 100),
+    } : null;
+
     return Response.json({
       driveId: parseInt(driveId),
       positions: posResult.rows.map(p => ({
@@ -41,6 +55,8 @@ export async function GET(request) {
         date: p.date,
         speed: p.speed != null ? Math.round(parseFloat(p.speed)) : null,
       })),
+      maxSpeedKmh,
+      speedBands,
     });
   } catch (err) {
     console.error('/api/route-map error:', err);

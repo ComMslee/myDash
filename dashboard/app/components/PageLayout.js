@@ -10,7 +10,7 @@ export function Spinner() {
 
 export function SectionLabel({ title }) {
   return (
-    <div className="flex items-center px-0.5 mb-2">
+    <div className="flex items-center px-0.5 mb-3">
       <span className="text-[10px] font-bold tracking-widest uppercase text-zinc-600">{title}</span>
     </div>
   );

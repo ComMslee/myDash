@@ -33,6 +33,8 @@ export default function IdleDrainCard({ records }) {
   const totalIdleHours = records.reduce((s, r) => s + r.idle_hours, 0);
   const totalDrop = records.reduce((s, r) => s + r.soc_drop, 0);
   const avgDrainPerDay = totalIdleHours > 0 ? (totalDrop / totalIdleHours * 24).toFixed(1) : '0';
+  const avgIdleHours = records.length > 0 ? totalIdleHours / records.length : 0;
+  const avgDrop = records.length > 0 ? (totalDrop / records.length).toFixed(1) : '0';
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       {/* 요약 */}
@@ -43,35 +45,66 @@ export default function IdleDrainCard({ records }) {
           <div className="text-[9px] text-zinc-600 mt-0.5">/일</div>
         </div>
         <div className="text-center py-3 border-r border-white/[0.06]">
-          <div className="text-[10px] text-zinc-600 mb-1">총 대기</div>
-          <div className="text-sm font-extrabold tabular-nums text-zinc-300">{formatDuration(totalIdleHours)}</div>
-          <div className="text-[9px] text-zinc-600 mt-0.5">{records.length}회</div>
+          <div className="text-[10px] text-zinc-600 mb-1">평균 대기</div>
+          <div className="text-sm font-extrabold tabular-nums text-zinc-300">{formatDuration(avgIdleHours)}</div>
+          <div className="text-[9px] text-zinc-600 mt-0.5">{records.length}회 기준</div>
         </div>
         <div className="text-center py-3">
-          <div className="text-[10px] text-zinc-600 mb-1">총 손실</div>
-          <div className="text-sm font-extrabold tabular-nums text-red-400">{totalDrop}%</div>
+          <div className="text-[10px] text-zinc-600 mb-1">평균 손실</div>
+          <div className="text-sm font-extrabold tabular-nums text-red-400">{avgDrop}%</div>
           <div className="text-[9px] text-zinc-600 mt-0.5">드레인 {withDrain.length}회</div>
         </div>
       </div>
 
-      {/* 최근 기록 리스트 */}
-      {records.slice(0, 8).map((r, i) => {
-        return (
-          <div
-            key={i}
-            className="flex items-center justify-between px-4 py-2.5 border-t border-white/[0.04]"
-          >
-            <span className="text-[10px] text-zinc-400 tabular-nums whitespace-nowrap">{formatDate(r.idle_start)}</span>
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] text-zinc-600 tabular-nums whitespace-nowrap">{formatDuration(r.idle_hours)}</span>
-              <span className="text-[10px] text-zinc-600 tabular-nums">{r.soc_start}→{r.soc_end}%</span>
-              <span className={`text-[10px] font-bold tabular-nums ${r.soc_drop === 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {r.soc_drop === 0 ? '0%' : `-${r.soc_drop}%`}
-              </span>
+      {/* 날짜별 그룹 리스트 */}
+      {(() => {
+        const getDateKey = (dateStr) => {
+          const d = new Date(dateStr);
+          const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+          return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}-${String(kst.getUTCDate()).padStart(2, '0')}`;
+        };
+        const formatDateLabel = (key) => {
+          const [y, m, d] = key.split('-');
+          const currentYear = new Date().getFullYear();
+          const prefix = parseInt(y) !== currentYear ? `${String(y).slice(2)}/` : '';
+          return `${prefix}${parseInt(m)}/${parseInt(d)}`;
+        };
+
+        const grouped = [];
+        const seen = {};
+        records.forEach(r => {
+          const key = getDateKey(r.idle_start);
+          if (!seen[key]) { seen[key] = []; grouped.push({ key, items: seen[key] }); }
+          seen[key].push(r);
+        });
+
+        return grouped.map(({ key, items }) => (
+          <div key={key}>
+            <div className="px-4 py-1.5 border-t border-white/[0.04] bg-white/[0.02]">
+              <span className="text-[10px] font-semibold text-zinc-500 tabular-nums">{formatDateLabel(key)}</span>
             </div>
+            {items.map((r, i) => {
+              const time = (() => {
+                const d = new Date(r.idle_start);
+                const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+                return `${String(kst.getUTCHours()).padStart(2, '0')}:${String(kst.getUTCMinutes()).padStart(2, '0')}`;
+              })();
+              return (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 border-t border-white/[0.03]">
+                  <span className="text-[10px] text-zinc-500 tabular-nums whitespace-nowrap">{time}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] text-zinc-600 tabular-nums whitespace-nowrap">{formatDuration(r.idle_hours)}</span>
+                    <span className="text-[10px] text-zinc-600 tabular-nums">{r.soc_start}→{r.soc_end}%</span>
+                    <span className={`text-[10px] font-bold tabular-nums ${r.soc_drop === 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {r.soc_drop === 0 ? '0%' : `-${r.soc_drop}%`}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        );
-      })}
+        ));
+      })()}
     </div>
   );
 }

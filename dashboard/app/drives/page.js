@@ -29,15 +29,27 @@ function efficiency(d) {
 
 // ── Leaflet Map (CDN) ─────────────────────────────────────────
 
+// Module-level queue prevents double-script when called concurrently
+let _leafletLoading = false;
+const _leafletQueue = [];
+
 function loadLeaflet(cb) {
   if (window.L) { cb(); return; }
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-  document.head.appendChild(link);
+  _leafletQueue.push(cb);
+  if (_leafletLoading) return;
+  _leafletLoading = true;
+  if (!document.querySelector('link[href*="leaflet"]')) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+  }
   const script = document.createElement('script');
   script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-  script.onload = cb;
+  script.onload = () => {
+    _leafletLoading = false;
+    _leafletQueue.splice(0).forEach(f => f());
+  };
   document.head.appendChild(script);
 }
 
@@ -58,22 +70,6 @@ function DriveMap({ positions, loading, placeMarker, visible }) {
     mapRef.current = mapInstanceRef.current;
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapInstanceRef.current);
   }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    loadLeaflet(initMap);
-    return () => {
-      mapInstanceRef.current?.remove();
-      mapInstanceRef.current = null;
-      mapRef.current = null;
-    };
-  }, [initMap]);
-
-  useEffect(() => {
-    if (visible && mapInstanceRef.current) {
-      setTimeout(() => mapInstanceRef.current?.invalidateSize(), 50);
-    }
-  }, [visible]);
 
   const drawContent = useCallback(() => {
     const map = mapRef.current;
@@ -101,11 +97,10 @@ function DriveMap({ positions, loading, placeMarker, visible }) {
       const CHUNKS = Math.min(15, Math.ceil(positions.length / 3));
       const chunkSize = Math.ceil(positions.length / CHUNKS);
       const speedColor = (spd) => {
-        if (spd <= 15) return '#ef4444';   // 정체 — 빨강
-        if (spd <= 30) return '#f97316';   // 저속 — 주황 (빨↔노 중간)
-        if (spd <= 50) return '#eab308';   // 서행 — 노랑
-        if (spd <= 80) return '#84cc16';   // 원활 — 연두 (노↔초 중간)
-        return '#22c55e';                   // 고속 — 초록
+        if (spd <= 30) return '#ef4444';   // 정체 — 빨강
+        if (spd <= 60) return '#f97316';   // 서행 — 주황
+        if (spd <= 80) return '#eab308';   // 원활 — 노랑
+        return '#22c55e';                   // 빠름 — 초록
       };
       const group = L.layerGroup().addTo(map);
       for (let i = 0; i < CHUNKS; i++) {
@@ -128,16 +123,37 @@ function DriveMap({ positions, loading, placeMarker, visible }) {
     map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50] });
   }, [positions, placeMarker]);
 
+  // Keep a ref to the latest drawContent so init callback always calls current version
+  const drawContentRef = useRef(drawContent);
+  useEffect(() => { drawContentRef.current = drawContent; }, [drawContent]);
+
+  // Init map once on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    let cancelled = false;
     loadLeaflet(() => {
-      if (cancelled) return;
       initMap();
-      drawContent();
+      drawContentRef.current();
+      setTimeout(() => mapInstanceRef.current?.invalidateSize(), 150);
     });
-    return () => { cancelled = true; };
-  }, [drawContent, initMap]);
+    return () => {
+      mapInstanceRef.current?.remove();
+      mapInstanceRef.current = null;
+      mapRef.current = null;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Redraw when positions / placeMarker change
+  useEffect(() => {
+    if (!mapRef.current || !window.L) return;
+    drawContent();
+  }, [drawContent]);
+
+  // Resize when tab becomes visible
+  useEffect(() => {
+    if (visible && mapInstanceRef.current) {
+      setTimeout(() => mapInstanceRef.current?.invalidateSize(), 150);
+    }
+  }, [visible]);
 
   return (
     <div className="relative w-full h-full">
@@ -179,6 +195,7 @@ function DrivesInner() {
   const [positions, setPositions] = useState([]);
   const [places, setPlaces] = useState([]);
   const [showAllPlaces, setShowAllPlaces] = useState(false);
+  const [routeData, setRouteData] = useState(null);
   const [loadingDrives, setLoadingDrives] = useState(true);
   const [loadingRoute, setLoadingRoute] = useState(false);
   const [error, setError] = useState(null);
@@ -218,21 +235,25 @@ function DrivesInner() {
     if (!selectedDrive) return;
     if (isMock) {
       setPositions(MOCK_DATA.routePositions);
+      setRouteData({ positions: MOCK_DATA.routePositions, maxSpeedKmh: 127, speedBands: { jam: 12, slow: 35, flow: 28, fast: 25 } });
       return;
     }
     setLoadingRoute(true);
     setPositions([]);
+    setRouteData(null);
     if (abortRef.current) abortRef.current.abort();
     abortRef.current = new AbortController();
     fetch(`/api/route-map?driveId=${selectedDrive.id}`, { signal: abortRef.current.signal })
       .then(r => r.json())
       .then(data => {
         setPositions(data.positions || []);
+        setRouteData(data);
         setLoadingRoute(false);
       })
       .catch(e => {
         if (e.name !== 'AbortError') {
           setPositions([]);
+          setRouteData(null);
           setLoadingRoute(false);
         }
       });
@@ -254,7 +275,7 @@ function DrivesInner() {
 
       {/* 자주 방문하는 장소 */}
       {places.length > 0 && (
-        <div className="flex-shrink-0 px-4 pt-3 pb-2">
+        <div className="flex-shrink-0 px-4 pt-4 pb-3">
           <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
             {places.slice(0, 5).map((p, i) => (
               <button
@@ -411,13 +432,37 @@ function DrivesInner() {
             <div className="flex-1 p-2">
               <DriveMap positions={positions} loading={loadingRoute} placeMarker={selectedPlace} visible={viewMode === 'map'} />
             </div>
+            {selectedDrive && routeData?.speedBands && (
+              <div className="px-4 py-2 border-t border-white/[0.04]">
+                <div className="flex items-center gap-2 flex-wrap justify-center">
+                  {[
+                    { key: 'jam',  label: '저속', color: '#ef4444' },
+                    { key: 'slow', label: '서행', color: '#f97316' },
+                    { key: 'flow', label: '원활', color: '#eab308' },
+                    { key: 'fast', label: '빠름', color: '#22c55e' },
+                  ].filter(b => routeData.speedBands[b.key] > 0).map(b => (
+                    <div key={b.key} className="flex items-center gap-1 text-[11px]">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: b.color }} />
+                      <span className="text-zinc-600">{b.label}</span>
+                      <span className="font-bold tabular-nums" style={{ color: b.color }}>{routeData.speedBands[b.key]}%</span>
+                    </div>
+                  ))}
+                  {routeData.maxSpeedKmh != null && (
+                    <div className="flex items-center gap-1 text-[11px] ml-1 pl-2 border-l border-white/[0.06]">
+                      <span className="text-zinc-600">최고</span>
+                      <span className="font-bold tabular-nums text-zinc-300">{routeData.maxSpeedKmh}<span className="text-zinc-600 font-normal ml-0.5">km/h</span></span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* ── 목록 모드 ── */}
       <div className="flex-1 flex flex-col px-4 pb-4" style={{ display: viewMode === 'list' ? 'flex' : 'none' }}>
-          <div className="flex items-center justify-between py-2 mb-1">
+          <div className="flex items-center justify-between py-3 mb-2">
             <span className="text-xs font-bold tracking-widest text-zinc-500 uppercase">주행 이력</span>
             <span className="text-zinc-600 text-sm">{loadingDrives ? '…' : `${drives.length}건`}</span>
           </div>
@@ -458,13 +503,13 @@ function DrivesInner() {
                   return (
                     <div key={d.id}>
                       {showDateHeader && (
-                        <div className="px-4 py-1.5 bg-white/[0.02] border-b border-white/[0.06]">
+                        <div className="px-4 py-2 bg-white/[0.02] border-b border-white/[0.06]">
                           <span className="text-[11px] font-bold text-zinc-500">{dt.getMonth()+1}월 {dt.getDate()}일</span>
                         </div>
                       )}
                       <button
                         onClick={() => goToDrive(d)}
-                        className="w-full text-left grid grid-cols-[52px_1fr_auto] items-center gap-2 px-4 py-2.5 border-b border-white/[0.06] last:border-0 hover:bg-white/[0.025] active:bg-blue-500/10 transition-all"
+                        className="w-full text-left grid grid-cols-[52px_1fr_auto] items-center gap-2 px-4 py-3 border-b border-white/[0.06] last:border-0 hover:bg-white/[0.025] active:bg-blue-500/10 transition-all"
                       >
                         <div className="text-xs text-zinc-500 tabular-nums leading-tight">
                           <p>{timeLabel}</p>

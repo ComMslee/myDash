@@ -1,5 +1,6 @@
 import pool from '@/lib/db';
 import { KWH_PER_KM } from '@/lib/constants';
+import { batchReverseGeocode } from '@/lib/kakao-geo';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,8 +58,12 @@ export async function GET(request) {
                 d.start_rated_range_km, d.end_rated_range_km,
                 sp.battery_level AS start_battery_level,
                 ep.battery_level AS end_battery_level,
-                COALESCE(sg.name, NULLIF(TRIM(CONCAT_WS(' ', sa.road, sa.house_number)), '')) AS start_address,
-                COALESCE(eg.name, NULLIF(TRIM(CONCAT_WS(' ', ea.road, ea.house_number)), '')) AS end_address
+                sp.latitude AS start_lat, sp.longitude AS start_lng,
+                ep.latitude AS end_lat, ep.longitude AS end_lng,
+                sg.name AS start_geofence_name,
+                eg.name AS end_geofence_name,
+                NULLIF(TRIM(CONCAT_WS(' ', sa.road, sa.house_number)), '') AS start_osm,
+                NULLIF(TRIM(CONCAT_WS(' ', ea.road, ea.house_number)), '') AS end_osm
          FROM drives d
          LEFT JOIN addresses sa ON sa.id = d.start_address_id
          LEFT JOIN addresses ea ON ea.id = d.end_address_id
@@ -75,6 +80,15 @@ export async function GET(request) {
 
     const toKwh = (range_used) => parseFloat((range_used * KWH_PER_KM).toFixed(1));
 
+    // Kakao 역지오코딩 — 지오펜스 이름이 없는 주소에만 적용
+    const drives = drivesResult.rows;
+    const startCoords = drives.map(d => ({ lat: d.start_lat ? parseFloat(d.start_lat) : null, lng: d.start_lng ? parseFloat(d.start_lng) : null }));
+    const endCoords   = drives.map(d => ({ lat: d.end_lat   ? parseFloat(d.end_lat)   : null, lng: d.end_lng   ? parseFloat(d.end_lng)   : null }));
+    const [kakaoStarts, kakaoEnds] = await Promise.all([
+      batchReverseGeocode(startCoords),
+      batchReverseGeocode(endCoords),
+    ]);
+
     return Response.json({
       today_distance:       parseFloat(todayResult.rows[0].distance.toFixed(1)),
       today_energy_kwh:     toKwh(todayResult.rows[0].range_used),
@@ -84,14 +98,14 @@ export async function GET(request) {
       prev_week_energy_kwh: toKwh(prevWeekResult.rows[0].range_used),
       month_distance:       parseFloat(monthResult.rows[0].distance.toFixed(1)),
       month_energy_kwh:     toKwh(monthResult.rows[0].range_used),
-      recent_drives: drivesResult.rows.map(d => ({
+      recent_drives: drives.map((d, i) => ({
         id: d.id,
         start_date: d.start_date,
         end_date:   d.end_date,
         distance:   d.distance ? parseFloat(parseFloat(d.distance).toFixed(1)) : 0,
         duration_min: d.duration_min ? Math.round(parseFloat(d.duration_min)) : null,
-        start_address: d.start_address || null,
-        end_address:   d.end_address   || null,
+        start_address: d.start_geofence_name || kakaoStarts[i] || d.start_osm || null,
+        end_address:   d.end_geofence_name   || kakaoEnds[i]   || d.end_osm   || null,
         start_rated_range_km: d.start_rated_range_km ? parseFloat(parseFloat(d.start_rated_range_km).toFixed(1)) : null,
         end_rated_range_km:   d.end_rated_range_km   ? parseFloat(parseFloat(d.end_rated_range_km).toFixed(1))   : null,
         start_battery_level: d.start_battery_level ?? null,

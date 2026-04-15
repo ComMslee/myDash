@@ -115,7 +115,7 @@ export default function HealthScoreCard({ data }) {
               const halfRange = (range_high - range_low) / 2;
               let color, zone;
               if (bucketMid >= range_low && bucketMid <= range_high) {
-                const distPct = Math.abs(bucketMid - optimal_center) / halfRange;
+                const distPct = halfRange > 0 ? Math.abs(bucketMid - optimal_center) / halfRange : 0;
                 if (distPct <= 0.4) { color = '#10b981'; zone = 'ideal'; }
                 else { color = '#3b82f6'; zone = 'good'; }
               } else if (bucketMid >= 10 && bucketMid <= 90) {
@@ -150,7 +150,7 @@ export default function HealthScoreCard({ data }) {
             const halfRange = (range_high - range_low) / 2;
             let numColor;
             if (bucketMid >= range_low && bucketMid <= range_high) {
-              const distPct = Math.abs(bucketMid - optimal_center) / halfRange;
+              const distPct = halfRange > 0 ? Math.abs(bucketMid - optimal_center) / halfRange : 0;
               numColor = distPct <= 0.4 ? '#10b981' : '#3b82f6';
             } else if (bucketMid >= 10 && bucketMid <= 90) {
               numColor = '#f59e0b';

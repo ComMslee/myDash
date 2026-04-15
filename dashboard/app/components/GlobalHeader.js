@@ -12,7 +12,8 @@ function StateBadge({ state }) {
     online:    { label: '온라인',    cls: 'text-teal-400' },
   };
   if (!state || state === 'offline' || state === 'charging') return null;
-  const s = map[state] || { label: '—', cls: 'text-zinc-500' };
+  const s = map[state];
+  if (!s) return null;
   return <span className={`text-xs font-semibold ${s.cls}`}>{s.label}</span>;
 }
 
