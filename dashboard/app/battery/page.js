@@ -7,6 +7,8 @@ import { LevelHabitCard } from './RecordsHabit';
 import MonthlyChargeCard from './MonthlyChargeCard';
 import FastChargeCard from './FastChargeCard';
 import { CapacityTrendCard, HabitTrendCard } from './BatteryTrendCard';
+import ChargeSummaryCard from './ChargeSummaryCard';
+import ChargeHeatmap from './ChargeHeatmap';
 import { Spinner, SectionLabel } from '@/app/components/PageLayout';
 
 export default function BatteryPage() {
@@ -44,11 +46,23 @@ export default function BatteryPage() {
           </div>
         ) : data ? (
           <>
+            {/* 마지막 충전 · 예측 충전일 */}
+            <div className="flex flex-col gap-3">
+              <SectionLabel title="충전 현황" />
+              <ChargeSummaryCard />
+            </div>
+
             {/* 배터리 상태 */}
             <div className="flex flex-col gap-3">
               <SectionLabel title="배터리 상태" />
               <HealthScoreCard data={data.health} />
               <CapacityTrendCard data={trend} />
+            </div>
+
+            {/* 연간 충전 히트맵 (최신 왼쪽, 충전만) */}
+            <div className="flex flex-col gap-3">
+              <SectionLabel title="연간 충전 히트맵" />
+              <ChargeHeatmap />
             </div>
 
             {/* 충전 통계 */}
