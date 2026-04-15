@@ -70,7 +70,7 @@ function DrivesSection({ drives, loading, error }) {
         {stats.map((s, i) => (
           <div key={`eff-${s.label}`} className={`pb-3 pt-1 text-center ${i < 3 ? 'border-r border-white/[0.06]' : ''}`}>
             <p className="text-sm font-bold tabular-nums leading-none text-amber-400">
-              {s.km > 0 && s.kwh > 0 ? (s.kwh / s.km * 1000).toFixed(0) : '—'}
+              {s.km > 0 && s.kwh > 0 ? (s.kwh / s.km * 1000).toFixed(0) : 0}
               <span className="text-[10px] font-medium text-zinc-600 ml-0.5">Wh/k</span>
             </p>
           </div>
