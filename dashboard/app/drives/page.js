@@ -107,9 +107,9 @@ function RecordsCard({ allTime }) {
         <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">단일 주행 기준 · 전체 기간</span>
       </div>
       <div className="grid grid-cols-3">
-        <RecordCell label="최장 거리" value={km(allTime.max_distance)}       valueClass="text-blue-400"  rankType="drive_distance" borderRight />
-        <RecordCell label="최장 시간" value={formatDuration(allTime.max_duration)} valueClass="text-zinc-200 text-base" rankType="drive_duration" borderRight />
-        <RecordCell label="평균 속도" value={kmh(allTime.avg_speed)}          valueClass="text-zinc-200" />
+        <RecordCell label="최장 거리" value={km(allTime.max_distance)}       valueClass="text-blue-400"  rankType="drive_distance"  borderRight />
+        <RecordCell label="최장 시간" value={formatDuration(allTime.max_duration)} valueClass="text-zinc-200 text-base" rankType="drive_duration"  borderRight />
+        <RecordCell label="평균 속도" value={kmh(allTime.avg_speed)}          valueClass="text-amber-400" rankType="drive_avg_speed" />
       </div>
 
       <div className="px-3 py-2 border-t border-b border-white/[0.06]">

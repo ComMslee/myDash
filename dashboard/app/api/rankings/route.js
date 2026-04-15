@@ -16,8 +16,17 @@ export async function GET(request) {
     }
     const carId = carResult.rows[0].id;
 
-    if (type === 'drive_distance' || type === 'drive_duration') {
-      const orderCol = type === 'drive_distance' ? 'd.distance' : 'd.duration_min';
+    if (type === 'drive_distance' || type === 'drive_duration' || type === 'drive_avg_speed') {
+      // 단일 주행 기준 정렬 컬럼
+      // 평균속도: distance/duration*60, 지나치게 짧은 주행은 이상치이므로 distance >= 10km 필터
+      let orderExpr, extraWhere = '';
+      if (type === 'drive_distance') orderExpr = 'd.distance';
+      else if (type === 'drive_duration') orderExpr = 'd.duration_min';
+      else {
+        orderExpr = 'd.distance / NULLIF(d.duration_min, 0) * 60';
+        extraWhere = ' AND d.distance >= 10 AND d.duration_min > 0';
+      }
+
       const rows = await pool.query(
         `SELECT d.id, d.start_date, d.end_date, d.distance, d.duration_min,
                 sp.latitude AS start_lat, sp.longitude AS start_lng,
@@ -33,8 +42,8 @@ export async function GET(request) {
          LEFT JOIN geofences eg ON eg.id = d.end_geofence_id
          LEFT JOIN positions sp ON sp.id = d.start_position_id
          LEFT JOIN positions ep ON ep.id = d.end_position_id
-         WHERE d.car_id = $1 AND ${orderCol} IS NOT NULL
-         ORDER BY ${orderCol} DESC NULLS LAST
+         WHERE d.car_id = $1 AND (${orderExpr}) IS NOT NULL${extraWhere}
+         ORDER BY (${orderExpr}) DESC NULLS LAST
          LIMIT $2`,
         [carId, limit]
       );
@@ -49,15 +58,21 @@ export async function GET(request) {
 
       return Response.json({
         type,
-        items: drives.map((d, i) => ({
-          id: d.id,
-          start_date: d.start_date,
-          end_date: d.end_date,
-          distance: d.distance ? parseFloat(parseFloat(d.distance).toFixed(1)) : 0,
-          duration_min: d.duration_min ? Math.round(parseFloat(d.duration_min)) : null,
-          start_address: d.start_geofence_name || kakaoStarts[i] || d.start_osm || null,
-          end_address:   d.end_geofence_name   || kakaoEnds[i]   || d.end_osm   || null,
-        })),
+        items: drives.map((d, i) => {
+          const dist = d.distance ? parseFloat(parseFloat(d.distance).toFixed(1)) : 0;
+          const dur  = d.duration_min ? Math.round(parseFloat(d.duration_min)) : null;
+          const avgSpeed = dist > 0 && dur > 0 ? parseFloat((dist / dur * 60).toFixed(1)) : null;
+          return {
+            id: d.id,
+            start_date: d.start_date,
+            end_date: d.end_date,
+            distance: dist,
+            duration_min: dur,
+            avg_speed: avgSpeed,
+            start_address: d.start_geofence_name || kakaoStarts[i] || d.start_osm || null,
+            end_address:   d.end_geofence_name   || kakaoEnds[i]   || d.end_osm   || null,
+          };
+        }),
       });
     }
 

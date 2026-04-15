@@ -6,10 +6,11 @@ import { useSearchParams } from 'next/navigation';
 import { formatDuration, shortAddr, formatKorDateTime, formatKorDay } from '@/lib/format';
 
 const TYPE_LABELS = {
-  drive_distance: { title: '최장거리 (단일 주행)', unit: 'km', color: 'text-blue-400' },
-  drive_duration: { title: '최장시간 (단일 주행)', unit: '', color: 'text-zinc-200' },
-  day_distance:   { title: '최장거리 (일간 합계)', unit: 'km', color: 'text-blue-400' },
-  day_duration:   { title: '최장시간 (일간 합계)', unit: '', color: 'text-zinc-200' },
+  drive_distance:  { title: '최장거리 (단일 주행)',  unit: 'km',   color: 'text-blue-400' },
+  drive_duration:  { title: '최장시간 (단일 주행)',  unit: '',     color: 'text-zinc-200' },
+  drive_avg_speed: { title: '평균속도 (단일 주행)',  unit: 'km/h', color: 'text-amber-400' },
+  day_distance:    { title: '최장거리 (일간 합계)',  unit: 'km',   color: 'text-blue-400' },
+  day_duration:    { title: '최장시간 (일간 합계)',  unit: '',     color: 'text-zinc-200' },
 };
 
 function RankingsInner() {
@@ -32,9 +33,28 @@ function RankingsInner() {
       .catch(() => setError('데이터를 불러오지 못했습니다'));
   }, [type]);
 
-  const isDrive = type === 'drive_distance' || type === 'drive_duration';
-  const isDay = type === 'day_distance' || type === 'day_duration';
+  const isDrive = type.startsWith('drive_');
+  const isDay = type.startsWith('day_');
   const isDistance = type === 'drive_distance' || type === 'day_distance';
+  const isSpeed = type === 'drive_avg_speed';
+
+  // 지표 탭 — 단일 주행은 3종(거리/시간/속도), 일 합계는 2종(거리/시간)
+  const metricTabs = isDrive
+    ? [
+        { key: 'drive_distance',  label: '거리' },
+        { key: 'drive_duration',  label: '시간' },
+        { key: 'drive_avg_speed', label: '속도' },
+      ]
+    : [
+        { key: 'day_distance', label: '거리' },
+        { key: 'day_duration', label: '시간' },
+      ];
+
+  // 기준 탭 — 속도 지표는 "단일 주행"만 존재하므로 "일 합계" 비활성
+  const baseSingleKey = isSpeed
+    ? 'drive_avg_speed'
+    : (isDistance ? 'drive_distance' : 'drive_duration');
+  const baseDayKey = isDistance ? 'day_distance' : (type === 'drive_duration' || type === 'day_duration' ? 'day_duration' : 'day_distance');
 
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white">
@@ -49,12 +69,9 @@ function RankingsInner() {
           <h1 className="text-base font-bold text-zinc-200">{meta.title}</h1>
         </div>
 
-        {/* 타입 탭 */}
-        <div className="grid grid-cols-2 gap-1.5 mb-4">
-          {[
-            { key: isDrive ? 'drive_distance' : 'day_distance', label: '거리' },
-            { key: isDrive ? 'drive_duration' : 'day_duration', label: '시간' },
-          ].map(t => (
+        {/* 지표 탭 */}
+        <div className={`grid gap-1.5 mb-4 ${metricTabs.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          {metricTabs.map(t => (
             <Link
               key={t.key}
               href={`/rankings?type=${t.key}`}
@@ -69,24 +86,30 @@ function RankingsInner() {
           ))}
         </div>
 
-        {/* 기준 탭 */}
+        {/* 기준 탭 — 속도일 땐 단일 주행만 */}
         <div className="grid grid-cols-2 gap-1.5 mb-5">
           <Link
-            href={`/rankings?type=${isDistance ? 'drive_distance' : 'drive_duration'}`}
+            href={`/rankings?type=${baseSingleKey}`}
             className={`py-1.5 text-center rounded-lg text-xs font-semibold transition-colors ${
               isDrive ? 'bg-zinc-700/70 text-zinc-100' : 'bg-zinc-800/50 text-zinc-500 hover:text-zinc-300'
             }`}
           >
             단일 주행
           </Link>
-          <Link
-            href={`/rankings?type=${isDistance ? 'day_distance' : 'day_duration'}`}
-            className={`py-1.5 text-center rounded-lg text-xs font-semibold transition-colors ${
-              isDay ? 'bg-zinc-700/70 text-zinc-100' : 'bg-zinc-800/50 text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            일 합계
-          </Link>
+          {isSpeed ? (
+            <span className="py-1.5 text-center rounded-lg text-xs font-semibold bg-zinc-900/40 text-zinc-700 border border-white/[0.03] cursor-not-allowed">
+              일 합계 <span className="text-[10px]">(미지원)</span>
+            </span>
+          ) : (
+            <Link
+              href={`/rankings?type=${baseDayKey}`}
+              className={`py-1.5 text-center rounded-lg text-xs font-semibold transition-colors ${
+                isDay ? 'bg-zinc-700/70 text-zinc-100' : 'bg-zinc-800/50 text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              일 합계
+            </Link>
+          )}
         </div>
 
         {/* 리스트 */}
@@ -120,7 +143,19 @@ function RankingsInner() {
                       </p>
                     </div>
                     <div className="text-right tabular-nums">
-                      {isDistance ? (
+                      {isSpeed ? (
+                        <>
+                          <p className={`text-base font-bold ${meta.color}`}>
+                            {it.avg_speed ?? '—'}<span className="text-xs font-medium text-zinc-600 ml-0.5">km/h</span>
+                          </p>
+                          {it.distance > 0 && (
+                            <p className="text-xs text-blue-400/80">
+                              {it.distance}<span className="text-zinc-600 ml-0.5">km</span>
+                              {it.duration_min && <span className="text-zinc-600 ml-1">· {formatDuration(it.duration_min)}</span>}
+                            </p>
+                          )}
+                        </>
+                      ) : isDistance ? (
                         <>
                           <p className={`text-base font-bold ${meta.color}`}>
                             {it.distance}<span className="text-xs font-medium text-zinc-600 ml-0.5">km</span>

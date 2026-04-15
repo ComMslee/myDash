@@ -57,26 +57,28 @@ export default function ChargeSummaryCard() {
         </div>
       </div>
 
-      {/* 추천 충전일 */}
-      {ec && (() => {
-        const target = new Date(ec.date);
-        const dateLabel = `${target.getMonth() + 1}/${target.getDate()}`;
-        const daysLabel = ec.days_until === 0 ? '곧' : `${ec.days_until}일 후`;
-        const urgent = ec.days_until <= 2;
-        const thresholdLabel = ec.threshold_source === 'learned'
-          ? `${ec.threshold_pct}% 습관`
-          : `${ec.threshold_pct}% 도달`;
-        return (
-          <div className="px-4 py-3 border-t border-white/[0.06] flex items-center justify-between">
-            <span className="text-xs text-zinc-500">추천 충전일</span>
+      {/* 추천 충전일 — 값이 없어도 행은 표시 */}
+      <div className="px-4 py-3 border-t border-white/[0.06] flex items-center justify-between">
+        <span className="text-xs text-zinc-500">추천 충전일</span>
+        {ec ? (() => {
+          const target = new Date(ec.date);
+          const dateLabel = `${target.getMonth() + 1}/${target.getDate()}`;
+          const daysLabel = ec.days_until === 0 ? '곧' : `${ec.days_until}일 후`;
+          const urgent = ec.days_until <= 2;
+          const thresholdLabel = ec.threshold_source === 'learned'
+            ? `${ec.threshold_pct}% 습관`
+            : `${ec.threshold_pct}% 도달`;
+          return (
             <div className="flex items-center gap-2 text-xs tabular-nums">
               <span className={`font-bold ${urgent ? 'text-rose-400' : 'text-amber-400'}`}>{daysLabel}</span>
               <span className="text-zinc-400">{dateLabel}</span>
               <span className="text-zinc-600">{thresholdLabel}</span>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })() : (
+          <span className="text-xs text-zinc-700 tabular-nums">—</span>
+        )}
+      </div>
     </div>
   );
 }
