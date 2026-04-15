@@ -30,20 +30,10 @@ export default function MonthlyChargeCard() {
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       <div className="px-4 py-3">
-        {/* 3열 요약 */}
-        <div className="grid grid-cols-3 divide-x divide-white/[0.06] mb-4 -mx-4 px-4">
-          <div className="text-center px-2 py-1">
-            <p className="text-zinc-600 text-xs mb-1.5">충전횟수</p>
-            <p className="text-white font-bold text-lg tabular-nums">{data.charge_count}회</p>
-          </div>
-          <div className="text-center px-2 py-1">
-            <p className="text-zinc-600 text-xs mb-1.5">총 충전량</p>
-            <p className="text-emerald-400 font-bold text-lg tabular-nums">{data.total_kwh}kWh</p>
-          </div>
-          <div className="text-center px-2 py-1">
-            <p className="text-zinc-600 text-xs mb-1.5">회당 평균</p>
-            <p className="text-emerald-400 font-bold text-lg tabular-nums">{data.avg_kwh}kWh</p>
-          </div>
+        {/* 회당 평균만 표시 */}
+        <div className="mb-4 text-center">
+          <p className="text-zinc-600 text-xs mb-1">회당 평균</p>
+          <p className="text-emerald-400 font-bold text-lg tabular-nums">{data.avg_kwh}<span className="text-zinc-600 text-xs ml-0.5">kWh</span></p>
         </div>
 
         {/* 집충전 / 외부충전 */}
