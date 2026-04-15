@@ -64,30 +64,7 @@ function PeriodStats({ drives }) {
   );
 }
 
-// ── 기록 카드 (최장거리/시간/평균속도) ─────────────────────
-
-// rankType이 지정되면 해당 랭킹 페이지로 링크되는 클릭 가능한 셀
-function RecordCell({ label, value, valueClass = 'text-zinc-200', rankType, borderRight }) {
-  const content = (
-    <>
-      <p className="text-zinc-500 text-[11px] mb-1.5">{label}</p>
-      <p className={`font-bold text-lg leading-none tabular-nums ${valueClass}`}>{value}</p>
-      <p className="text-[10px] text-zinc-500 mt-1">{rankType ? 'TOP 50 ›' : '\u00A0'}</p>
-    </>
-  );
-  const baseClass = `px-2 py-4 text-center ${borderRight ? 'border-r border-white/[0.06]' : ''}`;
-  if (rankType) {
-    return (
-      <Link
-        href={`/rankings?type=${rankType}`}
-        className={`${baseClass} hover:bg-white/[0.03] active:bg-blue-500/10 transition-colors`}
-      >
-        {content}
-      </Link>
-    );
-  }
-  return <div className={baseClass}>{content}</div>;
-}
+// ── 기록 카드 — 3지표 × 2기준 테이블 (클릭 시 랭킹 페이지) ──
 
 function RecordsCard({ allTime }) {
   if (!allTime) {
@@ -98,26 +75,88 @@ function RecordsCard({ allTime }) {
     );
   }
 
-  const km = (v) => <>{v}<span className="text-zinc-600 text-xs ml-0.5">km</span></>;
-  const kmh = (v) => <>{v}<span className="text-zinc-600 text-xs ml-0.5">km/h</span></>;
+  const km  = (v) => <>{v}<span className="text-zinc-600 text-[11px] ml-0.5 font-normal">km</span></>;
+  const kmh = (v) => <>{v}<span className="text-zinc-600 text-[11px] ml-0.5 font-normal">km/h</span></>;
+
+  // 지표(행) × 기준(열) 구성
+  const rows = [
+    {
+      label: '최장 거리',
+      icon: (
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+        </svg>
+      ),
+      color: 'text-blue-400',
+      drive: { value: km(allTime.max_distance),     rankType: 'drive_distance' },
+      day:   { value: km(allTime.max_day_distance), rankType: 'day_distance'   },
+    },
+    {
+      label: '최장 시간',
+      icon: (
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      color: 'text-zinc-200',
+      drive: { value: formatDuration(allTime.max_duration),     rankType: 'drive_duration' },
+      day:   { value: formatDuration(allTime.max_day_duration), rankType: 'day_duration'   },
+    },
+    {
+      label: '평균 속도',
+      icon: (
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      ),
+      color: 'text-amber-400',
+      drive: { value: kmh(allTime.avg_speed),                      rankType: 'drive_avg_speed' },
+      day:   { value: allTime.max_day_avg_speed != null ? kmh(allTime.max_day_avg_speed) : '—', rankType: 'day_avg_speed' },
+    },
+  ];
+
+  const cellBase = 'py-3.5 text-center font-bold text-lg leading-none tabular-nums transition-colors';
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      <div className="px-3 py-2 border-b border-white/[0.06]">
-        <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">단일 주행 기준 · 전체 기간</span>
-      </div>
-      <div className="grid grid-cols-3">
-        <RecordCell label="최장 거리" value={km(allTime.max_distance)}       valueClass="text-blue-400"  rankType="drive_distance"  borderRight />
-        <RecordCell label="최장 시간" value={formatDuration(allTime.max_duration)} valueClass="text-zinc-200 text-base" rankType="drive_duration"  borderRight />
-        <RecordCell label="평균 속도" value={kmh(allTime.avg_speed)}          valueClass="text-amber-400" rankType="drive_avg_speed" />
+      {/* 헤더 — 공통 TOP 50 힌트 */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
+        <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">전체 기간 기록</span>
+        <span className="text-[10px] text-zinc-500">TOP 50 ›</span>
       </div>
 
-      <div className="px-3 py-2 border-t border-b border-white/[0.06]">
-        <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">일 기준 · 전체 기간</span>
+      {/* 컬럼 헤더 */}
+      <div className="grid grid-cols-[82px_1fr_1fr] bg-white/[0.02]">
+        <div className="px-3 py-2 border-b border-white/[0.06]" />
+        <div className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500 border-b border-l border-white/[0.06]">단일 주행</div>
+        <div className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500 border-b border-l border-white/[0.06]">일 합계</div>
       </div>
-      <div className="grid grid-cols-2">
-        <RecordCell label="일 최장 거리" value={km(allTime.max_day_distance)}        valueClass="text-blue-400"  rankType="day_distance" borderRight />
-        <RecordCell label="일 최장 시간" value={formatDuration(allTime.max_day_duration)} valueClass="text-zinc-200 text-base" rankType="day_duration" />
+
+      {/* 데이터 행들 */}
+      <div className="grid grid-cols-[82px_1fr_1fr]">
+        {rows.flatMap((r, i) => {
+          const rowBorder = i < rows.length - 1 ? 'border-b border-white/[0.06]' : '';
+          return [
+            <div key={`l-${i}`} className={`px-3 py-3.5 flex items-center gap-1.5 ${rowBorder} ${r.color}`}>
+              {r.icon}
+              <span className="text-[11px] text-zinc-300 font-semibold">{r.label}</span>
+            </div>,
+            <Link
+              key={`d-${i}`}
+              href={`/rankings?type=${r.drive.rankType}`}
+              className={`${cellBase} ${r.color} border-l border-white/[0.06] ${rowBorder} hover:bg-white/[0.03] active:bg-blue-500/10`}
+            >
+              {r.drive.value}
+            </Link>,
+            <Link
+              key={`y-${i}`}
+              href={`/rankings?type=${r.day.rankType}`}
+              className={`${cellBase} ${r.color} border-l border-white/[0.06] ${rowBorder} hover:bg-white/[0.03] active:bg-blue-500/10`}
+            >
+              {r.day.value}
+            </Link>,
+          ];
+        })}
       </div>
     </div>
   );

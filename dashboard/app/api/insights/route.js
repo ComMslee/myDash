@@ -157,11 +157,16 @@ export async function GET() {
       // 전체 기간 일별 최대 거리/시간
       pool.query(
         `SELECT MAX(day_distance)::float AS max_day_distance,
-                MAX(day_duration)::int AS max_day_duration
+                MAX(day_duration)::int AS max_day_duration,
+                MAX(day_avg_speed)::float AS max_day_avg_speed
          FROM (
            SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
                   SUM(distance)::float AS day_distance,
-                  SUM(duration_min)::int AS day_duration
+                  SUM(duration_min)::int AS day_duration,
+                  CASE WHEN SUM(distance) >= 10 AND SUM(duration_min) > 0
+                       THEN SUM(distance) / SUM(duration_min) * 60
+                       ELSE NULL
+                  END AS day_avg_speed
            FROM drives
            WHERE car_id = $1
            GROUP BY day
@@ -240,6 +245,7 @@ export async function GET() {
       efficiency_wh_km: parseFloat(allTimeEff.toFixed(0)),
       max_day_distance: dayMax.max_day_distance != null ? parseFloat(parseFloat(dayMax.max_day_distance).toFixed(1)) : 0,
       max_day_duration: dayMax.max_day_duration != null ? parseInt(dayMax.max_day_duration) : 0,
+      max_day_avg_speed: dayMax.max_day_avg_speed != null ? parseFloat(parseFloat(dayMax.max_day_avg_speed).toFixed(1)) : null,
     };
 
     return Response.json({
