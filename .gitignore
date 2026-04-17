@@ -3,3 +3,7 @@ dashboard/node_modules/
 dashboard/.omc/
 .env
 *.env.local
+
+# AWS / Lightsail
+*.pem
+budget.json

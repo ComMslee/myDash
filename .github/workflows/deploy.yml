@@ -1,30 +1,32 @@
-name: Deploy Dashboard
+name: Deploy Dashboard to Lightsail
 
 on:
   push:
     branches:
       - master
+  workflow_dispatch:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-lightsail
+      cancel-in-progress: false
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Write .env
-        shell: bash
-        run: |
-          printf 'TM_DB_USER=%s\n' "${{ secrets.TM_DB_USER }}" > .env
-          printf 'TM_DB_PASS=%s\n' "${{ secrets.TM_DB_PASS }}" >> .env
-          printf 'TM_DB_NAME=%s\n' "${{ secrets.TM_DB_NAME }}" >> .env
-          printf 'ENCRYPTION_KEY=%s\n' "${{ secrets.ENCRYPTION_KEY }}" >> .env
-
-      - name: Build dashboard
-        shell: bash
-        run: docker compose -p teslamate build dashboard
-
-      - name: Restart dashboard
-        shell: bash
-        run: docker compose -p teslamate up -d dashboard
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          timeout: 60s
+          command_timeout: 20m
+          script: |
+            set -e
+            cd ~/myDash
+            git fetch --all --prune
+            git reset --hard origin/master
+            sudo docker compose build dashboard
+            sudo docker compose up -d dashboard
+            sudo docker image prune -f
