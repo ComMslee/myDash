@@ -1,24 +1,13 @@
 # 접속 방법
 
-## 웹 대시보드
+## 웹
 
-### 방법 A — Tailscale (권장, 설정 후)
+| 용도 | URL |
+|---|---|
+| **Dashboard** | **http://43.202.133.239/** |
+| **TeslaMate 설정** | **http://43.202.133.239:4000/** |
 
-Tailscale 설정 완료 후 ([TAILSCALE.md](./TAILSCALE.md)):
-
-- Dashboard: `http://mydash-aws:5000` (또는 Tailscale 할당 IP:5000)
-- TeslaMate 관리: `http://mydash-aws:4000`
-
-### 방법 B — SSH 터널 (임시, 방화벽 열지 않고)
-
-로컬에서:
-```bash
-ssh -i lightsail-seoul.pem -L 5000:localhost:5000 -L 4000:localhost:4000 ubuntu@43.202.133.239
-```
-→ 브라우저에서 `http://localhost:5000` / `http://localhost:4000`
-
-### 방법 C — 퍼블릭 HTTPS (비추천)
-80/443 열고 Caddy 추가해야 함. 현재 미구성.
+둘 다 **공개 상태**. 인증 없이 URL만 알면 누구나 접근. 개인용이면 OK.
 
 ## SSH
 
@@ -28,13 +17,12 @@ ssh -i C:\Users\lmskn\Downloads\myDash\lightsail-seoul.pem ubuntu@43.202.133.239
 ```
 
 ### 편의 스크립트
-`docs/scripts/` 폴더의 스크립트 사용:
 - Windows: `docs\scripts\ssh.bat` 더블클릭
-- Git Bash/WSL: `bash docs/scripts/ssh.sh`
+- Git Bash: `bash docs/scripts/ssh.sh`
 
 ## AWS CLI
 
-로컬 프로파일: `mydash` (`~/.aws/credentials`에 저장됨).
+로컬 프로파일: `mydash` (`~/.aws/credentials`).
 
 ```bash
 # Windows
@@ -65,3 +53,20 @@ bash docs/scripts/aws-status.sh
 | 서버 프로젝트 | `/home/ubuntu/myDash` |
 | 서버 .env | `/home/ubuntu/myDash/.env` |
 | 서버 Compose | `/home/ubuntu/myDash/docker-compose.yml` |
+
+## 방화벽 포트
+
+현재 공개 포트:
+| 포트 | 용도 |
+|---|---|
+| 22 | SSH |
+| 80 | Dashboard (→ 5000 컨테이너 포트) |
+| 4000 | TeslaMate |
+
+포트 닫으려면:
+```bash
+aws --profile mydash lightsail put-instance-public-ports \
+  --instance-name mydash-prod --region ap-northeast-2 \
+  --port-infos fromPort=22,toPort=22,protocol=tcp
+# → SSH만 남기고 80/4000 차단
+```
