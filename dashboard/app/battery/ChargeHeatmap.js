@@ -18,7 +18,7 @@ export default function ChargeHeatmap() {
     <YearHeatmap
       data={data}
       loading={loading}
-      title="지난 1년 충전"
+      title=""
       metric="kwh"
       color="#22c55e"
       legendLabel="충전"

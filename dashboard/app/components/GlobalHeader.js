@@ -118,7 +118,7 @@ export default function GlobalHeader() {
           aria-hidden="true"
         />
       )}
-      <div className="relative max-w-2xl mx-auto px-4 py-3 flex items-center gap-2">
+      <div className="relative max-w-2xl mx-auto px-4 py-2 flex items-center gap-2">
 
         {/* 좌측: 아이콘 + 차량명 + 갱신시간 */}
         <div className="flex items-center gap-1.5 min-w-0">

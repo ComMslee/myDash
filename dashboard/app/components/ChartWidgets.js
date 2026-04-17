@@ -31,6 +31,9 @@ export function CombinedHourlyHeatmap({ driveData, chargeData }) {
           })}
         </div>
       </div>
+      <div className="flex justify-between mt-1 text-xs text-zinc-500 pl-[26px]" aria-hidden="true">
+        <span>0시</span><span>6</span><span>12</span><span>18</span><span>23시</span>
+      </div>
     </div>
   );
 }
@@ -53,6 +56,7 @@ export function CombinedWeekdayBars({ driveData, chargeData }) {
             <div className="w-full h-3.5 rounded-[2px]"
               style={{ background: '#22c55e', opacity: (c?.count || 0) === 0 ? 0.08 : 0.15 + chargeRatio * 0.85 }}
               title={`${labels[d.dow]} 충전: ${c?.count || 0}회`} />
+            <span className="text-[10px] text-zinc-500">{labels[d.dow]}</span>
           </div>
         );
       })}
@@ -77,6 +81,9 @@ export function HourlyHeatmap({ data, hexColor, valueKey = 'count' }) {
           );
         })}
       </div>
+      <div className="flex justify-between mt-1 text-xs text-zinc-500 px-px" aria-hidden="true">
+        <span className="font-semibold">0시</span><span>6</span><span>12</span><span>18</span><span>23시</span>
+      </div>
     </div>
   );
 }
@@ -94,6 +101,7 @@ export function WeekdayBars({ data, hexColor, valueKey = 'count' }) {
               className="w-full h-4 rounded-[3px]"
               style={{ background: hexColor, opacity: d[valueKey] === 0 ? 0.08 : 0.18 + ratio * 0.82 }}
             />
+            <span className="text-[10px] text-zinc-500">{labels[d.dow]}</span>
           </div>
         );
       })}

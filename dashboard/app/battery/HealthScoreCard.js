@@ -10,7 +10,7 @@ export default function HealthScoreCard({ data }) {
     range_high = 80,
     total_readings,
     soc_histogram,
-    soc_histogram_5,
+    soc_histogram_2,
     zone_pct,
     tips,
   } = data;
@@ -23,9 +23,9 @@ export default function HealthScoreCard({ data }) {
     );
   }
 
-  // 5% 단위가 있으면 20칸, 없으면 10칸 fallback
-  const hist = soc_histogram_5 && soc_histogram_5.length === 20 ? soc_histogram_5 : soc_histogram;
-  const bucketSize = hist.length === 20 ? 5 : 10;
+  // 2% 단위가 있으면 50칸, 없으면 10칸 fallback
+  const hist = soc_histogram_2 && soc_histogram_2.length === 50 ? soc_histogram_2 : soc_histogram;
+  const bucketSize = hist.length === 50 ? 2 : 10;
   const maxHist = Math.max(1, ...hist);
   const histH = 44;
 
@@ -58,7 +58,7 @@ export default function HealthScoreCard({ data }) {
         </div>
       </div>
 
-      {/* SOC 체류 분포 — 5% 단위 */}
+      {/* SOC 체류 분포 — 2% 단위 */}
       <div className="px-4 py-3">
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-xs font-semibold text-zinc-400">SOC 체류 분포</span>
