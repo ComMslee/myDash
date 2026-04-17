@@ -85,9 +85,9 @@ export default function HealthScoreCard({ data }) {
                   key={i}
                   className="flex-1 rounded-t-sm transition-all duration-500"
                   style={{
-                    height: h,
+                    height: Math.max(h, 8),
                     background: color,
-                    opacity: cnt === 0 ? 0.12 : zone === 'ideal' ? 1 : zone === 'good' ? 0.8 : 0.7,
+                    opacity: cnt === 0 ? 0.28 : zone === 'ideal' ? 1 : zone === 'good' ? 0.85 : 0.75,
                   }}
                   title={`${i * bucketSize}–${i * bucketSize + bucketSize}%: ${cnt.toLocaleString()}회`}
                 />
