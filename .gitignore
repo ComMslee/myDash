@@ -7,3 +7,6 @@ dashboard/.omc/
 # AWS / Lightsail
 *.pem
 budget.json
+
+# Local secrets
+.tm_password.txt
