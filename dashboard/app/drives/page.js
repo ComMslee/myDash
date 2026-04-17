@@ -119,41 +119,43 @@ function RecordsCard({ allTime }) {
   const cellBase = 'py-3 text-center font-bold text-lg leading-none tabular-nums transition-colors rounded-lg';
 
   return (
-    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-3">
-      {/* 헤더 — 공통 TOP 50 힌트 */}
-      <div className="flex items-center justify-between px-1 pb-2">
+    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
+      {/* 헤더 — 다른 카드들과 동일 포맷 */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
         <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">기록</span>
         <span className="text-[10px] text-zinc-500">TOP 50 ›</span>
       </div>
 
-      {/* 컬럼 헤더 */}
-      <div className="grid grid-cols-[40px_1fr_1fr] gap-1 pb-1">
-        <div />
-        <div className="text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500">단일 주행</div>
-        <div className="text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500">일 합계</div>
-      </div>
+      <div className="px-4 pt-3 pb-3">
+        {/* 컬럼 헤더 */}
+        <div className="grid grid-cols-[40px_1fr_1fr] gap-1 pb-1">
+          <div />
+          <div className="text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500">단일 주행</div>
+          <div className="text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500">일 합계</div>
+        </div>
 
-      {/* 데이터 행들 — 테두리 없이 여백으로만 구분 */}
-      <div className="grid grid-cols-[40px_1fr_1fr] gap-1">
-        {rows.flatMap((r, i) => [
-          <div key={`l-${i}`} className={`flex items-center justify-center ${r.color}`}>
-            {r.icon}
-          </div>,
-          <Link
-            key={`d-${i}`}
-            href={`/rankings?type=${r.drive.rankType}`}
-            className={`${cellBase} ${r.color} hover:bg-white/[0.04] active:bg-blue-500/10`}
-          >
-            {r.drive.value}
-          </Link>,
-          <Link
-            key={`y-${i}`}
-            href={`/rankings?type=${r.day.rankType}`}
-            className={`${cellBase} ${r.color} hover:bg-white/[0.04] active:bg-blue-500/10`}
-          >
-            {r.day.value}
-          </Link>,
-        ])}
+        {/* 데이터 행들 — 테두리 없이 여백으로만 구분 */}
+        <div className="grid grid-cols-[40px_1fr_1fr] gap-1">
+          {rows.flatMap((r, i) => [
+            <div key={`l-${i}`} className={`flex items-center justify-center ${r.color}`}>
+              {r.icon}
+            </div>,
+            <Link
+              key={`d-${i}`}
+              href={`/rankings?type=${r.drive.rankType}`}
+              className={`${cellBase} ${r.color} hover:bg-white/[0.04] active:bg-blue-500/10`}
+            >
+              {r.drive.value}
+            </Link>,
+            <Link
+              key={`y-${i}`}
+              href={`/rankings?type=${r.day.rankType}`}
+              className={`${cellBase} ${r.color} hover:bg-white/[0.04] active:bg-blue-500/10`}
+            >
+              {r.day.value}
+            </Link>,
+          ])}
+        </div>
       </div>
     </div>
   );
@@ -167,10 +169,8 @@ function PatternCard({ hourly, weekday }) {
       <div className="px-3 py-2 border-b border-white/[0.06]">
         <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">주행 패턴</span>
       </div>
-      <div className="px-4 pt-4 pb-4">
-        <p className="text-[11px] text-zinc-600 uppercase tracking-wider mb-2">시간대</p>
+      <div className="px-4 pt-4 pb-4 space-y-4">
         <HourlyHeatmap data={hourly} hexColor="#3b82f6" />
-        <p className="text-[11px] text-zinc-600 uppercase tracking-wider mt-4 mb-2">요일</p>
         <WeekdayBars data={weekday} hexColor="#3b82f6" />
       </div>
     </div>
@@ -271,7 +271,7 @@ export default function DrivesPage() {
         <YearHeatmap
           data={yearHeatmap}
           loading={loading.heatmap}
-          title="지난 1년 주행"
+          title=""
           metric="km"
           color="#3b82f6"
           legendLabel="주행"
@@ -288,7 +288,9 @@ export default function DrivesPage() {
         {error ? (
           <p className="text-red-400 text-sm text-center py-8">{error}</p>
         ) : loading.history ? <Spinner /> : months.length === 0 ? (
-          <p className="text-center text-zinc-600 py-8">데이터가 없습니다</p>
+          <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-6 text-center text-zinc-600 text-xs">
+            데이터가 없습니다
+          </div>
         ) : (
           <>
           <div className="space-y-4">
