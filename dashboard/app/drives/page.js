@@ -116,48 +116,44 @@ function RecordsCard({ allTime }) {
     },
   ];
 
-  const cellBase = 'py-3.5 text-center font-bold text-lg leading-none tabular-nums transition-colors';
+  const cellBase = 'py-3 text-center font-bold text-lg leading-none tabular-nums transition-colors rounded-lg';
 
   return (
-    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
+    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-3">
       {/* 헤더 — 공통 TOP 50 힌트 */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
+      <div className="flex items-center justify-between px-1 pb-2">
         <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">기록</span>
         <span className="text-[10px] text-zinc-500">TOP 50 ›</span>
       </div>
 
       {/* 컬럼 헤더 */}
-      <div className="grid grid-cols-[72px_1fr_1fr] bg-white/[0.02]">
-        <div className="px-3 py-2 border-b border-white/[0.06]" />
-        <div className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500 border-b border-l border-white/[0.06]">단일 주행</div>
-        <div className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500 border-b border-l border-white/[0.06]">일 합계</div>
+      <div className="grid grid-cols-[40px_1fr_1fr] gap-1 pb-1">
+        <div />
+        <div className="text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500">단일 주행</div>
+        <div className="text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500">일 합계</div>
       </div>
 
-      {/* 데이터 행들 */}
-      <div className="grid grid-cols-[72px_1fr_1fr]">
-        {rows.flatMap((r, i) => {
-          const rowBorder = i < rows.length - 1 ? 'border-b border-white/[0.06]' : '';
-          return [
-            <div key={`l-${i}`} className={`px-3 py-3.5 flex items-center gap-1.5 whitespace-nowrap ${rowBorder} ${r.color}`}>
-              {r.icon}
-              <span className="text-xs text-zinc-300 font-semibold">{r.label}</span>
-            </div>,
-            <Link
-              key={`d-${i}`}
-              href={`/rankings?type=${r.drive.rankType}`}
-              className={`${cellBase} ${r.color} border-l border-white/[0.06] ${rowBorder} hover:bg-white/[0.03] active:bg-blue-500/10`}
-            >
-              {r.drive.value}
-            </Link>,
-            <Link
-              key={`y-${i}`}
-              href={`/rankings?type=${r.day.rankType}`}
-              className={`${cellBase} ${r.color} border-l border-white/[0.06] ${rowBorder} hover:bg-white/[0.03] active:bg-blue-500/10`}
-            >
-              {r.day.value}
-            </Link>,
-          ];
-        })}
+      {/* 데이터 행들 — 테두리 없이 여백으로만 구분 */}
+      <div className="grid grid-cols-[40px_1fr_1fr] gap-1">
+        {rows.flatMap((r, i) => [
+          <div key={`l-${i}`} className={`flex items-center justify-center ${r.color}`}>
+            {r.icon}
+          </div>,
+          <Link
+            key={`d-${i}`}
+            href={`/rankings?type=${r.drive.rankType}`}
+            className={`${cellBase} ${r.color} hover:bg-white/[0.04] active:bg-blue-500/10`}
+          >
+            {r.drive.value}
+          </Link>,
+          <Link
+            key={`y-${i}`}
+            href={`/rankings?type=${r.day.rankType}`}
+            className={`${cellBase} ${r.color} hover:bg-white/[0.04] active:bg-blue-500/10`}
+          >
+            {r.day.value}
+          </Link>,
+        ])}
       </div>
     </div>
   );
