@@ -21,35 +21,19 @@ function StateBadge({ state }) {
   return <span className={`text-xs font-semibold ${s.cls}`}>{s.label}</span>;
 }
 
-function BatteryBar({ level, limitLevel, color, charging }) {
+function PercentBadge({ level, color, charging }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <div className="relative flex items-center">
-        <div
-          className="w-8 h-3.5 border border-zinc-500 rounded-sm overflow-hidden relative"
-          role="progressbar"
-          aria-valuenow={level}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label="배터리 잔량"
-        >
-          <div
-            className="h-full rounded-sm transition-all"
-            style={{ width: `${level}%`, background: color }}
-          />
-          {/* 충전 목표선 */}
-          {charging && limitLevel && (
-            <div
-              className="absolute top-0 bottom-0 w-px bg-white/40"
-              style={{ left: `${limitLevel}%` }}
-            />
-          )}
-        </div>
-        <div className="w-0.5 h-1.5 bg-zinc-500 rounded-r ml-px" />
-        {charging && (
-          <span className="absolute -top-0.5 -right-1 text-[8px] text-green-400 animate-pulse" aria-hidden="true">⚡</span>
-        )}
-      </div>
+    <div
+      className="flex items-center gap-1"
+      role="progressbar"
+      aria-valuenow={level}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label="배터리 잔량"
+    >
+      {charging && (
+        <span className="text-[10px] text-green-400 animate-pulse" aria-hidden="true">⚡</span>
+      )}
       <span className="text-sm font-bold tabular-nums" style={{ color }}>{level}%</span>
     </div>
   );
@@ -116,8 +100,25 @@ export default function GlobalHeader() {
     : null;
 
   return (
-    <header className="sticky top-0 z-50 bg-[#0f0f0f]/90 backdrop-blur border-b border-white/[0.06]">
-      <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-2">
+    <header className="sticky top-0 z-50 bg-[#0f0f0f]/90 backdrop-blur border-b border-white/[0.06] relative overflow-hidden">
+      {/* 배터리 게이지 — 헤더 배경 */}
+      <div
+        className="absolute inset-y-0 left-0 transition-all duration-700 pointer-events-none"
+        style={{
+          width: `${lvl}%`,
+          background: `linear-gradient(90deg, ${color}3d 0%, ${color}22 70%, ${color}0a 100%)`,
+        }}
+        aria-hidden="true"
+      />
+      {/* 충전 목표 지점 세로선 */}
+      {isCharging && limitLvl && limitLvl > lvl && (
+        <div
+          className="absolute inset-y-0 w-px bg-white/30 pointer-events-none"
+          style={{ left: `${limitLvl}%` }}
+          aria-hidden="true"
+        />
+      )}
+      <div className="relative max-w-2xl mx-auto px-4 py-3 flex items-center gap-2">
 
         {/* 좌측: 아이콘 + 차량명 + 갱신시간 */}
         <div className="flex items-center gap-1.5 min-w-0">
@@ -155,7 +156,7 @@ export default function GlobalHeader() {
                 {charging.charger_power != null ? `${charging.charger_power}kW` : '충전 중'}
               </span>
             </div>
-            <BatteryBar level={lvl} limitLevel={limitLvl} color={color} charging />
+            <PercentBadge level={lvl} color={color} charging />
             {limitLvl && <span className="text-zinc-600 text-[11px] tabular-nums flex-shrink-0">→{limitLvl}%</span>}
             {remainMin != null && (
               <span className="text-zinc-500 text-[11px] tabular-nums truncate">{formatDuration(remainMin)}</span>
@@ -167,7 +168,7 @@ export default function GlobalHeader() {
             {estRange && (
               <span className="text-zinc-400 text-xs tabular-nums">예측 {estRange}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
             )}
-            <BatteryBar level={lvl} color={color} charging={false} />
+            <PercentBadge level={lvl} color={color} charging={false} />
           </div>
         )}
 
