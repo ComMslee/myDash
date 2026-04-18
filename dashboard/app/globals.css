@@ -35,13 +35,25 @@ html, body {
   background-color: #0f0f0f;
 }
 
-/* 배터리 수위 물결 애니메이션 */
-@keyframes wave-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-2.5px); }
+/* NOW 도트 펄스 — 현재 SoC 위치 */
+@keyframes now-pulse {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.35); }
 }
-.wave-bob {
-  animation: wave-bob 2.4s ease-in-out infinite;
+.now-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: now-pulse 1.8s ease-in-out infinite;
+}
+
+/* 예측 드레인 구간 시머 — 시간 흐름 느낌 */
+@keyframes predict-shimmer {
+  0%   { opacity: 0.55; }
+  50%  { opacity: 0.95; }
+  100% { opacity: 0.55; }
+}
+.predict-shimmer {
+  animation: predict-shimmer 5s ease-in-out infinite;
 }
 
 /* 충전 임박 펄스 (번개 아이콘용) */
