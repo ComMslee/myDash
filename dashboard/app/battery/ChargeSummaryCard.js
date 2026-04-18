@@ -19,9 +19,8 @@ function FlagIcon({ className }) {
   );
 }
 
-// 가로 배터리 + 예측 드레인 페이드
-// [0, threshold] 안정 구간은 solid, [threshold, SoC] 구간은 예측 드레인으로 페이드.
-// 임계선에 ⚡ 아이콘, 현재 SoC에 NOW 펄스 도트.
+// 좌우 분할 히어로: 좌측 배터리(시각) + 우측 D-day 숫자(메시지)
+// 배터리는 안정/예측 구간 fade로 드레인 방향을 표현, 우측은 "며칠 뒤 충전" 강조.
 export default function ChargeSummaryCard() {
   const [car, setCar] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -60,7 +59,18 @@ export default function ChargeSummaryCard() {
     const t = new Date(ec.date);
     return `${t.getMonth() + 1}/${t.getDate()}`;
   })() : null;
-  const daysLabel = ec ? (ec.days_until === 0 ? '곧' : `D-${ec.days_until}`) : null;
+
+  // 히어로 숫자: 오늘("곧") · 1일("내일") · 나머지 "Nd"
+  let heroNumber = null;
+  let heroSuffix = null;
+  if (ec) {
+    if (ec.days_until === 0) {
+      heroNumber = '곧';
+    } else {
+      heroNumber = String(ec.days_until);
+      heroSuffix = '일';
+    }
+  }
 
   // SVG 기하 (컴팩트)
   const VIEW_W = 320;
@@ -84,167 +94,191 @@ export default function ChargeSummaryCard() {
   const predictRegionW = thresholdX != null ? Math.max(0, fillEdgeX - thresholdX) : 0;
 
   const LABEL_Y = BATT_Y + BATT_H + 12;
+  const socLabelX = Math.max(INNER_X + 14, Math.min(INNER_X + INNER_W - 14, fillEdgeX));
+  const hideThresholdLabel = thresholdX != null && Math.abs(socLabelX - thresholdX) < 30;
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
-      {/* 상단: 좌(마지막 충전) · 우(현재 SoC) */}
-      <div className="flex justify-between items-center gap-3 mb-1 min-h-[20px]">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <FlagIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-          {lc ? (
-            <div className="text-[11px] leading-tight truncate">
-              <span className="text-zinc-300 tabular-nums">{elapsedLabel(lc.end_date)}</span>
-              {lc.location && <span className="text-zinc-500 ml-1">· {lc.location}</span>}
-            </div>
+      {/* 상단: 마지막 충전 */}
+      <div className="flex items-center gap-1.5 min-w-0 mb-2 min-h-[20px]">
+        <FlagIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+        {lc ? (
+          <div className="text-[11px] leading-tight truncate">
+            <span className="text-zinc-300 tabular-nums">{elapsedLabel(lc.end_date)}</span>
+            {lc.location && <span className="text-zinc-500 ml-1">· {lc.location}</span>}
+          </div>
+        ) : (
+          <span className="text-[11px] text-zinc-600">—</span>
+        )}
+      </div>
+
+      {/* 본체: 배터리(좌) + D-day 히어로(우) */}
+      <div className="flex items-center gap-4">
+        {/* 좌측: 배터리 */}
+        <div className="flex-1 min-w-0">
+          <svg
+            viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+            className="w-full h-auto block"
+            style={{ overflow: 'visible' }}
+          >
+            <defs>
+              <linearGradient
+                id="predictGrad"
+                gradientUnits="userSpaceOnUse"
+                x1={thresholdX ?? 0} y1={0}
+                x2={fillEdgeX} y2={0}
+              >
+                <stop offset="0%" stopColor={stableColor} stopOpacity="0.85" />
+                <stop offset="100%" stopColor={stableLight} stopOpacity="0.15" />
+              </linearGradient>
+              <linearGradient id="glossGrad" x1="0%" x2="0%" y1="0%" y2="100%">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.08" />
+                <stop offset="60%" stopColor="#ffffff" stopOpacity="0" />
+              </linearGradient>
+              <clipPath id="battInner">
+                <rect
+                  x={INNER_X} y={INNER_Y}
+                  width={INNER_W} height={INNER_H}
+                  rx={BATT_RX - INNER_PAD}
+                />
+              </clipPath>
+            </defs>
+
+            {/* 배터리 본체 */}
+            <rect
+              x={BATT_X} y={BATT_Y}
+              width={BATT_W} height={BATT_H}
+              rx={BATT_RX}
+              fill="rgba(255,255,255,0.02)"
+              stroke="rgba(255,255,255,0.10)"
+              strokeWidth="1.2"
+            />
+            <rect
+              x={BATT_X + BATT_W}
+              y={BATT_Y + (BATT_H - 16) / 2}
+              width={TERM_W}
+              height={16}
+              rx="1.5"
+              fill="rgba(255,255,255,0.12)"
+            />
+
+            {/* 내부 */}
+            <g clipPath="url(#battInner)">
+              {thresholdX != null && thresholdX > INNER_X && (
+                <rect
+                  x={INNER_X} y={INNER_Y}
+                  width={thresholdX - INNER_X} height={INNER_H}
+                  fill={stableColor}
+                  opacity="0.92"
+                />
+              )}
+              {thresholdX != null && predictRegionW > 0 && (
+                <rect
+                  className="predict-shimmer"
+                  x={thresholdX} y={INNER_Y}
+                  width={predictRegionW} height={INNER_H}
+                  fill="url(#predictGrad)"
+                />
+              )}
+              {thresholdX == null && fillEdgeX > INNER_X && (
+                <rect
+                  x={INNER_X} y={INNER_Y}
+                  width={fillEdgeX - INNER_X} height={INNER_H}
+                  fill={stableColor}
+                  opacity="0.85"
+                />
+              )}
+              {fillEdgeX > INNER_X && (
+                <rect
+                  x={INNER_X} y={INNER_Y}
+                  width={fillEdgeX - INNER_X} height={INNER_H * 0.45}
+                  fill="url(#glossGrad)"
+                />
+              )}
+              {thresholdX != null && (
+                <line
+                  x1={thresholdX} y1={INNER_Y - 2}
+                  x2={thresholdX} y2={INNER_Y + INNER_H + 2}
+                  stroke={overdue ? 'rgba(239,68,68,0.8)' : 'rgba(255,255,255,0.45)'}
+                  strokeWidth="1"
+                  strokeDasharray="3 2"
+                />
+              )}
+              {soc != null && (
+                <>
+                  <line
+                    x1={fillEdgeX} y1={INNER_Y}
+                    x2={fillEdgeX} y2={INNER_Y + INNER_H}
+                    stroke="#ffffff"
+                    strokeOpacity="0.85"
+                    strokeWidth="1.2"
+                  />
+                  <circle
+                    className="now-pulse"
+                    cx={fillEdgeX} cy={INNER_Y + INNER_H / 2}
+                    r="3"
+                    fill="#ffffff"
+                  />
+                </>
+              )}
+            </g>
+
+            {/* 하단 라벨: 임계값 (⚡ + %) */}
+            {thresholdX != null && !hideThresholdLabel && (
+              <text
+                x={thresholdX}
+                y={LABEL_Y}
+                textAnchor="middle"
+                style={{ fontFeatureSettings: '"tnum"' }}
+              >
+                <tspan fontSize="10" fill={accentColor}>⚡</tspan>
+                <tspan fontSize="9" fill="#71717a" dx="1">{threshold}%</tspan>
+              </text>
+            )}
+
+            {/* 하단 라벨: 현재 SoC */}
+            {soc != null && (
+              <text
+                x={socLabelX}
+                y={LABEL_Y}
+                textAnchor="middle"
+                fontSize="10"
+                fontWeight="700"
+                fill="#e4e4e7"
+                style={{ fontFeatureSettings: '"tnum"' }}
+              >
+                {socPct}%
+              </text>
+            )}
+          </svg>
+        </div>
+
+        {/* 우측: D-day 히어로 */}
+        <div className="shrink-0 text-right leading-none">
+          {ec ? (
+            <>
+              <div
+                className={`flex items-baseline justify-end gap-0.5 tabular-nums ${overdue || urgent ? 'charge-pulse' : ''}`}
+                style={{ color: accentColor }}
+              >
+                <span className="text-[34px] font-black leading-none tracking-tight">
+                  {heroNumber}
+                </span>
+                {heroSuffix && (
+                  <span className="text-[16px] font-bold leading-none">
+                    {heroSuffix}
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] text-zinc-500 tabular-nums mt-1.5">
+                {ec.days_until === 0 ? '충전 필요' : `뒤 · ${dateLabel}`}
+              </div>
+            </>
           ) : (
             <span className="text-[11px] text-zinc-600">—</span>
           )}
         </div>
-        {soc != null && (
-          <span className="text-[13px] font-bold tabular-nums text-zinc-200 shrink-0">
-            {socPct}%
-          </span>
-        )}
       </div>
-
-      {/* 배터리 SVG */}
-      <svg
-        viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
-        className="w-full h-auto block"
-        style={{ overflow: 'visible' }}
-      >
-        <defs>
-          {/* 예측 드레인 구간: 임계선(진함) → 현재(연함) */}
-          <linearGradient
-            id="predictGrad"
-            gradientUnits="userSpaceOnUse"
-            x1={thresholdX ?? 0} y1={0}
-            x2={fillEdgeX} y2={0}
-          >
-            <stop offset="0%" stopColor={stableColor} stopOpacity="0.85" />
-            <stop offset="100%" stopColor={stableLight} stopOpacity="0.15" />
-          </linearGradient>
-          {/* 상단 미묘한 광택 */}
-          <linearGradient id="glossGrad" x1="0%" x2="0%" y1="0%" y2="100%">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.08" />
-            <stop offset="60%" stopColor="#ffffff" stopOpacity="0" />
-          </linearGradient>
-          <clipPath id="battInner">
-            <rect
-              x={INNER_X} y={INNER_Y}
-              width={INNER_W} height={INNER_H}
-              rx={BATT_RX - INNER_PAD}
-            />
-          </clipPath>
-        </defs>
-
-        {/* 배터리 본체 */}
-        <rect
-          x={BATT_X} y={BATT_Y}
-          width={BATT_W} height={BATT_H}
-          rx={BATT_RX}
-          fill="rgba(255,255,255,0.02)"
-          stroke="rgba(255,255,255,0.10)"
-          strokeWidth="1.2"
-        />
-        {/* 터미널 */}
-        <rect
-          x={BATT_X + BATT_W}
-          y={BATT_Y + (BATT_H - 16) / 2}
-          width={TERM_W}
-          height={16}
-          rx="1.5"
-          fill="rgba(255,255,255,0.12)"
-        />
-
-        {/* 내부: 안정 + 예측 + 광택 + 임계선 + NOW */}
-        <g clipPath="url(#battInner)">
-          {/* 안정 구간 [0, threshold] — solid */}
-          {thresholdX != null && thresholdX > INNER_X && (
-            <rect
-              x={INNER_X} y={INNER_Y}
-              width={thresholdX - INNER_X} height={INNER_H}
-              fill={stableColor}
-              opacity="0.92"
-            />
-          )}
-
-          {/* 예측 드레인 구간 [threshold, soc] — fade gradient */}
-          {thresholdX != null && predictRegionW > 0 && (
-            <rect
-              className="predict-shimmer"
-              x={thresholdX} y={INNER_Y}
-              width={predictRegionW} height={INNER_H}
-              fill="url(#predictGrad)"
-            />
-          )}
-
-          {/* threshold 없을 때 fallback: 전체 solid */}
-          {thresholdX == null && fillEdgeX > INNER_X && (
-            <rect
-              x={INNER_X} y={INNER_Y}
-              width={fillEdgeX - INNER_X} height={INNER_H}
-              fill={stableColor}
-              opacity="0.85"
-            />
-          )}
-
-          {/* 상단 광택 (전체 채움 위) */}
-          {fillEdgeX > INNER_X && (
-            <rect
-              x={INNER_X} y={INNER_Y}
-              width={fillEdgeX - INNER_X} height={INNER_H * 0.45}
-              fill="url(#glossGrad)"
-            />
-          )}
-
-          {/* 임계선 점선 */}
-          {thresholdX != null && (
-            <line
-              x1={thresholdX} y1={INNER_Y - 2}
-              x2={thresholdX} y2={INNER_Y + INNER_H + 2}
-              stroke={overdue ? 'rgba(239,68,68,0.8)' : 'rgba(255,255,255,0.45)'}
-              strokeWidth="1"
-              strokeDasharray="3 2"
-            />
-          )}
-
-          {/* NOW 수직선 + 펄스 도트 */}
-          {soc != null && (
-            <>
-              <line
-                x1={fillEdgeX} y1={INNER_Y}
-                x2={fillEdgeX} y2={INNER_Y + INNER_H}
-                stroke="#ffffff"
-                strokeOpacity="0.85"
-                strokeWidth="1.2"
-              />
-              <circle
-                className="now-pulse"
-                cx={fillEdgeX} cy={INNER_Y + INNER_H / 2}
-                r="3"
-                fill="#ffffff"
-              />
-            </>
-          )}
-        </g>
-
-        {/* 임계선 하단: ⚡ + D-day + 날짜 (한 줄 묶음) */}
-        {thresholdX != null && ec && (
-          <text
-            x={thresholdX - 4}
-            y={LABEL_Y}
-            textAnchor="start"
-            className={overdue || urgent ? 'charge-pulse' : ''}
-            style={{ fontFeatureSettings: '"tnum"', color: accentColor }}
-          >
-            <tspan fontSize="12" fill={accentColor}>⚡</tspan>
-            <tspan fontSize="11" fontWeight="700" fill={accentColor} dx="2">{daysLabel}</tspan>
-            <tspan fontSize="10" fill="#71717a" dx="3">· {dateLabel}</tspan>
-          </text>
-        )}
-
-      </svg>
     </div>
   );
 }
