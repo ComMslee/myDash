@@ -2,16 +2,13 @@
 
 import { useEffect, useState } from 'react';
 
-// 경과 시간을 "X시간 전" / "Y일 전" 형태로
-function elapsedLabel(isoDate) {
-  const diffMs = Date.now() - new Date(isoDate).getTime();
+function elapsedLabel(iso) {
+  const diffMs = Date.now() - new Date(iso).getTime();
   const diffMin = Math.floor(diffMs / 60000);
   if (diffMin < 60) return `${diffMin}분 전`;
   const diffH = Math.floor(diffMin / 60);
   if (diffH < 24) return `${diffH}시간 전`;
-  const diffD = Math.floor(diffH / 24);
-  const remH = diffH % 24;
-  return remH > 0 ? `${diffD}일 ${remH}시간 전` : `${diffD}일 전`;
+  return `${Math.floor(diffH / 24)}일 전`;
 }
 
 function FlagIcon({ className }) {
@@ -22,17 +19,16 @@ function FlagIcon({ className }) {
   );
 }
 
-function TargetIcon({ className }) {
+function BoltIcon({ className, style }) {
   return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-      <circle cx="12" cy="12" r="9" />
-      <circle cx="12" cy="12" r="5" />
-      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    <svg className={className} style={style} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
     </svg>
   );
 }
 
-// 홈에서 이동: 마지막 충전 + 추천 충전일을 수평 타임라인으로 표현
+// 가로 배터리 히어로 — 좌측 수위가 현재 SoC, 점선은 충전 임계값,
+// 우측 터미널 쪽으로 수위가 줄어드는 상상으로 "다음 충전일" 예측.
 export default function ChargeSummaryCard() {
   const [car, setCar] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -56,133 +52,209 @@ export default function ChargeSummaryCard() {
 
   const lc = car.last_charge;
   const ec = car.estimated_charge;
+  const soc = car.battery_level;
+  const threshold = ec?.threshold_pct ?? null;
+  const socPct = soc != null ? Math.max(0, Math.min(100, soc)) : 0;
 
-  const lastTs = lc?.end_date ? new Date(lc.end_date).getTime() : null;
-  const targetTs = ec?.date ? new Date(ec.date).getTime() : null;
-  const nowTs = Date.now();
+  const overdue = threshold != null && soc != null && soc <= threshold;
+  const urgent = !overdue && ec?.days_until != null && ec.days_until <= 1;
 
-  // 현재 위치 비율 (0: 방금 충전 / 1: 충전 시점 임박 또는 지남)
-  let currentPct = null;
-  let overdue = false;
-  if (lastTs && targetTs && targetTs > lastTs) {
-    const raw = (nowTs - lastTs) / (targetTs - lastTs);
-    currentPct = Math.max(0, Math.min(1, raw)) * 100;
-    overdue = raw >= 1;
-  } else if (lastTs && !targetTs) {
-    currentPct = 15; // 마지막만 있고 예측 없음 — 왼쪽 가까이
-  }
-
-  // 현재 포인트 색상 — 긴박도에 따라
-  const currentDotColor =
-    overdue ? '#ef4444'
-    : currentPct != null && currentPct > 75 ? '#f59e0b'
-    : '#22c55e';
+  // 수위 그라디언트: 구간별로 색 다르게
+  const fillStart = overdue ? '#ef4444' : urgent ? '#f59e0b' : '#10b981';
+  const fillEnd   = overdue ? '#f87171' : urgent ? '#fbbf24' : '#34d399';
+  const accentColor = overdue ? '#ef4444' : '#f59e0b';
 
   const dateLabel = ec ? (() => {
     const t = new Date(ec.date);
     return `${t.getMonth() + 1}/${t.getDate()}`;
   })() : null;
-  const daysLabel = ec ? (ec.days_until === 0 ? '곧' : `${ec.days_until}일 후`) : null;
-  const thresholdLabel = ec
-    ? (ec.threshold_source === 'learned' ? `${ec.threshold_pct}% 습관` : `${ec.threshold_pct}%`)
-    : null;
+  const daysLabel = ec ? (ec.days_until === 0 ? '곧' : `D-${ec.days_until}`) : null;
+
+  // SVG 기하
+  const VIEW_W = 320;
+  const VIEW_H = 86;
+  const PAD_X = 4;
+  const TERM_W = 6;
+  const BATT_X = PAD_X;
+  const BATT_Y = 16;
+  const BATT_W = VIEW_W - PAD_X * 2 - TERM_W;
+  const BATT_H = 52;
+  const BATT_RX = 10;
+
+  const INNER_PAD = 4;
+  const INNER_X = BATT_X + INNER_PAD;
+  const INNER_Y = BATT_Y + INNER_PAD;
+  const INNER_W = BATT_W - INNER_PAD * 2;
+  const INNER_H = BATT_H - INNER_PAD * 2;
+
+  const fillW = (INNER_W * socPct) / 100;
+  const fillEdgeX = INNER_X + fillW;
+  const thresholdX = threshold != null ? INNER_X + (INNER_W * threshold) / 100 : null;
+
+  const LABEL_Y = BATT_Y + BATT_H + 14;
+  const socLabelX = Math.max(INNER_X + 14, Math.min(INNER_X + INNER_W - 14, fillEdgeX));
+
+  // 라벨 겹침 방지: 임계값과 현재 라벨이 너무 가까우면 임계 라벨 숨김
+  const hideThresholdLabel = thresholdX != null && Math.abs(socLabelX - thresholdX) < 28;
 
   return (
-    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      <div className="px-4 pt-5 pb-4">
-        {/* 타임라인 */}
-        <div className="relative h-8 mx-7 mb-3">
-          {/* 가로선 — 구간별 색상 (지남 영역은 emerald→amber, 앞으로 남은 영역은 zinc) */}
-          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] rounded-full bg-zinc-800 overflow-hidden">
-            {currentPct != null && (
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${currentPct}%`,
-                  background: overdue
-                    ? 'linear-gradient(90deg, #10b981 0%, #ef4444 100%)'
-                    : 'linear-gradient(90deg, #10b981 0%, #f59e0b 100%)',
-                }}
-              />
-            )}
-          </div>
-
-          {/* 왼쪽 깃발 (마지막 충전) */}
-          <div className="absolute -left-7 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center">
-            <FlagIcon className="w-3.5 h-3.5 text-emerald-400" />
-          </div>
-
-          {/* 오른쪽 타겟 (예상 충전일) */}
-          <div className={`absolute -right-7 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full border flex items-center justify-center ${
-            ec ? 'bg-zinc-800 border-white/10' : 'bg-zinc-900 border-white/[0.04]'
-          }`}>
-            <TargetIcon className={`w-3.5 h-3.5 ${ec ? (overdue ? 'text-red-400' : 'text-amber-400') : 'text-zinc-700'}`} />
-          </div>
-
-          {/* 현재 포인트 */}
-          {currentPct != null && (
-            <div
-              className="absolute top-1/2 w-3 h-3 rounded-full border-2 border-[#161618] pointer-events-none"
-              style={{
-                left: `${currentPct}%`,
-                transform: 'translate(-50%, -50%)',
-                background: currentDotColor,
-                boxShadow: `0 0 8px ${currentDotColor}aa`,
-              }}
-              aria-label="현재 위치"
-            />
+    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-5 py-4">
+      {/* 상단: 좌(마지막 충전) · 우(다음 충전 예측) */}
+      <div className="flex justify-between items-center mb-1 min-h-[22px] gap-3">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <FlagIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          {lc ? (
+            <div className="text-[11px] leading-tight truncate">
+              <span className="text-zinc-300 tabular-nums">{elapsedLabel(lc.end_date)}</span>
+              {lc.location && <span className="text-zinc-500 ml-1">· {lc.location}</span>}
+            </div>
+          ) : (
+            <span className="text-[11px] text-zinc-600">—</span>
           )}
         </div>
-
-        {/* 하단 3열 라벨 */}
-        <div className="grid grid-cols-3 gap-2 items-start">
-          {/* 좌 — 마지막 충전 */}
-          <div className="text-left">
-            <p className="text-[10px] text-zinc-500 mb-0.5">마지막 충전</p>
-            {lc ? (
-              <>
-                <p className="text-[13px] font-bold text-zinc-200 tabular-nums leading-tight">{elapsedLabel(lc.end_date)}</p>
-                <p className="text-[10px] text-zinc-500 tabular-nums leading-tight mt-0.5">
-                  {lc.location ? <span>{lc.location}</span> : null}
-                  {lc.soc_start != null && lc.soc_end != null && (
-                    <span className={lc.location ? 'ml-1' : ''}>{lc.soc_start}→{lc.soc_end}%</span>
-                  )}
-                </p>
-              </>
-            ) : <p className="text-xs text-zinc-700 tabular-nums">—</p>}
-          </div>
-
-          {/* 중 — 지금 */}
-          <div className="text-center">
-            <p className="text-[10px] mb-0.5" style={{ color: `${currentDotColor}cc` }}>지금</p>
-            {car.battery_level != null ? (
-              <p className="text-[13px] font-bold tabular-nums leading-tight" style={{ color: currentDotColor }}>
-                {car.battery_level}%
-              </p>
-            ) : <p className="text-xs text-zinc-700">—</p>}
-            {ec?.daily_consumption_pct != null && (
-              <p className="text-[10px] text-zinc-500 tabular-nums leading-tight mt-0.5">
-                일 {ec.daily_consumption_pct}%↓
-              </p>
-            )}
-          </div>
-
-          {/* 우 — 추천 충전일 */}
-          <div className="text-right">
-            <p className="text-[10px] text-zinc-500 mb-0.5">추천 충전일 (예상)</p>
-            {ec ? (
-              <>
-                <p className={`text-[13px] font-bold tabular-nums leading-tight ${overdue ? 'text-red-400' : 'text-amber-400'}`}>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {ec ? (
+            <>
+              <div className="text-right leading-tight">
+                <span
+                  className="text-[13px] font-bold tabular-nums"
+                  style={{ color: accentColor }}
+                >
                   {daysLabel}
-                </p>
-                <p className="text-[10px] text-zinc-500 tabular-nums leading-tight mt-0.5">
-                  {dateLabel} · {thresholdLabel}
-                </p>
-              </>
-            ) : <p className="text-xs text-zinc-700 tabular-nums">—</p>}
-          </div>
+                </span>
+                <span className="text-[11px] text-zinc-500 tabular-nums ml-1.5">
+                  {dateLabel}
+                </span>
+              </div>
+              <BoltIcon
+                className={`w-3.5 h-3.5 shrink-0 ${overdue || urgent ? 'charge-pulse' : ''}`}
+                style={{ color: accentColor }}
+              />
+            </>
+          ) : (
+            <span className="text-[11px] text-zinc-600">—</span>
+          )}
         </div>
       </div>
+
+      {/* 배터리 SVG */}
+      <svg
+        viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+        className="w-full h-auto block"
+        style={{ overflow: 'visible' }}
+      >
+        <defs>
+          <linearGradient id="socGrad" x1="0%" x2="100%" y1="0%" y2="0%">
+            <stop offset="0%" stopColor={fillStart} stopOpacity="0.95" />
+            <stop offset="100%" stopColor={fillEnd} stopOpacity="0.95" />
+          </linearGradient>
+          <linearGradient id="glossGrad" x1="0%" x2="0%" y1="0%" y2="100%">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.08" />
+            <stop offset="60%" stopColor="#ffffff" stopOpacity="0" />
+          </linearGradient>
+          <clipPath id="battInner">
+            <rect
+              x={INNER_X} y={INNER_Y}
+              width={INNER_W} height={INNER_H}
+              rx={BATT_RX - INNER_PAD}
+            />
+          </clipPath>
+        </defs>
+
+        {/* 배터리 본체 */}
+        <rect
+          x={BATT_X} y={BATT_Y}
+          width={BATT_W} height={BATT_H}
+          rx={BATT_RX}
+          fill="rgba(255,255,255,0.02)"
+          stroke="rgba(255,255,255,0.10)"
+          strokeWidth="1.2"
+        />
+        {/* 터미널 */}
+        <rect
+          x={BATT_X + BATT_W}
+          y={BATT_Y + (BATT_H - 22) / 2}
+          width={TERM_W}
+          height={22}
+          rx="1.5"
+          fill="rgba(255,255,255,0.12)"
+        />
+
+        {/* 내부: 채움 + 물결 + 임계선 */}
+        <g clipPath="url(#battInner)">
+          {fillW > 0 && (
+            <>
+              <rect
+                x={INNER_X} y={INNER_Y}
+                width={fillW} height={INNER_H}
+                fill="url(#socGrad)"
+              />
+              {/* 수위 우측 물결 — 상하 미세 진동 */}
+              <g className="wave-bob" style={{ color: fillEnd }}>
+                <path
+                  d={`
+                    M ${fillEdgeX - 7} ${INNER_Y - 2}
+                    C ${fillEdgeX - 3} ${INNER_Y + 3},
+                      ${fillEdgeX + 1} ${INNER_Y - 3},
+                      ${fillEdgeX + 5} ${INNER_Y + 2}
+                    L ${fillEdgeX + 5} ${INNER_Y + INNER_H + 2}
+                    L ${fillEdgeX - 7} ${INNER_Y + INNER_H + 2}
+                    Z
+                  `}
+                  fill="currentColor"
+                  opacity="0.55"
+                />
+              </g>
+              {/* 상단 광택 */}
+              <rect
+                x={INNER_X} y={INNER_Y}
+                width={fillW} height={INNER_H * 0.45}
+                fill="url(#glossGrad)"
+              />
+            </>
+          )}
+
+          {/* 임계선 */}
+          {thresholdX != null && (
+            <line
+              x1={thresholdX} y1={INNER_Y - 2}
+              x2={thresholdX} y2={INNER_Y + INNER_H + 2}
+              stroke={overdue ? 'rgba(239,68,68,0.7)' : 'rgba(255,255,255,0.4)'}
+              strokeWidth="1"
+              strokeDasharray="3 3"
+            />
+          )}
+        </g>
+
+        {/* 하단 라벨: 임계값 */}
+        {thresholdX != null && !hideThresholdLabel && (
+          <text
+            x={thresholdX}
+            y={LABEL_Y}
+            textAnchor="middle"
+            fontSize="10"
+            fill="#71717a"
+            style={{ fontFeatureSettings: '"tnum"' }}
+          >
+            ↑{threshold}%{ec?.threshold_source === 'learned' ? ' 습관' : ''}
+          </text>
+        )}
+
+        {/* 하단 라벨: 현재 SoC */}
+        {soc != null && (
+          <text
+            x={socLabelX}
+            y={LABEL_Y}
+            textAnchor="middle"
+            fontSize="11"
+            fontWeight="700"
+            fill="#e4e4e7"
+            style={{ fontFeatureSettings: '"tnum"' }}
+          >
+            ↑{socPct}%
+          </text>
+        )}
+      </svg>
     </div>
   );
 }
