@@ -34,3 +34,21 @@
 html, body {
   background-color: #0f0f0f;
 }
+
+/* 배터리 수위 물결 애니메이션 */
+@keyframes wave-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2.5px); }
+}
+.wave-bob {
+  animation: wave-bob 2.4s ease-in-out infinite;
+}
+
+/* 충전 임박 펄스 (번개 아이콘용) */
+@keyframes charge-pulse {
+  0%, 100% { opacity: 0.85; filter: drop-shadow(0 0 3px currentColor); }
+  50%      { opacity: 1;    filter: drop-shadow(0 0 8px currentColor); }
+}
+.charge-pulse {
+  animation: charge-pulse 1.6s ease-in-out infinite;
+}
