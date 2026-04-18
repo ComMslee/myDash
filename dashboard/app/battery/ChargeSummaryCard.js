@@ -84,13 +84,11 @@ export default function ChargeSummaryCard() {
   const predictRegionW = thresholdX != null ? Math.max(0, fillEdgeX - thresholdX) : 0;
 
   const LABEL_Y = BATT_Y + BATT_H + 12;
-  const socLabelX = Math.max(INNER_X + 14, Math.min(INNER_X + INNER_W - 14, fillEdgeX));
-  const hideThresholdLabel = thresholdX != null && Math.abs(socLabelX - thresholdX) < 32;
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
-      {/* 상단: 좌(마지막 충전) · 우(다음 충전 예측) */}
-      <div className="flex justify-between items-center mb-1 min-h-[20px] gap-3">
+      {/* 상단: 좌(마지막 충전) · 우(현재 SoC) */}
+      <div className="flex justify-between items-center gap-3 mb-1 min-h-[20px]">
         <div className="flex items-center gap-1.5 min-w-0">
           <FlagIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
           {lc ? (
@@ -102,23 +100,11 @@ export default function ChargeSummaryCard() {
             <span className="text-[11px] text-zinc-600">—</span>
           )}
         </div>
-        <div className="shrink-0 leading-tight">
-          {ec ? (
-            <>
-              <span
-                className="text-[13px] font-bold tabular-nums"
-                style={{ color: accentColor }}
-              >
-                {daysLabel}
-              </span>
-              <span className="text-[11px] text-zinc-500 tabular-nums ml-1.5">
-                {dateLabel}
-              </span>
-            </>
-          ) : (
-            <span className="text-[11px] text-zinc-600">—</span>
-          )}
-        </div>
+        {soc != null && (
+          <span className="text-[13px] font-bold tabular-nums text-zinc-200 shrink-0">
+            {socPct}%
+          </span>
+        )}
       </div>
 
       {/* 배터리 SVG */}
@@ -243,46 +229,21 @@ export default function ChargeSummaryCard() {
           )}
         </g>
 
-        {/* 임계선 아래 ⚡ 배지 */}
-        {thresholdX != null && (
-          <g transform={`translate(${thresholdX}, ${BATT_Y + BATT_H + 3})`}>
-            <path
-              className={overdue || urgent ? 'charge-pulse' : ''}
-              d="M 1 -3 L -3 3 L 0 3 L -1 7 L 3 0 L 0 0 Z"
-              fill={accentColor}
-              style={{ color: accentColor }}
-            />
-          </g>
-        )}
-
-        {/* 하단 라벨: 임계값 */}
-        {thresholdX != null && !hideThresholdLabel && (
+        {/* 임계선 하단: ⚡ + D-day + 날짜 (한 줄 묶음) */}
+        {thresholdX != null && ec && (
           <text
-            x={thresholdX + 7}
-            y={LABEL_Y + 2}
-            textAnchor="start"
-            fontSize="9"
-            fill="#71717a"
-            style={{ fontFeatureSettings: '"tnum"' }}
-          >
-            {threshold}%{ec?.threshold_source === 'learned' ? '·습관' : ''}
-          </text>
-        )}
-
-        {/* 하단 라벨: 현재 SoC */}
-        {soc != null && (
-          <text
-            x={socLabelX}
+            x={thresholdX - 4}
             y={LABEL_Y}
-            textAnchor="middle"
-            fontSize="10"
-            fontWeight="700"
-            fill="#e4e4e7"
-            style={{ fontFeatureSettings: '"tnum"' }}
+            textAnchor="start"
+            className={overdue || urgent ? 'charge-pulse' : ''}
+            style={{ fontFeatureSettings: '"tnum"', color: accentColor }}
           >
-            {socPct}%
+            <tspan fontSize="12" fill={accentColor}>⚡</tspan>
+            <tspan fontSize="11" fontWeight="700" fill={accentColor} dx="2">{daysLabel}</tspan>
+            <tspan fontSize="10" fill="#71717a" dx="3">· {dateLabel}</tspan>
           </text>
         )}
+
       </svg>
     </div>
   );
