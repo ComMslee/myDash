@@ -13,18 +13,34 @@ function elapsedShort(iso) {
   return `${diffD}일 전`;
 }
 
-// 수정된 계획 C: 배터리 위에 3개 마커 (5일뒤/지금/어제)
-// SoC 축 기준 → 낮은%(미래,좌) ← 현재 ← 높은%(과거,우)
-// 시간은 우→좌로 흐름 (드레인 방향)
+function formatMinutes(min) {
+  if (min == null) return null;
+  if (min < 60) return `${min}분 남음`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m > 0 ? `${h}시간 ${m}분 남음` : `${h}시간 남음`;
+}
+
+// 배터리 위 3 시점 마커 (과거/현재/예측)
+// 충전 중엔 예측 대신 "충전 중" 상태 + 목표 SoC 마커로 전환
 export default function ChargeSummaryCard() {
   const [car, setCar] = useState(null);
+  const [charging, setCharging] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/car')
-      .then(r => r.json())
-      .then(d => { setCar(d); setLoading(false); })
-      .catch(() => setLoading(false));
+    const fetchAll = () =>
+      Promise.all([
+        fetch('/api/car').then(r => r.json()).catch(() => null),
+        fetch('/api/charging-status').then(r => r.json()).catch(() => null),
+      ]).then(([carData, chargingData]) => {
+        if (carData) setCar(carData);
+        setCharging(chargingData?.charging ? chargingData : null);
+        setLoading(false);
+      });
+    fetchAll();
+    const id = setInterval(fetchAll, 30000);
+    return () => clearInterval(id);
   }, []);
 
   if (loading) {
@@ -39,16 +55,21 @@ export default function ChargeSummaryCard() {
 
   const lc = car.last_charge;
   const ec = car.estimated_charge;
-  const soc = car.battery_level;
+  const isCharging = !!charging || car.state === 'charging';
+  const soc = isCharging ? (charging?.battery_level ?? car.battery_level) : car.battery_level;
   const threshold = ec?.threshold_pct ?? null;
   const socPct = soc != null ? Math.max(0, Math.min(100, soc)) : 0;
   const lastSoc = lc?.soc_end ?? null;
+  const targetSoc = charging?.charge_limit_soc ?? null;
+  const remainMin = charging?.time_to_full_charge ? Math.round(charging.time_to_full_charge * 60) : null;
 
-  const overdue = threshold != null && soc != null && soc <= threshold;
-  const urgent = !overdue && ec?.days_until != null && ec.days_until <= 1;
+  const overdue = !isCharging && threshold != null && soc != null && soc <= threshold;
+  const urgent  = !isCharging && !overdue && ec?.days_until != null && ec.days_until <= 1;
 
-  const stableColor  = overdue ? '#ef4444' : urgent ? '#f59e0b' : '#10b981';
-  const stableLight  = overdue ? '#f87171' : urgent ? '#fbbf24' : '#34d399';
+  const chargeColor  = '#10b981';
+  const chargeLight  = '#34d399';
+  const stableColor  = isCharging ? chargeColor : (overdue ? '#ef4444' : urgent ? '#f59e0b' : '#10b981');
+  const stableLight  = isCharging ? chargeLight : (overdue ? '#f87171' : urgent ? '#fbbf24' : '#34d399');
   const accentColor  = overdue ? '#ef4444' : '#f59e0b';
 
   const daysLabel = ec ? (ec.days_until === 0 ? '곧' : `${ec.days_until}일 뒤`) : null;
@@ -59,7 +80,7 @@ export default function ChargeSummaryCard() {
   const PAD_X = 4;
   const TERM_W = 6;
   const BATT_X = PAD_X;
-  const BATT_Y = 32;             // 위쪽 라벨 공간
+  const BATT_Y = 32;
   const BATT_W = VIEW_W - PAD_X * 2 - TERM_W;
   const BATT_H = 36;
   const BATT_RX = 8;
@@ -73,9 +94,9 @@ export default function ChargeSummaryCard() {
   const fillEdgeX = INNER_X + (INNER_W * socPct) / 100;
   const thresholdX = threshold != null ? INNER_X + (INNER_W * threshold) / 100 : null;
   const lastSocX = lastSoc != null ? INNER_X + (INNER_W * lastSoc) / 100 : null;
+  const targetX  = targetSoc != null ? INNER_X + (INNER_W * targetSoc) / 100 : null;
   const predictRegionW = thresholdX != null ? Math.max(0, fillEdgeX - thresholdX) : 0;
 
-  // 텍스트 앵커 — 가장자리 근처면 start/end, 가운데면 middle
   const anchorFor = (x) => {
     if (x == null) return 'middle';
     if (x < 24) return 'start';
@@ -107,6 +128,10 @@ export default function ChargeSummaryCard() {
             <stop offset="0%" stopColor={stableColor} stopOpacity="0.85" />
             <stop offset="100%" stopColor={stableLight} stopOpacity="0.15" />
           </linearGradient>
+          <linearGradient id="chargeGrad" x1="0%" x2="100%" y1="0%" y2="0%">
+            <stop offset="0%"  stopColor={chargeColor} stopOpacity="0.85" />
+            <stop offset="100%" stopColor={chargeLight} stopOpacity="0.95" />
+          </linearGradient>
           <linearGradient id="glossGrad" x1="0%" x2="0%" y1="0%" y2="100%">
             <stop offset="0%" stopColor="#ffffff" stopOpacity="0.08" />
             <stop offset="60%" stopColor="#ffffff" stopOpacity="0" />
@@ -120,86 +145,82 @@ export default function ChargeSummaryCard() {
           </clipPath>
         </defs>
 
-        {/* ── 배터리 위 3개 마커 ── */}
-
-        {/* 예상 충전일 (좌 · 낮은 SoC) */}
-        {ec && thresholdX != null && (
-          <g className={overdue || urgent ? 'charge-pulse' : ''}
-             style={{ color: accentColor }}>
-            <text
-              x={clampX(thresholdX)}
-              y={Y_TIME}
-              textAnchor={anchorFor(thresholdX)}
-              fontSize="11"
-              fontWeight="700"
-              fill={accentColor}
-              style={{ fontFeatureSettings: '"tnum"' }}
-            >
-              ⚡ {daysLabel}
+        {/* ── 좌 마커: 예측(평소) / 충전 중(충전 시) ── */}
+        {isCharging ? (
+          <g className="charge-pulse" style={{ color: chargeColor }}>
+            <text x={4} y={Y_TIME} textAnchor="start" fontSize="11" fontWeight="700"
+                  fill={chargeColor} style={{ fontFeatureSettings: '"tnum"' }}>
+              ⚡ 충전 중
             </text>
-            <text
-              x={clampX(thresholdX)}
-              y={Y_PCT}
-              textAnchor={anchorFor(thresholdX)}
-              fontSize="10"
-              fill="#a1a1aa"
-              style={{ fontFeatureSettings: '"tnum"' }}
-            >
-              {threshold}%
-            </text>
+            {remainMin != null && (
+              <text x={4} y={Y_PCT} textAnchor="start" fontSize="10"
+                    fill="#a1a1aa" style={{ fontFeatureSettings: '"tnum"' }}>
+                {formatMinutes(remainMin)}
+              </text>
+            )}
           </g>
+        ) : (
+          ec && thresholdX != null && (
+            <g className={overdue || urgent ? 'charge-pulse' : ''}
+               style={{ color: accentColor }}>
+              <text x={clampX(thresholdX)} y={Y_TIME} textAnchor={anchorFor(thresholdX)}
+                    fontSize="11" fontWeight="700" fill={accentColor}
+                    style={{ fontFeatureSettings: '"tnum"' }}>
+                ⚡ {daysLabel}
+              </text>
+              <text x={clampX(thresholdX)} y={Y_PCT} textAnchor={anchorFor(thresholdX)}
+                    fontSize="10" fill="#a1a1aa"
+                    style={{ fontFeatureSettings: '"tnum"' }}>
+                {threshold}%
+              </text>
+            </g>
+          )
         )}
 
-        {/* 지금 (중앙 · 현재 SoC) */}
+        {/* ── 중앙 마커: 지금 ── */}
         {soc != null && (
           <>
-            <text
-              x={clampX(fillEdgeX)}
-              y={Y_TIME}
-              textAnchor={anchorFor(fillEdgeX)}
-              fontSize="10"
-              fill="#a1a1aa"
-            >
-              지금
+            <text x={clampX(fillEdgeX)} y={Y_TIME} textAnchor={anchorFor(fillEdgeX)}
+                  fontSize="10" fill="#a1a1aa">
+              {isCharging ? '지금 ↑' : '지금'}
             </text>
-            <text
-              x={clampX(fillEdgeX)}
-              y={Y_PCT}
-              textAnchor={anchorFor(fillEdgeX)}
-              fontSize="11"
-              fontWeight="700"
-              fill="#e4e4e7"
-              style={{ fontFeatureSettings: '"tnum"' }}
-            >
+            <text x={clampX(fillEdgeX)} y={Y_PCT} textAnchor={anchorFor(fillEdgeX)}
+                  fontSize="11" fontWeight="700" fill="#e4e4e7"
+                  style={{ fontFeatureSettings: '"tnum"' }}>
               {socPct}%
             </text>
           </>
         )}
 
-        {/* 마지막 충전 (우 · 높은 SoC) */}
-        {lc && lastSocX != null && (
-          <>
-            <text
-              x={clampX(lastSocX)}
-              y={Y_TIME}
-              textAnchor={anchorFor(lastSocX)}
-              fontSize="10"
-              fill="#a1a1aa"
-            >
-              🏁 {elapsedShort(lc.end_date)}
-            </text>
-            <text
-              x={clampX(lastSocX)}
-              y={Y_PCT}
-              textAnchor={anchorFor(lastSocX)}
-              fontSize="10"
-              fontWeight="700"
-              fill="#34d399"
-              style={{ fontFeatureSettings: '"tnum"' }}
-            >
-              {lastSoc}%
-            </text>
-          </>
+        {/* ── 우 마커: 충전 목표(충전 중) / 마지막 충전(평소) ── */}
+        {isCharging ? (
+          targetSoc != null && targetX != null && (
+            <>
+              <text x={clampX(targetX)} y={Y_TIME} textAnchor={anchorFor(targetX)}
+                    fontSize="10" fill="#a1a1aa">
+                🎯 목표
+              </text>
+              <text x={clampX(targetX)} y={Y_PCT} textAnchor={anchorFor(targetX)}
+                    fontSize="10" fontWeight="700" fill="#14b8a6"
+                    style={{ fontFeatureSettings: '"tnum"' }}>
+                {targetSoc}%
+              </text>
+            </>
+          )
+        ) : (
+          lc && lastSocX != null && (
+            <>
+              <text x={clampX(lastSocX)} y={Y_TIME} textAnchor={anchorFor(lastSocX)}
+                    fontSize="10" fill="#a1a1aa">
+                🏁 {elapsedShort(lc.end_date)}
+              </text>
+              <text x={clampX(lastSocX)} y={Y_PCT} textAnchor={anchorFor(lastSocX)}
+                    fontSize="10" fontWeight="700" fill="#34d399"
+                    style={{ fontFeatureSettings: '"tnum"' }}>
+                {lastSoc}%
+              </text>
+            </>
+          )
         )}
 
         {/* ── 배터리 본체 ── */}
@@ -208,7 +229,7 @@ export default function ChargeSummaryCard() {
           width={BATT_W} height={BATT_H}
           rx={BATT_RX}
           fill="rgba(255,255,255,0.02)"
-          stroke="rgba(255,255,255,0.10)"
+          stroke={isCharging ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.10)'}
           strokeWidth="1.2"
         />
         <rect
@@ -217,35 +238,85 @@ export default function ChargeSummaryCard() {
           width={TERM_W}
           height={14}
           rx="1.5"
-          fill="rgba(255,255,255,0.12)"
+          fill={isCharging ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.12)'}
         />
 
         {/* 내부 */}
         <g clipPath="url(#battInner)">
-          {thresholdX != null && thresholdX > INNER_X && (
-            <rect
-              x={INNER_X} y={INNER_Y}
-              width={thresholdX - INNER_X} height={INNER_H}
-              fill={stableColor}
-              opacity="0.92"
-            />
+          {isCharging ? (
+            <>
+              {/* 충전 중: 전체 채움을 pulsing 그라디언트로 */}
+              {fillEdgeX > INNER_X && (
+                <rect
+                  className="charge-fill-pulse"
+                  x={INNER_X} y={INNER_Y}
+                  width={fillEdgeX - INNER_X} height={INNER_H}
+                  fill="url(#chargeGrad)"
+                />
+              )}
+              {/* 목표 지점 점선 */}
+              {targetX != null && targetX > INNER_X && targetX < INNER_X + INNER_W && (
+                <line
+                  x1={targetX} y1={INNER_Y - 2}
+                  x2={targetX} y2={INNER_Y + INNER_H + 2}
+                  stroke="rgba(20,184,166,0.7)"
+                  strokeWidth="1"
+                  strokeDasharray="3 2"
+                />
+              )}
+            </>
+          ) : (
+            <>
+              {/* 평소: 안정 + 예측 fade */}
+              {thresholdX != null && thresholdX > INNER_X && (
+                <rect
+                  x={INNER_X} y={INNER_Y}
+                  width={thresholdX - INNER_X} height={INNER_H}
+                  fill={stableColor}
+                  opacity="0.92"
+                />
+              )}
+              {thresholdX != null && predictRegionW > 0 && (
+                <rect
+                  className="predict-shimmer"
+                  x={thresholdX} y={INNER_Y}
+                  width={predictRegionW} height={INNER_H}
+                  fill="url(#predictGrad)"
+                />
+              )}
+              {thresholdX == null && fillEdgeX > INNER_X && (
+                <rect
+                  x={INNER_X} y={INNER_Y}
+                  width={fillEdgeX - INNER_X} height={INNER_H}
+                  fill={stableColor}
+                  opacity="0.85"
+                />
+              )}
+              {/* 임계선 */}
+              {thresholdX != null && (
+                <line
+                  x1={thresholdX} y1={INNER_Y - 2}
+                  x2={thresholdX} y2={INNER_Y + INNER_H + 2}
+                  stroke={overdue ? 'rgba(239,68,68,0.8)' : 'rgba(255,255,255,0.45)'}
+                  strokeWidth="1"
+                  strokeDasharray="3 2"
+                />
+              )}
+              {/* 마지막 충전 SoC 힌트 */}
+              {lastSocX != null && lastSocX > INNER_X && lastSocX < INNER_X + INNER_W && (
+                <line
+                  x1={lastSocX} y1={INNER_Y - 2}
+                  x2={lastSocX} y2={INNER_Y + INNER_H + 2}
+                  stroke="#34d399"
+                  strokeOpacity="0.5"
+                  strokeWidth="1"
+                  strokeDasharray="1 2"
+                />
+              )}
+            </>
           )}
-          {thresholdX != null && predictRegionW > 0 && (
-            <rect
-              className="predict-shimmer"
-              x={thresholdX} y={INNER_Y}
-              width={predictRegionW} height={INNER_H}
-              fill="url(#predictGrad)"
-            />
-          )}
-          {thresholdX == null && fillEdgeX > INNER_X && (
-            <rect
-              x={INNER_X} y={INNER_Y}
-              width={fillEdgeX - INNER_X} height={INNER_H}
-              fill={stableColor}
-              opacity="0.85"
-            />
-          )}
+
+          {/* 광택 */}
           {fillEdgeX > INNER_X && (
             <rect
               x={INNER_X} y={INNER_Y}
@@ -253,27 +324,7 @@ export default function ChargeSummaryCard() {
               fill="url(#glossGrad)"
             />
           )}
-          {/* 임계선 */}
-          {thresholdX != null && (
-            <line
-              x1={thresholdX} y1={INNER_Y - 2}
-              x2={thresholdX} y2={INNER_Y + INNER_H + 2}
-              stroke={overdue ? 'rgba(239,68,68,0.8)' : 'rgba(255,255,255,0.45)'}
-              strokeWidth="1"
-              strokeDasharray="3 2"
-            />
-          )}
-          {/* 마지막 충전 SoC 마커 (안쪽 얇은 세로선) */}
-          {lastSocX != null && lastSocX > INNER_X && lastSocX < INNER_X + INNER_W && (
-            <line
-              x1={lastSocX} y1={INNER_Y - 2}
-              x2={lastSocX} y2={INNER_Y + INNER_H + 2}
-              stroke="#34d399"
-              strokeOpacity="0.5"
-              strokeWidth="1"
-              strokeDasharray="1 2"
-            />
-          )}
+
           {/* NOW 수직선 + 펄스 도트 */}
           {soc != null && (
             <>
@@ -294,8 +345,8 @@ export default function ChargeSummaryCard() {
           )}
         </g>
 
-        {/* 드레인 방향 힌트 (배터리 위 가로 화살표, 우→좌) */}
-        {ec && thresholdX != null && (
+        {/* 방향 힌트 화살표 — 평소: 드레인(우→좌) · 충전: 충전(좌→우) */}
+        {!isCharging && ec && thresholdX != null && (
           <g opacity="0.3">
             <line
               x1={fillEdgeX - 6} y1={BATT_Y - 4}
@@ -307,6 +358,21 @@ export default function ChargeSummaryCard() {
             <path
               d={`M ${thresholdX + 8} ${BATT_Y - 6} L ${thresholdX + 4} ${BATT_Y - 4} L ${thresholdX + 8} ${BATT_Y - 2} Z`}
               fill="#71717a"
+            />
+          </g>
+        )}
+        {isCharging && targetX != null && fillEdgeX < targetX && (
+          <g opacity="0.45">
+            <line
+              x1={fillEdgeX + 6} y1={BATT_Y - 4}
+              x2={targetX - 6} y2={BATT_Y - 4}
+              stroke={chargeColor}
+              strokeWidth="0.8"
+              strokeDasharray="1 2"
+            />
+            <path
+              d={`M ${targetX - 8} ${BATT_Y - 6} L ${targetX - 4} ${BATT_Y - 4} L ${targetX - 8} ${BATT_Y - 2} Z`}
+              fill={chargeColor}
             />
           </g>
         )}

@@ -73,7 +73,7 @@ export default function GlobalHeader() {
 
   if (hidden) return null;
 
-  const isCharging = !!charging;
+  const isCharging = !!charging || car?.state === 'charging';
   const effectiveState = (isMock && isMockCharging) ? 'charging' : car?.state;
   const lvl = isCharging ? (charging.battery_level ?? car?.battery_level ?? 0) : (car?.battery_level ?? 0);
   const limitLvl = charging?.charge_limit_soc ?? null;
@@ -125,14 +125,21 @@ export default function GlobalHeader() {
           <div
             className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 border transition-colors ${
               isCharging
-                ? 'bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/30'
+                ? 'bg-gradient-to-br from-green-500/25 to-green-600/10 border-green-500/40 charge-pulse'
                 : 'bg-gradient-to-br from-red-500/20 to-red-600/10 border-red-500/30'
             }`}
             title={isCharging ? '충전 중' : '주차 중'}
+            style={isCharging ? { color: '#34d399' } : undefined}
           >
-            <svg className={`w-4 h-4 ${isCharging ? 'text-green-400' : 'text-red-400'}`} fill="currentColor" viewBox="0 0 24 24">
-              <path d="M19 17h2v2a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-2zM3 17h2v2a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-2h1zm15-7l1.68 4h-15.36L6 10h12zm-14 6h16v-3h-16v3zm.5-5l2.5-5c.36-.72 1.09-1 1.83-1h8.34c.74 0 1.47.28 1.83 1l2.5 5h-17z"/>
-            </svg>
+            {isCharging ? (
+              <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19 17h2v2a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-2zM3 17h2v2a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-2h1zm15-7l1.68 4h-15.36L6 10h12zm-14 6h16v-3h-16v3zm.5-5l2.5-5c.36-.72 1.09-1 1.83-1h8.34c.74 0 1.47.28 1.83 1l2.5 5h-17z"/>
+              </svg>
+            )}
             <span className="sr-only">{isCharging ? '충전중' : '주차중'}</span>
           </div>
           <span className="font-semibold text-zinc-200 text-base truncate">
