@@ -64,3 +64,12 @@ html, body {
 .charge-pulse {
   animation: charge-pulse 1.6s ease-in-out infinite;
 }
+
+/* 충전 중 배터리 채움 펄스 (빠른 숨쉬기) */
+@keyframes charge-fill-pulse {
+  0%, 100% { opacity: 0.78; }
+  50%      { opacity: 1;    }
+}
+.charge-fill-pulse {
+  animation: charge-fill-pulse 1.6s ease-in-out infinite;
+}
