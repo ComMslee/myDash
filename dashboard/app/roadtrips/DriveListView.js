@@ -48,12 +48,24 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
     }
   });
 
-  return groups.map(g => {
+  return groups.flatMap((g, gi) => {
     const weekday = WEEKDAY_KO[g.firstDate.getDay()];
     const multi = g.items.length > 1;
 
-    return (
-      <div key={g.key} className="flex border-b border-white/[0.06] last:border-0">
+    // 그룹 사이 대기 시간 (이전 날 첫 주행 end → 이번 날 마지막 주행 start)
+    const nextG = groups[gi + 1];
+    let crossGap = null;
+    if (nextG) {
+      const curOldest = g.items[g.items.length - 1];
+      const nextNewest = nextG.items[0];
+      if (curOldest?.start_date && nextNewest?.end_date) {
+        const ms = new Date(curOldest.start_date) - new Date(nextNewest.end_date);
+        if (ms > 0) crossGap = formatDuration(Math.round(ms / 60000));
+      }
+    }
+
+    const groupNode = (
+      <div key={g.key} className="flex">
         {/* 좌측 날짜 박스 — 일 합계 탭 */}
         <button
           type="button"
@@ -146,5 +158,17 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
         </div>
       </div>
     );
+
+    const nodes = [groupNode];
+    if (crossGap) {
+      nodes.push(
+        <div key={g.key + '-xgap'} className="flex items-center gap-2 px-3 py-1 bg-black/40 border-y border-white/[0.08]">
+          <div className="flex-1 h-px bg-white/[0.06]" />
+          <span className="text-[10px] text-zinc-600 tabular-nums">{crossGap}</span>
+          <div className="flex-1 h-px bg-white/[0.06]" />
+        </div>
+      );
+    }
+    return nodes;
   });
 }
