@@ -72,15 +72,17 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
           onClick={() => onDayClick(g.dateStr)}
           className="flex-shrink-0 w-16 bg-white/[0.02] hover:bg-white/[0.05] active:bg-blue-500/10 border-r border-white/[0.06] flex flex-col items-center justify-center py-2.5 gap-0.5 tabular-nums transition-colors"
         >
-          <span className="text-sm font-bold text-zinc-300 leading-none">{g.firstDate.getMonth() + 1}/{g.firstDate.getDate()}</span>
-          <span className="text-[10px] text-zinc-600 leading-none mt-0.5">{weekday}</span>
+          <span className="text-sm font-bold text-zinc-300 leading-none">
+            {g.firstDate.getMonth() + 1}/{g.firstDate.getDate()}
+            <span className="text-[10px] text-zinc-600 font-normal ml-0.5">({weekday})</span>
+          </span>
           {multi && (
             <>
               <span className="text-[10px] font-bold text-blue-400 leading-none mt-2">
                 {g.distance.toFixed(0)}<span className="text-zinc-600 font-normal ml-0.5">km</span>
               </span>
               {g.usedPct > 0 && (
-                <span className="text-[10px] text-zinc-500 leading-none mt-0.5">-{g.usedPct}%</span>
+                <span className="text-[10px] text-zinc-500 leading-none mt-0.5">{g.usedPct}%</span>
               )}
             </>
           )}
