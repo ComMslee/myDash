@@ -249,10 +249,11 @@ export async function GET() {
         WITH timeline AS (
           SELECT start_date AS ts, end_date AS te,
             (SELECT battery_level FROM positions WHERE id = start_position_id) AS start_soc,
-            (SELECT battery_level FROM positions WHERE id = end_position_id) AS end_soc
+            (SELECT battery_level FROM positions WHERE id = end_position_id) AS end_soc,
+            'drive'::text AS ev_type
           FROM drives WHERE car_id = $1 AND end_date IS NOT NULL AND end_position_id IS NOT NULL
           UNION ALL
-          SELECT start_date, end_date, start_battery_level::int, end_battery_level::int
+          SELECT start_date, end_date, start_battery_level::int, end_battery_level::int, 'charge'::text
           FROM charging_processes WHERE car_id = $1 AND end_date IS NOT NULL AND end_battery_level IS NOT NULL
           ORDER BY ts
         ),
@@ -261,11 +262,13 @@ export async function GET() {
             te AS idle_start,
             LEAD(ts) OVER (ORDER BY ts) AS idle_end,
             end_soc AS soc_start,
-            LEAD(start_soc) OVER (ORDER BY ts) AS soc_end
+            LEAD(start_soc) OVER (ORDER BY ts) AS soc_end,
+            LEAD(ev_type) OVER (ORDER BY ts) AS next_type
           FROM timeline
         )
         SELECT idle_start, idle_end,
           soc_start, soc_end,
+          next_type,
           GREATEST(soc_start - soc_end, 0) AS soc_drop,
           ROUND(EXTRACT(EPOCH FROM idle_end - idle_start) / 3600, 1)::float AS idle_hours
         FROM idle
@@ -605,6 +608,7 @@ export async function GET() {
         soc_end: parseInt(r.soc_end),
         soc_drop: parseInt(r.soc_drop),
         idle_hours: parseFloat(r.idle_hours),
+        next_type: r.next_type,
       })),
     });
   } catch (err) {
