@@ -6,17 +6,19 @@ const ZCODE = '41';
 const MAX_PAGES = 10;
 const PAGE_SIZE = 9999;
 
+// 공공 API 일일 쿼터 1,000회/일 고려하여 보수적 TTL
 const CACHE_TIERS = [
-  { start:  6, end: 10, ttlMs:  2 * 60_000 },
-  { start: 10, end: 17, ttlMs:  5 * 60_000 },
-  { start: 17, end: 22, ttlMs:  2 * 60_000 },
-  { start: 22, end: 24, ttlMs: 30 * 60_000 },
-  { start:  0, end:  6, ttlMs: Infinity   },
+  { start:  6, end: 10, ttlMs:  5 * 60_000 }, // 출근 피크
+  { start: 10, end: 17, ttlMs: 10 * 60_000 }, // 낮 안정
+  { start: 17, end: 22, ttlMs:  5 * 60_000 }, // 귀가/충전 피크
+  { start: 22, end: 24, ttlMs: 30 * 60_000 }, // 저녁~자정
+  { start:  0, end:  6, ttlMs: Infinity   }, // 심야 (갱신 안 함)
 ];
-const FALLBACK_TTL_MS = 10 * 60_000;
+const FALLBACK_TTL_MS = 15 * 60_000;
 
 let cache = { ts: 0, data: null };
 let inflight = null;
+const lastHitPage = new Map(); // statId → 이전에 찾은 페이지 번호 (API 호출 절약)
 
 export function cacheTtlMs(now = new Date()) {
   const kstHour = (now.getUTCHours() + 9) % 24;
@@ -87,7 +89,14 @@ async function fetchPageOnce(pageNo, key) {
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) throw new Error(`upstream ${res.status}`);
-  return res.text();
+  const text = await res.text();
+  // 환경공단 에러 응답 감지 (쿼터 초과/인증 실패 등): <item> 없이 에러 XML 반환
+  const errMsg = /<errMsg>([^<]+)<\/errMsg>/.exec(text)?.[1]?.trim();
+  const authMsg = /<returnAuthMsg>([^<]+)<\/returnAuthMsg>/.exec(text)?.[1]?.trim();
+  if (errMsg && errMsg !== 'NORMAL SERVICE.') {
+    throw new Error(`API ${errMsg}${authMsg ? ` / ${authMsg}` : ''}`);
+  }
+  return text;
 }
 
 async function fetchPage(pageNo, key) {
@@ -132,27 +141,59 @@ export async function loadStations(statIds, key) {
   const bucket = new Map();
   for (const id of statIds) bucket.set(id, { station: null, chargers: [] });
 
+  // Fast path: 이전에 찾은 페이지부터 먼저 시도 (중복 제거)
+  const knownPages = [...new Set(statIds.map(id => lastHitPage.get(id)).filter(Boolean))];
+  const visitedPages = new Set();
+  for (const p of knownPages) {
+    visitedPages.add(p);
+    try {
+      const items = parseItems(await fetchPage(p, key));
+      collectStations(items, statIdSet, bucket);
+    } catch (e) {
+      console.warn(`[home-charger] fast path page ${p} failed:`, e.message);
+    }
+  }
+  // fast path으로 모두 채워졌으면 전체 스캔 생략 → API 호출 1~N회
+  const missing = () => statIds.filter(id => !bucket.get(id).station);
+  if (!missing().length) {
+    for (const id of statIds) {
+      bucket.get(id).chargers.sort((a, b) => a.chgerId.localeCompare(b.chgerId));
+    }
+    return statIds.map(id => bucket.get(id)).filter(s => s.station && s.chargers.length);
+  }
+
+  // 전체 스캔 (fast path 실패 또는 신규 statId)
+  const pageIndices = Array.from({ length: MAX_PAGES }, (_, i) => i + 1).filter(p => !visitedPages.has(p));
   const results = await Promise.all(
-    Array.from({ length: MAX_PAGES }, (_, i) =>
-      fetchPage(i + 1, key).then(parseItems).catch(err => {
-        console.warn(`[home-charger] page ${i + 1} failed:`, err.message);
-        return null;
+    pageIndices.map(p =>
+      fetchPage(p, key).then(xml => ({ p, items: parseItems(xml) })).catch(err => {
+        console.warn(`[home-charger] page ${p} failed:`, err.message);
+        return { p, items: null };
       })
     )
   );
 
-  const failedPages = results.map((r, i) => r == null ? i + 1 : null).filter(Boolean);
-  for (const items of results) {
-    if (items) collectStations(items, statIdSet, bucket);
+  const failedPages = results.filter(r => r.items == null).map(r => r.p);
+  for (const { p, items } of results) {
+    if (!items) continue;
+    const before = new Map(statIds.map(id => [id, bucket.get(id).station]));
+    collectStations(items, statIdSet, bucket);
+    // 새로 찾은 statId의 페이지 번호 기록
+    for (const id of statIds) {
+      if (!before.get(id) && bucket.get(id).station) lastHitPage.set(id, p);
+    }
   }
 
-  // 아직 못 찾은 statId가 있고 실패 페이지가 있으면 순차 재시도
-  const missing = () => statIds.filter(id => !bucket.get(id).station);
   if (missing().length && failedPages.length) {
     for (const p of failedPages) {
       if (!missing().length) break;
       try {
-        collectStations(parseItems(await fetchPage(p, key)), statIdSet, bucket);
+        const items = parseItems(await fetchPage(p, key));
+        const before = new Map(statIds.map(id => [id, bucket.get(id).station]));
+        collectStations(items, statIdSet, bucket);
+        for (const id of statIds) {
+          if (!before.get(id) && bucket.get(id).station) lastHitPage.set(id, p);
+        }
       } catch (e) {
         console.warn(`[home-charger] retry page ${p} failed:`, e.message);
       }
