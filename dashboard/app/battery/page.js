@@ -7,7 +7,6 @@ import { LevelHabitCard } from './RecordsHabit';
 import MonthlyChargeCard from './MonthlyChargeCard';
 import FastChargeCard from './FastChargeCard';
 import { CapacityTrendCard } from './BatteryTrendCard';
-import ChargeSummaryCard from './ChargeSummaryCard';
 import ChargeHeatmap from './ChargeHeatmap';
 import { Spinner } from '@/app/components/PageLayout';
 
@@ -46,9 +45,6 @@ export default function BatteryPage() {
           </div>
         ) : data ? (
           <>
-            {/* 충전 현황 — 타임라인 */}
-            <ChargeSummaryCard />
-
             {/* 배터리 상태 — 헬스 + 용량 트렌드 */}
             <HealthScoreCard data={data.health} />
             <CapacityTrendCard data={trend} />
