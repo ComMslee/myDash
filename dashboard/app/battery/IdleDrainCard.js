@@ -215,15 +215,16 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                     const visibleH = Math.min(24 - hourOffset, c.hours);
                     const widthPct = (visibleH / 24) * 100;
                     if (widthPct <= 0) return null;
-                    const showLabel = widthPct >= 8;
                     return (
                       <div
                         key={`c-${ci}`}
-                        className="absolute top-0 bottom-0 flex items-center justify-center text-[10px] font-black tabular-nums text-black"
+                        className="absolute top-0 bottom-0 flex items-center justify-center"
                         style={{ left: `${leftPct}%`, width: `${widthPct}%`, background: 'rgba(234,179,8,0.9)' }}
                         title={`충전 ${formatHM(c.start)}~${formatHM(c.end)} · ${formatDuration(c.hours)} · ${c.soc_start}→${c.soc_end}% (+${c.soc_added}%)`}
                       >
-                        {showLabel ? `+${c.soc_added}` : '+'}
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="#18181b" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round">
+                          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                        </svg>
                       </div>
                     );
                   })}
