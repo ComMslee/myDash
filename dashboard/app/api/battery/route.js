@@ -1,5 +1,6 @@
 import pool from '@/lib/db';
 import { KWH_PER_KM, RATED_RANGE_MAX_KM } from '@/lib/constants';
+import { KST_OFFSET_MS } from '@/lib/kst';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +20,7 @@ export async function GET() {
     if (carResult.rows.length === 0) return Response.json({ error: 'No car found' }, { status: 404 });
     const carId = carResult.rows[0].id;
 
-    const KST = 9 * 60 * 60 * 1000;
+    const KST = KST_OFFSET_MS;
     const now = new Date();
     const nowKST = new Date(now.getTime() + KST);
     const dowKST = nowKST.getUTCDay(); // 0=Sun
