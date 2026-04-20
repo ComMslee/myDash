@@ -53,25 +53,27 @@ export default function SlowChargeCard() {
 
           return (
             <div key={r.id} className="px-4 py-3 border-b border-white/[0.06] last:border-0">
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-zinc-300 font-bold tabular-nums">{dateLabel}</span>
-                  <span className="text-xs text-zinc-500 tabular-nums">{timeLabel}</span>
-                  {r.duration_min && <span className="text-xs text-zinc-600 tabular-nums">{formatDuration(r.duration_min)}</span>}
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-sm text-zinc-300 font-bold tabular-nums flex-shrink-0">{dateLabel}</span>
+                  <span className="text-xs text-zinc-500 tabular-nums flex-shrink-0">{timeLabel}</span>
+                  {r.duration_min && <span className="text-xs text-zinc-600 tabular-nums flex-shrink-0">{formatDuration(r.duration_min)}</span>}
                 </div>
-                <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 text-xs font-semibold">완속</span>
+                <span className="text-xs text-zinc-400 truncate text-right">{shortAddr(r.location)}</span>
               </div>
-              <p className="text-xs text-zinc-500 truncate mb-1.5">{shortAddr(r.location)}</p>
               <div className="flex items-center gap-3 text-xs tabular-nums flex-wrap">
                 <span className="text-emerald-400 font-bold">{r.energy_kwh}<span className="text-zinc-600 ml-0.5">kWh</span></span>
                 {r.soc_start != null && r.soc_end != null && (
                   <span className="text-zinc-400">{r.soc_start}<span className="text-zinc-600">→</span>{r.soc_end}<span className="text-zinc-600 ml-0.5">%</span></span>
                 )}
                 {r.max_power && (
-                  <span className="text-emerald-400/80 font-bold">{r.max_power}<span className="text-zinc-600 ml-0.5">kW</span><span className="text-zinc-700 ml-0.5">최대</span></span>
+                  <span className="text-emerald-400/80 font-bold">{r.max_power}<span className="text-zinc-700 ml-0.5">최대</span></span>
+                )}
+                {r.min_power && (
+                  <span className="text-zinc-500">{r.min_power}<span className="text-zinc-700 ml-0.5">최소</span></span>
                 )}
                 {r.avg_power && (
-                  <span className="text-zinc-400">{r.avg_power}<span className="text-zinc-600 ml-0.5">kW</span><span className="text-zinc-700 ml-0.5">평균</span></span>
+                  <span className="text-zinc-400">{r.avg_power}<span className="text-zinc-700 ml-0.5">평균</span></span>
                 )}
               </div>
             </div>
