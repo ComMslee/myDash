@@ -1,6 +1,8 @@
 // 집충전기 주변 스테이션 탐색 임시 API (1회성 조사용)
 // GET /api/find-nearby-chargers?base=PI795111&radius=1000&count=12
 
+import pool from '@/lib/db';
+
 export const dynamic = 'force-dynamic';
 
 function jsonUtf8(data, init = {}) {
@@ -80,8 +82,35 @@ export async function GET(req) {
   const zscode = searchParams.get('zscode') || '';
   const addrFilter = (searchParams.get('addr') || '').trim();
   const nameFilter = (searchParams.get('name') || '').trim();
-  const manualLat = Number(searchParams.get('lat'));
-  const manualLng = Number(searchParams.get('lng'));
+  let manualLat = Number(searchParams.get('lat'));
+  let manualLng = Number(searchParams.get('lng'));
+  let gpsSource = 'param';
+
+  // lat/lng 미지정 시 TeslaMate geofences에서 집 좌표 자동 조회
+  if (!Number.isFinite(manualLat) || !Number.isFinite(manualLng)) {
+    try {
+      const r = await pool.query(
+        `SELECT latitude, longitude, name FROM geofences
+         WHERE name ILIKE '%집%' OR name ILIKE '%home%' OR name ILIKE '%house%'
+         ORDER BY id ASC LIMIT 1`
+      );
+      if (r.rows.length === 0) {
+        // fallback: 첫 번째 geofence
+        const any = await pool.query(`SELECT latitude, longitude, name FROM geofences ORDER BY id ASC LIMIT 1`);
+        if (any.rows.length) {
+          manualLat = parseFloat(any.rows[0].latitude);
+          manualLng = parseFloat(any.rows[0].longitude);
+          gpsSource = `geofence:${any.rows[0].name}`;
+        }
+      } else {
+        manualLat = parseFloat(r.rows[0].latitude);
+        manualLng = parseFloat(r.rows[0].longitude);
+        gpsSource = `geofence:${r.rows[0].name}`;
+      }
+    } catch (e) {
+      console.warn('geofences lookup failed:', e.message);
+    }
+  }
   const useGps = Number.isFinite(manualLat) && Number.isFinite(manualLng);
 
   try {
@@ -121,8 +150,8 @@ export async function GET(req) {
     let base;
     if (useGps) {
       base = {
-        statId: null, statNm: `GPS(${manualLat},${manualLng})`,
-        addr: null, lat: manualLat, lng: manualLng, count: 0,
+        statId: null, statNm: `GPS(${manualLat.toFixed(6)},${manualLng.toFixed(6)})`,
+        addr: null, lat: manualLat, lng: manualLng, count: 0, gpsSource,
       };
     } else {
       base = byStat.get(baseStatId);
