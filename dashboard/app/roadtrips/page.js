@@ -227,7 +227,53 @@ function DrivesInner() {
 
           {/* 주행 정보 + 지도 */}
           <div className="flex-1 min-h-0 flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden mb-20">
-            {selectedDrive ? (() => {
+            {dayMode ? (() => {
+              const dayDrives = drives
+                .filter(d => driveDayStr(d) === dayMode)
+                .slice()
+                .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+              if (dayDrives.length === 0) return null;
+              const first = dayDrives[0];
+              const last = dayDrives[dayDrives.length - 1];
+              const totalKm = dayDrives.reduce((s, d) => s + (parseFloat(d.distance) || 0), 0);
+              const totalMin = dayDrives.reduce((s, d) => s + (parseFloat(d.duration_min) || 0), 0);
+              const totalKwh = dayDrives.reduce((s, d) => {
+                if (d.start_rated_range_km && d.end_rated_range_km) {
+                  const usedKm = parseFloat(d.start_rated_range_km) - parseFloat(d.end_rated_range_km);
+                  if (usedKm > 0) return s + usedKm * KWH_PER_KM;
+                }
+                return s;
+              }, 0);
+              // 주행 구간만 합산 (사이 충전 제외)
+              const usedPct = dayDrives.reduce((s, d) =>
+                (d.start_battery_level != null && d.end_battery_level != null)
+                  ? s + Math.max(0, d.start_battery_level - d.end_battery_level)
+                  : s, 0);
+              const perKm = totalKm > 0 && totalKwh > 0 ? Math.round((totalKwh * 1000) / totalKm) : null;
+              return (
+                <div className="px-4 py-2 border-b border-white/[0.06] flex items-center gap-3 flex-shrink-0">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-zinc-500 tabular-nums">
+                      {formatTimeRange(first.start_date, last.end_date)}
+                      <span className="text-zinc-600"> · {dayDrives.length}회 ({formatDuration(Math.round(totalMin))})</span>
+                    </p>
+                    <p className="text-sm text-zinc-300 truncate">
+                      {shortAddr(first.start_address) || '출발지'}&nbsp;→&nbsp;{shortAddr(last.end_address) || '도착지'}
+                    </p>
+                  </div>
+                  <div className="flex-shrink-0 text-right tabular-nums">
+                    <p className="text-sm font-bold text-blue-400">{totalKm.toFixed(1)}<span className="text-xs text-zinc-600 ml-0.5">km</span></p>
+                    {totalKwh > 0 && (
+                      <p className="text-sm font-semibold text-green-400">
+                        {totalKwh.toFixed(1)}<span className="text-xs text-zinc-600 ml-0.5">kWh</span>
+                        {usedPct > 0 && <span className="text-zinc-500 text-xs ml-1">({usedPct}%)</span>}
+                      </p>
+                    )}
+                    {perKm != null && <p className="text-xs text-amber-400">{perKm}<span className="text-zinc-600 ml-0.5">Wh/km</span></p>}
+                  </div>
+                </div>
+              );
+            })() : selectedDrive ? (() => {
               const sp = selectedDrive.start_battery_level ?? null;
               const ep = selectedDrive.end_battery_level ?? null;
               return (
