@@ -81,16 +81,49 @@ export default function HomeChargerCard() {
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center justify-between">
-        <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">집충전기</span>
-        <span className="text-[11px] text-zinc-500">{station.useTime}</span>
+      <div className="px-4 py-2.5 border-b border-white/[0.06] flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] tabular-nums">
+        <span className="font-bold tracking-widest uppercase text-zinc-500 shrink-0">집충전기</span>
+        <span className="text-zinc-400">총 {chargers.length}기</span>
+        {['2', '3', '5', '1', '4', '9'].map(k => {
+          const n = counts[k];
+          if (!n) return null;
+          const meta = STAT_META[k];
+          return (
+            <span key={k} className={`flex items-center gap-1 ${meta.text}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+              {meta.label} {n}
+            </span>
+          );
+        })}
+        <span className="ml-auto flex items-center gap-1.5 text-zinc-500">
+          {fetchedAt && <span>{timeAgoKo(fetchedAt)}</span>}
+          <button
+            type="button"
+            onClick={() => load(true)}
+            disabled={refreshing}
+            aria-label="지금 갱신"
+            className="w-6 h-6 rounded-md hover:bg-white/[0.06] active:bg-white/[0.08] flex items-center justify-center text-zinc-400 hover:text-zinc-200 disabled:opacity-50"
+          >
+            <svg
+              viewBox="0 0 20 20"
+              className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 10a7 7 0 0 1 12-4.95L17 7" />
+              <path d="M17 3v4h-4" />
+              <path d="M17 10a7 7 0 0 1-12 4.95L3 13" />
+              <path d="M3 17v-4h4" />
+            </svg>
+          </button>
+        </span>
       </div>
 
       <div className="px-4 py-3">
-        <div className="mb-3">
-          <div className="text-[15px] font-semibold text-white">{station.statNm}</div>
-          <div className="text-[11px] text-zinc-500 mt-0.5">{station.addr}</div>
-        </div>
+        <div className="text-[13px] font-medium text-white mb-3">{station.statNm}</div>
 
         {(() => {
           const byId = new Map(chargers.map(c => [c.chgerId, c]));
@@ -113,7 +146,7 @@ export default function HomeChargerCard() {
             );
           };
           return (
-            <div className="mb-3 space-y-2">
+            <div className="space-y-2">
               {(() => {
                 const favChargers = FAVORITE_IDS_ORDERED.map(id => byId.get(id)).filter(Boolean);
                 if (!favChargers.length) return null;
@@ -130,46 +163,6 @@ export default function HomeChargerCard() {
             </div>
           );
         })()}
-
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] tabular-nums">
-          <span className="text-zinc-400">총 {chargers.length}기</span>
-          {['2', '3', '5', '1', '4', '9'].map(k => {
-            const n = counts[k];
-            if (!n) return null;
-            const meta = STAT_META[k];
-            return (
-              <span key={k} className={`flex items-center gap-1 ${meta.text}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
-                {meta.label} {n}
-              </span>
-            );
-          })}
-          <span className="ml-auto flex items-center gap-1.5 text-zinc-500">
-            {fetchedAt && <span>갱신 {timeAgoKo(fetchedAt)}</span>}
-            <button
-              type="button"
-              onClick={() => load(true)}
-              disabled={refreshing}
-              aria-label="지금 갱신"
-              className="w-6 h-6 rounded-md hover:bg-white/[0.06] active:bg-white/[0.08] flex items-center justify-center text-zinc-400 hover:text-zinc-200 disabled:opacity-50"
-            >
-              <svg
-                viewBox="0 0 20 20"
-                className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M3 10a7 7 0 0 1 12-4.95L17 7" />
-                <path d="M17 3v4h-4" />
-                <path d="M17 10a7 7 0 0 1-12 4.95L3 13" />
-                <path d="M3 17v-4h4" />
-              </svg>
-            </button>
-          </span>
-        </div>
       </div>
     </div>
   );
