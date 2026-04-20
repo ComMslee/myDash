@@ -216,12 +216,15 @@ export default function GlobalHeader() {
             )}
             {(() => {
               const ec = car?.estimated_charge;
-              if (!ec) return null;
+              if (!ec || ec.days_until == null) return null;
+              // 신뢰도 낮으면 숨김 (운행 데이터 부족)
+              if (ec.confidence === 'low') return null;
               const days = ec.days_until;
-              if (days == null) return null;
-              const label = days === 0 ? '곧 충전' : `${days}일 뒤`;
-              const colorCls = days === 0 ? 'text-red-400' : days <= 1 ? 'text-amber-400' : 'text-zinc-500';
-              return <span className={`text-xs tabular-nums font-semibold ${colorCls}`}>⚡ {label}</span>;
+              // 3일 이상 여유면 노이즈라 숨김 (필요할 때만 표시)
+              if (days > 2) return null;
+              const label = days === 0 ? '오늘 충전 필요' : days === 1 ? '내일 충전' : '2일 뒤 충전';
+              const colorCls = days === 0 ? 'text-red-400' : days === 1 ? 'text-amber-400' : 'text-zinc-400';
+              return <span className={`text-xs tabular-nums font-bold ${colorCls}`}>⚡ {label}</span>;
             })()}
             <PercentBadge level={lvl} color={color} charging={false} />
           </div>
