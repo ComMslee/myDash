@@ -111,6 +111,12 @@ export default function ChargeSummaryCard() {
   const Y_TIME = 10;
   const Y_PCT  = 22;
 
+  // 라벨 겹침 방지: '지금' 마커와의 최소 간격 (viewBox 단위)
+  const LABEL_MIN_GAP = 36;
+  const lastTooClose = lastSocX != null && Math.abs(fillEdgeX - lastSocX) < LABEL_MIN_GAP;
+  const thresholdTooClose = thresholdX != null && Math.abs(fillEdgeX - thresholdX) < LABEL_MIN_GAP;
+  const targetTooClose = targetX != null && Math.abs(fillEdgeX - targetX) < LABEL_MIN_GAP;
+
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
       <svg
@@ -160,7 +166,7 @@ export default function ChargeSummaryCard() {
             )}
           </g>
         ) : (
-          ec && thresholdX != null && (
+          ec && thresholdX != null && !thresholdTooClose && (
             <g className={overdue || urgent ? 'charge-pulse' : ''}
                style={{ color: accentColor }}>
               <text x={clampX(thresholdX)} y={Y_TIME} textAnchor={anchorFor(thresholdX)}
@@ -194,7 +200,7 @@ export default function ChargeSummaryCard() {
 
         {/* ── 우 마커: 충전 목표(충전 중) / 마지막 충전(평소) ── */}
         {isCharging ? (
-          targetSoc != null && targetX != null && (
+          targetSoc != null && targetX != null && !targetTooClose && (
             <>
               <text x={clampX(targetX)} y={Y_TIME} textAnchor={anchorFor(targetX)}
                     fontSize="10" fill="#a1a1aa">
@@ -208,7 +214,7 @@ export default function ChargeSummaryCard() {
             </>
           )
         ) : (
-          lc && lastSocX != null && (
+          lc && lastSocX != null && !lastTooClose && (
             <>
               <text x={clampX(lastSocX)} y={Y_TIME} textAnchor={anchorFor(lastSocX)}
                     fontSize="10" fill="#a1a1aa">
