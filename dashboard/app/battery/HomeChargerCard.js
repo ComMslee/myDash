@@ -114,14 +114,17 @@ export default function HomeChargerCard() {
         {(() => {
           const mainGroup = chargers.filter(c => !SEPARATE_IDS.has(c.chgerId));
           const extraGroup = chargers.filter(c => SEPARATE_IDS.has(c.chgerId));
-          const renderCell = (c) => {
+          const renderCell = (c, size = 'md') => {
             const meta = STAT_META[c.stat] || STAT_META['9'];
             const localId = ID_OFFSET + Number(c.chgerId);
-            const label = localId - 95100; // 끝 2자리 (앱에서 보이는 숫자)
+            const label = localId - 95100;
+            const sizeClass = size === 'sm'
+              ? 'w-7 h-7 text-[10px]'
+              : 'aspect-square text-[11px]';
             return (
               <div
                 key={c.chgerId}
-                className={`aspect-square rounded-md flex items-center justify-center text-[11px] font-bold tabular-nums ${meta.cellBg} ${meta.cellText}`}
+                className={`${sizeClass} rounded-md flex items-center justify-center font-bold tabular-nums ${meta.cellBg} ${meta.cellText}`}
                 title={`${localId} · ${meta.label}`}
               >
                 {label}
@@ -130,17 +133,15 @@ export default function HomeChargerCard() {
           };
           return (
             <div className="mb-3 space-y-2">
-              <div className="grid grid-cols-8 gap-1.5">
-                {mainGroup.map(renderCell)}
-              </div>
               {extraGroup.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-zinc-600 w-4 shrink-0">별도</span>
-                  <div className="grid grid-cols-8 gap-1.5 flex-1">
-                    {extraGroup.map(renderCell)}
-                  </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-zinc-600 mr-0.5">별도</span>
+                  {extraGroup.map(c => renderCell(c, 'sm'))}
                 </div>
               )}
+              <div className="grid grid-cols-8 gap-1.5">
+                {mainGroup.map(c => renderCell(c, 'md'))}
+              </div>
             </div>
           );
         })()}
