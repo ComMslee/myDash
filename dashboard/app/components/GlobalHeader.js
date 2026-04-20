@@ -175,6 +175,15 @@ export default function GlobalHeader() {
             {estRange && (
               <span className="text-zinc-400 text-xs tabular-nums">예측 {estRange}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
             )}
+            {(() => {
+              const ec = car?.estimated_charge;
+              if (!ec) return null;
+              const days = ec.days_until;
+              if (days == null) return null;
+              const label = days === 0 ? '곧 충전' : `${days}일 뒤`;
+              const colorCls = days === 0 ? 'text-red-400' : days <= 1 ? 'text-amber-400' : 'text-zinc-500';
+              return <span className={`text-xs tabular-nums font-semibold ${colorCls}`}>⚡ {label}</span>;
+            })()}
             <PercentBadge level={lvl} color={color} charging={false} />
           </div>
         )}
