@@ -97,14 +97,12 @@ export default function GlobalHeader() {
     : null;
 
   // 확정 상태(주차/주행/충전)별 경과 시간 계산
-  const PARKED_STATES = new Set(['parked', 'online', 'suspended', 'asleep']);
+  // driving/charging 제외한 나머지(online/suspended/asleep/parked/unknown/offline)는 모두 '주차'로 통합
   const displayState = isCharging
     ? 'charging'
     : effectiveState === 'driving'
       ? 'driving'
-      : PARKED_STATES.has(effectiveState)
-        ? 'parked'
-        : null; // offline/unknown → 아이콘/경과 없음
+      : 'parked';
 
   let elapsedSince = null;
   if (displayState === 'charging') elapsedSince = charging?.start_date ?? null;
