@@ -77,7 +77,7 @@ function StationBlock({ station, chargers, withFavorites }) {
           </div>
         )}
         {mainGroup.length > 0 && (
-          <div className="grid grid-cols-12 gap-1 pt-1">
+          <div className="grid gap-1 pt-1" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
             {mainGroup.map(c => renderCell(c, 'md'))}
           </div>
         )}
