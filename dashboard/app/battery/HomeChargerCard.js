@@ -133,7 +133,8 @@ export default function HomeChargerCard() {
     );
   }
 
-  const { stations = [], fetchedAt } = data;
+  const { stations = [], fetchedAt, stale, lastError } = data;
+  const errMsg = error || lastError;
   const allChargers = stations.flatMap(s => s.chargers);
   const counts = allChargers.reduce((acc, c) => {
     acc[c.stat] = (acc[c.stat] || 0) + 1;
@@ -183,6 +184,15 @@ export default function HomeChargerCard() {
           </button>
         </span>
       </div>
+
+      {(errMsg || stale) && (
+        <div className="px-4 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-[11px] text-amber-400 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" aria-hidden="true" />
+          <span className="break-words">
+            {errMsg ? `갱신 실패 — ${errMsg}` : '갱신이 지연되고 있어요 (이전 데이터 표시 중)'}
+          </span>
+        </div>
+      )}
 
       <div className="px-4 py-3 space-y-4">
         {stations.map((s, i) => (

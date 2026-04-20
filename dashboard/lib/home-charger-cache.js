@@ -18,7 +18,10 @@ const FALLBACK_TTL_MS = 15 * 60_000;
 
 let cache = { ts: 0, data: null };
 let inflight = null;
+let lastError = null; // 마지막 로드 실패 사유 (UI 표시용)
 const lastHitPage = new Map(); // statId → 이전에 찾은 페이지 번호 (API 호출 절약)
+
+export function getLastError() { return lastError; }
 
 export function cacheTtlMs(now = new Date()) {
   const kstHour = (now.getUTCHours() + 9) % 24;
@@ -223,12 +226,15 @@ export async function warmIfNeeded() {
       if (stations.length) {
         const payload = { stations, fetchedAt: new Date().toISOString() };
         setCache(payload);
+        lastError = null;
         console.log(`[home-charger] warm cache loaded (${stations.length} station(s), ${stations.reduce((s,x)=>s+x.chargers.length,0)} chargers)`);
         return payload;
       }
+      lastError = `스테이션 매칭 없음 (요청 ${statIds.join(',')})`;
       return null;
     } catch (e) {
-      console.warn('[home-charger] warm failed:', e.message);
+      lastError = e.message || String(e);
+      console.warn('[home-charger] warm failed:', lastError);
       return null;
     } finally {
       inflight = null;
