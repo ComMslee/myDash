@@ -7,7 +7,11 @@ const TYPE_LABEL = {
 };
 
 const ID_OFFSET = 95110; // chgerId + 95110 = 차지비 앱 ID
-const SEPARATE_IDS = new Set(['04', '05']); // 별도 그룹 (앱 번호 14, 15)
+const FAVORITE_GROUPS = [
+  { label: '그룹 1', ids: ['04', '05'] }, // 앱 번호 14, 15
+  { label: '그룹 2', ids: ['12', '13'] }, // 앱 번호 22, 23
+];
+const FAVORITE_IDS = new Set(FAVORITE_GROUPS.flatMap(g => g.ids));
 
 const STAT_META = {
   '2': { label: '대기',     dot: 'bg-emerald-500', text: 'text-emerald-400', cellBg: 'bg-emerald-500/80', cellText: 'text-white' },
@@ -112,8 +116,8 @@ export default function HomeChargerCard() {
         </div>
 
         {(() => {
-          const mainGroup = chargers.filter(c => !SEPARATE_IDS.has(c.chgerId));
-          const extraGroup = chargers.filter(c => SEPARATE_IDS.has(c.chgerId));
+          const byId = new Map(chargers.map(c => [c.chgerId, c]));
+          const mainGroup = chargers.filter(c => !FAVORITE_IDS.has(c.chgerId));
           const renderCell = (c, size = 'md') => {
             const meta = STAT_META[c.stat] || STAT_META['9'];
             const localId = ID_OFFSET + Number(c.chgerId);
@@ -133,13 +137,17 @@ export default function HomeChargerCard() {
           };
           return (
             <div className="mb-3 space-y-2">
-              {extraGroup.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-zinc-600 mr-0.5">자주 쓰는</span>
-                  {extraGroup.map(c => renderCell(c, 'lg'))}
-                </div>
-              )}
-              <div className="grid grid-cols-12 gap-1">
+              {FAVORITE_GROUPS.map(g => {
+                const groupChargers = g.ids.map(id => byId.get(id)).filter(Boolean);
+                if (!groupChargers.length) return null;
+                return (
+                  <div key={g.label} className="flex items-center gap-2">
+                    <span className="text-[10px] text-zinc-600 mr-0.5 w-10 shrink-0">{g.label}</span>
+                    {groupChargers.map(c => renderCell(c, 'lg'))}
+                  </div>
+                );
+              })}
+              <div className="grid grid-cols-12 gap-1 pt-1">
                 {mainGroup.map(c => renderCell(c, 'md'))}
               </div>
             </div>
