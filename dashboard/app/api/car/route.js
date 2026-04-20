@@ -40,7 +40,7 @@ export async function GET() {
         [carId]
       ),
       pool.query(
-        `SELECT state FROM states WHERE car_id = $1 ORDER BY start_date DESC LIMIT 1`,
+        `SELECT state, start_date FROM states WHERE car_id = $1 ORDER BY start_date DESC LIMIT 1`,
         [carId]
       ),
       pool.query(
@@ -81,6 +81,7 @@ export async function GET() {
 
     const pos = posResult.rows[0];
     const currentState = stateResult.rows[0]?.state || 'unknown';
+    const stateSince = stateResult.rows[0]?.start_date || null;
     const currentBattery = pos?.battery_level ?? null;
 
     // ── 추천 충전일 계산 ──
@@ -153,6 +154,7 @@ export async function GET() {
       est_battery_range: pos?.est_battery_range_km ? parseFloat(pos.est_battery_range_km).toFixed(0) : null,
       rated_battery_range: pos?.rated_battery_range_km ? parseFloat(pos.rated_battery_range_km).toFixed(0) : null,
       state: currentState,
+      state_since: stateSince,
       last_seen: pos?.date ?? null,
       last_charge: lastChargeResult.rows[0] ? {
         end_date: lastChargeResult.rows[0].end_date,
