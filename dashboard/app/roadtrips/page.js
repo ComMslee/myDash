@@ -102,8 +102,8 @@ function DrivesInner() {
   const goNext = () => { if (selectedIdx < drives.length - 1) { setSelectedDrive(drives[selectedIdx + 1]); setSelectedPlace(null); } };
 
   return (
-    <main className="min-h-screen bg-[#0f0f0f] text-white">
-      <div className="max-w-2xl mx-auto flex flex-col" style={{ height: 'calc(100dvh - 57px - env(safe-area-inset-bottom, 0px))' }}>
+    <main className="bg-[#0f0f0f] text-white -mb-20">
+      <div className="max-w-2xl mx-auto flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 57px - env(safe-area-inset-bottom, 0px))' }}>
 
       {/* 자주 방문하는 장소 */}
       {places.length > 0 && (
