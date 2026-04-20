@@ -46,29 +46,29 @@ export default function BatteryPage() {
           </div>
         ) : data ? (
           <>
-            {/* 배터리 상태 — 점수(등급) · 평균 SOC · 용량 추이 통합 */}
+            {/* 배터리 건강 — 점수/평균SOC/추이 + SOC 체류 분포 */}
             <HealthScoreCard data={data.health} trend={trend} />
 
-            {/* 충전 습관 */}
-            <LevelHabitCard histogram={data.histogram} />
-
-            {/* 충전 통계 */}
-            <MonthlyChargeCard />
-
-            {/* 연간 충전 히트맵 (최신 왼쪽, 충전만) */}
-            <ChargeHeatmap />
-
-            {/* 급속 충전 */}
-            <FastChargeCard />
-
-            {/* 완속 충전 */}
-            <SlowChargeCard />
-
-            {/* 대기 소모 */}
+            {/* 배터리 건강 — 대기 소모 */}
             <IdleDrainCard records={data.idle_drain} chargingSessions={data.charging_sessions} />
 
-            {/* 집충전기 실시간 상태 */}
+            {/* 현재 상태 — 집충전기 실시간 */}
             <HomeChargerCard />
+
+            {/* 충전 습관 — SOC 시작/종료 분포 */}
+            <LevelHabitCard histogram={data.histogram} />
+
+            {/* 충전 습관 — 요약 */}
+            <MonthlyChargeCard />
+
+            {/* 충전 습관 — 연간 히트맵 */}
+            <ChargeHeatmap />
+
+            {/* 충전 상세 — 급속 */}
+            <FastChargeCard />
+
+            {/* 충전 상세 — 완속 */}
+            <SlowChargeCard />
           </>
         ) : null}
       </div>
