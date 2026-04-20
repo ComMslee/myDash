@@ -11,7 +11,7 @@ function jsonUtf8(data, init = {}) {
 }
 
 const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
-const ZCODE = '41';
+const DEFAULT_ZCODE = '41';
 const MAX_PAGES = 10;
 const PAGE_SIZE = 9999;
 
@@ -49,12 +49,13 @@ function parseItems(xml) {
   return items;
 }
 
-async function fetchPage(pageNo, key) {
+async function fetchPage(pageNo, key, { zcode, zscode }) {
   const url = new URL(BASE);
   url.searchParams.set('serviceKey', key);
   url.searchParams.set('pageNo', String(pageNo));
   url.searchParams.set('numOfRows', String(PAGE_SIZE));
-  url.searchParams.set('zcode', ZCODE);
+  if (zscode) url.searchParams.set('zscode', zscode);
+  else if (zcode) url.searchParams.set('zcode', zcode);
   const res = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0' },
     cache: 'no-store',
@@ -75,28 +76,38 @@ export async function GET(req) {
   const baseStatId = searchParams.get('base') || process.env.HOME_CHARGER_STAT_ID || 'PI795111';
   const radiusM = Number(searchParams.get('radius')) || 1000;
   const targetCount = Number(searchParams.get('count')) || 12;
+  const zcode = searchParams.get('zcode') || DEFAULT_ZCODE;
+  const zscode = searchParams.get('zscode') || '';
+  const addrFilter = (searchParams.get('addr') || '').trim();
+  const nameFilter = (searchParams.get('name') || '').trim();
 
   try {
-    // 전 페이지 풀스캔 (1회성)
+    // 지역코드로 1차 필터링 후 페이지 스캔 (zscode 지정 시 보통 1페이지로 충분)
     const allItems = [];
+    let apiCalls = 0;
     for (let p = 1; p <= MAX_PAGES; p++) {
       try {
-        const items = await fetchPage(p, key);
+        const items = await fetchPage(p, key, { zcode, zscode });
+        apiCalls += 1;
         if (!items.length) break;
         allItems.push(...items);
+        if (items.length < PAGE_SIZE) break; // 더 이상 페이지 없음
       } catch (e) {
-        return jsonUtf8({ error: `page ${p} 실패: ${e.message}` }, { status: 500 });
+        return jsonUtf8({ error: `page ${p} 실패: ${e.message}`, apiCalls }, { status: 500 });
       }
     }
 
-    // 스테이션별 집계
+    // 스테이션별 집계 (addr/name 서브스트링 필터 적용)
     const byStat = new Map();
     for (const it of allItems) {
       if (!it.statId) continue;
+      const combinedAddr = [it.addr, it.addrDetail].filter(v => v && v !== 'null').join(' ');
+      if (addrFilter && !combinedAddr.includes(addrFilter)) continue;
+      if (nameFilter && !(it.statNm || '').includes(nameFilter)) continue;
       if (!byStat.has(it.statId)) {
         byStat.set(it.statId, {
           statId: it.statId, statNm: it.statNm,
-          addr: [it.addr, it.addrDetail].filter(v => v && v !== 'null').join(' '),
+          addr: combinedAddr,
           lat: it.lat, lng: it.lng,
           busiNm: it.busiNm, count: 0, outputs: new Set(),
         });
@@ -109,7 +120,8 @@ export async function GET(req) {
     const base = byStat.get(baseStatId);
     if (!base) {
       return jsonUtf8({
-        error: `baseStatId=${baseStatId} not found in zcode=${ZCODE}`,
+        error: `baseStatId=${baseStatId} not found in zcode=${zcode}${zscode ? ` zscode=${zscode}` : ''}${addrFilter ? ` addr=${addrFilter}` : ''}${nameFilter ? ` name=${nameFilter}` : ''}`,
+        apiCalls,
         sampleStatIds: Array.from(byStat.keys()).slice(0, 20),
       }, { status: 404 });
     }
@@ -152,12 +164,11 @@ export async function GET(req) {
     sameAddress.sort((a, b) => b.count - a.count);
 
     return jsonUtf8({
+      query: { zcode, zscode: zscode || null, addr: addrFilter || null, name: nameFilter || null, radiusM, targetCount, apiCalls },
       base: {
         statId: base.statId, statNm: base.statNm,
         addr: base.addr, lat: base.lat, lng: base.lng, count: base.count,
       },
-      radiusM,
-      targetCount,
       baseAddrKey,
       sameAddressCount: sameAddress.length,
       sameAddress,
