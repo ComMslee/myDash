@@ -139,7 +139,7 @@ export default function HomeChargerCard() {
                   {extraGroup.map(c => renderCell(c, 'sm'))}
                 </div>
               )}
-              <div className="grid grid-cols-8 gap-1.5">
+              <div className="grid grid-cols-10 gap-1.5">
                 {mainGroup.map(c => renderCell(c, 'md'))}
               </div>
             </div>
