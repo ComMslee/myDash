@@ -62,14 +62,15 @@ export default function HomeChargerCard() {
     return () => { clearInterval(poll); clearInterval(clock); };
   }, [load]);
 
-  if (loading) {
-    return (
-      <div className="bg-[#161618] border border-white/[0.06] rounded-2xl flex items-center justify-center py-10">
-        <div className="w-5 h-5 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
-      </div>
-    );
-  }
-  if (error || !data) {
+  // 데이터가 없을 때만 스피너/에러 UI 노출. 이전 데이터가 있으면 에러가 와도 유지.
+  if (!data) {
+    if (loading) {
+      return (
+        <div className="bg-[#161618] border border-white/[0.06] rounded-2xl flex items-center justify-center py-10">
+          <div className="w-5 h-5 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
+        </div>
+      );
+    }
     return (
       <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3 text-xs text-zinc-500">
         집충전기 정보를 불러오지 못했습니다{error ? ` — ${error}` : ''}.

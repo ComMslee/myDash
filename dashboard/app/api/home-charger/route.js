@@ -43,12 +43,18 @@ export async function GET(req) {
     return Response.json(isFresh() ? cache.data : { ...cache.data, stale: true });
   }
 
-  // 콜드 스타트(캐시 비어있음): warm inflight를 공유하여 대기
-  try {
-    const payload = await warmIfNeeded();
-    if (payload) return Response.json(payload);
-  } catch (e) {
-    console.error('[home-charger] cold load failed:', e.message);
+  // 콜드 스타트(캐시 비어있음): warm inflight를 공유해 최대 3회 재시도
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const payload = await warmIfNeeded();
+      if (payload) return Response.json(payload);
+    } catch (e) {
+      console.error(`[home-charger] cold load attempt ${attempt + 1} failed:`, e.message);
+    }
+    // 이미 다른 요청이 채워뒀다면 즉시 사용
+    const c = getCache();
+    if (c.data) return Response.json(c.data);
+    if (attempt < 2) await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
   }
   return Response.json({ error: '스테이션을 찾지 못했습니다.' }, { status: 404 });
 }
