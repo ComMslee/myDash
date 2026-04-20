@@ -67,6 +67,13 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
     if (routes && routes.length > 0) {
       const group = L.layerGroup().addTo(map);
       const allLatLngs = [];
+      const total = routes.length;
+      const makeBadge = (label, color) => L.divIcon({
+        html: `<div style="background:${color};color:#fff;border:2px solid rgba(255,255,255,0.9);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;box-shadow:0 0 4px rgba(0,0,0,0.5)">${label}</div>`,
+        className: '',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      });
       routes.forEach((r, idx) => {
         const pos = r.positions || [];
         if (pos.length < 2) return;
@@ -74,15 +81,16 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
         allLatLngs.push(...latlngs);
         const color = r.color || '#3b82f6';
         L.polyline(latlngs, { color, weight: 4, opacity: 0.85 }).addTo(group);
-        // 순서 표시된 시작 마커 (번호 배지)
-        const startIcon = L.divIcon({
-          html: `<div style="background:${color};color:#fff;border:2px solid rgba(255,255,255,0.9);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;box-shadow:0 0 4px rgba(0,0,0,0.5)">${idx + 1}</div>`,
-          className: '',
-          iconSize: [22, 22],
-          iconAnchor: [11, 11],
-        });
-        const s = L.marker(latlngs[0], { icon: startIcon }).addTo(group);
-        const e = L.circleMarker(latlngs[latlngs.length - 1], { radius: 5, fillColor: color, color: '#fff', weight: 1.5, fillOpacity: 0.9 }).addTo(group);
+        // 시작 마커: 첫 주행=S, 그 외 주행 번호
+        const startLabel = idx === 0 ? 'S' : String(idx + 1);
+        const s = L.marker(latlngs[0], { icon: makeBadge(startLabel, color) }).addTo(group);
+        // 종료 마커: 마지막 주행만 E 배지, 그 외는 작은 점
+        let e;
+        if (idx === total - 1) {
+          e = L.marker(latlngs[latlngs.length - 1], { icon: makeBadge('E', color) }).addTo(group);
+        } else {
+          e = L.circleMarker(latlngs[latlngs.length - 1], { radius: 5, fillColor: color, color: '#fff', weight: 1.5, fillOpacity: 0.9 }).addTo(group);
+        }
         markersRef.current.push(s, e);
       });
       polyRef.current = group;
