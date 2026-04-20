@@ -4,9 +4,10 @@ const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 const ZCODE = '41';
 const MAX_PAGES = 10;
 const PAGE_SIZE = 9999;
-const CACHE_TTL_MS = 60_000;
+const CACHE_TTL_MS = 5 * 60_000;
 
 let cache = { ts: 0, data: null };
+let lastHitPage = null;
 
 function parseItems(xml) {
   const items = [];
@@ -54,43 +55,85 @@ async function fetchPage(pageNo, key) {
   return res.text();
 }
 
-async function loadStation(statId, key) {
+function pickStationFromItems(items, statId) {
   const chargers = [];
   let station = null;
-  for (let p = 1; p <= MAX_PAGES; p++) {
-    const xml = await fetchPage(p, key);
-    const items = parseItems(xml);
-    if (!items.length) break;
-    for (const it of items) {
-      if (it.statId === statId) {
-        chargers.push({
-          chgerId: it.chgerId,
-          chgerType: it.chgerType,
-          output: Number(it.output) || null,
-          stat: it.stat,
-          statUpdDt: it.statUpdDt,
-          lastTsdt: it.lastTsdt,
-          lastTedt: it.lastTedt,
-        });
-        if (!station) {
-          station = {
-            statId: it.statId,
-            statNm: it.statNm,
-            addr: [it.addr, it.addrDetail].filter(v => v && v !== 'null').join(' '),
-            lat: Number(it.lat) || null,
-            lng: Number(it.lng) || null,
-            busiNm: it.busiNm,
-            useTime: it.useTime,
-            parkingFree: it.parkingFree === 'Y',
-          };
-        }
-      }
+  for (const it of items) {
+    if (it.statId !== statId) continue;
+    chargers.push({
+      chgerId: it.chgerId,
+      chgerType: it.chgerType,
+      output: Number(it.output) || null,
+      stat: it.stat,
+      statUpdDt: it.statUpdDt,
+      lastTsdt: it.lastTsdt,
+      lastTedt: it.lastTedt,
+    });
+    if (!station) {
+      station = {
+        statId: it.statId,
+        statNm: it.statNm,
+        addr: [it.addr, it.addrDetail].filter(v => v && v !== 'null').join(' '),
+        lat: Number(it.lat) || null,
+        lng: Number(it.lng) || null,
+        busiNm: it.busiNm,
+        useTime: it.useTime,
+        parkingFree: it.parkingFree === 'Y',
+      };
     }
-    if (items.length < PAGE_SIZE) break;
-    if (chargers.length >= 25 && p >= 6) break;
   }
-  chargers.sort((a, b) => a.chgerId.localeCompare(b.chgerId));
   return { station, chargers };
+}
+
+function mergeChargers(target, incoming) {
+  const seen = new Set(target.map(c => c.chgerId));
+  for (const c of incoming) {
+    if (!seen.has(c.chgerId)) {
+      target.push(c);
+      seen.add(c.chgerId);
+    }
+  }
+}
+
+async function loadStation(statId, key) {
+  // Fast path: remembered hit page
+  if (lastHitPage) {
+    try {
+      const xml = await fetchPage(lastHitPage, key);
+      const items = parseItems(xml);
+      const { station, chargers } = pickStationFromItems(items, statId);
+      if (station && chargers.length) {
+        chargers.sort((a, b) => a.chgerId.localeCompare(b.chgerId));
+        return { station, chargers };
+      }
+    } catch {
+      // fall through to full scan
+    }
+  }
+
+  // Parallel full scan
+  const results = await Promise.all(
+    Array.from({ length: MAX_PAGES }, (_, i) =>
+      fetchPage(i + 1, key).then(parseItems).catch(() => null)
+    )
+  );
+
+  const merged = [];
+  let station = null;
+  let hitPage = null;
+  for (let i = 0; i < results.length; i++) {
+    const items = results[i];
+    if (!items) continue;
+    const { station: s, chargers } = pickStationFromItems(items, statId);
+    if (chargers.length) {
+      if (!station) station = s;
+      if (hitPage == null) hitPage = i + 1;
+      mergeChargers(merged, chargers);
+    }
+  }
+  if (hitPage) lastHitPage = hitPage;
+  merged.sort((a, b) => a.chgerId.localeCompare(b.chgerId));
+  return { station, chargers: merged };
 }
 
 export async function GET() {
