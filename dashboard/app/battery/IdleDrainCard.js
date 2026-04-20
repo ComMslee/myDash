@@ -29,6 +29,41 @@ export default function IdleDrainCard({ records }) {
     );
   }
 
+  // 자정(KST) 넘어가는 idle 세션은 각 날짜로 분할
+  const expandedRecords = [];
+  records.forEach(r => {
+    const startMs = new Date(r.idle_start).getTime();
+    const endMs = r.idle_end ? new Date(r.idle_end).getTime() : Date.now();
+    if (endMs <= startMs) return;
+    const totalMs = endMs - startMs;
+    const totalDrop = r.soc_drop || 0;
+    let cursor = startMs;
+    while (cursor < endMs) {
+      const kstCursor = new Date(cursor + 9 * 3600 * 1000);
+      // 다음 KST 자정 (UTC ms)
+      const nextKstMidnight = Date.UTC(
+        kstCursor.getUTCFullYear(),
+        kstCursor.getUTCMonth(),
+        kstCursor.getUTCDate() + 1
+      ) - 9 * 3600 * 1000;
+      const segEnd = Math.min(endMs, nextKstMidnight);
+      const segMs = segEnd - cursor;
+      const segRatio = segMs / totalMs;
+      const segDrop = Math.round(totalDrop * segRatio * 10) / 10;
+      const socStart = r.soc_start != null ? r.soc_start - totalDrop * ((cursor - startMs) / totalMs) : null;
+      const socEnd = r.soc_start != null ? r.soc_start - totalDrop * ((segEnd - startMs) / totalMs) : null;
+      expandedRecords.push({
+        idle_start: new Date(cursor).toISOString(),
+        idle_end: new Date(segEnd).toISOString(),
+        idle_hours: segMs / 3600000,
+        soc_drop: segDrop,
+        soc_start: socStart != null ? Math.round(socStart * 10) / 10 : null,
+        soc_end: socEnd != null ? Math.round(socEnd * 10) / 10 : null,
+      });
+      cursor = segEnd;
+    }
+  });
+
   const withDrain = records.filter(r => r.soc_drop > 0);
   const totalIdleHours = records.reduce((s, r) => s + r.idle_hours, 0);
   const totalDrop = records.reduce((s, r) => s + r.soc_drop, 0);
@@ -72,15 +107,17 @@ export default function IdleDrainCard({ records }) {
 
         const grouped = [];
         const seen = {};
-        records.forEach(r => {
+        expandedRecords.forEach(r => {
           const key = getDateKey(r.idle_start);
           if (!seen[key]) { seen[key] = []; grouped.push({ key, items: seen[key] }); }
           seen[key].push(r);
         });
 
+        const fmtDrop = (n) => (Math.round(n * 10) / 10).toString();
         return grouped.map(({ key, items }) => {
           const dayIdleH = items.reduce((s, r) => s + r.idle_hours, 0);
-          const dayDrop = items.reduce((s, r) => s + r.soc_drop, 0);
+          const dayDropRaw = items.reduce((s, r) => s + r.soc_drop, 0);
+          const dayDrop = Math.round(dayDropRaw * 10) / 10;
           const formatHM = (dateStr) => {
             const d = new Date(dateStr);
             const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
@@ -94,8 +131,8 @@ export default function IdleDrainCard({ records }) {
                 <span className="text-[10px] font-semibold text-zinc-500 tabular-nums">{formatDateLabel(key)}</span>
                 <div className="flex items-center gap-2 tabular-nums">
                   <span className="text-[10px] text-zinc-600">{formatDuration(dayIdleH)}</span>
-                  <span className={`text-[10px] font-bold ${dayDrop === 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {dayDrop === 0 ? '0%' : `-${dayDrop}%`}
+                  <span className={`text-[10px] font-bold ${dayDrop < 0.05 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {dayDrop < 0.05 ? '0%' : `-${fmtDrop(dayDrop)}%`}
                   </span>
                 </div>
               </div>
@@ -111,8 +148,9 @@ export default function IdleDrainCard({ records }) {
                     const widthPct = (visibleH / 24) * 100;
                     if (widthPct <= 0) return null;
                     const rate = r.idle_hours > 0 ? r.soc_drop / r.idle_hours : 0;
-                    const intensity = r.soc_drop === 0 ? 0 : Math.max(0.35, Math.min(1, rate / maxRate));
-                    const bg = r.soc_drop === 0
+                    const isZero = r.soc_drop < 0.05;
+                    const intensity = isZero ? 0 : Math.max(0.35, Math.min(1, rate / maxRate));
+                    const bg = isZero
                       ? 'rgba(16,185,129,0.3)'
                       : `rgba(239,68,68,${intensity})`;
                     const showLabel = widthPct >= 10;
@@ -121,9 +159,9 @@ export default function IdleDrainCard({ records }) {
                         key={i}
                         className="absolute top-0 bottom-0 flex items-center justify-center text-[9px] font-bold tabular-nums text-white/90"
                         style={{ left: `${leftPct}%`, width: `${widthPct}%`, background: bg }}
-                        title={`${formatHM(r.idle_start)}~${r.idle_end ? formatHM(r.idle_end) : '현재'} · ${formatDuration(r.idle_hours)} · ${r.soc_start}→${r.soc_end}% · ${r.soc_drop === 0 ? '0%' : `-${r.soc_drop}%`}`}
+                        title={`${formatHM(r.idle_start)}~${r.idle_end ? formatHM(r.idle_end) : '현재'} · ${formatDuration(r.idle_hours)} · ${r.soc_start}→${r.soc_end}% · ${isZero ? '0%' : `-${fmtDrop(r.soc_drop)}%`}`}
                       >
-                        {showLabel ? (r.soc_drop === 0 ? '0' : `-${r.soc_drop}%`) : ''}
+                        {showLabel ? (isZero ? '0' : `-${fmtDrop(r.soc_drop)}%`) : ''}
                       </div>
                     );
                   })}
