@@ -53,7 +53,7 @@ function loadLeaflet(cb) {
   document.head.appendChild(script);
 }
 
-function DriveMap({ positions, loading, placeMarker, visible }) {
+function DriveMap({ positions, routes, loading, placeMarker, visible }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -85,6 +85,27 @@ function DriveMap({ positions, loading, placeMarker, visible }) {
         radius: 12, fillColor: '#f59e0b', color: '#fff', weight: 2, fillOpacity: 0.9,
       }).addTo(map);
       map.flyTo([placeMarker.lat, placeMarker.lng], 14, { animate: true, duration: 0.8 });
+      return;
+    }
+
+    // 다중 경로 모드 (일 합계 진입)
+    if (routes && routes.length > 0) {
+      const group = L.layerGroup().addTo(map);
+      const allLatLngs = [];
+      routes.forEach((r, idx) => {
+        const pos = r.positions || [];
+        if (pos.length < 2) return;
+        const latlngs = pos.map(p => [p.lat, p.lng]);
+        allLatLngs.push(...latlngs);
+        L.polyline(latlngs, { color: r.color || '#3b82f6', weight: 4, opacity: 0.8 }).addTo(group);
+        const s = L.circleMarker(latlngs[0], { radius: 5, fillColor: '#22c55e', color: '#fff', weight: 1.5, fillOpacity: 1 }).addTo(group);
+        const e = L.circleMarker(latlngs[latlngs.length - 1], { radius: 5, fillColor: '#ef4444', color: '#fff', weight: 1.5, fillOpacity: 1 }).addTo(group);
+        markersRef.current.push(s, e);
+      });
+      polyRef.current = group;
+      if (allLatLngs.length >= 2) {
+        map.fitBounds(L.latLngBounds(allLatLngs), { padding: [50, 50] });
+      }
       return;
     }
 
@@ -121,7 +142,7 @@ function DriveMap({ positions, loading, placeMarker, visible }) {
     const mkEnd = L.circleMarker(latlngs[latlngs.length - 1], { radius: 7, fillColor: '#ef4444', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
     markersRef.current = [mkStart, mkEnd];
     map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50] });
-  }, [positions, placeMarker]);
+  }, [positions, routes, placeMarker]);
 
   // Keep a ref to the latest drawContent so init callback always calls current version
   const drawContentRef = useRef(drawContent);
@@ -168,7 +189,7 @@ function DriveMap({ positions, loading, placeMarker, visible }) {
           <div className="w-6 h-6 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
         </div>
       )}
-      {!loading && !placeMarker && (!positions || positions.length < 2) && (
+      {!loading && !placeMarker && (!routes || routes.length === 0) && (!positions || positions.length < 2) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-600 pointer-events-none">
           <svg className="w-12 h-12 mb-2 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -215,7 +236,10 @@ function DrivesInner() {
   const [loadingDrives, setLoadingDrives] = useState(true);
   const [loadingRoute, setLoadingRoute] = useState(false);
   const [error, setError] = useState(null);
+  const [dayMode, setDayMode] = useState(initialDate || null); // 'YYYY-MM-DD' or null
+  const [dayRoutes, setDayRoutes] = useState([]);
   const abortRef = useRef(null);
+  const dayAbortRef = useRef(null);
 
   // 진입 쿼리(id/date)에 맞는 주행을 선택 — id > date > 첫 항목
   const pickPreselect = (list) => {
@@ -259,6 +283,7 @@ function DrivesInner() {
   }, [isMock, refreshSignal, initialId, initialDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (dayMode) return; // 일 모드에서는 단일 경로 미로딩
     if (!selectedDrive) return;
     if (isMock) {
       setPositions(MOCK_DATA.routePositions);
@@ -284,7 +309,34 @@ function DrivesInner() {
           setLoadingRoute(false);
         }
       });
-  }, [selectedDrive?.id, isMock, refreshSignal]);
+  }, [selectedDrive?.id, isMock, refreshSignal, dayMode]);
+
+  // 일 모드 — 해당 일의 모든 주행 경로 병렬 로드
+  useEffect(() => {
+    if (!dayMode || isMock || drives.length === 0) { setDayRoutes([]); return; }
+    const dayDrives = drives.filter(d => driveDayStr(d) === dayMode);
+    if (dayDrives.length === 0) { setDayRoutes([]); return; }
+    setLoadingRoute(true);
+    if (dayAbortRef.current) dayAbortRef.current.abort();
+    dayAbortRef.current = new AbortController();
+    const palette = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7', '#84cc16', '#f43f5e'];
+    Promise.all(
+      dayDrives.map((d, idx) =>
+        fetch(`/api/route-map?driveId=${d.id}`, { signal: dayAbortRef.current.signal })
+          .then(r => r.json())
+          .then(data => ({
+            positions: data.positions || [],
+            color: palette[idx % palette.length],
+            id: d.id,
+          }))
+          .catch(() => null)
+      )
+    ).then(results => {
+      const valid = results.filter(r => r && r.positions.length >= 2);
+      setDayRoutes(valid);
+      setLoadingRoute(false);
+    });
+  }, [dayMode, isMock, drives]);
 
   // 목록/지도 모드 — id 또는 date로 진입하면 지도 뷰로 바로
   const entryInMapView = !!initialId || !!initialDate;
@@ -293,7 +345,8 @@ function DrivesInner() {
   const selectedIdx = selectedDrive ? drives.findIndex(d => d.id === selectedDrive.id) : -1;
   const eff = selectedDrive ? efficiency(selectedDrive) : null;
 
-  const goToDrive = (d) => { setSelectedDrive(d); setSelectedPlace(null); setMapEverShown(true); setViewMode('map'); };
+  const goToDrive = (d) => { setSelectedDrive(d); setSelectedPlace(null); setDayMode(null); setMapEverShown(true); setViewMode('map'); };
+  const goToDay = (dateStr) => { setDayMode(dateStr); setSelectedPlace(null); setMapEverShown(true); setViewMode('map'); };
   const goPrev = () => { if (selectedIdx > 0) { setSelectedDrive(drives[selectedIdx - 1]); setSelectedPlace(null); } };
   const goNext = () => { if (selectedIdx < drives.length - 1) { setSelectedDrive(drives[selectedIdx + 1]); setSelectedPlace(null); } };
 
@@ -467,7 +520,7 @@ function DrivesInner() {
               </div>
             ) : null}
             <div className="flex-1 p-2">
-              <DriveMap positions={positions} loading={loadingRoute} placeMarker={selectedPlace} visible={viewMode === 'map'} />
+              <DriveMap positions={positions} routes={dayMode ? dayRoutes : undefined} loading={loadingRoute} placeMarker={selectedPlace} visible={viewMode === 'map'} />
             </div>
             {selectedDrive && routeData?.speedBands && (
               <div className="px-4 py-2 border-t border-white/[0.04]">
@@ -552,7 +605,11 @@ function DrivesInner() {
                   return (
                     <div key={d.id}>
                       {showDateHeader && (
-                        <div className="px-4 py-2 bg-white/[0.02] border-b border-white/[0.06] flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => goToDay(driveDayStr(d))}
+                          className="w-full px-4 py-2 bg-white/[0.02] border-b border-white/[0.06] flex items-center justify-between hover:bg-white/[0.05] active:bg-blue-500/10 transition-colors"
+                        >
                           <span className="text-[11px] font-bold text-zinc-500">{dt.getMonth()+1}월 {dt.getDate()}일</span>
                           {dayTotal && (
                             <div className="flex items-center gap-2 tabular-nums">
@@ -565,7 +622,7 @@ function DrivesInner() {
                               )}
                             </div>
                           )}
-                        </div>
+                        </button>
                       )}
                       <button
                         onClick={() => goToDrive(d)}
