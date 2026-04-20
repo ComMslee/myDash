@@ -53,7 +53,7 @@ export default function HomeChargerCard() {
   useEffect(() => {
     load(false);
     const poll = setInterval(() => load(false), 60_000);
-    const clock = setInterval(() => setTick(t => t + 1), 30_000);
+    const clock = setInterval(() => setTick(t => t + 1), 1000);
     return () => { clearInterval(poll); clearInterval(clock); };
   }, [load]);
 
