@@ -7,12 +7,12 @@ const TYPE_LABEL = {
 };
 
 const STAT_META = {
-  '2': { label: '대기', dot: 'bg-emerald-500', text: 'text-emerald-400' },
-  '3': { label: '충전중', dot: 'bg-blue-500', text: 'text-blue-400' },
-  '4': { label: '운영중지', dot: 'bg-zinc-600', text: 'text-zinc-400' },
-  '5': { label: '점검중', dot: 'bg-amber-500', text: 'text-amber-400' },
-  '1': { label: '통신이상', dot: 'bg-rose-500', text: 'text-rose-400' },
-  '9': { label: '확인불가', dot: 'bg-zinc-700', text: 'text-zinc-500' },
+  '2': { label: '대기',     dot: 'bg-emerald-500', text: 'text-emerald-400', cellBg: 'bg-emerald-500/80', cellText: 'text-white' },
+  '3': { label: '충전중',   dot: 'bg-blue-500',    text: 'text-blue-400',    cellBg: 'bg-blue-500/80',    cellText: 'text-white' },
+  '4': { label: '운영중지', dot: 'bg-zinc-600',    text: 'text-zinc-400',    cellBg: 'bg-zinc-700/70',    cellText: 'text-zinc-300' },
+  '5': { label: '점검중',   dot: 'bg-amber-500',   text: 'text-amber-400',   cellBg: 'bg-amber-500/80',   cellText: 'text-white' },
+  '1': { label: '통신이상', dot: 'bg-rose-500',    text: 'text-rose-400',    cellBg: 'bg-rose-500/80',    cellText: 'text-white' },
+  '9': { label: '확인불가', dot: 'bg-zinc-700',    text: 'text-zinc-500',    cellBg: 'bg-zinc-800',       cellText: 'text-zinc-500' },
 };
 
 function timeAgoKo(iso) {
@@ -114,11 +114,10 @@ export default function HomeChargerCard() {
             return (
               <div
                 key={c.chgerId}
-                className="relative aspect-square rounded-md border border-white/[0.06] bg-zinc-900 flex items-center justify-center text-[10px] tabular-nums text-zinc-300"
+                className={`aspect-square rounded-md flex items-center justify-center text-[11px] font-bold tabular-nums ${meta.cellBg} ${meta.cellText}`}
                 title={`${c.chgerId}번 · ${meta.label}`}
               >
-                <span>{Number(c.chgerId)}</span>
-                <span className={`absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+                {Number(c.chgerId)}
               </div>
             );
           })}
