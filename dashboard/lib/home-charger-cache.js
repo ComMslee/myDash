@@ -17,6 +17,7 @@ const FALLBACK_TTL_MS = 10 * 60_000;
 let cache = { ts: 0, data: null };
 let inflight = null;
 let lastError = null;
+let quotaCooldownUntil = 0; // 쿼터 초과 감지 시 이 시각까지 백그라운드 호출 억제
 
 export function cacheTtlMs(now = new Date()) {
   const kstHour = (now.getUTCHours() + 9) % 24;
@@ -76,6 +77,13 @@ function parseItems(xml) {
   return items;
 }
 
+class QuotaExceededError extends Error {
+  constructor(detail) {
+    super(`일일 쿼터 초과 — 자정(KST) 이후 자동 복구${detail ? ` (${detail})` : ''}`);
+    this.quota = true;
+  }
+}
+
 async function fetchStationOnce(statId, key) {
   const url = new URL(BASE);
   url.searchParams.set('serviceKey', key);
@@ -87,10 +95,14 @@ async function fetchStationOnce(statId, key) {
     cache: 'no-store',
     signal: AbortSignal.timeout(15_000),
   });
+  if (res.status === 429) throw new QuotaExceededError('HTTP 429');
   if (!res.ok) throw new Error(`upstream ${res.status}`);
   const text = await res.text();
   const errMsg = /<errMsg>([^<]+)<\/errMsg>/.exec(text)?.[1]?.trim();
   const authMsg = /<returnAuthMsg>([^<]+)<\/returnAuthMsg>/.exec(text)?.[1]?.trim();
+  if (authMsg && /LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS/i.test(authMsg)) {
+    throw new QuotaExceededError(authMsg);
+  }
   if (errMsg && errMsg !== 'NORMAL SERVICE.') {
     throw new Error(`API ${errMsg}${authMsg ? ` / ${authMsg}` : ''}`);
   }
@@ -101,6 +113,7 @@ async function fetchStation(statId, key) {
   try {
     return await fetchStationOnce(statId, key);
   } catch (e) {
+    if (e.quota) throw e; // 쿼터 초과면 재시도 무의미
     await new Promise(r => setTimeout(r, 200 + Math.random() * 400));
     return fetchStationOnce(statId, key);
   }
@@ -131,6 +144,22 @@ function toStationPayload(items) {
   return { station, chargers };
 }
 
+function formatKstTime(ms) {
+  const d = new Date(ms + 9 * 60 * 60 * 1000);
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const mm = String(d.getUTCMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+function applyQuotaCooldown() {
+  // 429는 1시간 단위로 재확인
+  quotaCooldownUntil = Date.now() + 60 * 60_000;
+  lastError = `일일 쿼터 초과 — ${formatKstTime(quotaCooldownUntil)} 재시도 예정`;
+}
+
+export function isQuotaCooldown() { return Date.now() < quotaCooldownUntil; }
+export function getQuotaCooldownUntil() { return quotaCooldownUntil; }
+
 export async function loadStations(statIds, key) {
   const results = await Promise.all(statIds.map(async id => {
     try {
@@ -138,12 +167,16 @@ export async function loadStations(statIds, key) {
       return { id, result: toStationPayload(items) };
     } catch (e) {
       console.warn(`[home-charger] statId=${id} failed:`, e.message);
-      return { id, result: null, error: e.message };
+      return { id, result: null, error: e, errMsg: e.message };
     }
   }));
-  // 첫 실패 에러는 lastError로 노출
-  const firstErr = results.find(r => r.error)?.error;
-  if (firstErr) lastError = firstErr;
+  const quotaHit = results.find(r => r.error?.quota);
+  if (quotaHit) {
+    applyQuotaCooldown();
+  } else {
+    const firstErr = results.find(r => r.errMsg)?.errMsg;
+    if (firstErr) lastError = firstErr;
+  }
   return results.map(r => r.result).filter(Boolean);
 }
 
@@ -152,6 +185,7 @@ export async function warmIfNeeded() {
   if (!key) return null;
   const statIds = getStatIds();
   if (isFresh()) return cache.data;
+  if (isQuotaCooldown()) return cache.data; // 쿼터 초과 중엔 호출 억제, 기존 캐시만 사용
   if (inflight) return inflight;
   inflight = (async () => {
     try {
