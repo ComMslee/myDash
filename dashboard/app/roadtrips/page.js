@@ -239,7 +239,8 @@ function DrivesInner() {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [positions, setPositions] = useState([]);
   const [places, setPlaces] = useState([]);
-  const [showAllPlaces, setShowAllPlaces] = useState(false);
+  const [placesExpanded, setPlacesExpanded] = useState(false); // 인라인 세로 리스트 펼침
+  const [placesCollapsed, setPlacesCollapsed] = useState(false); // 지도 모드에서 섹션 전체 접힘
   const [routeData, setRouteData] = useState(null);
   const [loadingDrives, setLoadingDrives] = useState(true);
   const [loadingRoute, setLoadingRoute] = useState(false);
@@ -349,6 +350,16 @@ function DrivesInner() {
   // 목록/지도 모드 — id 또는 date로 진입하면 지도 뷰로 바로
   const entryInMapView = !!initialId || !!initialDate;
   const [viewMode, setViewMode] = useState(entryInMapView ? 'map' : 'list');
+
+  // 지도 모드 진입 시 자주 가는 곳 섹션 자동 접힘, 목록 복귀 시 자동 펼침
+  useEffect(() => {
+    if (viewMode === 'map') {
+      setPlacesCollapsed(true);
+      setPlacesExpanded(false);
+    } else {
+      setPlacesCollapsed(false);
+    }
+  }, [viewMode]);
   const [mapEverShown, setMapEverShown] = useState(entryInMapView);
   const selectedIdx = selectedDrive ? drives.findIndex(d => d.id === selectedDrive.id) : -1;
   const eff = selectedDrive ? efficiency(selectedDrive) : null;
@@ -374,63 +385,85 @@ function DrivesInner() {
 
       {/* 자주 방문하는 장소 */}
       {places.length > 0 && (
-        <div className="flex-shrink-0 px-4 pt-4 pb-3">
-          <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
-            {places.slice(0, 5).map((p, i) => (
-              <button
-                key={p.id}
-                onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMapEverShown(true); setViewMode('map'); }}
-                className={`flex-shrink-0 flex flex-col gap-1.5 border rounded-xl px-3 py-3 w-[130px] text-left transition-colors ${
-                  selectedPlace?.id === p.id
-                    ? 'bg-amber-500/10 border-amber-500/30'
-                    : 'bg-zinc-800/60 border-white/[0.06] hover:bg-zinc-800/90'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-600 text-sm font-bold leading-none">#{i + 1}</span>
-                  <span className="text-zinc-500 text-xs leading-none">{p.visit_count}회</span>
+        <div className="flex-shrink-0 px-4 pt-3 pb-2">
+          {placesCollapsed ? (
+            // 지도 모드: 얇은 바 (탭하면 펼침)
+            <button
+              onClick={() => setPlacesCollapsed(false)}
+              className="w-full flex items-center justify-between px-3 py-1.5 bg-zinc-800/40 border border-white/[0.06] rounded-lg hover:bg-zinc-800/70 transition-colors"
+            >
+              <span className="text-xs text-zinc-400">📍 자주 가는 곳 <span className="text-zinc-600 ml-1">· {places.length}개</span></span>
+              <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          ) : (
+            <>
+              {viewMode === 'map' && (
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">자주 가는 곳</span>
+                  <button onClick={() => setPlacesCollapsed(true)} className="text-[10px] text-zinc-600 hover:text-zinc-300 px-1.5">접기</button>
                 </div>
-                <p className="text-zinc-300 text-xs leading-snug line-clamp-3 flex-1">{p.label || p.city || '—'}</p>
-              </button>
-            ))}
-            {places.length > 5 && (
-              <button
-                onClick={() => setShowAllPlaces(true)}
-                className="flex-shrink-0 flex flex-col items-center justify-center gap-1 border border-white/[0.06] rounded-xl px-3 py-3 w-[64px] bg-zinc-800/40 hover:bg-zinc-800/70 transition-colors"
-              >
-                <span className="text-zinc-400 text-lg font-bold leading-none">···</span>
-                <span className="text-zinc-500 text-xs">더보기</span>
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+              )}
+              <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
+                {places.slice(0, 5).map((p, i) => (
+                  <button
+                    key={p.id}
+                    onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMapEverShown(true); setViewMode('map'); }}
+                    className={`flex-shrink-0 flex flex-col gap-1.5 border rounded-xl px-3 py-3 w-[130px] text-left transition-colors ${
+                      selectedPlace?.id === p.id
+                        ? 'bg-amber-500/10 border-amber-500/30'
+                        : 'bg-zinc-800/60 border-white/[0.06] hover:bg-zinc-800/90'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-zinc-600 text-sm font-bold leading-none">#{i + 1}</span>
+                      <span className="text-zinc-500 text-xs leading-none">{p.visit_count}회</span>
+                    </div>
+                    <p className="text-zinc-300 text-xs leading-snug line-clamp-3 flex-1">{p.label || p.city || '—'}</p>
+                  </button>
+                ))}
+                {places.length > 5 && (
+                  <button
+                    onClick={() => setPlacesExpanded(v => !v)}
+                    className={`flex-shrink-0 flex flex-col items-center justify-center gap-1 border rounded-xl px-3 py-3 w-[64px] transition-colors ${
+                      placesExpanded
+                        ? 'bg-blue-500/15 border-blue-500/30'
+                        : 'bg-zinc-800/40 border-white/[0.06] hover:bg-zinc-800/70'
+                    }`}
+                  >
+                    <span className={`text-lg font-bold leading-none ${placesExpanded ? 'text-blue-300' : 'text-zinc-400'}`}>{placesExpanded ? '×' : '···'}</span>
+                    <span className={`text-xs ${placesExpanded ? 'text-blue-300' : 'text-zinc-500'}`}>{placesExpanded ? '접기' : '더보기'}</span>
+                  </button>
+                )}
+              </div>
 
-      {/* 자주 가는 곳 전체 랭킹 모달 */}
-      {showAllPlaces && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={() => setShowAllPlaces(false)}>
-          <div className="w-full max-w-2xl bg-[#161618] border border-white/[0.08] rounded-t-2xl pb-safe" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/[0.06]">
-              <span className="text-sm font-bold text-zinc-300">자주 가는 곳 랭킹</span>
-              <button onClick={() => setShowAllPlaces(false)} className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-zinc-300">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <div className="overflow-y-auto" style={{ maxHeight: '60vh' }}>
-              {places.map((p, i) => (
-                <button key={p.id} onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setShowAllPlaces(false); setViewMode('map'); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.03] transition-colors text-left">
-                  <span className={`text-sm font-black w-7 text-center flex-shrink-0 ${i < 3 ? 'text-amber-400' : 'text-zinc-600'}`}>{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-zinc-300 text-sm truncate">{p.label || p.city || '—'}</p>
-                    {p.city && p.label !== p.city && <p className="text-zinc-600 text-xs truncate">{p.city}</p>}
+              {/* 인라인 세로 리스트 — 더보기 클릭 시 펼침 */}
+              {placesExpanded && (
+                <div className="mt-2 border border-white/[0.06] rounded-xl bg-[#161618] overflow-hidden">
+                  <div className="overflow-y-auto" style={{ maxHeight: '40vh' }}>
+                    {places.slice(5).map((p, i) => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          setSelectedPlace(p); setSelectedDrive(null); setPositions([]);
+                          setPlacesExpanded(false); setMapEverShown(true); setViewMode('map');
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.03] transition-colors text-left"
+                      >
+                        <span className="text-sm font-black w-7 text-center flex-shrink-0 text-zinc-600">{i + 6}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-zinc-300 text-sm truncate">{p.label || p.city || '—'}</p>
+                          {p.city && p.label !== p.city && <p className="text-zinc-600 text-xs truncate">{p.city}</p>}
+                        </div>
+                        <span className="text-zinc-400 text-sm tabular-nums flex-shrink-0">{p.visit_count}회</span>
+                      </button>
+                    ))}
                   </div>
-                  <span className="text-zinc-400 text-sm tabular-nums flex-shrink-0">{p.visit_count}회</span>
-                </button>
-              ))}
-            </div>
-            <div className="h-6" />
-          </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 
