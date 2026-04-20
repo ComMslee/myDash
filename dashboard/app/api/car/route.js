@@ -30,6 +30,7 @@ export async function GET() {
     const [
       posResult,
       stateResult,
+      lastDriveResult,
       lastChargeResult,
       dailyDrivesResult,
       thresholdResult,
@@ -41,6 +42,10 @@ export async function GET() {
       ),
       pool.query(
         `SELECT state, start_date FROM states WHERE car_id = $1 ORDER BY start_date DESC LIMIT 1`,
+        [carId]
+      ),
+      pool.query(
+        `SELECT start_date, end_date FROM drives WHERE car_id = $1 ORDER BY start_date DESC LIMIT 1`,
         [carId]
       ),
       pool.query(
@@ -155,6 +160,8 @@ export async function GET() {
       rated_battery_range: pos?.rated_battery_range_km ? parseFloat(pos.rated_battery_range_km).toFixed(0) : null,
       state: currentState,
       state_since: stateSince,
+      current_drive_start: lastDriveResult.rows[0]?.end_date == null ? lastDriveResult.rows[0]?.start_date ?? null : null,
+      last_drive_end: lastDriveResult.rows[0]?.end_date ?? null,
       last_seen: pos?.date ?? null,
       last_charge: lastChargeResult.rows[0] ? {
         end_date: lastChargeResult.rows[0].end_date,
