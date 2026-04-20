@@ -81,37 +81,53 @@ export default function IdleDrainCard({ records }) {
         return grouped.map(({ key, items }) => {
           const dayIdleH = items.reduce((s, r) => s + r.idle_hours, 0);
           const dayDrop = items.reduce((s, r) => s + r.soc_drop, 0);
+          const formatHM = (dateStr) => {
+            const d = new Date(dateStr);
+            const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+            return `${String(kst.getUTCHours()).padStart(2, '0')}:${String(kst.getUTCMinutes()).padStart(2, '0')}`;
+          };
+          // 드레인 속도 최댓값(해당 일 기준)으로 색 농도 정규화
+          const maxRate = Math.max(0.1, ...items.map(r => r.idle_hours > 0 ? r.soc_drop / r.idle_hours : 0));
           return (
-          <div key={key}>
-            <div className="px-4 py-1.5 border-t border-white/[0.04] bg-white/[0.02] flex items-center justify-between">
-              <span className="text-[10px] font-semibold text-zinc-500 tabular-nums">{formatDateLabel(key)}</span>
-              <div className="flex items-center gap-2 tabular-nums">
-                <span className="text-[10px] text-zinc-600">{formatDuration(dayIdleH)}</span>
-                <span className={`text-[10px] font-bold ${dayDrop === 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {dayDrop === 0 ? '0%' : `-${dayDrop}%`}
-                </span>
+            <div key={key} className="border-t border-white/[0.04]">
+              <div className="px-4 py-1.5 bg-white/[0.02] flex items-center justify-between">
+                <span className="text-[10px] font-semibold text-zinc-500 tabular-nums">{formatDateLabel(key)}</span>
+                <div className="flex items-center gap-2 tabular-nums">
+                  <span className="text-[10px] text-zinc-600">{formatDuration(dayIdleH)}</span>
+                  <span className={`text-[10px] font-bold ${dayDrop === 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {dayDrop === 0 ? '0%' : `-${dayDrop}%`}
+                  </span>
+                </div>
+              </div>
+              <div className="px-4 py-2.5">
+                <div className="flex w-full h-6 rounded-md overflow-hidden bg-white/[0.03]">
+                  {items.map((r, i) => {
+                    const widthPct = dayIdleH > 0 ? (r.idle_hours / dayIdleH) * 100 : 0;
+                    const rate = r.idle_hours > 0 ? r.soc_drop / r.idle_hours : 0;
+                    const intensity = r.soc_drop === 0 ? 0 : Math.max(0.35, Math.min(1, rate / maxRate));
+                    const bg = r.soc_drop === 0
+                      ? 'rgba(16,185,129,0.25)'
+                      : `rgba(239,68,68,${intensity})`;
+                    const showLabel = widthPct >= 12;
+                    return (
+                      <div
+                        key={i}
+                        className="flex items-center justify-center text-[9px] font-bold tabular-nums text-white/90 border-r border-black/20 last:border-0"
+                        style={{ width: `${widthPct}%`, background: bg }}
+                        title={`${formatHM(r.idle_start)}~${r.idle_end ? formatHM(r.idle_end) : '현재'} · ${formatDuration(r.idle_hours)} · ${r.soc_start}→${r.soc_end}% · ${r.soc_drop === 0 ? '0%' : `-${r.soc_drop}%`}`}
+                      >
+                        {showLabel ? (r.soc_drop === 0 ? '0' : `-${r.soc_drop}%`) : ''}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between mt-1 text-[9px] tabular-nums text-zinc-600">
+                  <span>{formatHM(items[0].idle_start)}</span>
+                  <span>{items.length}회</span>
+                  <span>{items[items.length - 1].idle_end ? formatHM(items[items.length - 1].idle_end) : '현재'}</span>
+                </div>
               </div>
             </div>
-            {items.map((r, i) => {
-              const time = (() => {
-                const d = new Date(r.idle_start);
-                const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-                return `${String(kst.getUTCHours()).padStart(2, '0')}:${String(kst.getUTCMinutes()).padStart(2, '0')}`;
-              })();
-              return (
-                <div key={i} className="flex items-center justify-between px-4 py-2.5 border-t border-white/[0.03]">
-                  <span className="text-[10px] text-zinc-500 tabular-nums whitespace-nowrap">{time}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[10px] text-zinc-600 tabular-nums whitespace-nowrap">{formatDuration(r.idle_hours)}</span>
-                    <span className="text-[10px] text-zinc-600 tabular-nums">{r.soc_start}→{r.soc_end}%</span>
-                    <span className={`text-[10px] font-bold tabular-nums ${r.soc_drop === 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {r.soc_drop === 0 ? '0%' : `-${r.soc_drop}%`}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
           );
         });
       })()}
