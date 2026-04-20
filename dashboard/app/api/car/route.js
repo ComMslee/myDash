@@ -3,16 +3,18 @@ import pool from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 // ── 추천 충전일 계산 파라미터 ─────────────────────────────
-// A안(유휴 포함) + D안(EMA 가중) + C안(임계값 학습)
-const LOOKBACK_DAYS = 14;              // 전체 관측 기간
-const RECENT_DAYS = 3;                 // 가중치 높이는 최근 기간
-const RECENT_WEIGHT = 2;               // 최근 구간 가중치
-const OLDER_WEIGHT = 1;                // 이전 구간 가중치
+// drives 기반 일별 소모 + 진짜 EMA(α=0.3) + 임계값 학습 + 신뢰도
+const LOOKBACK_DAYS = 14;              // drives 관측 기간
+const EMA_ALPHA = 0.3;                 // 지수이동평균 평활 계수 (최신 비중)
+const VAMPIRE_BASELINE_PCT = 1.0;      // 주차 대기 소모 기본값 %/일
+const MIN_EFFECTIVE_DAILY = 0.5;       // 하한 — 0이면 예측 불능 방지
 const THRESHOLD_LOOKBACK_DAYS = 90;    // 임계값 학습 기간
 const MIN_CHARGES_FOR_LEARNING = 5;    // 학습 최소 표본 수
 const THRESHOLD_MIN_PCT = 15;          // 학습 임계값 하한(안전)
 const THRESHOLD_MAX_PCT = 50;          // 학습 임계값 상한
 const DEFAULT_THRESHOLD_PCT = 20;      // 학습 실패 시 기본값
+const CONFIDENCE_HIGH_DAYS = 7;        // 운행일 ≥ 이 수 = high
+const CONFIDENCE_MID_DAYS = 3;         // 운행일 ≥ 이 수 = medium, 미만 = low
 
 export async function GET() {
   try {
@@ -28,10 +30,7 @@ export async function GET() {
       posResult,
       stateResult,
       lastChargeResult,
-      socPastFullResult,
-      socPastRecentResult,
-      chargesFullResult,
-      chargesRecentResult,
+      dailyDrivesResult,
       thresholdResult,
     ] = await Promise.all([
       pool.query(
@@ -52,44 +51,20 @@ export async function GET() {
          ORDER BY cp.end_date DESC LIMIT 1`,
         [carId]
       ),
-      // LOOKBACK_DAYS 전 시점의 SoC (그 시점 이전 가장 가까운 positions)
+      // 일별 drives 소모량 (drives 기반 — 충전 타이밍 영향 받지 않음)
       pool.query(
-        `SELECT battery_level FROM positions
-         WHERE car_id = $1 AND battery_level IS NOT NULL
-           AND date <= NOW() - ($2 || ' days')::interval
-         ORDER BY date DESC LIMIT 1`,
+        `SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
+                SUM(CASE
+                  WHEN start_battery_level IS NOT NULL AND end_battery_level IS NOT NULL
+                  THEN GREATEST(start_battery_level - end_battery_level, 0)
+                  ELSE 0
+                END)::float AS pct_consumed
+         FROM drives
+         WHERE car_id = $1
+           AND start_date >= NOW() - ($2 || ' days')::interval
+         GROUP BY day
+         ORDER BY day ASC`,
         [carId, LOOKBACK_DAYS]
-      ),
-      // RECENT_DAYS 전 시점의 SoC
-      pool.query(
-        `SELECT battery_level FROM positions
-         WHERE car_id = $1 AND battery_level IS NOT NULL
-           AND date <= NOW() - ($2 || ' days')::interval
-         ORDER BY date DESC LIMIT 1`,
-        [carId, RECENT_DAYS]
-      ),
-      // LOOKBACK_DAYS ~ RECENT_DAYS 구간 충전량 (SoC %)
-      pool.query(
-        `SELECT COALESCE(SUM(end_battery_level - start_battery_level), 0)::float AS soc_added
-         FROM charging_processes
-         WHERE car_id = $1
-           AND end_date >= NOW() - ($2 || ' days')::interval
-           AND end_date <  NOW() - ($3 || ' days')::interval
-           AND start_battery_level IS NOT NULL
-           AND end_battery_level IS NOT NULL
-           AND end_battery_level > start_battery_level`,
-        [carId, LOOKBACK_DAYS, RECENT_DAYS]
-      ),
-      // 최근 RECENT_DAYS 구간 충전량 (SoC %)
-      pool.query(
-        `SELECT COALESCE(SUM(end_battery_level - start_battery_level), 0)::float AS soc_added
-         FROM charging_processes
-         WHERE car_id = $1
-           AND end_date >= NOW() - ($2 || ' days')::interval
-           AND start_battery_level IS NOT NULL
-           AND end_battery_level IS NOT NULL
-           AND end_battery_level > start_battery_level`,
-        [carId, RECENT_DAYS]
       ),
       // 임계값 학습: 최근 THRESHOLD_LOOKBACK_DAYS 충전 시작 SoC 중앙값
       pool.query(
@@ -111,40 +86,7 @@ export async function GET() {
     let estimatedCharge = null;
 
     if (currentBattery != null && currentState !== 'charging') {
-      const socAtFullPast = socPastFullResult.rows[0]?.battery_level ?? null;
-      const socAtRecentPast = socPastRecentResult.rows[0]?.battery_level ?? null;
-      const chargesRecent = chargesRecentResult.rows[0]?.soc_added ?? 0;
-      const chargesOlder = chargesFullResult.rows[0]?.soc_added ?? 0;
-
-      // 기간별 총 소모량 = 과거 SoC − 기준 SoC + 그 사이 충전량
-      // 최근 구간: socAtRecentPast → currentBattery
-      const recentConsumption = socAtRecentPast != null
-        ? (socAtRecentPast - currentBattery) + chargesRecent
-        : null;
-      // 이전 구간: socAtFullPast → socAtRecentPast
-      const olderConsumption = (socAtFullPast != null && socAtRecentPast != null)
-        ? (socAtFullPast - socAtRecentPast) + chargesOlder
-        : null;
-
-      const olderDays = LOOKBACK_DAYS - RECENT_DAYS;
-      const recentDaily = recentConsumption != null && recentConsumption > 0
-        ? recentConsumption / RECENT_DAYS
-        : null;
-      const olderDaily = olderConsumption != null && olderConsumption > 0
-        ? olderConsumption / olderDays
-        : null;
-
-      // D안: EMA 스타일 가중 평균 (양쪽 다 있으면 가중, 한쪽만 있으면 그대로)
-      let weightedDaily = null;
-      if (recentDaily != null && olderDaily != null) {
-        weightedDaily = (recentDaily * RECENT_WEIGHT + olderDaily * OLDER_WEIGHT) / (RECENT_WEIGHT + OLDER_WEIGHT);
-      } else if (recentDaily != null) {
-        weightedDaily = recentDaily;
-      } else if (olderDaily != null) {
-        weightedDaily = olderDaily;
-      }
-
-      // C안: 임계값 학습
+      // 임계값 학습 (PERCENTILE_CONT 기반 — 기존 유지)
       const learnedMedian = thresholdResult.rows[0]?.median_soc;
       const sampleCount = thresholdResult.rows[0]?.sample_count ?? 0;
       let thresholdPct = DEFAULT_THRESHOLD_PCT;
@@ -154,16 +96,37 @@ export async function GET() {
         thresholdSource = 'learned';
       }
 
-      // 실측 일일 소모 없으면 기본값(3%/일) 폴백
-      const FALLBACK_DAILY_PCT = 3;
-      const effectiveDaily = (weightedDaily != null && weightedDaily > 0)
-        ? weightedDaily
-        : FALLBACK_DAILY_PCT;
-      const source = (weightedDaily != null && weightedDaily > 0)
-        ? thresholdSource
-        : 'fallback';
+      // drives 기반 일별 소모량 → LOOKBACK_DAYS 타임라인 채움 + 진짜 EMA
+      const pctByDay = new Map(dailyDrivesResult.rows.map(r => [r.day, parseFloat(r.pct_consumed) || 0]));
+      const drivingDayCount = Array.from(pctByDay.values()).filter(v => v > 0).length;
 
-      if (effectiveDaily > 0 && currentBattery > thresholdPct) {
+      // 오늘(KST)부터 LOOKBACK_DAYS 이전까지 일별 시리즈 구성 (누락일=0)
+      const todayKst = new Date(Date.now() + 9 * 3600 * 1000);
+      const series = [];
+      for (let i = LOOKBACK_DAYS - 1; i >= 0; i--) {
+        const d = new Date(todayKst);
+        d.setUTCDate(d.getUTCDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        series.push(pctByDay.get(key) ?? 0);
+      }
+
+      // 지수이동평균 (α=0.3, 오래된→최신 순)
+      let ema = null;
+      for (const pct of series) {
+        ema = ema === null ? pct : EMA_ALPHA * pct + (1 - EMA_ALPHA) * ema;
+      }
+      const drivingDaily = ema ?? 0;
+
+      // 주차 중 자연 감소 베이스라인 포함
+      const effectiveDaily = Math.max(MIN_EFFECTIVE_DAILY, drivingDaily + VAMPIRE_BASELINE_PCT);
+
+      // 신뢰도 — 운행일이 충분한가
+      const confidence =
+        drivingDayCount >= CONFIDENCE_HIGH_DAYS ? 'high'
+        : drivingDayCount >= CONFIDENCE_MID_DAYS ? 'medium'
+        : 'low';
+
+      if (currentBattery > thresholdPct) {
         const remainingPct = currentBattery - thresholdPct;
         const daysUntil = Math.max(0, Math.round(remainingPct / effectiveDaily));
         const target = new Date();
@@ -173,8 +136,11 @@ export async function GET() {
           date: target.toISOString(),
           days_until: daysUntil,
           threshold_pct: thresholdPct,
-          threshold_source: source,
+          threshold_source: thresholdSource,
           daily_consumption_pct: parseFloat(effectiveDaily.toFixed(2)),
+          driving_daily_pct: parseFloat(drivingDaily.toFixed(2)),
+          driving_day_count: drivingDayCount,
+          confidence,
         };
       }
     }
