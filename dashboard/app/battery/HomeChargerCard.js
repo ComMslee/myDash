@@ -6,6 +6,9 @@ const TYPE_LABEL = {
   '05': 'DC차데모+DC콤보', '06': 'DC차데모+AC3상+DC콤보', '07': 'AC3상', '08': 'DC콤보(완속)',
 };
 
+const ID_OFFSET = 95110; // chgerId + 95110 = 차지비 앱 ID
+const SEPARATE_IDS = new Set(['04', '05']); // 별도 그룹 (앱 번호 14, 15)
+
 const STAT_META = {
   '2': { label: '대기',     dot: 'bg-emerald-500', text: 'text-emerald-400', cellBg: 'bg-emerald-500/80', cellText: 'text-white' },
   '3': { label: '충전중',   dot: 'bg-blue-500',    text: 'text-blue-400',    cellBg: 'bg-blue-500/80',    cellText: 'text-white' },
@@ -108,20 +111,39 @@ export default function HomeChargerCard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-8 gap-1.5 mb-3">
-          {chargers.map(c => {
+        {(() => {
+          const mainGroup = chargers.filter(c => !SEPARATE_IDS.has(c.chgerId));
+          const extraGroup = chargers.filter(c => SEPARATE_IDS.has(c.chgerId));
+          const renderCell = (c) => {
             const meta = STAT_META[c.stat] || STAT_META['9'];
+            const localId = ID_OFFSET + Number(c.chgerId);
+            const label = localId - 95100; // 끝 2자리 (앱에서 보이는 숫자)
             return (
               <div
                 key={c.chgerId}
                 className={`aspect-square rounded-md flex items-center justify-center text-[11px] font-bold tabular-nums ${meta.cellBg} ${meta.cellText}`}
-                title={`${c.chgerId}번 · ${meta.label}`}
+                title={`${localId} · ${meta.label}`}
               >
-                {Number(c.chgerId)}
+                {label}
               </div>
             );
-          })}
-        </div>
+          };
+          return (
+            <div className="mb-3 space-y-2">
+              <div className="grid grid-cols-8 gap-1.5">
+                {mainGroup.map(renderCell)}
+              </div>
+              {extraGroup.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-zinc-600 w-4 shrink-0">별도</span>
+                  <div className="grid grid-cols-8 gap-1.5 flex-1">
+                    {extraGroup.map(renderCell)}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] tabular-nums">
           {['2', '3', '5', '1', '4', '9'].map(k => {
