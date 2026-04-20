@@ -1,5 +1,5 @@
 // Next.js 기동 시 1회 + 주기적 실행 — 집충전기 캐시를 항상 데워둔다.
-const KEEP_WARM_INTERVAL_MS = 5 * 60_000; // 5분마다 점검 (warmIfNeeded는 fresh면 no-op, 쿼터 보호)
+const KEEP_WARM_INTERVAL_MS = 2 * 60_000; // 2분마다 점검 (warmIfNeeded는 fresh면 no-op, statId 필터로 호출당 1call)
 
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
