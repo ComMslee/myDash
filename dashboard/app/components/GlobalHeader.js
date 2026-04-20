@@ -45,6 +45,12 @@ export default function GlobalHeader() {
   const [car, setCar] = useState(null);
   const [charging, setCharging] = useState(null);
   const [carFetchedAt, setCarFetchedAt] = useState(null);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const activeMockData = mockData || MOCK_DATA;
   const hidden = HIDDEN_ROUTES.some(p => pathname === p || pathname.startsWith(p + '/'));
@@ -88,6 +94,10 @@ export default function GlobalHeader() {
 
   const lastSeenLabel = car?.last_seen
     ? new Date(car.last_seen).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+    : null;
+
+  const elapsedMin = car?.state_since
+    ? Math.max(0, Math.floor((Date.now() - new Date(car.state_since).getTime()) / 60000))
     : null;
 
   const remainMin = charging?.time_to_full_charge ? Math.round(charging.time_to_full_charge * 60) : null;
@@ -181,10 +191,20 @@ export default function GlobalHeader() {
               </div>
             );
           })()}
-          {(lastSeenLabel || timeLabel) && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-zinc-800/80 border border-white/5 text-zinc-500 flex-shrink-0">
-              <span className="text-[11px] tabular-nums">{lastSeenLabel ?? timeLabel}</span>
-            </span>
+          {(() => {
+            const isOffline = !effectiveState || effectiveState === 'offline' || effectiveState === 'unknown';
+            const dotColor = isOffline ? 'bg-zinc-500' : 'bg-emerald-400';
+            const label = isOffline ? (lastSeenLabel ?? timeLabel ?? '오프라인') : '온라인';
+            if (!label) return null;
+            return (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-zinc-800/80 border border-white/5 text-zinc-500 flex-shrink-0">
+                <span className={`w-1.5 h-1.5 rounded-full ${dotColor} ${isOffline ? '' : 'animate-pulse'}`} aria-hidden="true" />
+                <span className="text-[11px] tabular-nums">{label}</span>
+              </span>
+            );
+          })()}
+          {elapsedMin != null && !isCharging && (
+            <span className="text-[11px] tabular-nums text-zinc-500 flex-shrink-0">{formatDuration(elapsedMin)}</span>
           )}
         </div>
 
@@ -203,6 +223,9 @@ export default function GlobalHeader() {
             {limitLvl && <span className="text-zinc-600 text-[11px] tabular-nums flex-shrink-0">→{limitLvl}%</span>}
             {remainMin != null && (
               <span className="text-zinc-500 text-[11px] tabular-nums truncate">{formatDuration(remainMin)}</span>
+            )}
+            {elapsedMin != null && (
+              <span className="text-zinc-600 text-[11px] tabular-nums truncate">+{formatDuration(elapsedMin)}</span>
             )}
           </div>
         ) : (
