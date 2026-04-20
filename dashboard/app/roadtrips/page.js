@@ -509,8 +509,23 @@ function DrivesInner() {
                 <p className="text-red-400 text-sm text-center py-4">{error}</p>
               ) : !drives.length ? (
                 <p className="text-zinc-500 text-sm text-center py-4">주행 기록이 없습니다</p>
-              ) : (
-                drives.map((d, idx) => {
+              ) : (() => {
+                // 날짜별 합계 사전 집계
+                const dailyTotals = {};
+                drives.forEach(d => {
+                  const dt = new Date(d.start_date);
+                  const key = dt.toDateString();
+                  if (!dailyTotals[key]) dailyTotals[key] = { distance: 0, kwh: 0, usedPct: 0 };
+                  dailyTotals[key].distance += parseFloat(d.distance) || 0;
+                  if (d.start_rated_range_km && d.end_rated_range_km) {
+                    const usedKm = parseFloat(d.start_rated_range_km) - parseFloat(d.end_rated_range_km);
+                    if (usedKm > 0) dailyTotals[key].kwh += usedKm * KWH_PER_KM;
+                  }
+                  if (d.start_battery_level != null && d.end_battery_level != null) {
+                    dailyTotals[key].usedPct += Math.max(0, d.start_battery_level - d.end_battery_level);
+                  }
+                });
+                return drives.map((d, idx) => {
                   const eff = efficiency(d);
                   const dt = new Date(d.start_date);
                   const dateLabel = `${dt.getMonth()+1}/${dt.getDate()}`;
@@ -522,6 +537,7 @@ function DrivesInner() {
                   // 날짜 구분선
                   const prevDt = idx > 0 ? new Date(drives[idx - 1].start_date) : null;
                   const showDateHeader = !prevDt || dt.toDateString() !== prevDt.toDateString();
+                  const dayTotal = showDateHeader ? dailyTotals[dt.toDateString()] : null;
 
                   // 대기 시간
                   let gapLabel = null;
@@ -536,8 +552,19 @@ function DrivesInner() {
                   return (
                     <div key={d.id}>
                       {showDateHeader && (
-                        <div className="px-4 py-2 bg-white/[0.02] border-b border-white/[0.06]">
+                        <div className="px-4 py-2 bg-white/[0.02] border-b border-white/[0.06] flex items-center justify-between">
                           <span className="text-[11px] font-bold text-zinc-500">{dt.getMonth()+1}월 {dt.getDate()}일</span>
+                          {dayTotal && (
+                            <div className="flex items-center gap-2 tabular-nums">
+                              <span className="text-[10px] font-bold text-blue-400">{dayTotal.distance.toFixed(1)}<span className="text-zinc-600 font-normal ml-0.5">km</span></span>
+                              {dayTotal.kwh > 0 && (
+                                <span className="text-[10px] text-green-400/80">{dayTotal.kwh.toFixed(1)}<span className="text-zinc-600 ml-0.5">kWh</span></span>
+                              )}
+                              {dayTotal.usedPct > 0 && (
+                                <span className="text-[10px] text-zinc-500">{dayTotal.usedPct}%</span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                       <button
@@ -584,8 +611,8 @@ function DrivesInner() {
                       )}
                     </div>
                   );
-                })
-              )}
+                });
+              })()}
             </div>
           </div>
         </div>

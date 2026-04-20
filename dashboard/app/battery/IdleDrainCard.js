@@ -78,10 +78,19 @@ export default function IdleDrainCard({ records }) {
           seen[key].push(r);
         });
 
-        return grouped.map(({ key, items }) => (
+        return grouped.map(({ key, items }) => {
+          const dayIdleH = items.reduce((s, r) => s + r.idle_hours, 0);
+          const dayDrop = items.reduce((s, r) => s + r.soc_drop, 0);
+          return (
           <div key={key}>
-            <div className="px-4 py-1.5 border-t border-white/[0.04] bg-white/[0.02]">
+            <div className="px-4 py-1.5 border-t border-white/[0.04] bg-white/[0.02] flex items-center justify-between">
               <span className="text-[10px] font-semibold text-zinc-500 tabular-nums">{formatDateLabel(key)}</span>
+              <div className="flex items-center gap-2 tabular-nums">
+                <span className="text-[10px] text-zinc-600">{formatDuration(dayIdleH)}</span>
+                <span className={`text-[10px] font-bold ${dayDrop === 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {dayDrop === 0 ? '0%' : `-${dayDrop}%`}
+                </span>
+              </div>
             </div>
             {items.map((r, i) => {
               const time = (() => {
@@ -103,7 +112,8 @@ export default function IdleDrainCard({ records }) {
               );
             })}
           </div>
-        ));
+          );
+        });
       })()}
     </div>
   );
