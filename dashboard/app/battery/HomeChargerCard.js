@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 const TYPE_LABEL = {
   '01': 'DC차데모', '02': 'AC완속', '03': 'DC차데모+AC3상', '04': 'DC콤보',
@@ -15,33 +15,48 @@ const STAT_META = {
   '9': { label: '확인불가', dot: 'bg-zinc-700', text: 'text-zinc-500' },
 };
 
-function formatUpdDt(s) {
-  if (!s || s.length < 12) return '';
-  const mo = s.slice(4, 6), d = s.slice(6, 8), h = s.slice(8, 10), mi = s.slice(10, 12);
-  return `${mo}/${d} ${h}:${mi}`;
+function timeAgoKo(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  if (s < 10) return '방금';
+  if (s < 60) return `${s}초 전`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}분 전`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}시간 전`;
+  return `${Math.floor(h / 24)}일 전`;
 }
 
 export default function HomeChargerCard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [tick, setTick] = useState(0); // relative-time re-render
+
+  const load = useCallback(async (force = false) => {
+    try {
+      if (force) setRefreshing(true);
+      const res = await fetch(`/api/home-charger${force ? '?refresh=1' : ''}`);
+      const d = await res.json();
+      if (d.error) setError(d.error);
+      else { setData(d); setError(null); }
+    } catch (e) {
+      setError(e.message || '조회 실패');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let alive = true;
-    const load = () => {
-      fetch('/api/home-charger')
-        .then(r => r.json())
-        .then(d => {
-          if (!alive) return;
-          if (d.error) setError(d.error); else setData(d);
-          setLoading(false);
-        })
-        .catch(e => { if (alive) { setError(e.message); setLoading(false); } });
-    };
-    load();
-    const id = setInterval(load, 60_000);
-    return () => { alive = false; clearInterval(id); };
-  }, []);
+    load(false);
+    const poll = setInterval(() => load(false), 60_000);
+    const clock = setInterval(() => setTick(t => t + 1), 30_000);
+    return () => { clearInterval(poll); clearInterval(clock); };
+  }, [load]);
 
   if (loading) {
     return (
@@ -58,18 +73,14 @@ export default function HomeChargerCard() {
     );
   }
 
-  const { station, chargers } = data;
+  const { station, chargers, fetchedAt } = data;
   const counts = chargers.reduce((acc, c) => {
     acc[c.stat] = (acc[c.stat] || 0) + 1;
     return acc;
   }, {});
   const typeLabel = TYPE_LABEL[chargers[0]?.chgerType] || '';
   const output = chargers[0]?.output;
-  const latestUpd = chargers
-    .map(c => c.statUpdDt)
-    .filter(Boolean)
-    .sort()
-    .pop();
+  void tick; // keep dependency for relative time re-render
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
@@ -103,7 +114,7 @@ export default function HomeChargerCard() {
             return (
               <div
                 key={c.chgerId}
-                className={`relative aspect-square rounded-md border border-white/[0.06] bg-zinc-900 flex items-center justify-center text-[10px] tabular-nums text-zinc-300`}
+                className="relative aspect-square rounded-md border border-white/[0.06] bg-zinc-900 flex items-center justify-center text-[10px] tabular-nums text-zinc-300"
                 title={`${c.chgerId}번 · ${meta.label}`}
               >
                 <span>{Number(c.chgerId)}</span>
@@ -125,11 +136,31 @@ export default function HomeChargerCard() {
               </span>
             );
           })}
-          {latestUpd && (
-            <span className="ml-auto text-[11px] text-zinc-600">
-              갱신 {formatUpdDt(latestUpd)}
-            </span>
-          )}
+          <span className="ml-auto flex items-center gap-1.5 text-zinc-500">
+            {fetchedAt && <span>갱신 {timeAgoKo(fetchedAt)}</span>}
+            <button
+              type="button"
+              onClick={() => load(true)}
+              disabled={refreshing}
+              aria-label="지금 갱신"
+              className="w-6 h-6 rounded-md hover:bg-white/[0.06] active:bg-white/[0.08] flex items-center justify-center text-zinc-400 hover:text-zinc-200 disabled:opacity-50"
+            >
+              <svg
+                viewBox="0 0 20 20"
+                className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 10a7 7 0 0 1 12-4.95L17 7" />
+                <path d="M17 3v4h-4" />
+                <path d="M17 10a7 7 0 0 1-12 4.95L3 13" />
+                <path d="M3 17v-4h4" />
+              </svg>
+            </button>
+          </span>
         </div>
       </div>
     </div>
