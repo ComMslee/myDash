@@ -97,13 +97,11 @@ export async function GET(req) {
       }
     }
 
-    // 스테이션별 집계 (addr/name 서브스트링 필터 적용)
+    // 스테이션별 집계 (필터는 후처리 — base는 반드시 포함되어야 함)
     const byStat = new Map();
     for (const it of allItems) {
       if (!it.statId) continue;
       const combinedAddr = [it.addr, it.addrDetail].filter(v => v && v !== 'null').join(' ');
-      if (addrFilter && !combinedAddr.includes(addrFilter)) continue;
-      if (nameFilter && !(it.statNm || '').includes(nameFilter)) continue;
       if (!byStat.has(it.statId)) {
         byStat.set(it.statId, {
           statId: it.statId, statNm: it.statNm,
@@ -130,9 +128,14 @@ export async function GET(req) {
     // 같은 주소(단지) 내 다른 스테이션 식별 — addr 앞부분(도로명까지) 매칭
     const baseAddrKey = (base.addr || '').split(/\s+/).slice(0, 4).join(' ').trim();
     const sameAddress = [];
+    const passesFilter = (s) => {
+      if (addrFilter && !(s.addr || '').includes(addrFilter)) return false;
+      if (nameFilter && !(s.statNm || '').includes(nameFilter)) return false;
+      return true;
+    };
     for (const s of byStat.values()) {
       if (s.statId === baseStatId) continue;
-      // 주소 매칭
+      // 같은 단지 (addr/name 필터 무시 — 항상 표시)
       const addrKey = (s.addr || '').split(/\s+/).slice(0, 4).join(' ').trim();
       if (baseAddrKey && addrKey === baseAddrKey) {
         sameAddress.push({
@@ -144,8 +147,9 @@ export async function GET(req) {
           outputs: [...s.outputs].join(','),
         });
       }
-      // 반경 기반 후보
+      // 반경/필터 기반 후보
       if (!s.lat || !s.lng) continue;
+      if (!passesFilter(s)) continue;
       const d = haversineM(base, s);
       if (d <= radiusM) {
         candidates.push({
