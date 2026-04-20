@@ -1,27 +1,21 @@
-// 집충전기(환경공단 EvCharger) 캐시 모듈 — 여러 스테이션을 한 번의 페이지 스캔으로 수집.
-// route + instrumentation에서 공유.
+// 집충전기(환경공단 EvCharger) 캐시 모듈.
+// 각 statId별로 getChargerInfo?statId=XXX 호출 (전국 풀스캔 불필요, 쿼터 대폭 절감).
 
 const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
-const ZCODE = '41';
-const MAX_PAGES = 10;
-const PAGE_SIZE = 9999;
 
 // 공공 API 일일 쿼터 1,000회/일 고려하여 보수적 TTL
 const CACHE_TIERS = [
-  { start:  6, end: 10, ttlMs:  5 * 60_000 }, // 출근 피크
-  { start: 10, end: 17, ttlMs: 10 * 60_000 }, // 낮 안정
-  { start: 17, end: 22, ttlMs:  5 * 60_000 }, // 귀가/충전 피크
+  { start:  6, end: 10, ttlMs:  2 * 60_000 }, // 출근 피크
+  { start: 10, end: 17, ttlMs:  5 * 60_000 }, // 낮 안정
+  { start: 17, end: 22, ttlMs:  2 * 60_000 }, // 귀가/충전 피크
   { start: 22, end: 24, ttlMs: 30 * 60_000 }, // 저녁~자정
   { start:  0, end:  6, ttlMs: Infinity   }, // 심야 (갱신 안 함)
 ];
-const FALLBACK_TTL_MS = 15 * 60_000;
+const FALLBACK_TTL_MS = 10 * 60_000;
 
 let cache = { ts: 0, data: null };
 let inflight = null;
-let lastError = null; // 마지막 로드 실패 사유 (UI 표시용)
-const lastHitPage = new Map(); // statId → 이전에 찾은 페이지 번호 (API 호출 절약)
-
-export function getLastError() { return lastError; }
+let lastError = null;
 
 export function cacheTtlMs(now = new Date()) {
   const kstHour = (now.getUTCHours() + 9) % 24;
@@ -37,6 +31,7 @@ export function cacheTtlMs(now = new Date()) {
 export function getCache() { return cache; }
 export function setCache(data) { cache = { ts: Date.now(), data }; }
 export function isFresh() { return !!cache.data && Date.now() - cache.ts < cacheTtlMs(); }
+export function getLastError() { return lastError; }
 
 export function getStatIds() {
   const multi = process.env.HOME_CHARGER_STAT_IDS;
@@ -80,12 +75,12 @@ function parseItems(xml) {
   return items;
 }
 
-async function fetchPageOnce(pageNo, key) {
+async function fetchStationOnce(statId, key) {
   const url = new URL(BASE);
   url.searchParams.set('serviceKey', key);
-  url.searchParams.set('pageNo', String(pageNo));
-  url.searchParams.set('numOfRows', String(PAGE_SIZE));
-  url.searchParams.set('zcode', ZCODE);
+  url.searchParams.set('pageNo', '1');
+  url.searchParams.set('numOfRows', '100'); // 한 스테이션의 충전기 수는 최대 수십 대
+  url.searchParams.set('statId', statId);
   const res = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0' },
     cache: 'no-store',
@@ -93,125 +88,62 @@ async function fetchPageOnce(pageNo, key) {
   });
   if (!res.ok) throw new Error(`upstream ${res.status}`);
   const text = await res.text();
-  // 환경공단 에러 응답 감지 (쿼터 초과/인증 실패 등): <item> 없이 에러 XML 반환
   const errMsg = /<errMsg>([^<]+)<\/errMsg>/.exec(text)?.[1]?.trim();
   const authMsg = /<returnAuthMsg>([^<]+)<\/returnAuthMsg>/.exec(text)?.[1]?.trim();
   if (errMsg && errMsg !== 'NORMAL SERVICE.') {
     throw new Error(`API ${errMsg}${authMsg ? ` / ${authMsg}` : ''}`);
   }
-  return text;
+  return parseItems(text);
 }
 
-async function fetchPage(pageNo, key) {
+async function fetchStation(statId, key) {
   try {
-    return await fetchPageOnce(pageNo, key);
+    return await fetchStationOnce(statId, key);
   } catch (e) {
     await new Promise(r => setTimeout(r, 200 + Math.random() * 400));
-    return fetchPageOnce(pageNo, key);
+    return fetchStationOnce(statId, key);
   }
 }
 
-function collectStations(items, statIdSet, bucket) {
-  for (const it of items) {
-    if (!statIdSet.has(it.statId)) continue;
-    const slot = bucket.get(it.statId);
-    slot.chargers.push({
-      chgerId: it.chgerId,
-      chgerType: it.chgerType,
-      output: Number(it.output) || null,
-      stat: it.stat,
-      statUpdDt: it.statUpdDt,
-      lastTsdt: it.lastTsdt,
-      lastTedt: it.lastTedt,
-    });
-    if (!slot.station) {
-      slot.station = {
-        statId: it.statId,
-        statNm: it.statNm,
-        addr: [it.addr, it.addrDetail].filter(v => v && v !== 'null').join(' '),
-        lat: Number(it.lat) || null,
-        lng: Number(it.lng) || null,
-        busiNm: it.busiNm,
-        useTime: it.useTime,
-        parkingFree: it.parkingFree === 'Y',
-      };
-    }
-  }
+function toStationPayload(items) {
+  if (!items.length) return null;
+  const first = items[0];
+  const station = {
+    statId: first.statId,
+    statNm: first.statNm,
+    addr: [first.addr, first.addrDetail].filter(v => v && v !== 'null').join(' '),
+    lat: Number(first.lat) || null,
+    lng: Number(first.lng) || null,
+    busiNm: first.busiNm,
+    useTime: first.useTime,
+    parkingFree: first.parkingFree === 'Y',
+  };
+  const chargers = items.map(it => ({
+    chgerId: it.chgerId,
+    chgerType: it.chgerType,
+    output: Number(it.output) || null,
+    stat: it.stat,
+    statUpdDt: it.statUpdDt,
+    lastTsdt: it.lastTsdt,
+    lastTedt: it.lastTedt,
+  })).sort((a, b) => a.chgerId.localeCompare(b.chgerId));
+  return { station, chargers };
 }
 
 export async function loadStations(statIds, key) {
-  const statIdSet = new Set(statIds);
-  const bucket = new Map();
-  for (const id of statIds) bucket.set(id, { station: null, chargers: [] });
-
-  // Fast path: 이전에 찾은 페이지부터 먼저 시도 (중복 제거)
-  const knownPages = [...new Set(statIds.map(id => lastHitPage.get(id)).filter(Boolean))];
-  const visitedPages = new Set();
-  for (const p of knownPages) {
-    visitedPages.add(p);
+  const results = await Promise.all(statIds.map(async id => {
     try {
-      const items = parseItems(await fetchPage(p, key));
-      collectStations(items, statIdSet, bucket);
+      const items = await fetchStation(id, key);
+      return { id, result: toStationPayload(items) };
     } catch (e) {
-      console.warn(`[home-charger] fast path page ${p} failed:`, e.message);
+      console.warn(`[home-charger] statId=${id} failed:`, e.message);
+      return { id, result: null, error: e.message };
     }
-  }
-  // fast path으로 모두 채워졌으면 전체 스캔 생략 → API 호출 1~N회
-  const missing = () => statIds.filter(id => !bucket.get(id).station);
-  if (!missing().length) {
-    for (const id of statIds) {
-      bucket.get(id).chargers.sort((a, b) => a.chgerId.localeCompare(b.chgerId));
-    }
-    return statIds.map(id => bucket.get(id)).filter(s => s.station && s.chargers.length);
-  }
-
-  // 전체 스캔 (fast path 실패 또는 신규 statId)
-  const pageIndices = Array.from({ length: MAX_PAGES }, (_, i) => i + 1).filter(p => !visitedPages.has(p));
-  const results = await Promise.all(
-    pageIndices.map(p =>
-      fetchPage(p, key).then(xml => ({ p, items: parseItems(xml) })).catch(err => {
-        console.warn(`[home-charger] page ${p} failed:`, err.message);
-        return { p, items: null };
-      })
-    )
-  );
-
-  const failedPages = results.filter(r => r.items == null).map(r => r.p);
-  for (const { p, items } of results) {
-    if (!items) continue;
-    const before = new Map(statIds.map(id => [id, bucket.get(id).station]));
-    collectStations(items, statIdSet, bucket);
-    // 새로 찾은 statId의 페이지 번호 기록
-    for (const id of statIds) {
-      if (!before.get(id) && bucket.get(id).station) lastHitPage.set(id, p);
-    }
-  }
-
-  if (missing().length && failedPages.length) {
-    for (const p of failedPages) {
-      if (!missing().length) break;
-      try {
-        const items = parseItems(await fetchPage(p, key));
-        const before = new Map(statIds.map(id => [id, bucket.get(id).station]));
-        collectStations(items, statIdSet, bucket);
-        for (const id of statIds) {
-          if (!before.get(id) && bucket.get(id).station) lastHitPage.set(id, p);
-        }
-      } catch (e) {
-        console.warn(`[home-charger] retry page ${p} failed:`, e.message);
-      }
-    }
-  }
-
-  const stations = [];
-  for (const id of statIds) {
-    const slot = bucket.get(id);
-    if (slot.station && slot.chargers.length) {
-      slot.chargers.sort((a, b) => a.chgerId.localeCompare(b.chgerId));
-      stations.push(slot);
-    }
-  }
-  return stations;
+  }));
+  // 첫 실패 에러는 lastError로 노출
+  const firstErr = results.find(r => r.error)?.error;
+  if (firstErr) lastError = firstErr;
+  return results.map(r => r.result).filter(Boolean);
 }
 
 export async function warmIfNeeded() {
@@ -226,11 +158,11 @@ export async function warmIfNeeded() {
       if (stations.length) {
         const payload = { stations, fetchedAt: new Date().toISOString() };
         setCache(payload);
-        lastError = null;
-        console.log(`[home-charger] warm cache loaded (${stations.length} station(s), ${stations.reduce((s,x)=>s+x.chargers.length,0)} chargers)`);
+        if (stations.length === statIds.length) lastError = null;
+        console.log(`[home-charger] warm cache loaded (${stations.length}/${statIds.length} station(s), ${stations.reduce((s,x)=>s+x.chargers.length,0)} chargers)`);
         return payload;
       }
-      lastError = `스테이션 매칭 없음 (요청 ${statIds.join(',')})`;
+      if (!lastError) lastError = `스테이션 매칭 없음 (요청 ${statIds.join(',')})`;
       return null;
     } catch (e) {
       lastError = e.message || String(e);
