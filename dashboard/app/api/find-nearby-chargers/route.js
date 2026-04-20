@@ -3,6 +3,13 @@
 
 export const dynamic = 'force-dynamic';
 
+function jsonUtf8(data, init = {}) {
+  return new Response(JSON.stringify(data), {
+    status: init.status ?? 200,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  });
+}
+
 const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 const ZCODE = '41';
 const MAX_PAGES = 10;
@@ -62,7 +69,7 @@ async function fetchPage(pageNo, key) {
 
 export async function GET(req) {
   const key = process.env.EV_CHARGER_API_KEY;
-  if (!key) return Response.json({ error: 'EV_CHARGER_API_KEY 미설정' }, { status: 503 });
+  if (!key) return jsonUtf8({ error: 'EV_CHARGER_API_KEY 미설정' }, { status: 503 });
 
   const { searchParams } = new URL(req.url);
   const baseStatId = searchParams.get('base') || process.env.HOME_CHARGER_STAT_ID || 'PI795111';
@@ -78,7 +85,7 @@ export async function GET(req) {
         if (!items.length) break;
         allItems.push(...items);
       } catch (e) {
-        return Response.json({ error: `page ${p} 실패: ${e.message}` }, { status: 500 });
+        return jsonUtf8({ error: `page ${p} 실패: ${e.message}` }, { status: 500 });
       }
     }
 
@@ -101,7 +108,7 @@ export async function GET(req) {
 
     const base = byStat.get(baseStatId);
     if (!base) {
-      return Response.json({
+      return jsonUtf8({
         error: `baseStatId=${baseStatId} not found in zcode=${ZCODE}`,
         sampleStatIds: Array.from(byStat.keys()).slice(0, 20),
       }, { status: 404 });
@@ -127,7 +134,7 @@ export async function GET(req) {
     }
     candidates.sort((a, b) => a.distanceM - b.distanceM);
 
-    return Response.json({
+    return jsonUtf8({
       base: {
         statId: base.statId, statNm: base.statNm,
         addr: base.addr, lat: base.lat, lng: base.lng, count: base.count,
@@ -139,6 +146,6 @@ export async function GET(req) {
       nearby: candidates,
     });
   } catch (e) {
-    return Response.json({ error: e.message }, { status: 500 });
+    return jsonUtf8({ error: e.message }, { status: 500 });
   }
 }
