@@ -96,8 +96,23 @@ export default function GlobalHeader() {
     ? new Date(car.last_seen).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
     : null;
 
-  const elapsedMin = car?.state_since
-    ? Math.max(0, Math.floor((Date.now() - new Date(car.state_since).getTime()) / 60000))
+  // 확정 상태(주차/주행/충전)별 경과 시간 계산
+  const PARKED_STATES = new Set(['parked', 'online', 'suspended', 'asleep']);
+  const displayState = isCharging
+    ? 'charging'
+    : effectiveState === 'driving'
+      ? 'driving'
+      : PARKED_STATES.has(effectiveState)
+        ? 'parked'
+        : null; // offline/unknown → 아이콘/경과 없음
+
+  let elapsedSince = null;
+  if (displayState === 'charging') elapsedSince = charging?.start_date ?? null;
+  else if (displayState === 'driving') elapsedSince = car?.current_drive_start ?? null;
+  else if (displayState === 'parked') elapsedSince = car?.last_drive_end ?? null;
+
+  const elapsedMin = elapsedSince
+    ? Math.max(0, Math.floor((Date.now() - new Date(elapsedSince).getTime()) / 60000))
     : null;
 
   const remainMin = charging?.time_to_full_charge ? Math.round(charging.time_to_full_charge * 60) : null;
@@ -133,8 +148,7 @@ export default function GlobalHeader() {
         {/* 좌측: 아이콘 + 차량명 + 갱신시간 */}
         <div className="flex items-center gap-1.5 min-w-0">
           {(() => {
-            // 상태별 아이콘/색상 맵
-            const statusKey = isCharging ? 'charging' : (effectiveState || 'parked');
+            if (!displayState) return null;
             const MAP = {
               charging: {
                 label: '충전 중',
@@ -146,39 +160,16 @@ export default function GlobalHeader() {
                 label: '주행 중',
                 cls: 'from-blue-500/25 to-blue-600/10 border-blue-500/40',
                 txt: 'text-blue-400',
-                // 화살표 (→)
                 icon: <path d="M5 13h11.17l-4.88 4.88a.996.996 0 1 0 1.41 1.41l6.59-6.59a.996.996 0 0 0 0-1.41l-6.58-6.6a.996.996 0 1 0-1.41 1.41L16.17 11H5c-.55 0-1 .45-1 1s.45 1 1 1z" />,
               },
               parked: {
                 label: '주차 중',
                 cls: 'from-zinc-500/20 to-zinc-600/10 border-zinc-500/30',
                 txt: 'text-zinc-300',
-                // P 박스
                 icon: <path d="M13 3H6v18h4v-6h3a6 6 0 0 0 0-12zm.2 8H10V7h3.2a2 2 0 1 1 0 4z" />,
               },
-              suspended: {
-                label: '절전 중',
-                cls: 'from-indigo-500/20 to-indigo-600/10 border-indigo-500/30',
-                txt: 'text-indigo-400',
-                // 달 (sleep)
-                icon: <path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z" />,
-              },
-              online: {
-                label: '온라인',
-                cls: 'from-teal-500/20 to-teal-600/10 border-teal-500/30',
-                txt: 'text-teal-400',
-                // wifi
-                icon: <path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 0 0-6 0zm-4-4l2 2a7.074 7.074 0 0 1 10 0l2-2C15.14 9.14 8.87 9.14 5 13z" />,
-              },
-              offline: {
-                label: '오프라인',
-                cls: 'from-zinc-700/30 to-zinc-800/20 border-zinc-600/30',
-                txt: 'text-zinc-500',
-                // x-mark cloud
-                icon: <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zm-4.85 5.54L12 13.08l-2.5 2.5-1.08-1.08L10.92 12l-2.5-2.5L9.5 8.42 12 10.92l2.5-2.5 1.08 1.08L13.08 12l2.5 2.5-1.08 1.08z" />,
-              },
             };
-            const conf = MAP[statusKey] || MAP.parked;
+            const conf = MAP[displayState];
             return (
               <div
                 className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 border transition-colors bg-gradient-to-br ${conf.cls}`}
@@ -203,7 +194,7 @@ export default function GlobalHeader() {
               </span>
             );
           })()}
-          {elapsedMin != null && !isCharging && (
+          {elapsedMin != null && (
             <span className="text-[11px] tabular-nums text-zinc-500 flex-shrink-0">{formatDuration(elapsedMin)}</span>
           )}
         </div>
@@ -223,9 +214,6 @@ export default function GlobalHeader() {
             {limitLvl && <span className="text-zinc-600 text-[11px] tabular-nums flex-shrink-0">→{limitLvl}%</span>}
             {remainMin != null && (
               <span className="text-zinc-500 text-[11px] tabular-nums truncate">{formatDuration(remainMin)}</span>
-            )}
-            {elapsedMin != null && (
-              <span className="text-zinc-600 text-[11px] tabular-nums truncate">+{formatDuration(elapsedMin)}</span>
             )}
           </div>
         ) : (
