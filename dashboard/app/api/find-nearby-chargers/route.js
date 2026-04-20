@@ -115,8 +115,24 @@ export async function GET(req) {
     }
 
     const candidates = [];
+    // 같은 주소(단지) 내 다른 스테이션 식별 — addr 앞부분(도로명까지) 매칭
+    const baseAddrKey = (base.addr || '').split(/\s+/).slice(0, 4).join(' ').trim();
+    const sameAddress = [];
     for (const s of byStat.values()) {
       if (s.statId === baseStatId) continue;
+      // 주소 매칭
+      const addrKey = (s.addr || '').split(/\s+/).slice(0, 4).join(' ').trim();
+      if (baseAddrKey && addrKey === baseAddrKey) {
+        sameAddress.push({
+          statId: s.statId,
+          statNm: s.statNm,
+          addr: s.addr,
+          busiNm: s.busiNm,
+          count: s.count,
+          outputs: [...s.outputs].join(','),
+        });
+      }
+      // 반경 기반 후보
       if (!s.lat || !s.lng) continue;
       const d = haversineM(base, s);
       if (d <= radiusM) {
@@ -133,6 +149,7 @@ export async function GET(req) {
       }
     }
     candidates.sort((a, b) => a.distanceM - b.distanceM);
+    sameAddress.sort((a, b) => b.count - a.count);
 
     return jsonUtf8({
       base: {
@@ -141,6 +158,9 @@ export async function GET(req) {
       },
       radiusM,
       targetCount,
+      baseAddrKey,
+      sameAddressCount: sameAddress.length,
+      sameAddress,
       totalCandidates: candidates.length,
       matched: candidates.filter(c => c.match),
       nearby: candidates,
