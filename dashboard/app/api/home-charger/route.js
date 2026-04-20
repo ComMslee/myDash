@@ -60,7 +60,7 @@ function parseItems(xml) {
   return items;
 }
 
-async function fetchPage(pageNo, key) {
+async function fetchPageOnce(pageNo, key) {
   const url = new URL(BASE);
   url.searchParams.set('serviceKey', key);
   url.searchParams.set('pageNo', String(pageNo));
@@ -69,9 +69,20 @@ async function fetchPage(pageNo, key) {
   const res = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0' },
     cache: 'no-store',
+    signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) throw new Error(`upstream ${res.status}`);
   return res.text();
+}
+
+async function fetchPage(pageNo, key) {
+  try {
+    return await fetchPageOnce(pageNo, key);
+  } catch (e) {
+    // 한 번만 재시도 (지터 포함)
+    await new Promise(r => setTimeout(r, 200 + Math.random() * 400));
+    return fetchPageOnce(pageNo, key);
+  }
 }
 
 function pickStationFromItems(items, statId) {
@@ -125,18 +136,22 @@ async function loadStation(statId, key) {
         chargers.sort((a, b) => a.chgerId.localeCompare(b.chgerId));
         return { station, chargers };
       }
-    } catch {
-      // fall through to full scan
+    } catch (e) {
+      console.warn(`[home-charger] fast path (page ${lastHitPage}) failed:`, e.message);
     }
   }
 
   // Parallel full scan
   const results = await Promise.all(
     Array.from({ length: MAX_PAGES }, (_, i) =>
-      fetchPage(i + 1, key).then(parseItems).catch(() => null)
+      fetchPage(i + 1, key).then(parseItems).catch(err => {
+        console.warn(`[home-charger] page ${i + 1} failed:`, err.message);
+        return null;
+      })
     )
   );
 
+  const failedPages = results.map((r, i) => r == null ? i + 1 : null).filter(Boolean);
   const merged = [];
   let station = null;
   let hitPage = null;
@@ -150,6 +165,25 @@ async function loadStation(statId, key) {
       mergeChargers(merged, chargers);
     }
   }
+
+  // 못 찾았는데 실패한 페이지가 있으면 순차 재시도
+  if (!station && failedPages.length) {
+    for (const p of failedPages) {
+      try {
+        const items = parseItems(await fetchPage(p, key));
+        const { station: s, chargers } = pickStationFromItems(items, statId);
+        if (chargers.length) {
+          station = s;
+          hitPage = p;
+          mergeChargers(merged, chargers);
+          break;
+        }
+      } catch (e) {
+        console.warn(`[home-charger] retry page ${p} failed:`, e.message);
+      }
+    }
+  }
+
   if (hitPage) lastHitPage = hitPage;
   merged.sort((a, b) => a.chgerId.localeCompare(b.chgerId));
   return { station, chargers: merged };
@@ -169,11 +203,22 @@ export async function GET(req) {
   }
   try {
     const { station, chargers } = await loadStation(statId, key);
-    if (!station) return Response.json({ error: '스테이션을 찾지 못했습니다.' }, { status: 404 });
-    const payload = { station, chargers, fetchedAt: new Date().toISOString() };
-    cache = { ts: now, data: payload };
-    return Response.json(payload);
+    if (station && chargers.length) {
+      const payload = { station, chargers, fetchedAt: new Date().toISOString() };
+      cache = { ts: now, data: payload };
+      return Response.json(payload);
+    }
+    // 못 찾았는데 이전 캐시가 있으면 stale 반환 (404 내지 말고 UX 우선)
+    if (cache.data) {
+      console.warn('[home-charger] station not found, serving stale cache');
+      return Response.json({ ...cache.data, stale: true });
+    }
+    return Response.json({ error: '스테이션을 찾지 못했습니다.' }, { status: 404 });
   } catch (e) {
+    console.error('[home-charger] upstream error:', e.message);
+    if (cache.data) {
+      return Response.json({ ...cache.data, stale: true });
+    }
     return Response.json({ error: e.message || '조회 실패' }, { status: 500 });
   }
 }
