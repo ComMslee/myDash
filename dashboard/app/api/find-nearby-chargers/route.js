@@ -80,6 +80,9 @@ export async function GET(req) {
   const zscode = searchParams.get('zscode') || '';
   const addrFilter = (searchParams.get('addr') || '').trim();
   const nameFilter = (searchParams.get('name') || '').trim();
+  const manualLat = Number(searchParams.get('lat'));
+  const manualLng = Number(searchParams.get('lng'));
+  const useGps = Number.isFinite(manualLat) && Number.isFinite(manualLng);
 
   try {
     // 지역코드로 1차 필터링 후 페이지 스캔 (zscode 지정 시 보통 1페이지로 충분)
@@ -115,13 +118,22 @@ export async function GET(req) {
       if (it.output) s.outputs.add(it.output);
     }
 
-    const base = byStat.get(baseStatId);
-    if (!base) {
-      return jsonUtf8({
-        error: `baseStatId=${baseStatId} not found in zcode=${zcode}${zscode ? ` zscode=${zscode}` : ''}${addrFilter ? ` addr=${addrFilter}` : ''}${nameFilter ? ` name=${nameFilter}` : ''}`,
-        apiCalls,
-        sampleStatIds: Array.from(byStat.keys()).slice(0, 20),
-      }, { status: 404 });
+    let base;
+    if (useGps) {
+      base = {
+        statId: null, statNm: `GPS(${manualLat},${manualLng})`,
+        addr: null, lat: manualLat, lng: manualLng, count: 0,
+      };
+    } else {
+      base = byStat.get(baseStatId);
+      if (!base) {
+        return jsonUtf8({
+          error: `baseStatId=${baseStatId} not found in zcode=${zcode}${zscode ? ` zscode=${zscode}` : ''}`,
+          apiCalls,
+          hint: '? lat=37.xx&lng=127.xx 로 GPS 검색하거나 ?zscode=... 로 지역 좁히기',
+          sampleStatIds: Array.from(byStat.keys()).slice(0, 20),
+        }, { status: 404 });
+      }
     }
 
     const candidates = [];
@@ -134,7 +146,7 @@ export async function GET(req) {
       return true;
     };
     for (const s of byStat.values()) {
-      if (s.statId === baseStatId) continue;
+      if (!useGps && s.statId === baseStatId) continue;
       // 같은 단지 (addr/name 필터 무시 — 항상 표시)
       const addrKey = (s.addr || '').split(/\s+/).slice(0, 4).join(' ').trim();
       if (baseAddrKey && addrKey === baseAddrKey) {
