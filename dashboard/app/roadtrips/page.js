@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useMock, MOCK_DATA } from '../context/mock';
+import { useMock } from '../context/mock';
 import { KWH_PER_KM } from '../../lib/constants';
 import { formatDuration, shortAddr } from '../../lib/format';
 import DriveMap from '../components/DriveMap';
 import DriveListView from './DriveListView';
+import { useDriveData } from './useDriveData';
 
 function formatTimeRange(start, end) {
   if (!start) return '—';
@@ -53,118 +54,20 @@ function DrivesInner() {
     return `${y}-${m}-${dd}`;
   };
 
-  const [drives, setDrives] = useState([]);
-  const [selectedDrive, setSelectedDrive] = useState(null);
+  const {
+    drives, places,
+    selectedDrive, setSelectedDrive,
+    positions, setPositions,
+    routeData,
+    dayMode, setDayMode,
+    dayRoutes,
+    loadingDrives, loadingRoute,
+    error,
+  } = useDriveData({ isMock, refreshSignal, initialId, initialDate, driveDayStr });
+
   const [selectedPlace, setSelectedPlace] = useState(null);
-  const [positions, setPositions] = useState([]);
-  const [places, setPlaces] = useState([]);
   const [placesExpanded, setPlacesExpanded] = useState(false); // 인라인 세로 리스트 펼침
   const [placesCollapsed, setPlacesCollapsed] = useState(false); // 지도 모드에서 섹션 전체 접힘
-  const [routeData, setRouteData] = useState(null);
-  const [loadingDrives, setLoadingDrives] = useState(true);
-  const [loadingRoute, setLoadingRoute] = useState(false);
-  const [error, setError] = useState(null);
-  const [dayMode, setDayMode] = useState(initialDate || null); // 'YYYY-MM-DD' or null
-  const [dayRoutes, setDayRoutes] = useState([]);
-  const abortRef = useRef(null);
-  const dayAbortRef = useRef(null);
-
-  // 진입 쿼리(id/date)에 맞는 주행을 선택 — id > date > 첫 항목
-  const pickPreselect = (list) => {
-    if (initialId) {
-      const found = list.find(d => d.id === initialId);
-      if (found) return found;
-    }
-    if (initialDate) {
-      const found = list.find(d => driveDayStr(d) === initialDate);
-      if (found) return found;
-    }
-    return list[0];
-  };
-
-  useEffect(() => {
-    if (isMock) {
-      const list = MOCK_DATA.drives.recent_drives;
-      setDrives(list);
-      setPlaces(MOCK_DATA.frequentPlaces);
-      setLoadingDrives(false);
-      setSelectedDrive(pickPreselect(list));
-      return;
-    }
-    setLoadingDrives(true);
-    setError(null);
-    Promise.allSettled([
-      fetch('/api/drives').then(r => r.json()),
-      fetch('/api/frequent-places').then(r => r.json()),
-    ]).then(([drivesResult, placesResult]) => {
-      const drivesData = drivesResult.status === 'fulfilled' ? drivesResult.value : { recent_drives: [] };
-      const placesData = placesResult.status === 'fulfilled' ? placesResult.value : { places: [] };
-      if (drivesResult.status === 'rejected') setError('데이터를 불러오지 못했습니다.');
-      const list = drivesData.recent_drives || [];
-      setDrives(list);
-      setPlaces(placesData.places || []);
-      setLoadingDrives(false);
-      if (list.length > 0) {
-        setSelectedDrive(pickPreselect(list));
-      }
-    });
-  }, [isMock, refreshSignal, initialId, initialDate]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (dayMode) return; // 일 모드에서는 단일 경로 미로딩
-    if (!selectedDrive) return;
-    if (isMock) {
-      setPositions(MOCK_DATA.routePositions);
-      setRouteData({ positions: MOCK_DATA.routePositions, maxSpeedKmh: 127, speedBands: { jam: 12, slow: 35, flow: 28, fast: 25 } });
-      return;
-    }
-    setLoadingRoute(true);
-    setPositions([]);
-    setRouteData(null);
-    if (abortRef.current) abortRef.current.abort();
-    abortRef.current = new AbortController();
-    fetch(`/api/route-map?driveId=${selectedDrive.id}`, { signal: abortRef.current.signal })
-      .then(r => r.json())
-      .then(data => {
-        setPositions(data.positions || []);
-        setRouteData(data);
-        setLoadingRoute(false);
-      })
-      .catch(e => {
-        if (e.name !== 'AbortError') {
-          setPositions([]);
-          setRouteData(null);
-          setLoadingRoute(false);
-        }
-      });
-  }, [selectedDrive?.id, isMock, refreshSignal, dayMode]);
-
-  // 일 모드 — 해당 일의 모든 주행 경로 병렬 로드
-  useEffect(() => {
-    if (!dayMode || isMock || drives.length === 0) { setDayRoutes([]); return; }
-    const dayDrives = drives.filter(d => driveDayStr(d) === dayMode);
-    if (dayDrives.length === 0) { setDayRoutes([]); return; }
-    setLoadingRoute(true);
-    if (dayAbortRef.current) dayAbortRef.current.abort();
-    dayAbortRef.current = new AbortController();
-    const palette = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7', '#84cc16', '#f43f5e'];
-    Promise.all(
-      dayDrives.map((d, idx) =>
-        fetch(`/api/route-map?driveId=${d.id}`, { signal: dayAbortRef.current.signal })
-          .then(r => r.json())
-          .then(data => ({
-            positions: data.positions || [],
-            color: palette[idx % palette.length],
-            id: d.id,
-          }))
-          .catch(() => null)
-      )
-    ).then(results => {
-      const valid = results.filter(r => r && r.positions.length >= 2);
-      setDayRoutes(valid);
-      setLoadingRoute(false);
-    });
-  }, [dayMode, isMock, drives]);
 
   // 목록/지도 모드 — id 또는 date로 진입하면 지도 뷰로 바로
   const entryInMapView = !!initialId || !!initialDate;
