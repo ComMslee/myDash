@@ -163,6 +163,6 @@ export async function GET() {
     });
   } catch (err) {
     console.error('/api/car error:', err);
-    return Response.json({ error: 'DB error' }, { status: 500 });
+    return Response.json({ error: 'DB error', detail: err?.message, stack: err?.stack?.split('\n').slice(0, 3) }, { status: 500 });
   }
 }
