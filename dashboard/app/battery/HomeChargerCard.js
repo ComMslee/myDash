@@ -118,9 +118,9 @@ export default function HomeChargerCard() {
             const meta = STAT_META[c.stat] || STAT_META['9'];
             const localId = ID_OFFSET + Number(c.chgerId);
             const label = localId - 95100;
-            const sizeClass = size === 'sm'
-              ? 'w-7 h-7 text-[10px]'
-              : 'aspect-square text-[11px]';
+            const sizeClass = size === 'lg'
+              ? 'w-10 h-10 text-sm'
+              : 'aspect-square text-[10px]';
             return (
               <div
                 key={c.chgerId}
@@ -134,12 +134,12 @@ export default function HomeChargerCard() {
           return (
             <div className="mb-3 space-y-2">
               {extraGroup.length > 0 && (
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                   <span className="text-[10px] text-zinc-600 mr-0.5">별도</span>
-                  {extraGroup.map(c => renderCell(c, 'sm'))}
+                  {extraGroup.map(c => renderCell(c, 'lg'))}
                 </div>
               )}
-              <div className="grid grid-cols-10 gap-1.5">
+              <div className="grid grid-cols-10 gap-1">
                 {mainGroup.map(c => renderCell(c, 'md'))}
               </div>
             </div>
