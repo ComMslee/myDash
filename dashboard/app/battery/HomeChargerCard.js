@@ -30,9 +30,12 @@ function timeAgoKo(iso) {
   return `${Math.floor(h / 24)}일 전`;
 }
 
+// 브라우저 세션 동안 유지 — 탭 재진입 시 스피너 없이 즉시 이전 데이터 노출
+let moduleCache = null;
+
 export default function HomeChargerCard() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState(moduleCache);
+  const [loading, setLoading] = useState(!moduleCache);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [tick, setTick] = useState(0); // relative-time re-render
@@ -43,7 +46,7 @@ export default function HomeChargerCard() {
       const res = await fetch(`/api/home-charger${force ? '?refresh=1' : ''}`);
       const d = await res.json();
       if (d.error) setError(d.error);
-      else { setData(d); setError(null); }
+      else { moduleCache = d; setData(d); setError(null); }
     } catch (e) {
       setError(e.message || '조회 실패');
     } finally {

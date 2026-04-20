@@ -165,7 +165,13 @@ export default function GlobalHeader() {
             );
           })()}
           {(() => {
-            const isOffline = !effectiveState || effectiveState === 'offline' || effectiveState === 'unknown';
+            // 온라인으로 간주: driving/charging/online, 그리고 position이 최근(≤5분)일 때만
+            const STALE_MS = 5 * 60_000;
+            const lastSeenMs = car?.last_seen ? new Date(car.last_seen).getTime() : null;
+            const stale = !lastSeenMs || (Date.now() - lastSeenMs) > STALE_MS;
+            const liveStates = new Set(['driving', 'charging', 'online']);
+            const isOnline = liveStates.has(effectiveState) && !stale;
+            const isOffline = !isOnline;
             const dotColor = isOffline ? 'bg-zinc-500' : 'bg-emerald-400';
             const label = isOffline ? (lastSeenLabel ?? timeLabel ?? '오프라인') : '온라인';
             if (!label) return null;
