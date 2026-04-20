@@ -61,10 +61,10 @@ export async function GET() {
                 END)::float AS pct_consumed
          FROM drives
          WHERE car_id = $1
-           AND start_date >= NOW() - ($2::int * INTERVAL '1 day')
+           AND start_date >= NOW() - INTERVAL '14 days'
          GROUP BY day
          ORDER BY day ASC`,
-        [carId, LOOKBACK_DAYS]
+        [carId]
       ),
       // 임계값 학습: 최근 THRESHOLD_LOOKBACK_DAYS 충전 시작 SoC 중앙값
       pool.query(
