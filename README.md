@@ -19,11 +19,14 @@ TeslaMate 위에 올린 커스텀 Next.js 대시보드. 주행 기록, 배터리
 - 충전 요약 — 집/외부, 완속/급속 비율 바
 - 시간대/요일별 주행·충전 패턴 히트맵
 
-### 주행 (`/drives`)
-- **목록 모드** — 날짜별 그룹핑, 컴팩트 리스트, 배터리 프로그래스바
-- **지도 모드** — 경로 속도별 5단계 색상 표시, 이전/다음 탐색
+### 로드트립 (`/roadtrips`)
+- **목록 모드** — 날짜별 그룹핑(일별 km·% 합계), 컴팩트 리스트, 배터리 프로그래스바
+- **지도 모드** — 경로 속도별 5단계 색상 표시, 일자 단위 다중 경로 + 순번 마커
 - 자주 가는 곳 TOP5 — 첫/최근 방문일, 평균 이동거리/소요시간, 주요 출발지 TOP3
-- 주행 간 대기 시간 표시
+
+### 랭킹 (`/rankings`)
+- 거리·시간·속도 기준 주행 일 합계 TOP 랭킹
+- 선택 시 해당 날짜의 전체 경로를 지도로 표시
 
 ### 월별 (`/monthly`)
 - 달력 — 일별 주행거리, 주행/충전 횟수 표시
@@ -31,11 +34,17 @@ TeslaMate 위에 올린 커스텀 Next.js 대시보드. 주행 기록, 배터리
 - 이번 달은 달력에서만 표시, 하단 리스트에서 중복 제거
 
 ### 배터리 (`/battery`)
-- 배터리 상태 — 건강 점수 게이지 + SOC 분포 히스토그램 + 용량 트렌드
+- 배터리 상태 — 건강 점수 게이지 + SOC 분포 + 용량 트렌드
 - 충전 통계 — 전체 충전 횟수/kWh, 집·외부 비율, 완속·급속 비율
-- 충전 습관 — SOC 체류 분포 + 습관 트렌드
-- 급속 충전 기록 — 날짜, 장소, 충전기 타입(SC/CCS), 최소/최대/평균 kW
-- 대기 소모 — 뱀파이어 드레인 기록
+- 충전 습관 — 시작→종료 SOC Range Bar(박스 플롯) + 월별 추이
+- 급속·완속 충전 기록 — 날짜, 장소, 충전기 타입, 최소/최대/평균 kW
+- 대기 소모 — 24시간 타임라인 바(구간별 드레인 %, 충전 세션 오버레이)
+
+### 상단 헤더 (공통)
+- 배터리 / 예상 주행거리 / 주행·주차·충전 상태 아이콘
+- **충전 예측 뱃지** — drives 기반 일별 소모 EMA(α=0.3, 14일) + 주차 뱀파이어 베이스라인 1%/일
+  - 임계값: 최근 90일 충전 시작 SoC 중앙값 학습(최소 5회), 기본 20%
+  - 신뢰도 low / 3일 이상 여유일 때는 숨김
 
 ## 초기 설정
 
@@ -120,6 +129,48 @@ docker compose -p teslamate build dashboard && docker compose -p teslamate up -d
 - **스타일링**: Tailwind CSS 3 — 다크 테마, 모바일 우선
 - **DB**: PostgreSQL 16 (TeslaMate 스키마) — `pg` 직접 쿼리
 - **지도**: Leaflet 1.9 (CDN, CartoDB Dark 타일, 속도별 경로 색상)
+- **역지오코딩**: Kakao Local API (coord2address + building_name, ~10m 정밀도 캐시)
 - **컨테이너**: Docker (node:20-alpine)
 - **CI/CD**: GitHub Actions → self-hosted runner
 - **UI**: 한국어, 30초 자동 갱신, 개발용 Mock 시스템
+
+## 코드 구조
+
+```
+dashboard/
+├── app/
+│   ├── page.js                 # 홈
+│   ├── roadtrips/              # 주행 상세 (목록/지도)
+│   │   ├── page.js
+│   │   ├── DriveListView.js
+│   │   └── useDriveData.js
+│   ├── rankings/page.js        # 거리·시간·속도 랭킹
+│   ├── monthly/page.js         # 월별 통계
+│   ├── battery/                # 배터리 / 충전 / 대기 소모
+│   │   ├── page.js
+│   │   ├── HealthScoreCard.js
+│   │   ├── BatteryTrendCard.js
+│   │   ├── CycleCard.js
+│   │   ├── RecordsHabit.js     # Range Bar (박스 플롯)
+│   │   ├── FastChargeCard.js
+│   │   ├── SlowChargeCard.js
+│   │   ├── IdleDrainCard.js    # 24h 타임라인
+│   │   ├── useIdleDrainDays.js
+│   │   ├── ChargeHeatmap.js
+│   │   ├── MonthlyChargeCard.js
+│   │   └── WeeklyCard.js
+│   ├── components/             # 공용 — GlobalHeader, BottomNav, DriveMap, 차트 위젯
+│   └── api/                    # 서버 API 라우트 (force-dynamic)
+└── lib/
+    ├── db.js                   # pg 커넥션 풀
+    ├── kst.js                  # KST(UTC+9) 유틸 (toKstDate, formatHM 등)
+    ├── format.js               # formatDuration, shortAddr, formatKorDate
+    ├── constants.js            # KWH_PER_KM, RATED_RANGE_MAX_KM
+    ├── effColor.js             # 전비 색상
+    ├── kakao-geo.js            # Kakao 역지오코딩 + PostgreSQL 캐시
+    └── queries/                # 배터리 쿼리 모듈
+        ├── battery-capacity.js
+        ├── battery-health.js
+        ├── battery-records.js
+        └── battery-idle.js
+```
