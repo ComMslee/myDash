@@ -9,6 +9,7 @@ import FastChargeCard from './FastChargeCard';
 import SlowChargeCard from './SlowChargeCard';
 import { CapacityTrendCard } from './BatteryTrendCard';
 import ChargeHeatmap from './ChargeHeatmap';
+import HomeChargerCard from './HomeChargerCard';
 import { Spinner } from '@/app/components/PageLayout';
 
 export default function BatteryPage() {
@@ -67,6 +68,9 @@ export default function BatteryPage() {
 
             {/* 대기 소모 */}
             <IdleDrainCard records={data.idle_drain} chargingSessions={data.charging_sessions} />
+
+            {/* 집충전기 실시간 상태 */}
+            <HomeChargerCard />
           </>
         ) : null}
       </div>
