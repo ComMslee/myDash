@@ -56,13 +56,16 @@ myDash/
     │   ├── monthly/
     │   │   └── page.js           # 월별 — 달력 + 6개월 차트 + 효율 트렌드 + 연도별 통계
     │   └── battery/
-    │       ├── page.js           # 배터리 — 상태/충전 습관/대기 소모
-    │       ├── HealthScoreCard.js
-    │       ├── BatteryTrendCard.js
-    │       ├── CycleCard.js
-    │       ├── IdleDrainCard.js
-    │       ├── RecordsHabit.js
+    │       ├── page.js           # 배터리 — 건강/집충전기/충전 습관/충전 상세
+    │       ├── HealthScoreCard.js    # 점수(등급)·평균 SOC·용량 추이 + SOC 체류 분포
+    │       ├── IdleDrainCard.js      # 대기 소모 24h 타임라인
+    │       ├── HomeChargerCard.js    # 집충전기 실시간 상태 (환경공단 API)
+    │       ├── RecordsHabit.js       # 충전 시작/종료 SOC Range Bar
     │       ├── MonthlyChargeCard.js
+    │       ├── ChargeHeatmap.js
+    │       ├── FastChargeCard.js
+    │       ├── SlowChargeCard.js
+    │       ├── CycleCard.js
     │       └── WeeklyCard.js
     └── app/api/                  # 서버사이드 API 라우트 (모두 GET, force-dynamic)
         ├── car/route.js          # 차량 기본 정보 + 배터리 + 상태
@@ -76,7 +79,8 @@ myDash/
         ├── charge-all-time/route.js  # 누적 충전 비용
         ├── frequent-places/route.js  # 자주 방문 장소 랭킹
         ├── route-map/route.js    # 특정 주행의 GPS 경로
-        └── heatmap/route.js      # 히트맵 데이터
+        ├── heatmap/route.js      # 히트맵 데이터
+        └── home-charger/route.js # 집충전기 실시간 (환경공단 EvCharger API + 시간대별 캐시)
 ```
 
 ## 페이지 (4탭)
@@ -86,7 +90,7 @@ myDash/
 | `/` | 홈 | 최근 주행 통계(오늘/이번주/저번주/이번달) + 최근 3건 + 6개월 통합(주행/충전 탭) |
 | `/drives` | 주행 | Leaflet 지도 + 주행 이력 리스트(200건) + 자주 가는 곳 TOP5 |
 | `/monthly` | 월별 | 달력(일별 km/충전) + 6개월 바 차트 + 효율 트렌드 + 연도별 요약 |
-| `/battery` | 배터리 | 건강 점수 + 용량 트렌드 + 충전 습관 히스토그램 + 대기 소모 |
+| `/battery` | 배터리 | 건강 점수(등급/평균SOC/추이) + 대기 소모 + **집충전기 실시간** + 충전 습관 + 급속/완속 기록 |
 
 ## 데이터베이스
 
@@ -113,6 +117,9 @@ TeslaMate가 관리하는 PostgreSQL 스키마. 직접 쿼리만 사용 (ORM 없
 | `TM_DB_NAME` | 데이터베이스 이름 (기본값: `teslamate`) |
 | `DB_HOST` | DB 호스트 (기본값: `database`) |
 | `ENCRYPTION_KEY` | TeslaMate 암호화 키 |
+| `KAKAO_REST_API_KEY` | Kakao Local API 키 (역지오코딩). 없으면 DB 캐시만 사용 |
+| `EV_CHARGER_API_KEY` | 공공데이터포털 환경공단 EvCharger 일반 인증키 (64-hex). 없으면 집충전기 카드 비표시 |
+| `HOME_CHARGER_STAT_ID` | 환경공단 스테이션 ID (기본값: `PI795111`) |
 
 ## 상수 (`lib/constants.js`)
 

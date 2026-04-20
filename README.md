@@ -34,11 +34,14 @@ TeslaMate 위에 올린 커스텀 Next.js 대시보드. 주행 기록, 배터리
 - 이번 달은 달력에서만 표시, 하단 리스트에서 중복 제거
 
 ### 배터리 (`/battery`)
-- 배터리 상태 — 건강 점수 게이지 + SOC 분포 + 용량 트렌드
-- 충전 통계 — 전체 충전 횟수/kWh, 집·외부 비율, 완속·급속 비율
-- 충전 습관 — 시작→종료 SOC Range Bar(박스 플롯) + 월별 추이
-- 급속·완속 충전 기록 — 날짜, 장소, 충전기 타입, 최소/최대/평균 kW
-- 대기 소모 — 24시간 타임라인 바(구간별 드레인 %, 충전 세션 오버레이)
+
+주제별 그룹핑 순서: 건강 → 현재상태 → 충전 습관 → 충전 상세.
+
+- **건강 점수 패널** — 점수(등급) · 평균 SOC · 용량 추이 한 줄 요약 + SOC 체류 분포 히스토그램
+- **대기 소모** — 24시간 타임라인 바 (구간별 드레인 %, 충전 세션 오버레이)
+- **집충전기 실시간** — 환경공단 공공 API로 등록된 AC 완속 25기의 상태(대기/충전중/점검 등)를 색상 셀로 표시. 자주 쓰는 그룹은 큰 셀로 상단 분리. 갱신 버튼 + 상대시간 표시. 시간대별 캐시 TTL (낮 2~5분 / 저녁 피크 2분 / 심야 00~06 갱신 중단)
+- **충전 습관** — 시작→종료 SOC Range Bar(박스 플롯), 집/외부·완속/급속 비율, 시간대/요일 패턴, 연간 히트맵
+- **급속·완속 충전 기록** — 날짜, 장소, 충전기 타입, 최소/최대/평균 kW
 
 ### 상단 헤더 (공통)
 - 배터리 / 예상 주행거리 / 주행·주차·충전 상태 아이콘
@@ -57,6 +60,10 @@ TM_DB_USER=teslamate
 TM_DB_PASS=your_password
 TM_DB_NAME=teslamate
 ENCRYPTION_KEY=your_encryption_key
+# 선택 — 없어도 동작하되 일부 기능 비활성화
+KAKAO_REST_API_KEY=...             # 역지오코딩 (건물명/도로명)
+EV_CHARGER_API_KEY=...             # 환경공단 EvCharger 일반 인증키 (64-hex). 집충전기 카드 활성화
+HOME_CHARGER_STAT_ID=PI795111      # 환경공단 스테이션 ID (기본값 망포늘푸른벽산)
 ```
 
 암호화 키 생성:
@@ -146,18 +153,18 @@ dashboard/
 │   │   └── useDriveData.js
 │   ├── rankings/page.js        # 거리·시간·속도 랭킹
 │   ├── monthly/page.js         # 월별 통계
-│   ├── battery/                # 배터리 / 충전 / 대기 소모
+│   ├── battery/                # 배터리 / 집충전기 / 충전 / 대기 소모
 │   │   ├── page.js
-│   │   ├── HealthScoreCard.js
-│   │   ├── BatteryTrendCard.js
-│   │   ├── CycleCard.js
-│   │   ├── RecordsHabit.js     # Range Bar (박스 플롯)
-│   │   ├── FastChargeCard.js
-│   │   ├── SlowChargeCard.js
+│   │   ├── HealthScoreCard.js  # 점수·평균SOC·용량추이 + SOC 체류 분포
 │   │   ├── IdleDrainCard.js    # 24h 타임라인
 │   │   ├── useIdleDrainDays.js
-│   │   ├── ChargeHeatmap.js
+│   │   ├── HomeChargerCard.js  # 집충전기 실시간 (환경공단 API)
+│   │   ├── RecordsHabit.js     # Range Bar (박스 플롯)
 │   │   ├── MonthlyChargeCard.js
+│   │   ├── ChargeHeatmap.js
+│   │   ├── FastChargeCard.js
+│   │   ├── SlowChargeCard.js
+│   │   ├── CycleCard.js
 │   │   └── WeeklyCard.js
 │   ├── components/             # 공용 — GlobalHeader, BottomNav, DriveMap, 차트 위젯
 │   └── api/                    # 서버 API 라우트 (force-dynamic)
