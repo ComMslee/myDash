@@ -66,8 +66,10 @@ async function main() {
   const baseStatId = process.argv[2] || process.env.HOME_CHARGER_STAT_ID || 'PI795111';
   const radiusM = Number(process.argv[3]) || 500;
   const targetCount = Number(process.argv[4]) || 12;
+  const excludeTerms = (process.env.EXCLUDE_TERMS || '신영통현대아파트')
+    .split(',').map(s => s.trim()).filter(Boolean);
 
-  console.log(`[search] base=${baseStatId} radius=${radiusM}m target=${targetCount}기 zcode=${ZCODE}`);
+  console.log(`[search] base=${baseStatId} radius=${radiusM}m target=${targetCount}기 zcode=${ZCODE} exclude=[${excludeTerms.join('|')}]`);
 
   const all = [];
   for (let p = 1; p <= MAX_PAGES; p++) {
@@ -107,12 +109,16 @@ async function main() {
   }
   console.log(`\n[base] ${base.statId}  ${base.statNm}  ${base.count}기  (${base.lat}, ${base.lng})  ${base.addr}`);
 
+  const isExcluded = (s) => {
+    const hay = `${s.statNm || ''} ${s.addr || ''}`;
+    return excludeTerms.some(t => t && hay.includes(t));
+  };
   const candidates = [];
   for (const s of byStat.values()) {
     if (s.statId === baseStatId) continue;
-    if (!s.lat || !s.lng) continue;
-    const d = haversineM(base, s);
-    if (d <= radiusM) candidates.push({ ...s, distanceM: Math.round(d) });
+    if (isExcluded(s)) continue;
+    const d = (s.lat && s.lng) ? Math.round(haversineM(base, s)) : null;
+    if (d !== null && d <= radiusM) candidates.push({ ...s, distanceM: d });
   }
   candidates.sort((a, b) => a.distanceM - b.distanceM);
 
@@ -123,10 +129,38 @@ async function main() {
     console.log(`  ${c.statId}  ${String(c.count).padStart(3)}기  ${String(c.distanceM).padStart(4)}m  [${outputs}kW]  ${c.statNm} — ${c.addr}${flag}`);
   }
 
-  const matched = candidates.filter(c => c.count === targetCount);
+  // 이름/주소 매칭 — 좌표가 없거나 반경 밖이어도 같은 단지로 보일 수 있음
+  const norm = (v) => (v || '').replace(/\s+/g, '').toLowerCase();
+  const baseNameTokens = (base.statNm || '').split(/[\s()\-_]+/).filter(t => t.length >= 2);
+  const baseAddrKey = norm(base.addr).slice(0, 20);
+  const nameAddrMatches = [];
+  for (const s of byStat.values()) {
+    if (s.statId === baseStatId) continue;
+    if (isExcluded(s)) continue;
+    const nm = norm(s.statNm);
+    const ad = norm(s.addr);
+    const nameHit = baseNameTokens.some(t => nm.includes(norm(t)));
+    const addrHit = baseAddrKey && ad.startsWith(baseAddrKey);
+    if (nameHit || addrHit) {
+      const d = (s.lat && s.lng) ? Math.round(haversineM(base, s)) : null;
+      nameAddrMatches.push({ ...s, distanceM: d, reason: [nameHit && 'name', addrHit && 'addr'].filter(Boolean).join('+') });
+    }
+  }
+  nameAddrMatches.sort((a, b) => (a.distanceM ?? 9e9) - (b.distanceM ?? 9e9));
+
+  console.log(`\n[name/addr 매칭] (${nameAddrMatches.length}개) — base="${base.statNm}" addr="${base.addr}"`);
+  for (const c of nameAddrMatches) {
+    const flag = c.count === targetCount ? ' ★' : '';
+    const outputs = [...new Set(c.outputs)].join(',');
+    const dist = c.distanceM === null ? '   -' : String(c.distanceM).padStart(4);
+    console.log(`  ${c.statId}  ${String(c.count).padStart(3)}기  ${dist}m  [${c.reason}]  [${outputs}kW]  ${c.statNm} — ${c.addr}${flag}`);
+  }
+
+  const matched = [...new Map([...candidates, ...nameAddrMatches].filter(c => c.count === targetCount).map(c => [c.statId, c])).values()];
   console.log(`\n[${targetCount}기 매칭]: ${matched.length}개`);
   for (const t of matched) {
-    console.log(`  → HOME_CHARGER_STAT_ID_2=${t.statId}  // ${t.statNm}, ${t.distanceM}m, ${t.addr}`);
+    const dist = t.distanceM === null ? '-' : `${t.distanceM}m`;
+    console.log(`  → HOME_CHARGER_STAT_ID_2=${t.statId}  // ${t.statNm}, ${dist}, ${t.addr}`);
   }
 }
 
