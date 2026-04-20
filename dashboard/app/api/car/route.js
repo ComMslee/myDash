@@ -36,8 +36,15 @@ export async function GET() {
       thresholdResult,
     ] = await Promise.all([
       pool.query(
-        `SELECT battery_level, est_battery_range_km, rated_battery_range_km, date
-         FROM positions WHERE car_id = $1 ORDER BY date DESC LIMIT 1`,
+        `SELECT
+           (SELECT battery_level FROM positions WHERE car_id = $1 ORDER BY date DESC LIMIT 1) AS battery_level,
+           (SELECT est_battery_range_km FROM positions
+              WHERE car_id = $1 AND est_battery_range_km IS NOT NULL
+              ORDER BY date DESC LIMIT 1) AS est_battery_range_km,
+           (SELECT rated_battery_range_km FROM positions
+              WHERE car_id = $1 AND rated_battery_range_km IS NOT NULL
+              ORDER BY date DESC LIMIT 1) AS rated_battery_range_km,
+           (SELECT date FROM positions WHERE car_id = $1 ORDER BY date DESC LIMIT 1) AS date`,
         [carId]
       ),
       pool.query(
