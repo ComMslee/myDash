@@ -115,7 +115,7 @@ function DrivesInner() {
 
   return (
     <main className="bg-[#0f0f0f] text-white">
-      <div className="max-w-2xl mx-auto flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 57px - env(safe-area-inset-bottom, 0px))' }}>
+      <div className="max-w-2xl mx-auto flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 57px - 58px - env(safe-area-inset-bottom, 0px))' }}>
 
       {/* 자주 방문하는 장소 */}
       {places.length > 0 && (
@@ -394,9 +394,9 @@ function DrivesInner() {
       )}
 
       {/* ── 목록 모드 ── */}
-      <div className="flex-1 flex flex-col px-4 pb-4 pt-3" style={{ display: viewMode === 'list' ? 'flex' : 'none' }}>
-          <div className="flex-1 bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
+      <div className="flex-1 min-h-0 flex flex-col px-4 pb-4 pt-3" style={{ display: viewMode === 'list' ? 'flex' : 'none' }}>
+          <div className="flex-1 min-h-0 bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
+            <div className="h-full overflow-y-auto">
               <DriveListView
                 drives={drives}
                 loadingDrives={loadingDrives}
