@@ -105,13 +105,19 @@ export default function IdleDrainCard({ records }) {
           return `${prefix}${parseInt(m)}/${parseInt(d)}`;
         };
 
-        const grouped = [];
         const seen = {};
         expandedRecords.forEach(r => {
           const key = getDateKey(r.idle_start);
-          if (!seen[key]) { seen[key] = []; grouped.push({ key, items: seen[key] }); }
+          if (!seen[key]) seen[key] = [];
           seen[key].push(r);
         });
+        // 각 일자 내 idle_start 역순 + 일자별 키 역순
+        Object.values(seen).forEach(items =>
+          items.sort((a, b) => new Date(b.idle_start) - new Date(a.idle_start))
+        );
+        const grouped = Object.keys(seen)
+          .sort((a, b) => b.localeCompare(a))
+          .map(key => ({ key, items: seen[key] }));
 
         const fmtDrop = (n) => (Math.round(n * 10) / 10).toString();
         return grouped.map(({ key, items }) => {
