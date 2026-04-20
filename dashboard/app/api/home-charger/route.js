@@ -1,8 +1,10 @@
 import {
   getCache,
   getLastError,
+  getQuotaCooldownUntil,
   getStatIds,
   isFresh,
+  isQuotaCooldown,
   loadStations,
   setCache,
   warmIfNeeded,
@@ -40,13 +42,14 @@ export async function GET(req) {
 
   const cache = getCache();
   if (cache.data) {
-    if (!isFresh()) {
+    if (!isFresh() && !isQuotaCooldown()) {
       warmIfNeeded().catch(e => console.warn('[home-charger] bg warm failed:', e.message));
     }
     const stale = !isFresh();
     const body = stale ? { ...cache.data, stale: true } : cache.data;
     const err = getLastError();
     if (stale && err) body.lastError = err;
+    if (isQuotaCooldown()) body.quotaCooldownUntil = getQuotaCooldownUntil();
     return Response.json(body);
   }
 
@@ -59,11 +62,16 @@ export async function GET(req) {
     }
     const c = getCache();
     if (c.data) return Response.json(c.data);
+    if (isQuotaCooldown()) break; // 쿠다운 중이면 더 시도 무의미
     if (attempt < 2) await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
   }
   const err = getLastError();
   return Response.json(
-    { error: err || '스테이션을 찾지 못했습니다.', statIds },
+    {
+      error: err || '스테이션을 찾지 못했습니다.',
+      statIds,
+      ...(isQuotaCooldown() ? { quotaCooldownUntil: getQuotaCooldownUntil() } : {}),
+    },
     { status: 404 }
   );
 }
