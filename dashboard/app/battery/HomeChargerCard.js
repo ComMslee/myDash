@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 const ID_OFFSET = 95110; // chgerId + 95110 = 차지비 앱 ID
 const FAVORITE_IDS_ORDERED = ['04', '05', '12', '13']; // 앱 번호 14, 15, 22, 23
 const FAVORITE_IDS = new Set(FAVORITE_IDS_ORDERED);
+const SECOND_LINE_IDS_ORDERED = ['06', '07', '08', '09', '10', '11']; // 앱 번호 16~21
+const SECOND_LINE_IDS = new Set(SECOND_LINE_IDS_ORDERED);
 
 const STAT_META = {
   '2': { label: '대기',     dot: 'bg-emerald-500', text: 'text-emerald-400', cellBg: 'bg-emerald-500/80', cellText: 'text-white' },
@@ -127,7 +129,7 @@ export default function HomeChargerCard() {
 
         {(() => {
           const byId = new Map(chargers.map(c => [c.chgerId, c]));
-          const mainGroup = chargers.filter(c => !FAVORITE_IDS.has(c.chgerId));
+          const mainGroup = chargers.filter(c => !FAVORITE_IDS.has(c.chgerId) && !SECOND_LINE_IDS.has(c.chgerId));
           const renderCell = (c, size = 'md') => {
             const meta = STAT_META[c.stat] || STAT_META['9'];
             const localId = ID_OFFSET + Number(c.chgerId);
@@ -145,18 +147,22 @@ export default function HomeChargerCard() {
               </div>
             );
           };
+          const favChargers = FAVORITE_IDS_ORDERED.map(id => byId.get(id)).filter(Boolean);
+          const secondChargers = SECOND_LINE_IDS_ORDERED.map(id => byId.get(id)).filter(Boolean);
           return (
             <div className="space-y-2">
-              {(() => {
-                const favChargers = FAVORITE_IDS_ORDERED.map(id => byId.get(id)).filter(Boolean);
-                if (!favChargers.length) return null;
-                return (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-zinc-600 mr-0.5 w-10 shrink-0">자주</span>
-                    {favChargers.map(c => renderCell(c, 'lg'))}
-                  </div>
-                );
-              })()}
+              {favChargers.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-zinc-600 mr-0.5 w-10 shrink-0">자주</span>
+                  {favChargers.map(c => renderCell(c, 'lg'))}
+                </div>
+              )}
+              {secondChargers.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="w-10 shrink-0" aria-hidden="true" />
+                  {secondChargers.map(c => renderCell(c, 'lg'))}
+                </div>
+              )}
               <div className="grid grid-cols-12 gap-1 pt-1">
                 {mainGroup.map(c => renderCell(c, 'md'))}
               </div>
