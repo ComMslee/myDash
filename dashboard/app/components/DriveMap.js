@@ -81,8 +81,8 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
         allLatLngs.push(...latlngs);
         const color = r.color || '#3b82f6';
         L.polyline(latlngs, { color, weight: 4, opacity: 0.85 }).addTo(group);
-        // 시작 마커: 첫 주행=S, 그 외 주행 번호
-        const startLabel = idx === 0 ? 'S' : String(idx + 1);
+        // 시작 마커: 첫 주행=S, 그 외 주행 번호(1, 2, 3...)
+        const startLabel = idx === 0 ? 'S' : String(idx);
         const s = L.marker(latlngs[0], { icon: makeBadge(startLabel, color) }).addTo(group);
         // 종료 마커: 마지막 주행만 E 배지, 그 외는 작은 점
         let e;
