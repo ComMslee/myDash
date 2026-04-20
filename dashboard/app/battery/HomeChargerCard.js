@@ -30,6 +30,62 @@ function timeAgoKo(iso) {
   return `${Math.floor(h / 24)}일 전`;
 }
 
+function renderCell(c, size = 'md') {
+  const meta = STAT_META[c.stat] || STAT_META['9'];
+  const localId = ID_OFFSET + Number(c.chgerId);
+  const label = localId - 95100;
+  const sizeClass = size === 'lg'
+    ? 'w-10 h-10 text-sm'
+    : 'aspect-square text-[10px]';
+  return (
+    <div
+      key={c.chgerId}
+      className={`${sizeClass} rounded-md flex items-center justify-center font-bold tabular-nums ${meta.cellBg} ${meta.cellText}`}
+      title={`${localId} · ${meta.label}`}
+    >
+      {label}
+    </div>
+  );
+}
+
+function StationBlock({ station, chargers, withFavorites }) {
+  const byId = new Map(chargers.map(c => [c.chgerId, c]));
+  const favChargers = withFavorites
+    ? FAVORITE_IDS_ORDERED.map(id => byId.get(id)).filter(Boolean)
+    : [];
+  const secondChargers = withFavorites
+    ? SECOND_LINE_IDS_ORDERED.map(id => byId.get(id)).filter(Boolean)
+    : [];
+  const mainGroup = withFavorites
+    ? chargers.filter(c => !FAVORITE_IDS.has(c.chgerId) && !SECOND_LINE_IDS.has(c.chgerId))
+    : chargers;
+
+  return (
+    <div>
+      <div className="text-[13px] font-medium text-white mb-2">{station.statNm}</div>
+      <div className="space-y-2">
+        {favChargers.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-zinc-600 mr-0.5 w-10 shrink-0">자주</span>
+            {favChargers.map(c => renderCell(c, 'lg'))}
+          </div>
+        )}
+        {secondChargers.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="w-10 shrink-0" aria-hidden="true" />
+            {secondChargers.map(c => renderCell(c, 'lg'))}
+          </div>
+        )}
+        {mainGroup.length > 0 && (
+          <div className="grid grid-cols-12 gap-1 pt-1">
+            {mainGroup.map(c => renderCell(c, 'md'))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // 브라우저 세션 동안 유지 — 탭 재진입 시 스피너 없이 즉시 이전 데이터 노출
 let moduleCache = null;
 
@@ -38,7 +94,7 @@ export default function HomeChargerCard() {
   const [loading, setLoading] = useState(!moduleCache);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [tick, setTick] = useState(0); // relative-time re-render
+  const [tick, setTick] = useState(0);
 
   const load = useCallback(async (force = false) => {
     try {
@@ -62,7 +118,6 @@ export default function HomeChargerCard() {
     return () => { clearInterval(poll); clearInterval(clock); };
   }, [load]);
 
-  // 데이터가 없을 때만 스피너/에러 UI 노출. 이전 데이터가 있으면 에러가 와도 유지.
   if (!data) {
     if (loading) {
       return (
@@ -78,18 +133,19 @@ export default function HomeChargerCard() {
     );
   }
 
-  const { station, chargers, fetchedAt } = data;
-  const counts = chargers.reduce((acc, c) => {
+  const { stations = [], fetchedAt } = data;
+  const allChargers = stations.flatMap(s => s.chargers);
+  const counts = allChargers.reduce((acc, c) => {
     acc[c.stat] = (acc[c.stat] || 0) + 1;
     return acc;
   }, {});
-  void tick; // keep dependency for relative time re-render
+  void tick;
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       <div className="px-4 py-2.5 border-b border-white/[0.06] flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] tabular-nums">
         <span className="font-bold tracking-widest uppercase text-zinc-500 shrink-0">집충전기</span>
-        <span className="text-zinc-400">총 {chargers.length}기</span>
+        <span className="text-zinc-400">총 {allChargers.length}기</span>
         {['2', '3', '5', '1', '4', '9'].map(k => {
           const n = counts[k];
           if (!n) return null;
@@ -128,51 +184,12 @@ export default function HomeChargerCard() {
         </span>
       </div>
 
-      <div className="px-4 py-3">
-        <div className="text-[13px] font-medium text-white mb-3">{station.statNm}</div>
-
-        {(() => {
-          const byId = new Map(chargers.map(c => [c.chgerId, c]));
-          const mainGroup = chargers.filter(c => !FAVORITE_IDS.has(c.chgerId) && !SECOND_LINE_IDS.has(c.chgerId));
-          const renderCell = (c, size = 'md') => {
-            const meta = STAT_META[c.stat] || STAT_META['9'];
-            const localId = ID_OFFSET + Number(c.chgerId);
-            const label = localId - 95100;
-            const sizeClass = size === 'lg'
-              ? 'w-10 h-10 text-sm'
-              : 'aspect-square text-[10px]';
-            return (
-              <div
-                key={c.chgerId}
-                className={`${sizeClass} rounded-md flex items-center justify-center font-bold tabular-nums ${meta.cellBg} ${meta.cellText}`}
-                title={`${localId} · ${meta.label}`}
-              >
-                {label}
-              </div>
-            );
-          };
-          const favChargers = FAVORITE_IDS_ORDERED.map(id => byId.get(id)).filter(Boolean);
-          const secondChargers = SECOND_LINE_IDS_ORDERED.map(id => byId.get(id)).filter(Boolean);
-          return (
-            <div className="space-y-2">
-              {favChargers.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-zinc-600 mr-0.5 w-10 shrink-0">자주</span>
-                  {favChargers.map(c => renderCell(c, 'lg'))}
-                </div>
-              )}
-              {secondChargers.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="w-10 shrink-0" aria-hidden="true" />
-                  {secondChargers.map(c => renderCell(c, 'lg'))}
-                </div>
-              )}
-              <div className="grid grid-cols-12 gap-1 pt-1">
-                {mainGroup.map(c => renderCell(c, 'md'))}
-              </div>
-            </div>
-          );
-        })()}
+      <div className="px-4 py-3 space-y-4">
+        {stations.map((s, i) => (
+          <div key={s.station.statId} className={i > 0 ? 'pt-3 border-t border-white/[0.04]' : ''}>
+            <StationBlock station={s.station} chargers={s.chargers} withFavorites={i === 0} />
+          </div>
+        ))}
       </div>
     </div>
   );
