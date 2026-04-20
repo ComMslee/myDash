@@ -56,6 +56,7 @@ export async function GET() {
       dailyMinChargeResult,
       dailyMaxDriveResult,
       dailyMinDriveResult,
+      chargeMatrixResult,
       histStartResult,
       histEndResult,
       socDistResult,
@@ -219,6 +220,20 @@ export async function GET() {
         FROM drives WHERE car_id = $1
         GROUP BY day HAVING SUM(distance) > 0
         ORDER BY range_used_km ASC LIMIT 1
+      `, [carId]),
+
+      // 충전 시작 × 종료 2D 히트맵 (5% 단위, 20x20)
+      pool.query(`
+        SELECT
+          LEAST(FLOOR(start_battery_level / 5)::int, 19) AS start_bucket,
+          LEAST(FLOOR(end_battery_level / 5)::int, 19) AS end_bucket,
+          COUNT(*)::int AS cnt
+        FROM charging_processes
+        WHERE car_id = $1
+          AND start_battery_level IS NOT NULL
+          AND end_battery_level IS NOT NULL
+          AND end_battery_level > start_battery_level
+        GROUP BY start_bucket, end_bucket
       `, [carId]),
 
       // 충전 시작 레벨 히스토그램 (50개 구간, 2% 단위)
@@ -597,6 +612,15 @@ export async function GET() {
         end_level: histEnd,
         start_modal_range: `${startModal * 2}–${startModal * 2 + 2}%`,
         end_modal_range: `${endModal * 2}–${endModal * 2 + 2}%`,
+        matrix: {
+          buckets: 20,
+          bucket_size: 5,
+          cells: chargeMatrixResult.rows.map(r => ({
+            start: r.start_bucket,
+            end: r.end_bucket,
+            cnt: r.cnt,
+          })),
+        },
       },
       health: {
         score: healthScore,

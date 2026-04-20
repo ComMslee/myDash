@@ -154,55 +154,102 @@ export function DailyRecordsCard({ records }) {
 }
 
 export function LevelHabitCard({ histogram }) {
-  const { start_level, end_level, start_modal_range, end_modal_range } = histogram;
-  // 2% 단위 50빈 → 5개 tick만 표시 (0/25/50/75/100)
-  const ticks = ['0', '25', '50', '75', '100%'];
+  const { matrix, start_modal_range, end_modal_range } = histogram;
+  if (!matrix) return null;
+  const { buckets, bucket_size, cells } = matrix;
+  const total = cells.reduce((s, c) => s + c.cnt, 0);
+  const maxCnt = Math.max(1, ...cells.map(c => c.cnt));
 
-  const startTotal = start_level.reduce((a, b) => a + b, 0);
-  const endTotal = end_level.reduce((a, b) => a + b, 0);
+  // SVG 기하
+  const PAD_L = 26, PAD_B = 20, PAD_R = 6, PAD_T = 8;
+  const GRID = 260;
+  const VIEW_W = PAD_L + GRID + PAD_R;
+  const VIEW_H = PAD_T + GRID + PAD_B;
+  const CELL = GRID / buckets;
+
+  const cellMap = new Map();
+  cells.forEach(c => cellMap.set(`${c.start}-${c.end}`, c.cnt));
 
   return (
-    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      <div className="px-4 py-3.5 border-b border-white/[0.06]">
-        <div className="flex items-center gap-1.5 mb-3">
-          <div className="w-2 h-2 rounded-full bg-red-400" />
-          <span className="text-[11px] font-semibold text-zinc-300">충전 시작 레벨</span>
-          {startTotal > 0 && (
-            <span className="ml-1 text-[10px] text-zinc-600">(총 {startTotal}회)</span>
-          )}
-        </div>
-        <HistBar counts={start_level} color="#f87171" />
-        {startTotal > 0 && (
-          <>
-            <div className="flex justify-between mt-1.5 text-[9px] tabular-nums text-zinc-600">
-              {ticks.map((l, i) => <span key={i}>{l}</span>)}
-            </div>
-            <div className="mt-2 text-[10px] text-zinc-600">
-              주로 <span className="text-zinc-300 font-semibold">{start_modal_range}</span> 구간에서 충전 시작
-            </div>
-          </>
-        )}
+    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3.5">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px] font-semibold text-zinc-300">충전 시작 → 종료 분포</span>
+        {total > 0 && <span className="text-[10px] text-zinc-600">총 {total}회</span>}
       </div>
-      <div className="px-4 py-3.5">
-        <div className="flex items-center gap-1.5 mb-3">
-          <div className="w-2 h-2 rounded-full bg-emerald-400" />
-          <span className="text-[11px] font-semibold text-zinc-300">충전 종료 레벨</span>
-          {endTotal > 0 && (
-            <span className="ml-1 text-[10px] text-zinc-600">(총 {endTotal}회)</span>
-          )}
-        </div>
-        <HistBar counts={end_level} color="#34d399" />
-        {endTotal > 0 && (
-          <>
-            <div className="flex justify-between mt-1.5 text-[9px] tabular-nums text-zinc-600">
-              {ticks.map((l, i) => <span key={i}>{l}</span>)}
-            </div>
-            <div className="mt-2 text-[10px] text-zinc-600">
-              주로 <span className="text-zinc-300 font-semibold">{end_modal_range}</span> 구간에서 충전 종료
-            </div>
-          </>
-        )}
-      </div>
+      {total === 0 ? (
+        <p className="text-[10px] text-zinc-600 py-8 text-center">충전 기록이 없습니다</p>
+      ) : (
+        <>
+          <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="w-full h-auto">
+            {Array.from({ length: buckets }).map((_, sx) =>
+              Array.from({ length: buckets }).map((_, ey) => {
+                const cnt = cellMap.get(`${sx}-${ey}`) || 0;
+                const x = PAD_L + sx * CELL;
+                const y = PAD_T + (buckets - 1 - ey) * CELL;
+                const isValid = ey > sx;
+                if (cnt === 0) {
+                  return (
+                    <rect
+                      key={`${sx}-${ey}`}
+                      x={x} y={y} width={CELL - 0.5} height={CELL - 0.5}
+                      fill={isValid ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.008)'}
+                      rx="0.5"
+                    />
+                  );
+                }
+                const intensity = Math.max(0.25, cnt / maxCnt);
+                return (
+                  <rect
+                    key={`${sx}-${ey}`}
+                    x={x} y={y} width={CELL - 0.5} height={CELL - 0.5}
+                    fill={`rgba(52,211,153,${intensity})`}
+                    rx="1"
+                  >
+                    <title>{`${sx * bucket_size}~${sx * bucket_size + bucket_size}% → ${ey * bucket_size}~${ey * bucket_size + bucket_size}%: ${cnt}회`}</title>
+                  </rect>
+                );
+              })
+            )}
+            {/* 대각선 (start=end) */}
+            <line
+              x1={PAD_L} y1={PAD_T + GRID}
+              x2={PAD_L + GRID} y2={PAD_T}
+              stroke="rgba(255,255,255,0.18)" strokeWidth="1" strokeDasharray="2 2"
+            />
+            {/* Y축 라벨 */}
+            {[0, 25, 50, 75, 100].map(v => {
+              const y = PAD_T + GRID - (v / 100) * GRID;
+              return (
+                <text key={`y-${v}`} x={PAD_L - 3} y={y + 3} textAnchor="end" fontSize="7" fill="#71717a">
+                  {v}
+                </text>
+              );
+            })}
+            {/* X축 라벨 */}
+            {[0, 25, 50, 75, 100].map(v => {
+              const x = PAD_L + (v / 100) * GRID;
+              return (
+                <text key={`x-${v}`} x={x} y={PAD_T + GRID + 10} textAnchor="middle" fontSize="7" fill="#71717a">
+                  {v}
+                </text>
+              );
+            })}
+            {/* 축 제목 */}
+            <text x={PAD_L + GRID / 2} y={VIEW_H - 2} textAnchor="middle" fontSize="7" fill="#a1a1aa">
+              시작 %
+            </text>
+            <text x={4} y={PAD_T + GRID / 2} textAnchor="middle" fontSize="7" fill="#a1a1aa"
+                  transform={`rotate(-90, 4, ${PAD_T + GRID / 2})`}>
+              종료 %
+            </text>
+          </svg>
+          <div className="mt-2 text-[10px] text-zinc-600 flex items-center justify-center gap-2">
+            <span>주로 <span className="text-red-400 font-semibold">{start_modal_range}</span></span>
+            <span className="text-zinc-700">→</span>
+            <span><span className="text-emerald-400 font-semibold">{end_modal_range}</span></span>
+          </div>
+        </>
+      )}
     </div>
   );
 }
