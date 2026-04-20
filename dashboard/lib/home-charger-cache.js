@@ -9,7 +9,7 @@ const CACHE_TIERS = [
   { start: 10, end: 17, ttlMs:  5 * 60_000 }, // 낮 안정
   { start: 17, end: 22, ttlMs:  2 * 60_000 }, // 귀가/충전 피크
   { start: 22, end: 24, ttlMs: 30 * 60_000 }, // 저녁~자정
-  { start:  0, end:  6, ttlMs: Infinity   }, // 심야 (갱신 안 함)
+  { start:  0, end:  6, ttlMs: 60 * 60_000 }, // 심야 1시간
 ];
 const FALLBACK_TTL_MS = 10 * 60_000;
 
