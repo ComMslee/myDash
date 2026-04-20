@@ -68,6 +68,7 @@ export async function GET() {
       dailyMinCharge6mResult,
       dailyMaxDrive6mResult,
       dailyMinDrive6mResult,
+      chargingSessionsResult,
     ] = await Promise.all([
       // 배터리 용량 추정 1순위: 충전 세션 역산
       pool.query(`
@@ -350,6 +351,21 @@ export async function GET() {
         GROUP BY day HAVING SUM(distance) > 0
         ORDER BY range_used_km ASC LIMIT 1
       `, [carId, sixMonthsAgoUTC]),
+      // 최근 충전 세션 (idle 타임라인과 함께 표시용)
+      pool.query(`
+        SELECT start_date, end_date,
+               start_battery_level::int AS soc_start,
+               end_battery_level::int AS soc_end,
+               (end_battery_level - start_battery_level)::int AS soc_added,
+               ROUND(EXTRACT(EPOCH FROM end_date - start_date) / 3600, 2)::float AS duration_hours
+        FROM charging_processes
+        WHERE car_id = $1
+          AND end_date IS NOT NULL
+          AND start_battery_level IS NOT NULL
+          AND end_battery_level IS NOT NULL
+          AND end_date >= NOW() - INTERVAL '14 days'
+        ORDER BY start_date DESC
+      `, [carId]),
     ]);
 
     // 배터리 용량: 1순위 충전역산, 2순위 positions역산, 3순위 상수
@@ -609,6 +625,14 @@ export async function GET() {
         soc_drop: parseInt(r.soc_drop),
         idle_hours: parseFloat(r.idle_hours),
         next_type: r.next_type,
+      })),
+      charging_sessions: chargingSessionsResult.rows.map(r => ({
+        start: r.start_date,
+        end: r.end_date,
+        soc_start: parseInt(r.soc_start),
+        soc_end: parseInt(r.soc_end),
+        soc_added: parseInt(r.soc_added),
+        duration_hours: parseFloat(r.duration_hours),
       })),
     });
   } catch (err) {
