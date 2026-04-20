@@ -8,19 +8,6 @@ import { formatDuration } from '../../lib/format';
 // GlobalHeader를 숨길 경로 (서브/상세 페이지)
 const HIDDEN_ROUTES = ['/rankings'];
 
-function StateBadge({ state }) {
-  const map = {
-    driving:   { label: '주행 중',   cls: 'text-blue-400' },
-    parked:    { label: '주차 중',   cls: 'text-zinc-400' },
-    suspended: { label: '절전 중',   cls: 'text-indigo-400' },
-    online:    { label: '온라인',    cls: 'text-teal-400' },
-  };
-  if (!state || state === 'offline' || state === 'charging') return null;
-  const s = map[state];
-  if (!s) return null;
-  return <span className={`text-xs font-semibold ${s.cls}`}>{s.label}</span>;
-}
-
 function PercentBadge({ level, color, charging }) {
   return (
     <div
@@ -97,12 +84,9 @@ export default function GlobalHeader() {
     : null;
 
   // 확정 상태(주차/주행/충전)별 경과 시간 계산
-  // driving/charging 제외한 나머지(online/suspended/asleep/parked/unknown/offline)는 모두 '주차'로 통합
-  const displayState = isCharging
-    ? 'charging'
-    : effectiveState === 'driving'
-      ? 'driving'
-      : 'parked';
+  // states 테이블이 아직 driving으로 전환 전이어도 진행중 drive(current_drive_start)가 있으면 주행
+  const isDriving = effectiveState === 'driving' || !!car?.current_drive_start;
+  const displayState = isCharging ? 'charging' : isDriving ? 'driving' : 'parked';
 
   let elapsedSince = null;
   if (displayState === 'charging') elapsedSince = charging?.start_date ?? null;
@@ -216,7 +200,6 @@ export default function GlobalHeader() {
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            {effectiveState && <StateBadge state={effectiveState} />}
             {estRange && (
               <span className="text-zinc-400 text-xs tabular-nums">예측 {estRange}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
             )}
