@@ -51,14 +51,14 @@ export async function GET() {
          ORDER BY cp.end_date DESC LIMIT 1`,
         [carId]
       ),
-      // 일별 drives 소모량 (drives 기반 — 충전 타이밍 영향 받지 않음)
+      // 일별 drives 소모량 (rated_range_km → % 환산, 350km 기준)
       pool.query(
         `SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
-                SUM(CASE
-                  WHEN start_battery_level IS NOT NULL AND end_battery_level IS NOT NULL
-                  THEN GREATEST(start_battery_level - end_battery_level, 0)
+                (SUM(CASE
+                  WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
+                  THEN GREATEST(start_rated_range_km - end_rated_range_km, 0)
                   ELSE 0
-                END)::float AS pct_consumed
+                END) / 350.0 * 100)::float AS pct_consumed
          FROM drives
          WHERE car_id = $1
            AND start_date >= NOW() - INTERVAL '14 days'
@@ -163,6 +163,6 @@ export async function GET() {
     });
   } catch (err) {
     console.error('/api/car error:', err);
-    return Response.json({ error: 'DB error', detail: err?.message, stack: err?.stack?.split('\n').slice(0, 3) }, { status: 500 });
+    return Response.json({ error: 'DB error' }, { status: 500 });
   }
 }
