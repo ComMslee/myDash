@@ -32,3 +32,4 @@ AWS Lightsail 기반 TeslaMate Dashboard 운영 문서.
 - [OPERATIONS.md](./OPERATIONS.md) — 배포, 모니터링, 재부팅, 문제 해결
 - [TAILSCALE.md](./TAILSCALE.md) — Tailscale 설정 (외부 접근)
 - [DEPLOY.md](./DEPLOY.md) — CI/CD (GitHub Actions)
+- [EV_CHARGER_API.md](./EV_CHARGER_API.md) — 한국환경공단 전기차 충전소 정보 API 사용 가이드

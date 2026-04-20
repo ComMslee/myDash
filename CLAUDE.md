@@ -161,3 +161,7 @@ TeslaMate가 관리하는 PostgreSQL 스키마. 직접 쿼리만 사용 (ORM 없
 ```
 
 타입: `feat`, `fix`, `ci`, `docs`
+
+## 외부 API 참고
+
+- **한국환경공단 전기자동차 충전소 정보** — 공공 충전소 위치/상태 조회 API. 엔드포인트, 인증키 보관, 호출 함정(HTTPS/UA/numOfRows), 오퍼레이션, Next.js 라우트 예시는 [`docs/EV_CHARGER_API.md`](./docs/EV_CHARGER_API.md) 참고.
