@@ -61,7 +61,7 @@ export async function GET() {
                 END)::float AS pct_consumed
          FROM drives
          WHERE car_id = $1
-           AND start_date >= NOW() - ($2 || ' days')::interval
+           AND start_date >= NOW() - ($2::int * INTERVAL '1 day')
          GROUP BY day
          ORDER BY day ASC`,
         [carId, LOOKBACK_DAYS]
