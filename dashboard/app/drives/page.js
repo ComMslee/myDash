@@ -120,16 +120,10 @@ function RecordsCard({ allTime }) {
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      {/* 헤더 — 다른 카드들과 동일 포맷 */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
-        <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">기록</span>
-        <span className="text-[10px] text-zinc-500">TOP 50 ›</span>
-      </div>
-
       <div className="px-4 pt-3 pb-3">
         {/* 컬럼 헤더 */}
         <div className="grid grid-cols-[40px_1fr_1fr] gap-1 pb-1">
-          <div />
+          <div className="text-[9px] font-bold tracking-wider text-zinc-600 flex items-center justify-center">TOP 50</div>
           <div className="text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500">단일 주행</div>
           <div className="text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500">일 합계</div>
         </div>
