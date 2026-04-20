@@ -6,6 +6,7 @@ import IdleDrainCard from './IdleDrainCard';
 import { LevelHabitCard } from './RecordsHabit';
 import MonthlyChargeCard from './MonthlyChargeCard';
 import FastChargeCard from './FastChargeCard';
+import SlowChargeCard from './SlowChargeCard';
 import { CapacityTrendCard } from './BatteryTrendCard';
 import ChargeHeatmap from './ChargeHeatmap';
 import { Spinner } from '@/app/components/PageLayout';
@@ -60,6 +61,9 @@ export default function BatteryPage() {
 
             {/* 급속 충전 */}
             <FastChargeCard />
+
+            {/* 완속 충전 */}
+            <SlowChargeCard />
 
             {/* 대기 소모 */}
             <IdleDrainCard records={data.idle_drain} chargingSessions={data.charging_sessions} />
