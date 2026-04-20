@@ -100,31 +100,44 @@ export default function IdleDrainCard({ records }) {
                 </div>
               </div>
               <div className="px-4 py-2.5">
-                <div className="flex w-full h-6 rounded-md overflow-hidden bg-white/[0.03]">
+                {/* 24h 타임라인 — 비대기 구간은 회색으로 */}
+                <div className="relative w-full h-6 rounded-md overflow-hidden bg-white/[0.05]">
                   {items.map((r, i) => {
-                    const widthPct = dayIdleH > 0 ? (r.idle_hours / dayIdleH) * 100 : 0;
+                    const start = new Date(r.idle_start);
+                    const kstStart = new Date(start.getTime() + 9 * 60 * 60 * 1000);
+                    const hourOffset = kstStart.getUTCHours() + kstStart.getUTCMinutes() / 60 + kstStart.getUTCSeconds() / 3600;
+                    const leftPct = (hourOffset / 24) * 100;
+                    const visibleH = Math.min(24 - hourOffset, r.idle_hours);
+                    const widthPct = (visibleH / 24) * 100;
+                    if (widthPct <= 0) return null;
                     const rate = r.idle_hours > 0 ? r.soc_drop / r.idle_hours : 0;
                     const intensity = r.soc_drop === 0 ? 0 : Math.max(0.35, Math.min(1, rate / maxRate));
                     const bg = r.soc_drop === 0
-                      ? 'rgba(16,185,129,0.25)'
+                      ? 'rgba(16,185,129,0.3)'
                       : `rgba(239,68,68,${intensity})`;
-                    const showLabel = widthPct >= 12;
+                    const showLabel = widthPct >= 10;
                     return (
                       <div
                         key={i}
-                        className="flex items-center justify-center text-[9px] font-bold tabular-nums text-white/90 border-r border-black/20 last:border-0"
-                        style={{ width: `${widthPct}%`, background: bg }}
+                        className="absolute top-0 bottom-0 flex items-center justify-center text-[9px] font-bold tabular-nums text-white/90"
+                        style={{ left: `${leftPct}%`, width: `${widthPct}%`, background: bg }}
                         title={`${formatHM(r.idle_start)}~${r.idle_end ? formatHM(r.idle_end) : '현재'} · ${formatDuration(r.idle_hours)} · ${r.soc_start}→${r.soc_end}% · ${r.soc_drop === 0 ? '0%' : `-${r.soc_drop}%`}`}
                       >
                         {showLabel ? (r.soc_drop === 0 ? '0' : `-${r.soc_drop}%`) : ''}
                       </div>
                     );
                   })}
+                  {/* 6·12·18시 가이드라인 */}
+                  {[6, 12, 18].map(h => (
+                    <div key={h} className="absolute top-0 bottom-0 w-px bg-white/10 pointer-events-none" style={{ left: `${(h / 24) * 100}%` }} />
+                  ))}
                 </div>
                 <div className="flex justify-between mt-1 text-[9px] tabular-nums text-zinc-600">
-                  <span>{formatHM(items[0].idle_start)}</span>
-                  <span>{items.length}회</span>
-                  <span>{items[items.length - 1].idle_end ? formatHM(items[items.length - 1].idle_end) : '현재'}</span>
+                  <span>0</span>
+                  <span>6</span>
+                  <span>12</span>
+                  <span>18</span>
+                  <span>24시</span>
                 </div>
               </div>
             </div>
