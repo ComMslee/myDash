@@ -1,6 +1,6 @@
 'use client';
 
-export default function HealthScoreCard({ data }) {
+export default function HealthScoreCard({ data, trend }) {
   const {
     score,
     grade,
@@ -23,6 +23,16 @@ export default function HealthScoreCard({ data }) {
     );
   }
 
+  // 배터리 용량 추이 (12개월 중 가장 오래된 달 대비 최근 달의 용량 비율)
+  const recentCap = (trend?.capacity_trend || []).slice(-12);
+  const firstCap = recentCap[0]?.est_capacity_kwh;
+  const lastCap = recentCap[recentCap.length - 1]?.est_capacity_kwh;
+  const trendPct = firstCap && lastCap ? (lastCap / firstCap) * 100 : null;
+  const trendColor = trendPct == null ? '#71717a'
+    : trendPct >= 95 ? '#10b981'
+    : trendPct >= 90 ? '#f59e0b'
+    : '#ef4444';
+
   // 2% 단위가 있으면 50칸, 없으면 10칸 fallback
   const hist = soc_histogram_2 && soc_histogram_2.length === 50 ? soc_histogram_2 : soc_histogram;
   const bucketSize = hist.length === 50 ? 2 : 10;
@@ -34,12 +44,13 @@ export default function HealthScoreCard({ data }) {
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      {/* 상단: 점수 · SOC · 등급 — 간소화 한 줄 */}
+      {/* 상단: 점수(등급) · 평균 SOC · 추이 — 한 줄 */}
       <div className="flex items-center justify-around px-4 py-3 border-b border-white/[0.06]">
         <div className="text-center">
           <p className="text-[10px] text-zinc-600 mb-0.5">점수</p>
           <p className="text-xl font-black leading-none tabular-nums" style={{ color: arcColor }}>
-            {score}<span className="text-xs text-zinc-600 font-normal ml-0.5">점</span>
+            {score}
+            <span className="text-xs text-zinc-500 font-bold ml-1">({grade})</span>
           </p>
         </div>
         <div className="w-px h-8 bg-white/[0.06]" />
@@ -51,9 +62,15 @@ export default function HealthScoreCard({ data }) {
         </div>
         <div className="w-px h-8 bg-white/[0.06]" />
         <div className="text-center">
-          <p className="text-[10px] text-zinc-600 mb-0.5">등급</p>
-          <p className="text-xl font-black leading-none tabular-nums" style={{ color: arcColor }}>
-            {grade}
+          <p className="text-[10px] text-zinc-600 mb-0.5">추이</p>
+          <p className="text-xl font-black leading-none tabular-nums" style={{ color: trendColor }}>
+            {trendPct != null ? (
+              <>
+                {trendPct.toFixed(1)}<span className="text-xs text-zinc-600 font-normal ml-0.5">%</span>
+              </>
+            ) : (
+              <span className="text-zinc-600">—</span>
+            )}
           </p>
         </div>
       </div>
