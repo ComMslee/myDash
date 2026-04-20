@@ -1,23 +1,21 @@
-// 집충전기(환경공단 EvCharger) 캐시 모듈
-// 라우트와 instrumentation(서버 기동 훅) 모두에서 공유하여 최초 기동 시 캐시를 미리 데운다.
+// 집충전기(환경공단 EvCharger) 캐시 모듈 — 여러 스테이션을 한 번의 페이지 스캔으로 수집.
+// route + instrumentation에서 공유.
 
 const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 const ZCODE = '41';
 const MAX_PAGES = 10;
 const PAGE_SIZE = 9999;
 
-// KST 시간대별 캐시 TTL. 범위는 [start, end) 이며 start>end이면 자정을 넘어감. Infinity = 갱신 안 함.
 const CACHE_TIERS = [
-  { start:  6, end: 10, ttlMs:  2 * 60_000 }, // 출근 피크
-  { start: 10, end: 17, ttlMs:  5 * 60_000 }, // 낮 안정
-  { start: 17, end: 22, ttlMs:  2 * 60_000 }, // 귀가/충전 피크
-  { start: 22, end: 24, ttlMs: 30 * 60_000 }, // 저녁~자정
-  { start:  0, end:  6, ttlMs: Infinity   }, // 심야 (갱신 안 함)
+  { start:  6, end: 10, ttlMs:  2 * 60_000 },
+  { start: 10, end: 17, ttlMs:  5 * 60_000 },
+  { start: 17, end: 22, ttlMs:  2 * 60_000 },
+  { start: 22, end: 24, ttlMs: 30 * 60_000 },
+  { start:  0, end:  6, ttlMs: Infinity   },
 ];
 const FALLBACK_TTL_MS = 10 * 60_000;
 
 let cache = { ts: 0, data: null };
-let lastHitPage = null;
 let inflight = null;
 
 export function cacheTtlMs(now = new Date()) {
@@ -34,6 +32,16 @@ export function cacheTtlMs(now = new Date()) {
 export function getCache() { return cache; }
 export function setCache(data) { cache = { ts: Date.now(), data }; }
 export function isFresh() { return !!cache.data && Date.now() - cache.ts < cacheTtlMs(); }
+
+export function getStatIds() {
+  const multi = process.env.HOME_CHARGER_STAT_IDS;
+  if (multi) {
+    const ids = multi.split(',').map(s => s.trim()).filter(Boolean);
+    if (ids.length) return ids;
+  }
+  const single = process.env.HOME_CHARGER_STAT_ID;
+  return [single || 'PI795111'];
+}
 
 function parseItems(xml) {
   const items = [];
@@ -91,12 +99,11 @@ async function fetchPage(pageNo, key) {
   }
 }
 
-function pickStationFromItems(items, statId) {
-  const chargers = [];
-  let station = null;
+function collectStations(items, statIdSet, bucket) {
   for (const it of items) {
-    if (it.statId !== statId) continue;
-    chargers.push({
+    if (!statIdSet.has(it.statId)) continue;
+    const slot = bucket.get(it.statId);
+    slot.chargers.push({
       chgerId: it.chgerId,
       chgerType: it.chgerType,
       output: Number(it.output) || null,
@@ -105,8 +112,8 @@ function pickStationFromItems(items, statId) {
       lastTsdt: it.lastTsdt,
       lastTedt: it.lastTedt,
     });
-    if (!station) {
-      station = {
+    if (!slot.station) {
+      slot.station = {
         statId: it.statId,
         statNm: it.statNm,
         addr: [it.addr, it.addrDetail].filter(v => v && v !== 'null').join(' '),
@@ -118,34 +125,12 @@ function pickStationFromItems(items, statId) {
       };
     }
   }
-  return { station, chargers };
 }
 
-function mergeChargers(target, incoming) {
-  const seen = new Set(target.map(c => c.chgerId));
-  for (const c of incoming) {
-    if (!seen.has(c.chgerId)) {
-      target.push(c);
-      seen.add(c.chgerId);
-    }
-  }
-}
-
-export async function loadStation(statId, key) {
-  // Fast path: remembered hit page
-  if (lastHitPage) {
-    try {
-      const xml = await fetchPage(lastHitPage, key);
-      const items = parseItems(xml);
-      const { station, chargers } = pickStationFromItems(items, statId);
-      if (station && chargers.length) {
-        chargers.sort((a, b) => a.chgerId.localeCompare(b.chgerId));
-        return { station, chargers };
-      }
-    } catch (e) {
-      console.warn(`[home-charger] fast path (page ${lastHitPage}) failed:`, e.message);
-    }
-  }
+export async function loadStations(statIds, key) {
+  const statIdSet = new Set(statIds);
+  const bucket = new Map();
+  for (const id of statIds) bucket.set(id, { station: null, chargers: [] });
 
   const results = await Promise.all(
     Array.from({ length: MAX_PAGES }, (_, i) =>
@@ -157,56 +142,47 @@ export async function loadStation(statId, key) {
   );
 
   const failedPages = results.map((r, i) => r == null ? i + 1 : null).filter(Boolean);
-  const merged = [];
-  let station = null;
-  let hitPage = null;
-  for (let i = 0; i < results.length; i++) {
-    const items = results[i];
-    if (!items) continue;
-    const { station: s, chargers } = pickStationFromItems(items, statId);
-    if (chargers.length) {
-      if (!station) station = s;
-      if (hitPage == null) hitPage = i + 1;
-      mergeChargers(merged, chargers);
-    }
+  for (const items of results) {
+    if (items) collectStations(items, statIdSet, bucket);
   }
 
-  if (!station && failedPages.length) {
+  // 아직 못 찾은 statId가 있고 실패 페이지가 있으면 순차 재시도
+  const missing = () => statIds.filter(id => !bucket.get(id).station);
+  if (missing().length && failedPages.length) {
     for (const p of failedPages) {
+      if (!missing().length) break;
       try {
-        const items = parseItems(await fetchPage(p, key));
-        const { station: s, chargers } = pickStationFromItems(items, statId);
-        if (chargers.length) {
-          station = s;
-          hitPage = p;
-          mergeChargers(merged, chargers);
-          break;
-        }
+        collectStations(parseItems(await fetchPage(p, key)), statIdSet, bucket);
       } catch (e) {
         console.warn(`[home-charger] retry page ${p} failed:`, e.message);
       }
     }
   }
 
-  if (hitPage) lastHitPage = hitPage;
-  merged.sort((a, b) => a.chgerId.localeCompare(b.chgerId));
-  return { station, chargers: merged };
+  const stations = [];
+  for (const id of statIds) {
+    const slot = bucket.get(id);
+    if (slot.station && slot.chargers.length) {
+      slot.chargers.sort((a, b) => a.chgerId.localeCompare(b.chgerId));
+      stations.push(slot);
+    }
+  }
+  return stations;
 }
 
-// 캐시가 비었거나 만료된 경우에만 백그라운드 로드. 동시 호출은 inflight로 단일 수행.
 export async function warmIfNeeded() {
   const key = process.env.EV_CHARGER_API_KEY;
-  const statId = process.env.HOME_CHARGER_STAT_ID || 'PI795111';
   if (!key) return null;
+  const statIds = getStatIds();
   if (isFresh()) return cache.data;
   if (inflight) return inflight;
   inflight = (async () => {
     try {
-      const { station, chargers } = await loadStation(statId, key);
-      if (station && chargers.length) {
-        const payload = { station, chargers, fetchedAt: new Date().toISOString() };
+      const stations = await loadStations(statIds, key);
+      if (stations.length) {
+        const payload = { stations, fetchedAt: new Date().toISOString() };
         setCache(payload);
-        console.log(`[home-charger] warm cache loaded (${chargers.length} chargers)`);
+        console.log(`[home-charger] warm cache loaded (${stations.length} station(s), ${stations.reduce((s,x)=>s+x.chargers.length,0)} chargers)`);
         return payload;
       }
       return null;
