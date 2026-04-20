@@ -54,6 +54,8 @@ services:
       - TM_DB_NAME=${TM_DB_NAME}
       - DB_HOST=database
       - KAKAO_REST_API_KEY=${KAKAO_REST_API_KEY}
+      - EV_CHARGER_API_KEY=${EV_CHARGER_API_KEY}
+      - HOME_CHARGER_STAT_ID=${HOME_CHARGER_STAT_ID:-PI795111}
     ports:
       - 80:5000
       - 5000:5000
