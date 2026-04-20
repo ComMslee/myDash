@@ -135,11 +135,11 @@ export default function HomeChargerCard() {
             <div className="mb-3 space-y-2">
               {extraGroup.length > 0 && (
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-zinc-600 mr-0.5">별도</span>
+                  <span className="text-[10px] text-zinc-600 mr-0.5">자주 쓰는</span>
                   {extraGroup.map(c => renderCell(c, 'lg'))}
                 </div>
               )}
-              <div className="grid grid-cols-10 gap-1">
+              <div className="grid grid-cols-12 gap-1">
                 {mainGroup.map(c => renderCell(c, 'md'))}
               </div>
             </div>
