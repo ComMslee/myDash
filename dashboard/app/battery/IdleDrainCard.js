@@ -59,6 +59,7 @@ export default function IdleDrainCard({ records }) {
         soc_drop: segDrop,
         soc_start: socStart != null ? Math.round(socStart * 10) / 10 : null,
         soc_end: socEnd != null ? Math.round(socEnd * 10) / 10 : null,
+        next_type: r.next_type,
       });
       cursor = segEnd;
     }
@@ -155,17 +156,18 @@ export default function IdleDrainCard({ records }) {
                     if (widthPct <= 0) return null;
                     const rate = r.idle_hours > 0 ? r.soc_drop / r.idle_hours : 0;
                     const isZero = r.soc_drop < 0.05;
+                    const isPreCharge = r.next_type === 'charge';
                     const intensity = isZero ? 0 : Math.max(0.35, Math.min(1, rate / maxRate));
                     const bg = isZero
-                      ? 'rgba(16,185,129,0.3)'
-                      : `rgba(239,68,68,${intensity})`;
+                      ? (isPreCharge ? 'rgba(234,179,8,0.3)' : 'rgba(16,185,129,0.3)')
+                      : (isPreCharge ? `rgba(234,179,8,${intensity})` : `rgba(239,68,68,${intensity})`);
                     const showLabel = widthPct >= 10;
                     return (
                       <div
                         key={i}
                         className="absolute top-0 bottom-0 flex items-center justify-center text-[9px] font-bold tabular-nums text-white/90"
                         style={{ left: `${leftPct}%`, width: `${widthPct}%`, background: bg }}
-                        title={`${formatHM(r.idle_start)}~${r.idle_end ? formatHM(r.idle_end) : '현재'} · ${formatDuration(r.idle_hours)} · ${r.soc_start}→${r.soc_end}% · ${isZero ? '0%' : `-${fmtDrop(r.soc_drop)}%`}`}
+                        title={`${formatHM(r.idle_start)}~${r.idle_end ? formatHM(r.idle_end) : '현재'} · ${formatDuration(r.idle_hours)} · ${r.soc_start}→${r.soc_end}% · ${isZero ? '0%' : `-${fmtDrop(r.soc_drop)}%`}${isPreCharge ? ' · ⚡충전 전 대기' : ''}`}
                       >
                         {showLabel ? (isZero ? '0' : `-${fmtDrop(r.soc_drop)}%`) : ''}
                       </div>
