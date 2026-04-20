@@ -7,9 +7,9 @@ const PAGE_SIZE = 9999;
 // KST 시간대별 캐시 TTL (분 단위). 범위는 [start, end) 이며 end=start인 구간은 자정을 넘어감.
 const CACHE_TIERS = [
   { start:  6, end: 10, ttlMs:  2 * 60_000 }, // 출근 피크
-  { start: 10, end: 17, ttlMs: 10 * 60_000 }, // 낮 안정
+  { start: 10, end: 17, ttlMs:  5 * 60_000 }, // 낮 안정
   { start: 17, end: 22, ttlMs:  2 * 60_000 }, // 귀가/충전 피크
-  { start: 22, end:  6, ttlMs: 30 * 60_000 }, // 심야
+  { start: 22, end:  6, ttlMs: 60 * 60_000 }, // 심야
 ];
 const FALLBACK_TTL_MS = 10 * 60_000;
 
