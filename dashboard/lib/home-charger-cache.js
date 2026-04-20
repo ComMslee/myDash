@@ -3,13 +3,14 @@
 
 const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 
-// 공공 API 일일 쿼터 1,000회/일 고려하여 보수적 TTL
+// 공공 API 일일 쿼터 1,000회/일 고려하여 시간대별 TTL 설정
 const CACHE_TIERS = [
-  { start:  6, end: 10, ttlMs:  5 * 60_000 }, // 출근 (전날 충전 끝났을 가능성 — 갱신 덜 급함)
-  { start: 10, end: 17, ttlMs:  5 * 60_000 }, // 낮 안정
-  { start: 17, end: 22, ttlMs:  2 * 60_000 }, // 귀가/충전 피크
-  { start: 22, end: 24, ttlMs: 30 * 60_000 }, // 저녁~자정
   { start:  0, end:  6, ttlMs: 60 * 60_000 }, // 심야 1시간
+  { start:  6, end: 12, ttlMs: 10 * 60_000 }, // 오전
+  { start: 12, end: 15, ttlMs:  5 * 60_000 }, // 점심
+  { start: 15, end: 17, ttlMs: 10 * 60_000 }, // 오후
+  { start: 17, end: 22, ttlMs:  3 * 60_000 }, // 귀가/충전 피크
+  { start: 22, end: 24, ttlMs: 10 * 60_000 }, // 저녁~자정
 ];
 const FALLBACK_TTL_MS = 10 * 60_000;
 
