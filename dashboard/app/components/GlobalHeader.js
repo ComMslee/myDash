@@ -181,9 +181,6 @@ export default function GlobalHeader() {
               </div>
             );
           })()}
-          <span className="font-semibold text-zinc-200 text-base truncate">
-            {car?.name || 'TeslaMate'}
-          </span>
           {(lastSeenLabel || timeLabel) && (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-zinc-800/80 border border-white/5 text-zinc-500 flex-shrink-0">
               <span className="text-[11px] tabular-nums">{lastSeenLabel ?? timeLabel}</span>
