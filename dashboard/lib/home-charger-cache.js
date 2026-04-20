@@ -5,7 +5,7 @@ const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 
 // 공공 API 일일 쿼터 1,000회/일 고려하여 보수적 TTL
 const CACHE_TIERS = [
-  { start:  6, end: 10, ttlMs:  2 * 60_000 }, // 출근 피크
+  { start:  6, end: 10, ttlMs:  5 * 60_000 }, // 출근 (전날 충전 끝났을 가능성 — 갱신 덜 급함)
   { start: 10, end: 17, ttlMs:  5 * 60_000 }, // 낮 안정
   { start: 17, end: 22, ttlMs:  2 * 60_000 }, // 귀가/충전 피크
   { start: 22, end: 24, ttlMs: 30 * 60_000 }, // 저녁~자정
