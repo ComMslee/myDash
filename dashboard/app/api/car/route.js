@@ -154,10 +154,18 @@ export async function GET() {
         thresholdSource = 'learned';
       }
 
-      if (weightedDaily != null && weightedDaily > 0) {
+      // 실측 일일 소모 없으면 기본값(3%/일) 폴백
+      const FALLBACK_DAILY_PCT = 3;
+      const effectiveDaily = (weightedDaily != null && weightedDaily > 0)
+        ? weightedDaily
+        : FALLBACK_DAILY_PCT;
+      const source = (weightedDaily != null && weightedDaily > 0)
+        ? thresholdSource
+        : 'fallback';
+
+      if (effectiveDaily > 0 && currentBattery > thresholdPct) {
         const remainingPct = currentBattery - thresholdPct;
-        const daysRaw = remainingPct > 0 ? remainingPct / weightedDaily : 0;
-        const daysUntil = Math.max(0, Math.round(daysRaw));
+        const daysUntil = Math.max(0, Math.round(remainingPct / effectiveDaily));
         const target = new Date();
         target.setDate(target.getDate() + daysUntil);
 
@@ -165,8 +173,8 @@ export async function GET() {
           date: target.toISOString(),
           days_until: daysUntil,
           threshold_pct: thresholdPct,
-          threshold_source: thresholdSource,
-          daily_consumption_pct: parseFloat(weightedDaily.toFixed(2)),
+          threshold_source: source,
+          daily_consumption_pct: parseFloat(effectiveDaily.toFixed(2)),
         };
       }
     }
