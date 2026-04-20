@@ -1,8 +1,6 @@
 // 집충전기 주변 스테이션 탐색 임시 API (1회성 조사용)
 // GET /api/find-nearby-chargers?base=PI795111&radius=1000&count=12
 
-import { loadStations } from '@/lib/home-charger-cache';
-
 export const dynamic = 'force-dynamic';
 
 const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
