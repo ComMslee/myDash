@@ -1,9 +1,9 @@
 import {
-  cacheTtlMs,
   getCache,
   isFresh,
   loadStation,
   setCache,
+  warmIfNeeded,
 } from '@/lib/home-charger-cache';
 
 export const dynamic = 'force-dynamic';
@@ -16,27 +16,39 @@ export async function GET(req) {
   }
   const { searchParams } = new URL(req.url);
   const force = searchParams.get('refresh') === '1';
+
+  // 강제 갱신: 동기 페치 (사용자가 버튼 누름)
+  if (force) {
+    try {
+      const { station, chargers } = await loadStation(statId, key);
+      if (station && chargers.length) {
+        const payload = { station, chargers, fetchedAt: new Date().toISOString() };
+        setCache(payload);
+        return Response.json(payload);
+      }
+    } catch (e) {
+      console.error('[home-charger] upstream error:', e.message);
+    }
+    const c = getCache();
+    if (c.data) return Response.json({ ...c.data, stale: true });
+    return Response.json({ error: '조회 실패' }, { status: 500 });
+  }
+
+  // SWR: 캐시가 있으면 즉시 응답, 만료됐으면 백그라운드에서 갱신
   const cache = getCache();
-  if (!force && isFresh()) {
-    return Response.json(cache.data);
+  if (cache.data) {
+    if (!isFresh()) {
+      warmIfNeeded().catch(e => console.warn('[home-charger] bg warm failed:', e.message));
+    }
+    return Response.json(isFresh() ? cache.data : { ...cache.data, stale: true });
   }
+
+  // 콜드 스타트(캐시 비어있음): warm inflight를 공유하여 대기
   try {
-    const { station, chargers } = await loadStation(statId, key);
-    if (station && chargers.length) {
-      const payload = { station, chargers, fetchedAt: new Date().toISOString() };
-      setCache(payload);
-      return Response.json(payload);
-    }
-    if (cache.data) {
-      console.warn('[home-charger] station not found, serving stale cache');
-      return Response.json({ ...cache.data, stale: true });
-    }
-    return Response.json({ error: '스테이션을 찾지 못했습니다.' }, { status: 404 });
+    const payload = await warmIfNeeded();
+    if (payload) return Response.json(payload);
   } catch (e) {
-    console.error('[home-charger] upstream error:', e.message);
-    if (cache.data) {
-      return Response.json({ ...cache.data, stale: true });
-    }
-    return Response.json({ error: e.message || '조회 실패' }, { status: 500 });
+    console.error('[home-charger] cold load failed:', e.message);
   }
+  return Response.json({ error: '스테이션을 찾지 못했습니다.' }, { status: 404 });
 }
