@@ -4,10 +4,19 @@ const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 const ZCODE = '41';
 const MAX_PAGES = 10;
 const PAGE_SIZE = 9999;
-const CACHE_TTL_MS = 5 * 60_000;
+const TTL_AWAKE_MS = 2 * 60_000;
+const TTL_SLEEP_MS = 30 * 60_000;
+const AWAKE_START_KST = 7;
+const AWAKE_END_KST = 23;
 
 let cache = { ts: 0, data: null };
 let lastHitPage = null;
+
+function cacheTtlMs(now = new Date()) {
+  const kstHour = (now.getUTCHours() + 9) % 24;
+  const awake = kstHour >= AWAKE_START_KST && kstHour < AWAKE_END_KST;
+  return awake ? TTL_AWAKE_MS : TTL_SLEEP_MS;
+}
 
 function parseItems(xml) {
   const items = [];
@@ -143,7 +152,7 @@ export async function GET() {
     return Response.json({ error: 'EV_CHARGER_API_KEY 미설정' }, { status: 503 });
   }
   const now = Date.now();
-  if (cache.data && now - cache.ts < CACHE_TTL_MS) {
+  if (cache.data && now - cache.ts < cacheTtlMs()) {
     return Response.json(cache.data);
   }
   try {
