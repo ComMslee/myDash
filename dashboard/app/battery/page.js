@@ -6,7 +6,7 @@ import IdleDrainCard from './IdleDrainCard';
 import { LevelHabitCard } from './RecordsHabit';
 import MonthlyChargeCard from './MonthlyChargeCard';
 import FastChargeCard from './FastChargeCard';
-import { CapacityTrendCard, HabitTrendCard } from './BatteryTrendCard';
+import { CapacityTrendCard } from './BatteryTrendCard';
 import ChargeSummaryCard from './ChargeSummaryCard';
 import ChargeHeatmap from './ChargeHeatmap';
 import { Spinner } from '@/app/components/PageLayout';
@@ -55,7 +55,6 @@ export default function BatteryPage() {
 
             {/* 충전 습관 */}
             <LevelHabitCard histogram={data.histogram} />
-            <HabitTrendCard data={trend} />
 
             {/* 충전 통계 */}
             <MonthlyChargeCard />
