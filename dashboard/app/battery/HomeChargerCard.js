@@ -71,13 +71,13 @@ function StationBlock({ station, chargers, withFavorites }) {
         {(favChargers.length > 0 || secondChargers.length > 0) && (
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-zinc-600 mr-0.5 w-10 shrink-0">자주</span>
-            {/* 16~21 */}
-            {secondChargers.map(c => renderCell(c, 'lg'))}
-            {/* 14 15 | 22 23 — 우측 정렬 */}
-            <span className="flex-1" />
+            {/* 14 15 | 22 23 */}
             {favLeft.map(c => renderCell(c, 'lg'))}
             <span className="w-px h-8 bg-white/10 mx-0.5" />
             {favRight.map(c => renderCell(c, 'lg'))}
+            {/* 16~21 — 우측 정렬 */}
+            <span className="flex-1" />
+            {secondChargers.map(c => renderCell(c, 'lg'))}
           </div>
         )}
         {mainGroup.length > 0 && (
