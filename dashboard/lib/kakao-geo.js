@@ -23,6 +23,10 @@ async function ensureTable() {
       updated_at TIMESTAMPTZ DEFAULT now()
     )
   `);
+  // 좌표 정밀도 변경(3→4자리)으로 구 키 포맷 일괄 삭제
+  await pool.query(
+    `DELETE FROM kakao_address_cache WHERE coord_key ~ '^-?[0-9]+\\.[0-9]{3},-?[0-9]+\\.[0-9]{3}$'`
+  );
   tableReady = true;
 }
 
@@ -71,7 +75,7 @@ async function fetchFromKakao(lat, lng) {
 export async function reverseGeocode(lat, lng) {
   if (lat == null || lng == null) return null;
 
-  const coordKey = `${parseFloat(lat).toFixed(3)},${parseFloat(lng).toFixed(3)}`;
+  const coordKey = `${parseFloat(lat).toFixed(4)},${parseFloat(lng).toFixed(4)}`;
 
   try {
     await ensureTable();
