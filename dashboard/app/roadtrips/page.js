@@ -45,6 +45,18 @@ function DrivesInner() {
   const dateParamRaw = searchParams.get('date');
   const initialDate = isValidDateStr(dateParamRaw) ? dateParamRaw : null;
 
+  // 로드트립 페이지는 body 스크롤 차단 (내부 리스트/지도만 스크롤)
+  useEffect(() => {
+    const htmlPrev = document.documentElement.style.overflow;
+    const bodyPrev = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.documentElement.style.overflow = htmlPrev;
+      document.body.style.overflow = bodyPrev;
+    };
+  }, []);
+
   // 주행의 KST 날짜 문자열 계산 (YYYY-MM-DD)
   const driveDayStr = (d) => {
     const dt = new Date(d.start_date);
@@ -102,7 +114,7 @@ function DrivesInner() {
   const goNext = () => { if (selectedIdx < drives.length - 1) { setSelectedDrive(drives[selectedIdx + 1]); setSelectedPlace(null); } };
 
   return (
-    <main className="bg-[#0f0f0f] text-white -mb-20">
+    <main className="bg-[#0f0f0f] text-white">
       <div className="max-w-2xl mx-auto flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 57px - env(safe-area-inset-bottom, 0px))' }}>
 
       {/* 자주 방문하는 장소 */}
