@@ -1,24 +1,7 @@
 'use client';
 
-function formatDuration(hours) {
-  if (hours < 1) return `${Math.round(hours * 60)}분`;
-  const h = Math.floor(hours);
-  const m = Math.round((hours - h) * 60);
-  return m > 0 ? `${h}시간 ${m}분` : `${h}시간`;
-}
-
-function formatDate(dateStr) {
-  const d = new Date(dateStr);
-  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-  const year = kst.getUTCFullYear();
-  const mm = String(kst.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(kst.getUTCDate()).padStart(2, '0');
-  const hh = String(kst.getUTCHours()).padStart(2, '0');
-  const mi = String(kst.getUTCMinutes()).padStart(2, '0');
-  const currentYear = new Date().getFullYear();
-  const prefix = year !== currentYear ? `${String(year).slice(2)}/` : '';
-  return `${prefix}${mm}/${dd} ${hh}:${mi}`;
-}
+import { formatHours } from '@/lib/format';
+import { toKstDate, formatHM, kstDateStr, splitByKstMidnight } from '@/lib/kst';
 
 export default function IdleDrainCard({ records, chargingSessions = [] }) {
   if (!records || records.length === 0) {
@@ -37,31 +20,21 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
     if (endMs <= startMs) return;
     const totalMs = endMs - startMs;
     const totalDrop = r.soc_drop || 0;
-    let cursor = startMs;
-    while (cursor < endMs) {
-      const kstCursor = new Date(cursor + 9 * 3600 * 1000);
-      // 다음 KST 자정 (UTC ms)
-      const nextKstMidnight = Date.UTC(
-        kstCursor.getUTCFullYear(),
-        kstCursor.getUTCMonth(),
-        kstCursor.getUTCDate() + 1
-      ) - 9 * 3600 * 1000;
-      const segEnd = Math.min(endMs, nextKstMidnight);
-      const segMs = segEnd - cursor;
+    for (const seg of splitByKstMidnight(startMs, endMs)) {
+      const segMs = seg.endMs - seg.startMs;
       const segRatio = segMs / totalMs;
       const segDrop = Math.round(totalDrop * segRatio * 10) / 10;
-      const socStart = r.soc_start != null ? r.soc_start - totalDrop * ((cursor - startMs) / totalMs) : null;
-      const socEnd = r.soc_start != null ? r.soc_start - totalDrop * ((segEnd - startMs) / totalMs) : null;
+      const socStart = r.soc_start != null ? r.soc_start - totalDrop * ((seg.startMs - startMs) / totalMs) : null;
+      const socEnd = r.soc_start != null ? r.soc_start - totalDrop * ((seg.endMs - startMs) / totalMs) : null;
       expandedRecords.push({
-        idle_start: new Date(cursor).toISOString(),
-        idle_end: new Date(segEnd).toISOString(),
+        idle_start: new Date(seg.startMs).toISOString(),
+        idle_end: new Date(seg.endMs).toISOString(),
         idle_hours: segMs / 3600000,
         soc_drop: segDrop,
         soc_start: socStart != null ? Math.round(socStart * 10) / 10 : null,
         soc_end: socEnd != null ? Math.round(socEnd * 10) / 10 : null,
         next_type: r.next_type,
       });
-      cursor = segEnd;
     }
   });
 
@@ -71,26 +44,16 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
     const startMs = new Date(c.start).getTime();
     const endMs = c.end ? new Date(c.end).getTime() : Date.now();
     if (endMs <= startMs) return;
-    let cursor = startMs;
-    while (cursor < endMs) {
-      const kstCursor = new Date(cursor + 9 * 3600 * 1000);
-      const nextKstMidnight = Date.UTC(
-        kstCursor.getUTCFullYear(),
-        kstCursor.getUTCMonth(),
-        kstCursor.getUTCDate() + 1
-      ) - 9 * 3600 * 1000;
-      const segEnd = Math.min(endMs, nextKstMidnight);
-      const kstDay = `${kstCursor.getUTCFullYear()}-${String(kstCursor.getUTCMonth() + 1).padStart(2, '0')}-${String(kstCursor.getUTCDate()).padStart(2, '0')}`;
-      if (!chargingByDay[kstDay]) chargingByDay[kstDay] = [];
-      chargingByDay[kstDay].push({
-        start: new Date(cursor).toISOString(),
-        end: new Date(segEnd).toISOString(),
-        hours: (segEnd - cursor) / 3600000,
+    for (const seg of splitByKstMidnight(startMs, endMs)) {
+      if (!chargingByDay[seg.kstDay]) chargingByDay[seg.kstDay] = [];
+      chargingByDay[seg.kstDay].push({
+        start: new Date(seg.startMs).toISOString(),
+        end: new Date(seg.endMs).toISOString(),
+        hours: (seg.endMs - seg.startMs) / 3600000,
         soc_start: c.soc_start,
         soc_end: c.soc_end,
         soc_added: c.soc_added,
       });
-      cursor = segEnd;
     }
   });
 
@@ -111,7 +74,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
         </div>
         <div className="text-center py-3 border-r border-white/[0.06]">
           <div className="text-[10px] text-zinc-600 mb-1">평균 대기</div>
-          <div className="text-sm font-extrabold tabular-nums text-zinc-300">{formatDuration(avgIdleHours)}</div>
+          <div className="text-sm font-extrabold tabular-nums text-zinc-300">{formatHours(avgIdleHours)}</div>
           <div className="text-[9px] text-zinc-600 mt-0.5">{records.length}회 기준</div>
         </div>
         <div className="text-center py-3">
@@ -123,11 +86,6 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
 
       {/* 날짜별 그룹 리스트 */}
       {(() => {
-        const getDateKey = (dateStr) => {
-          const d = new Date(dateStr);
-          const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-          return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}-${String(kst.getUTCDate()).padStart(2, '0')}`;
-        };
         const formatDateLabel = (key) => {
           const [y, m, d] = key.split('-');
           const currentYear = new Date().getFullYear();
@@ -137,7 +95,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
 
         const seen = {};
         expandedRecords.forEach(r => {
-          const key = getDateKey(r.idle_start);
+          const key = kstDateStr(r.idle_start);
           if (!seen[key]) seen[key] = [];
           seen[key].push(r);
         });
@@ -156,11 +114,6 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
           const dayIdleH = items.reduce((s, r) => s + r.idle_hours, 0);
           const dayDropRaw = items.reduce((s, r) => s + r.soc_drop, 0);
           const dayDrop = Math.round(dayDropRaw * 10) / 10;
-          const formatHM = (dateStr) => {
-            const d = new Date(dateStr);
-            const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-            return `${String(kst.getUTCHours()).padStart(2, '0')}:${String(kst.getUTCMinutes()).padStart(2, '0')}`;
-          };
           // 드레인 속도 최댓값(해당 일 기준)으로 색 농도 정규화
           const maxRate = items.length > 0
             ? Math.max(0.1, ...items.map(r => r.idle_hours > 0 ? r.soc_drop / r.idle_hours : 0))
@@ -170,7 +123,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
               <div className="px-4 py-1.5 bg-white/[0.02] flex items-center justify-between">
                 <span className="text-[10px] font-semibold text-zinc-500 tabular-nums">{formatDateLabel(key)}</span>
                 <div className="flex items-center gap-2 tabular-nums">
-                  <span className="text-[10px] text-zinc-600">{formatDuration(dayIdleH)}</span>
+                  <span className="text-[10px] text-zinc-600">{formatHours(dayIdleH)}</span>
                   <span className={`text-[10px] font-bold ${dayDrop < 0.05 ? 'text-emerald-400' : 'text-red-400'}`}>
                     {dayDrop < 0.05 ? '0%' : `-${fmtDrop(dayDrop)}%`}
                   </span>
@@ -180,8 +133,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                 {/* 24h 타임라인 — 비대기 구간은 회색으로 */}
                 <div className="relative w-full h-6 rounded-md overflow-hidden bg-white/[0.05]">
                   {items.map((r, i) => {
-                    const start = new Date(r.idle_start);
-                    const kstStart = new Date(start.getTime() + 9 * 60 * 60 * 1000);
+                    const kstStart = toKstDate(r.idle_start);
                     const hourOffset = kstStart.getUTCHours() + kstStart.getUTCMinutes() / 60 + kstStart.getUTCSeconds() / 3600;
                     const leftPct = (hourOffset / 24) * 100;
                     const visibleH = Math.min(24 - hourOffset, r.idle_hours);
@@ -200,7 +152,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                         key={i}
                         className="absolute top-0 bottom-0 flex items-center justify-center text-[9px] font-bold tabular-nums text-white/90"
                         style={{ left: `${leftPct}%`, width: `${widthPct}%`, background: bg }}
-                        title={`${formatHM(r.idle_start)}~${r.idle_end ? formatHM(r.idle_end) : '현재'} · ${formatDuration(r.idle_hours)} · ${r.soc_start}→${r.soc_end}% · ${isZero ? '0%' : `-${fmtDrop(r.soc_drop)}%`}${isPreCharge ? ' · ⚡충전 전 대기' : ''}`}
+                        title={`${formatHM(r.idle_start)}~${r.idle_end ? formatHM(r.idle_end) : '현재'} · ${formatHours(r.idle_hours)} · ${r.soc_start}→${r.soc_end}% · ${isZero ? '0%' : `-${fmtDrop(r.soc_drop)}%`}${isPreCharge ? ' · ⚡충전 전 대기' : ''}`}
                       >
                         {showLabel ? (isZero ? '0' : `-${fmtDrop(r.soc_drop)}%`) : ''}
                       </div>
@@ -208,8 +160,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                   })}
                   {/* 충전 세션 (노랑) */}
                   {(chargingByDay[key] || []).map((c, ci) => {
-                    const st = new Date(c.start);
-                    const kstStart = new Date(st.getTime() + 9 * 3600 * 1000);
+                    const kstStart = toKstDate(c.start);
                     const hourOffset = kstStart.getUTCHours() + kstStart.getUTCMinutes() / 60 + kstStart.getUTCSeconds() / 3600;
                     const leftPct = (hourOffset / 24) * 100;
                     const visibleH = Math.min(24 - hourOffset, c.hours);
@@ -220,7 +171,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                         key={`c-${ci}`}
                         className="absolute top-0 bottom-0 flex items-center justify-center"
                         style={{ left: `${leftPct}%`, width: `${widthPct}%`, background: 'rgba(234,179,8,0.9)' }}
-                        title={`충전 ${formatHM(c.start)}~${formatHM(c.end)} · ${formatDuration(c.hours)} · ${c.soc_start}→${c.soc_end}% (+${c.soc_added}%)`}
+                        title={`충전 ${formatHM(c.start)}~${formatHM(c.end)} · ${formatHours(c.hours)} · ${c.soc_start}→${c.soc_end}% (+${c.soc_added}%)`}
                       >
                         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="#18181b" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round">
                           <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
