@@ -1,6 +1,21 @@
 import pool from '@/lib/db';
 import { KWH_PER_KM, RATED_RANGE_MAX_KM } from '@/lib/constants';
 import { KST_OFFSET_MS } from '@/lib/kst';
+import {
+  queryCapacityFromCharge, queryCapacityFromPositions,
+  queryOdometer, queryTotalKwh, queryTotalDriveDischargeKm,
+  queryFirstCharge, queryFirstDrive,
+  queryThisWeekCharge, queryThisWeekDischarge,
+  queryThisMonthCharge, queryThisMonthDischarge,
+  queryWeeklyCharge, queryWeeklyDrive,
+  computeBatteryCapacity, computeCycles,
+} from '@/lib/queries/battery-capacity';
+import {
+  queryChargeMatrix, queryHistStart, queryHistEnd, querySocDist,
+  buildHist, computeHealth,
+} from '@/lib/queries/battery-health';
+import { queryAllDailyRecords } from '@/lib/queries/battery-records';
+import { queryIdleDrain, queryChargingSessions } from '@/lib/queries/battery-idle';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,376 +68,46 @@ export async function GET() {
       thisMonthDischargeResult,
       weeklyChargeResult,
       weeklyDriveResult,
-      dailyMaxChargeResult,
-      dailyMinChargeResult,
-      dailyMaxDriveResult,
-      dailyMinDriveResult,
       chargeMatrixResult,
       histStartResult,
       histEndResult,
       socDistResult,
       idleDrainResult,
-      dailyMaxCharge1mResult,
-      dailyMinCharge1mResult,
-      dailyMaxDrive1mResult,
-      dailyMinDrive1mResult,
-      dailyMaxCharge6mResult,
-      dailyMinCharge6mResult,
-      dailyMaxDrive6mResult,
-      dailyMinDrive6mResult,
+      dailyRecords,
       chargingSessionsResult,
     ] = await Promise.all([
-      // 배터리 용량 추정 1순위: 충전 세션 역산
-      pool.query(`
-        SELECT AVG(est)::float AS capacity_kwh FROM (
-          SELECT charge_energy_added / NULLIF(end_battery_level - start_battery_level, 0) * 100 AS est
-          FROM charging_processes
-          WHERE car_id = $1 AND charge_energy_added > 5
-            AND start_battery_level IS NOT NULL AND end_battery_level IS NOT NULL
-            AND end_battery_level > start_battery_level + 5
-          ORDER BY (end_battery_level - start_battery_level) DESC
-          LIMIT 20
-        ) sub
-      `, [carId]),
-
-      // 배터리 용량 추정 2순위: positions rated_range / battery_level 역산
-      pool.query(`
-        SELECT AVG(rated_battery_range_km / battery_level * 100)::float AS full_rated_range_km
-        FROM (
-          SELECT rated_battery_range_km, battery_level
-          FROM positions
-          WHERE car_id = $1 AND rated_battery_range_km IS NOT NULL AND battery_level > 10
-          ORDER BY date DESC LIMIT 50
-        ) sub
-      `, [carId]),
-
-      // 누적 주행거리 (odometer)
-      pool.query(`
-        SELECT odometer::float FROM positions
-        WHERE car_id = $1 AND odometer IS NOT NULL
-        ORDER BY date DESC LIMIT 1
-      `, [carId]),
-
-      // 누적 충전량
-      pool.query(`
-        SELECT COALESCE(SUM(charge_energy_added), 0)::float AS total_kwh
-        FROM charging_processes WHERE car_id = $1 AND charge_energy_added IS NOT NULL
-      `, [carId]),
-
-      // 누적 주행 방전량 (rated range km 기준)
-      pool.query(`
-        SELECT COALESCE(SUM(GREATEST(start_rated_range_km - end_rated_range_km, 0)), 0)::float AS total_km
-        FROM drives WHERE car_id = $1
-          AND start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
-      `, [carId]),
-
-      // 첫 충전일 (월평균 계산용)
-      pool.query(`
-        SELECT MIN(start_date) AS first_date FROM charging_processes WHERE car_id = $1
-      `, [carId]),
-
-      // 첫 주행일 (충전 데이터 없을 때 fallback)
-      pool.query(`
-        SELECT MIN(start_date) AS first_date FROM drives WHERE car_id = $1
-      `, [carId]),
-
-      // 이번주 충전량
-      pool.query(`
-        SELECT COALESCE(SUM(charge_energy_added), 0)::float AS kwh
-        FROM charging_processes WHERE car_id = $1 AND start_date >= $2
-          AND charge_energy_added IS NOT NULL
-      `, [carId, curWeekMonUTC.toISOString()]),
-
-      // 이번주 방전량 (rated range km 기준)
-      pool.query(`
-        SELECT COALESCE(SUM(GREATEST(start_rated_range_km - end_rated_range_km, 0)), 0)::float AS total_km
-        FROM drives WHERE car_id = $1 AND start_date >= $2
-          AND start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
-      `, [carId, curWeekMonUTC.toISOString()]),
-
-      // 이번달 충전량
-      pool.query(`
-        SELECT COALESCE(SUM(charge_energy_added), 0)::float AS kwh
-        FROM charging_processes WHERE car_id = $1 AND start_date >= $2
-          AND charge_energy_added IS NOT NULL
-      `, [carId, thisMonthStartUTC.toISOString()]),
-
-      // 이번달 방전량 (rated range km 기준)
-      pool.query(`
-        SELECT COALESCE(SUM(GREATEST(start_rated_range_km - end_rated_range_km, 0)), 0)::float AS total_km
-        FROM drives WHERE car_id = $1 AND start_date >= $2
-          AND start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
-      `, [carId, thisMonthStartUTC.toISOString()]),
-
-      // 주별 충전 패턴 (12주)
-      pool.query(`
-        SELECT
-          EXTRACT(EPOCH FROM DATE_TRUNC('week', start_date + INTERVAL '9 hours') - INTERVAL '9 hours')::bigint AS week_epoch,
-          COALESCE(SUM(
-            CASE WHEN end_battery_level IS NOT NULL AND start_battery_level IS NOT NULL
-                 THEN GREATEST(end_battery_level - start_battery_level, 0) ELSE 0 END
-          ), 0)::int AS charge_pct,
-          COALESCE(SUM(charge_energy_added), 0)::float AS charge_kwh
-        FROM charging_processes
-        WHERE car_id = $1 AND start_date >= $2 AND charge_energy_added IS NOT NULL
-        GROUP BY week_epoch ORDER BY week_epoch DESC
-      `, [carId, twelveWeeksAgoUTC.toISOString()]),
-
-      // 주별 소비 패턴 (12주)
-      pool.query(`
-        SELECT
-          EXTRACT(EPOCH FROM DATE_TRUNC('week', start_date + INTERVAL '9 hours') - INTERVAL '9 hours')::bigint AS week_epoch,
-          COALESCE(SUM(
-            CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
-                 THEN GREATEST(start_rated_range_km - end_rated_range_km, 0) ELSE 0 END
-          ), 0)::float AS range_used_km
-        FROM drives
-        WHERE car_id = $1 AND start_date >= $2
-        GROUP BY week_epoch ORDER BY week_epoch DESC
-      `, [carId, twelveWeeksAgoUTC.toISOString()]),
-
-      // 일간 최다 충전
-      pool.query(`
-        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
-               SUM(CASE WHEN end_battery_level IS NOT NULL AND start_battery_level IS NOT NULL
-                        THEN GREATEST(end_battery_level - start_battery_level, 0) ELSE 0 END)::int AS charge_pct,
-               SUM(charge_energy_added)::float AS kwh
-        FROM charging_processes
-        WHERE car_id = $1 AND charge_energy_added IS NOT NULL
-        GROUP BY day ORDER BY kwh DESC LIMIT 1
-      `, [carId]),
-
-      // 일간 최소 충전 (1kWh 이상 충전한 날)
-      pool.query(`
-        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
-               SUM(CASE WHEN end_battery_level IS NOT NULL AND start_battery_level IS NOT NULL
-                        THEN GREATEST(end_battery_level - start_battery_level, 0) ELSE 0 END)::int AS charge_pct,
-               SUM(charge_energy_added)::float AS kwh
-        FROM charging_processes
-        WHERE car_id = $1 AND charge_energy_added IS NOT NULL
-        GROUP BY day HAVING SUM(charge_energy_added) >= 1
-        ORDER BY kwh ASC LIMIT 1
-      `, [carId]),
-
-      // 일간 최다 소비 (주행거리 기준)
-      pool.query(`
-        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
-               SUM(CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
-                        THEN GREATEST(start_rated_range_km - end_rated_range_km, 0) ELSE 0 END)::float AS range_used_km
-        FROM drives WHERE car_id = $1
-        GROUP BY day ORDER BY range_used_km DESC LIMIT 1
-      `, [carId]),
-
-      // 일간 최소 소비 (주행이 있었던 날 중)
-      pool.query(`
-        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
-               SUM(CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
-                        THEN GREATEST(start_rated_range_km - end_rated_range_km, 0) ELSE 0 END)::float AS range_used_km
-        FROM drives WHERE car_id = $1
-        GROUP BY day HAVING SUM(distance) > 0
-        ORDER BY range_used_km ASC LIMIT 1
-      `, [carId]),
-
-      // 충전 시작 × 종료 2D 히트맵 (5% 단위, 20x20)
-      pool.query(`
-        SELECT
-          LEAST(FLOOR(start_battery_level / 5)::int, 19) AS start_bucket,
-          LEAST(FLOOR(end_battery_level / 5)::int, 19) AS end_bucket,
-          COUNT(*)::int AS cnt
-        FROM charging_processes
-        WHERE car_id = $1
-          AND start_battery_level IS NOT NULL
-          AND end_battery_level IS NOT NULL
-          AND end_battery_level > start_battery_level
-        GROUP BY start_bucket, end_bucket
-      `, [carId]),
-
-      // 충전 시작 레벨 히스토그램 (50개 구간, 2% 단위)
-      pool.query(`
-        SELECT LEAST(FLOOR(start_battery_level / 2)::int, 49) AS bucket, COUNT(*)::int AS cnt
-        FROM charging_processes
-        WHERE car_id = $1 AND start_battery_level IS NOT NULL
-        GROUP BY bucket ORDER BY bucket
-      `, [carId]),
-
-      // 충전 종료 레벨 히스토그램 (50개 구간, 2% 단위)
-      pool.query(`
-        SELECT LEAST(FLOOR(end_battery_level / 2)::int, 49) AS bucket, COUNT(*)::int AS cnt
-        FROM charging_processes
-        WHERE car_id = $1 AND end_battery_level IS NOT NULL
-        GROUP BY bucket ORDER BY bucket
-      `, [carId]),
-
-      // SOC 체류 분포 (positions 기반, 1% 단위)
-      pool.query(`
-        SELECT battery_level AS soc, COUNT(*)::int AS cnt
-        FROM positions
-        WHERE car_id = $1 AND battery_level IS NOT NULL
-        GROUP BY battery_level ORDER BY battery_level
-      `, [carId]),
-
-      // 대기 중 배터리 소모 (뱀파이어 드레인)
-      pool.query(`
-        WITH timeline AS (
-          SELECT start_date AS ts, end_date AS te,
-            (SELECT battery_level FROM positions WHERE id = start_position_id) AS start_soc,
-            (SELECT battery_level FROM positions WHERE id = end_position_id) AS end_soc,
-            'drive'::text AS ev_type
-          FROM drives WHERE car_id = $1 AND end_date IS NOT NULL AND end_position_id IS NOT NULL
-          UNION ALL
-          SELECT start_date, end_date, start_battery_level::int, end_battery_level::int, 'charge'::text
-          FROM charging_processes WHERE car_id = $1 AND end_date IS NOT NULL AND end_battery_level IS NOT NULL
-          ORDER BY ts
-        ),
-        idle AS (
-          SELECT
-            te AS idle_start,
-            LEAD(ts) OVER (ORDER BY ts) AS idle_end,
-            end_soc AS soc_start,
-            LEAD(start_soc) OVER (ORDER BY ts) AS soc_end,
-            LEAD(ev_type) OVER (ORDER BY ts) AS next_type
-          FROM timeline
-        )
-        SELECT idle_start, idle_end,
-          soc_start, soc_end,
-          next_type,
-          GREATEST(soc_start - soc_end, 0) AS soc_drop,
-          ROUND(EXTRACT(EPOCH FROM idle_end - idle_start) / 3600, 1)::float AS idle_hours
-        FROM idle
-        WHERE idle_end IS NOT NULL
-          AND EXTRACT(EPOCH FROM idle_end - idle_start) > 1800
-          AND soc_start IS NOT NULL AND soc_end IS NOT NULL
-        ORDER BY idle_start DESC
-        LIMIT 20
-      `, [carId]),
-
-      // 최근 1달 일간 레코드
-      pool.query(`
-        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
-               SUM(CASE WHEN end_battery_level IS NOT NULL AND start_battery_level IS NOT NULL
-                        THEN GREATEST(end_battery_level - start_battery_level, 0) ELSE 0 END)::int AS charge_pct,
-               SUM(charge_energy_added)::float AS kwh
-        FROM charging_processes
-        WHERE car_id = $1 AND charge_energy_added IS NOT NULL AND start_date >= $2
-        GROUP BY day ORDER BY kwh DESC LIMIT 1
-      `, [carId, oneMonthAgoUTC]),
-      pool.query(`
-        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
-               SUM(CASE WHEN end_battery_level IS NOT NULL AND start_battery_level IS NOT NULL
-                        THEN GREATEST(end_battery_level - start_battery_level, 0) ELSE 0 END)::int AS charge_pct,
-               SUM(charge_energy_added)::float AS kwh
-        FROM charging_processes
-        WHERE car_id = $1 AND charge_energy_added IS NOT NULL AND start_date >= $2
-        GROUP BY day HAVING SUM(charge_energy_added) >= 1
-        ORDER BY kwh ASC LIMIT 1
-      `, [carId, oneMonthAgoUTC]),
-      pool.query(`
-        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
-               SUM(CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
-                        THEN GREATEST(start_rated_range_km - end_rated_range_km, 0) ELSE 0 END)::float AS range_used_km
-        FROM drives WHERE car_id = $1 AND start_date >= $2
-        GROUP BY day ORDER BY range_used_km DESC LIMIT 1
-      `, [carId, oneMonthAgoUTC]),
-      pool.query(`
-        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
-               SUM(CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
-                        THEN GREATEST(start_rated_range_km - end_rated_range_km, 0) ELSE 0 END)::float AS range_used_km
-        FROM drives WHERE car_id = $1 AND start_date >= $2
-        GROUP BY day HAVING SUM(distance) > 0
-        ORDER BY range_used_km ASC LIMIT 1
-      `, [carId, oneMonthAgoUTC]),
-
-      // 최근 6개월 일간 레코드
-      pool.query(`
-        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
-               SUM(CASE WHEN end_battery_level IS NOT NULL AND start_battery_level IS NOT NULL
-                        THEN GREATEST(end_battery_level - start_battery_level, 0) ELSE 0 END)::int AS charge_pct,
-               SUM(charge_energy_added)::float AS kwh
-        FROM charging_processes
-        WHERE car_id = $1 AND charge_energy_added IS NOT NULL AND start_date >= $2
-        GROUP BY day ORDER BY kwh DESC LIMIT 1
-      `, [carId, sixMonthsAgoUTC]),
-      pool.query(`
-        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
-               SUM(CASE WHEN end_battery_level IS NOT NULL AND start_battery_level IS NOT NULL
-                        THEN GREATEST(end_battery_level - start_battery_level, 0) ELSE 0 END)::int AS charge_pct,
-               SUM(charge_energy_added)::float AS kwh
-        FROM charging_processes
-        WHERE car_id = $1 AND charge_energy_added IS NOT NULL AND start_date >= $2
-        GROUP BY day HAVING SUM(charge_energy_added) >= 1
-        ORDER BY kwh ASC LIMIT 1
-      `, [carId, sixMonthsAgoUTC]),
-      pool.query(`
-        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
-               SUM(CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
-                        THEN GREATEST(start_rated_range_km - end_rated_range_km, 0) ELSE 0 END)::float AS range_used_km
-        FROM drives WHERE car_id = $1 AND start_date >= $2
-        GROUP BY day ORDER BY range_used_km DESC LIMIT 1
-      `, [carId, sixMonthsAgoUTC]),
-      pool.query(`
-        SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
-               SUM(CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
-                        THEN GREATEST(start_rated_range_km - end_rated_range_km, 0) ELSE 0 END)::float AS range_used_km
-        FROM drives WHERE car_id = $1 AND start_date >= $2
-        GROUP BY day HAVING SUM(distance) > 0
-        ORDER BY range_used_km ASC LIMIT 1
-      `, [carId, sixMonthsAgoUTC]),
-      // 최근 충전 세션 (idle 타임라인과 함께 표시용)
-      pool.query(`
-        SELECT start_date, end_date,
-               start_battery_level::int AS soc_start,
-               end_battery_level::int AS soc_end,
-               (end_battery_level - start_battery_level)::int AS soc_added,
-               ROUND(EXTRACT(EPOCH FROM end_date - start_date) / 3600, 2)::float AS duration_hours
-        FROM charging_processes
-        WHERE car_id = $1
-          AND end_date IS NOT NULL
-          AND start_battery_level IS NOT NULL
-          AND end_battery_level IS NOT NULL
-          AND end_date >= NOW() - INTERVAL '14 days'
-        ORDER BY start_date DESC
-      `, [carId]),
+      queryCapacityFromCharge(carId),
+      queryCapacityFromPositions(carId),
+      queryOdometer(carId),
+      queryTotalKwh(carId),
+      queryTotalDriveDischargeKm(carId),
+      queryFirstCharge(carId),
+      queryFirstDrive(carId),
+      queryThisWeekCharge(carId, curWeekMonUTC.toISOString()),
+      queryThisWeekDischarge(carId, curWeekMonUTC.toISOString()),
+      queryThisMonthCharge(carId, thisMonthStartUTC.toISOString()),
+      queryThisMonthDischarge(carId, thisMonthStartUTC.toISOString()),
+      queryWeeklyCharge(carId, twelveWeeksAgoUTC.toISOString()),
+      queryWeeklyDrive(carId, twelveWeeksAgoUTC.toISOString()),
+      queryChargeMatrix(carId),
+      queryHistStart(carId),
+      queryHistEnd(carId),
+      querySocDist(carId),
+      queryIdleDrain(carId),
+      queryAllDailyRecords(carId, { oneMonthAgo: oneMonthAgoUTC, sixMonthsAgo: sixMonthsAgoUTC }),
+      queryChargingSessions(carId),
     ]);
 
-    // 배터리 용량: 1순위 충전역산, 2순위 positions역산, 3순위 상수
-    const capFromCharge = capacityFromChargeResult.rows[0]?.capacity_kwh;
-    const fullRatedRangeKm = capacityFromPositionsResult.rows[0]?.full_rated_range_km;
-    const capFromPositions = fullRatedRangeKm ? fullRatedRangeKm * KWH_PER_KM : null;
-    const batteryCapacity = capFromCharge
-      ? parseFloat(parseFloat(capFromCharge).toFixed(1))
-      : capFromPositions
-        ? parseFloat(parseFloat(capFromPositions).toFixed(1))
-        : parseFloat((RATED_RANGE_MAX_KM * KWH_PER_KM).toFixed(1));
+    // 배터리 용량 (1순위 충전역산 → 2순위 positions 역산 → 3순위 상수)
+    const batteryCapacity = computeBatteryCapacity(
+      capacityFromChargeResult.rows[0], capacityFromPositionsResult.rows[0]
+    );
 
-    // 누적 주행거리 (odometer)
+    // 누적 주행거리
     const odometer = odometerResult.rows[0]?.odometer || 0;
-
-    // ── 사이클 계산 (블렌딩 모델) ──
-    // odometerKwh = 전체 주행거리 기반 추정 (설치 이전 포함)
-    // totalKwh    = TeslaMate가 실제 기록한 충전량
-    // 충전 데이터가 쌓일수록 실측 비중↑, 추정 비중↓ → 점진적 보정
     const totalKwh = parseFloat(totalKwhResult.rows[0].total_kwh);
-    const odometerKwh = odometer * KWH_PER_KM;
 
-    let totalKwhEffective;
-    if (odometerKwh <= 0) {
-      // odometer 없음 → 충전 데이터만 사용
-      totalKwhEffective = totalKwh;
-    } else if (totalKwh <= 0) {
-      // 충전 기록 없음 → odometer 추정만 사용
-      totalKwhEffective = odometerKwh;
-    } else {
-      // 블렌딩: 충전 비중(α) = 충전kWh / odometer추정kWh (0~1)
-      // α가 1에 가까울수록 TeslaMate가 거의 전체 기간 커버 → 실측 신뢰
-      // α가 0에 가까우면 아직 데이터 부족 → odometer 추정 신뢰
-      const alpha = Math.min(totalKwh / odometerKwh, 1);
-      totalKwhEffective = alpha * totalKwh + (1 - alpha) * odometerKwh;
-    }
-
-    const totalCycles = batteryCapacity > 0 ? parseFloat((totalKwhEffective / batteryCapacity).toFixed(1)) : 0;
-    const isEstimated = totalKwh <= 0 || (odometerKwh > 0 && totalKwh / odometerKwh < 0.9);
-
-    // 월평균: odometer 기반이면 월 평균주행거리로 개월수 추정, 실측이면 기록 기간 기준
+    // 첫 활동일 (충전/주행 중 빠른 쪽)
     const firstChargeDate = firstChargeResult.rows[0]?.first_date;
     const firstDriveDate = firstDriveResult.rows[0]?.first_date;
     const firstDate = firstChargeDate && firstDriveDate
@@ -430,14 +115,10 @@ export async function GET() {
       : firstChargeDate ? new Date(firstChargeDate)
       : firstDriveDate ? new Date(firstDriveDate)
       : null;
-    // 블렌딩 비율에 따라 개월수도 블렌딩
-    const monthsFromOdo = odometer > 0 ? Math.max(1, odometer / 1500) : 12;
-    const monthsFromRecord = firstDate ? Math.max(1, (now - firstDate) / (30.4375 * 86400000)) : null;
-    const chargeRatio = odometerKwh > 0 ? Math.min(totalKwh / odometerKwh, 1) : 0;
-    const monthsElapsed = monthsFromRecord
-      ? chargeRatio * monthsFromRecord + (1 - chargeRatio) * monthsFromOdo
-      : monthsFromOdo;
-    const avgMonthlyCycles = parseFloat((totalCycles / monthsElapsed).toFixed(2));
+
+    const { totalCycles, isEstimated, avgMonthlyCycles } = computeCycles({
+      batteryCapacity, totalKwh, odometer, firstDate, now,
+    });
 
     // 이번주/이번달: 충전 기록 있으면 충전 기준, 없으면 방전 기준
     const thisWeekKwh = parseFloat(thisWeekChargeResult.rows[0].kwh);
@@ -483,7 +164,7 @@ export async function GET() {
       });
     }
 
-    // 일간 레코드
+    // 일간 레코드 포맷팅
     const fmtCharge = (row) => row ? {
       date: row.day,
       charge_pct: row.charge_pct || 0,
@@ -494,119 +175,30 @@ export async function GET() {
       consume_pct: RATED_RANGE_MAX_KM > 0 ? Math.round(parseFloat(row.range_used_km) / RATED_RANGE_MAX_KM * 100) : 0,
       consume_kwh: parseFloat((parseFloat(row.range_used_km) * KWH_PER_KM).toFixed(1)),
     } : null;
+    const fmtRecordBlock = (block) => ({
+      max_charge: fmtCharge(block.max_charge),
+      min_charge: fmtCharge(block.min_charge),
+      max_consume: fmtDrive(block.max_consume),
+      min_consume: fmtDrive(block.min_consume),
+    });
 
     // 히스토그램 (50빈, 2% 단위)
-    const buildHist = (rows) => Array.from({ length: 50 }, (_, i) => {
-      const row = rows.find(r => r.bucket === i);
-      return row?.cnt || 0;
-    });
     const histStart = buildHist(histStartResult.rows);
     const histEnd = buildHist(histEndResult.rows);
-
-    // 주로 충전하는 구간 (최빈값 버킷)
     const startModal = histStart.indexOf(Math.max(...histStart));
     const endModal = histEnd.indexOf(Math.max(...histEnd));
 
-    // ── 배터리 헬스 점수 (배터리 화학 기반) ──
-    // LFP: 이상 범위 20-100%, 최적 중심 60% (Tesla 공식 100% 충전 권장)
-    // NCA/NMC: 이상 범위 20-80%, 최적 중심 50%
-    // 판별: Model Y SR (상하이 생산, trim_badging=50) = LFP
+    // ── 배터리 헬스 점수 (LFP: 이상 20-100%, 최적 60%) ──
+    // 판별: Model Y SR (상하이, trim_badging=50) = LFP
     const isLFP = true; // Model Y RWD/SR = LFP (향후 DB 기반 자동 판별 가능)
-    const OPTIMAL_CENTER = isLFP ? 60 : 50;
-    const RANGE_LOW = 20;
-    const RANGE_HIGH = isLFP ? 100 : 80;
-
-    const socRows = socDistResult.rows;
-    const totalReadings = socRows.reduce((s, r) => s + r.cnt, 0);
-    let healthScore = 0;
-    let avgSoc = 0;
-    const zoneCounts = { ideal: 0, good: 0, caution: 0, stress: 0 };
-    const socHist = Array.from({ length: 10 }, () => 0);
-    // 2% 단위 세분화 히스토그램 (50칸: 0-2, 2-4, ..., 98-100)
-    const socHist2 = Array.from({ length: 50 }, () => 0);
-
-    if (totalReadings > 0) {
-      let weightedSoc = 0;
-      let weightedScore = 0;
-      for (const { soc, cnt } of socRows) {
-        const level = parseInt(soc);
-        weightedSoc += level * cnt;
-        // 점수: 이상 범위 내 = 고점수, 범위 밖 = 패널티
-        let pointScore;
-        if (level >= RANGE_LOW && level <= RANGE_HIGH) {
-          // 범위 내: 중심에서 멀어질수록 약간 감점 (최소 70점)
-          const halfRange = (RANGE_HIGH - RANGE_LOW) / 2;
-          const distFromCenter = Math.abs(level - OPTIMAL_CENTER) / halfRange;
-          pointScore = 100 - distFromCenter * 30;
-        } else {
-          // 범위 밖: 급격히 감점
-          const overLow = level < RANGE_LOW ? (RANGE_LOW - level) / RANGE_LOW : 0;
-          const denomHigh = 100 - RANGE_HIGH;
-          const overHigh = level > RANGE_HIGH && denomHigh > 0 ? (level - RANGE_HIGH) / denomHigh : 0;
-          const over = Math.max(overLow, overHigh);
-          pointScore = Math.max(0, 60 - over * 100);
-        }
-        weightedScore += pointScore * cnt;
-        // 구간 분류
-        if (level >= RANGE_LOW && level <= RANGE_HIGH) {
-          const distPct = Math.abs(level - OPTIMAL_CENTER) / ((RANGE_HIGH - RANGE_LOW) / 2);
-          if (distPct <= 0.4) zoneCounts.ideal += cnt;
-          else zoneCounts.good += cnt;
-        } else if (level >= 10 && level < RANGE_LOW || level > RANGE_HIGH && level <= 90) {
-          zoneCounts.caution += cnt;
-        } else {
-          zoneCounts.stress += cnt;
-        }
-        const bucket = Math.min(Math.floor(level / 10), 9);
-        socHist[bucket] += cnt;
-        const bucket2 = Math.min(Math.floor(level / 2), 49);
-        socHist2[bucket2] += cnt;
-      }
-      avgSoc = parseFloat((weightedSoc / totalReadings).toFixed(1));
-      healthScore = Math.round(weightedScore / totalReadings);
-    }
-
-    const grade = healthScore >= 90 ? 'A+' : healthScore >= 80 ? 'A'
-      : healthScore >= 70 ? 'B+' : healthScore >= 60 ? 'B'
-      : healthScore >= 50 ? 'C+' : healthScore >= 40 ? 'C'
-      : healthScore >= 30 ? 'D' : 'F';
-
-    // 팁 생성 (LFP 맞춤)
-    const tips = [];
-    if (isLFP) {
-      if (avgSoc < 50) tips.push('LFP는 100% 충전 권장, SOC를 높이세요');
-      if (avgSoc >= 50 && avgSoc <= 80) tips.push('주기적 100% 충전으로 BMS 캘리브레이션');
-      if (avgSoc > 80) tips.push('이상적인 관리! 20% 이하 방전만 주의');
-      if (avgSoc < 20) tips.push('20% 이하 방전은 셀 스트레스 증가');
-    } else {
-      if (avgSoc > 80) tips.push('충전 상한 80%로 수명 향상');
-      if (avgSoc < 20) tips.push('20% 이하 방전은 셀 스트레스 증가');
-      if (tips.length === 0) tips.push('20~80% 범위 유지 권장');
-    }
-    if (zoneCounts.ideal > totalReadings * 0.5 && tips.length === 0) tips.push('이상적인 배터리 관리 중!');
-    if (tips.length === 0) tips.push(`${RANGE_LOW}~${RANGE_HIGH}% 범위 유지 권장`);
+    const health = computeHealth(socDistResult.rows, { isLFP });
 
     return Response.json({
       weekly,
       daily_records: {
-        all: {
-          max_charge: fmtCharge(dailyMaxChargeResult.rows[0]),
-          min_charge: fmtCharge(dailyMinChargeResult.rows[0]),
-          max_consume: fmtDrive(dailyMaxDriveResult.rows[0]),
-          min_consume: fmtDrive(dailyMinDriveResult.rows[0]),
-        },
-        month: {
-          max_charge: fmtCharge(dailyMaxCharge1mResult.rows[0]),
-          min_charge: fmtCharge(dailyMinCharge1mResult.rows[0]),
-          max_consume: fmtDrive(dailyMaxDrive1mResult.rows[0]),
-          min_consume: fmtDrive(dailyMinDrive1mResult.rows[0]),
-        },
-        six_month: {
-          max_charge: fmtCharge(dailyMaxCharge6mResult.rows[0]),
-          min_charge: fmtCharge(dailyMinCharge6mResult.rows[0]),
-          max_consume: fmtDrive(dailyMaxDrive6mResult.rows[0]),
-          min_consume: fmtDrive(dailyMinDrive6mResult.rows[0]),
-        },
+        all: fmtRecordBlock(dailyRecords.all),
+        month: fmtRecordBlock(dailyRecords.month),
+        six_month: fmtRecordBlock(dailyRecords.six_month),
       },
       histogram: {
         start_level: histStart,
@@ -624,23 +216,23 @@ export async function GET() {
         },
       },
       health: {
-        score: healthScore,
-        grade,
-        avg_soc: avgSoc,
-        optimal_center: OPTIMAL_CENTER,
-        range_low: RANGE_LOW,
-        range_high: RANGE_HIGH,
-        battery_type: isLFP ? 'LFP' : 'NCA/NMC',
-        total_readings: totalReadings,
-        soc_histogram: socHist,
-        soc_histogram_2: socHist2,
+        score: health.healthScore,
+        grade: health.grade,
+        avg_soc: health.avgSoc,
+        optimal_center: health.OPTIMAL_CENTER,
+        range_low: health.RANGE_LOW,
+        range_high: health.RANGE_HIGH,
+        battery_type: health.isLFP ? 'LFP' : 'NCA/NMC',
+        total_readings: health.totalReadings,
+        soc_histogram: health.socHist,
+        soc_histogram_2: health.socHist2,
         zone_pct: {
-          ideal: totalReadings > 0 ? Math.round(zoneCounts.ideal / totalReadings * 100) : 0,
-          good: totalReadings > 0 ? Math.round(zoneCounts.good / totalReadings * 100) : 0,
-          caution: totalReadings > 0 ? Math.round(zoneCounts.caution / totalReadings * 100) : 0,
-          stress: totalReadings > 0 ? Math.round(zoneCounts.stress / totalReadings * 100) : 0,
+          ideal: health.totalReadings > 0 ? Math.round(health.zoneCounts.ideal / health.totalReadings * 100) : 0,
+          good: health.totalReadings > 0 ? Math.round(health.zoneCounts.good / health.totalReadings * 100) : 0,
+          caution: health.totalReadings > 0 ? Math.round(health.zoneCounts.caution / health.totalReadings * 100) : 0,
+          stress: health.totalReadings > 0 ? Math.round(health.zoneCounts.stress / health.totalReadings * 100) : 0,
         },
-        tips,
+        tips: health.tips,
       },
       idle_drain: idleDrainResult.rows.map(r => ({
         idle_start: r.idle_start,
