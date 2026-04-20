@@ -269,8 +269,17 @@ function DrivesInner() {
                       {formatTimeRange(first.start_date, last.end_date)}
                       <span className="text-zinc-600"> · {dayDrives.length}회 ({formatDuration(Math.round(totalMin))})</span>
                     </p>
-                    <p className="text-sm text-zinc-300 truncate">
-                      {shortAddr(first.start_address) || '출발지'}&nbsp;→&nbsp;{shortAddr(last.end_address) || '도착지'}
+                    <p className="text-sm text-zinc-300 leading-snug break-words">
+                      {(() => {
+                        const chain = [first.start_address, ...dayDrives.map(d => d.end_address)]
+                          .map(a => shortAddr(a) || '?');
+                        return chain.map((addr, i) => (
+                          <span key={i}>
+                            {i > 0 && <span className="text-zinc-600 mx-1">→</span>}
+                            {addr}
+                          </span>
+                        ));
+                      })()}
                     </p>
                   </div>
                   <div className="flex-shrink-0 text-right tabular-nums">
