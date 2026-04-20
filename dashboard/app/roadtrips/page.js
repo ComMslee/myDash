@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMock, MOCK_DATA } from '../context/mock';
 import { KWH_PER_KM } from '../../lib/constants';
@@ -97,9 +97,17 @@ function DriveMap({ positions, routes, loading, placeMarker, visible }) {
         if (pos.length < 2) return;
         const latlngs = pos.map(p => [p.lat, p.lng]);
         allLatLngs.push(...latlngs);
-        L.polyline(latlngs, { color: r.color || '#3b82f6', weight: 4, opacity: 0.8 }).addTo(group);
-        const s = L.circleMarker(latlngs[0], { radius: 5, fillColor: '#22c55e', color: '#fff', weight: 1.5, fillOpacity: 1 }).addTo(group);
-        const e = L.circleMarker(latlngs[latlngs.length - 1], { radius: 5, fillColor: '#ef4444', color: '#fff', weight: 1.5, fillOpacity: 1 }).addTo(group);
+        const color = r.color || '#3b82f6';
+        L.polyline(latlngs, { color, weight: 4, opacity: 0.85 }).addTo(group);
+        // 순서 표시된 시작 마커 (번호 배지)
+        const startIcon = L.divIcon({
+          html: `<div style="background:${color};color:#fff;border:2px solid rgba(255,255,255,0.9);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;box-shadow:0 0 4px rgba(0,0,0,0.5)">${idx + 1}</div>`,
+          className: '',
+          iconSize: [22, 22],
+          iconAnchor: [11, 11],
+        });
+        const s = L.marker(latlngs[0], { icon: startIcon }).addTo(group);
+        const e = L.circleMarker(latlngs[latlngs.length - 1], { radius: 5, fillColor: color, color: '#fff', weight: 1.5, fillOpacity: 0.9 }).addTo(group);
         markersRef.current.push(s, e);
       });
       polyRef.current = group;
@@ -347,6 +355,16 @@ function DrivesInner() {
 
   const goToDrive = (d) => { setSelectedDrive(d); setSelectedPlace(null); setDayMode(null); setMapEverShown(true); setViewMode('map'); };
   const goToDay = (dateStr) => { setDayMode(dateStr); setSelectedPlace(null); setMapEverShown(true); setViewMode('map'); };
+
+  // 일 모드 날짜 네비 — drives에서 유니크 날짜를 내림차순 정렬 후 dayMode 인덱스 계산
+  const uniqueDays = useMemo(() => {
+    if (!drives.length) return [];
+    const set = new Set(drives.map(d => driveDayStr(d)));
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [drives]);
+  const dayIdx = dayMode ? uniqueDays.indexOf(dayMode) : -1;
+  const goPrevDay = () => { if (dayIdx > 0) setDayMode(uniqueDays[dayIdx - 1]); };
+  const goNextDay = () => { if (dayIdx >= 0 && dayIdx < uniqueDays.length - 1) setDayMode(uniqueDays[dayIdx + 1]); };
   const goPrev = () => { if (selectedIdx > 0) { setSelectedDrive(drives[selectedIdx - 1]); setSelectedPlace(null); } };
   const goNext = () => { if (selectedIdx < drives.length - 1) { setSelectedDrive(drives[selectedIdx + 1]); setSelectedPlace(null); } };
 
@@ -425,7 +443,19 @@ function DrivesInner() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               목록
             </button>
-            {selectedDrive && (
+            {dayMode ? (
+              <div className="flex items-center gap-3">
+                <button onClick={goPrevDay} disabled={dayIdx <= 0}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <span className="text-xs text-zinc-400 tabular-nums">{dayMode}<span className="text-zinc-600 ml-1">({dayRoutes.length}회)</span></span>
+                <button onClick={goNextDay} disabled={dayIdx < 0 || dayIdx >= uniqueDays.length - 1}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                </button>
+              </div>
+            ) : selectedDrive && (
               <div className="flex items-center gap-3">
                 <button onClick={goPrev} disabled={selectedIdx <= 0}
                   className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
