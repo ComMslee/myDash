@@ -219,11 +219,11 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                     return (
                       <div
                         key={`c-${ci}`}
-                        className="absolute top-0 bottom-0 flex items-center justify-center text-[9px] font-bold tabular-nums text-black/85"
-                        style={{ left: `${leftPct}%`, width: `${widthPct}%`, background: 'rgba(234,179,8,0.85)' }}
-                        title={`⚡ 충전 ${formatHM(c.start)}~${formatHM(c.end)} · ${formatDuration(c.hours)} · ${c.soc_start}→${c.soc_end}% (+${c.soc_added}%)`}
+                        className="absolute top-0 bottom-0 flex items-center justify-center text-[10px] font-black tabular-nums text-black"
+                        style={{ left: `${leftPct}%`, width: `${widthPct}%`, background: 'rgba(234,179,8,0.9)' }}
+                        title={`충전 ${formatHM(c.start)}~${formatHM(c.end)} · ${formatDuration(c.hours)} · ${c.soc_start}→${c.soc_end}% (+${c.soc_added}%)`}
                       >
-                        {showLabel ? `⚡+${c.soc_added}%` : '⚡'}
+                        {showLabel ? `+${c.soc_added}` : '+'}
                       </div>
                     );
                   })}
