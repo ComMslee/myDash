@@ -1,5 +1,6 @@
 import pool from '@/lib/db';
 import { KWH_PER_KM } from '@/lib/constants';
+import { KST_OFFSET_MS } from '@/lib/kst';
 import { batchReverseGeocode } from '@/lib/kakao-geo';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +19,7 @@ export async function GET(request) {
 
     const now = new Date();
     // KST(UTC+9) 기준 자정 계산
-    const KST = 9 * 60 * 60 * 1000;
+    const KST = KST_OFFSET_MS;
     const nowKST = new Date(now.getTime() + KST);
     const ky = nowKST.getUTCFullYear(), km = nowKST.getUTCMonth(), kd = nowKST.getUTCDate();
     const todayStart    = new Date(Date.UTC(ky, km, kd) - KST);

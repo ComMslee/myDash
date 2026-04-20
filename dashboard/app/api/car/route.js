@@ -1,4 +1,5 @@
 import pool from '@/lib/db';
+import { toKstDate } from '@/lib/kst';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,7 +102,7 @@ export async function GET() {
       const drivingDayCount = Array.from(pctByDay.values()).filter(v => v > 0).length;
 
       // 오늘(KST)부터 LOOKBACK_DAYS 이전까지 일별 시리즈 구성 (누락일=0)
-      const todayKst = new Date(Date.now() + 9 * 3600 * 1000);
+      const todayKst = toKstDate(Date.now());
       const series = [];
       for (let i = LOOKBACK_DAYS - 1; i >= 0; i--) {
         const d = new Date(todayKst);
