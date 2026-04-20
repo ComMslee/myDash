@@ -34,7 +34,7 @@ function HistBar({ counts, color }) {
               opacity: cnt === 0 ? 0.12 : isModal ? 1 : 0.55,
               outline: isModal ? `1.5px solid ${color}` : 'none',
             }}
-            title={`${i * 10}–${i * 10 + 10}%: ${cnt}회`}
+            title={`${i * 2}–${i * 2 + 2}%: ${cnt}회`}
           />
         );
       })}
@@ -155,13 +155,11 @@ export function DailyRecordsCard({ records }) {
 
 export function LevelHabitCard({ histogram }) {
   const { start_level, end_level, start_modal_range, end_modal_range } = histogram;
-  const labels = ['0', '10', '20', '30', '40', '50', '60', '70', '80', '90', '100%'];
+  // 2% 단위 50빈 → 5개 tick만 표시 (0/25/50/75/100)
+  const ticks = ['0', '25', '50', '75', '100%'];
 
   const startTotal = start_level.reduce((a, b) => a + b, 0);
   const endTotal = end_level.reduce((a, b) => a + b, 0);
-
-  const startMaxIdx = start_level.indexOf(Math.max(...start_level));
-  const endMaxIdx = end_level.indexOf(Math.max(...end_level));
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
@@ -176,20 +174,8 @@ export function LevelHabitCard({ histogram }) {
         <HistBar counts={start_level} color="#f87171" />
         {startTotal > 0 && (
           <>
-            <div className="flex justify-between mt-1.5">
-              {labels.map((l, i) => (
-                <span
-                  key={i}
-                  className="text-[8px] tabular-nums"
-                  style={{
-                    color: i < 10 && i === startMaxIdx && start_level[i] > 0
-                      ? '#f87171'
-                      : '#3f3f46',
-                  }}
-                >
-                  {l}
-                </span>
-              ))}
+            <div className="flex justify-between mt-1.5 text-[9px] tabular-nums text-zinc-600">
+              {ticks.map((l, i) => <span key={i}>{l}</span>)}
             </div>
             <div className="mt-2 text-[10px] text-zinc-600">
               주로 <span className="text-zinc-300 font-semibold">{start_modal_range}</span> 구간에서 충전 시작
@@ -208,20 +194,8 @@ export function LevelHabitCard({ histogram }) {
         <HistBar counts={end_level} color="#34d399" />
         {endTotal > 0 && (
           <>
-            <div className="flex justify-between mt-1.5">
-              {labels.map((l, i) => (
-                <span
-                  key={i}
-                  className="text-[8px] tabular-nums"
-                  style={{
-                    color: i < 10 && i === endMaxIdx && end_level[i] > 0
-                      ? '#34d399'
-                      : '#3f3f46',
-                  }}
-                >
-                  {l}
-                </span>
-              ))}
+            <div className="flex justify-between mt-1.5 text-[9px] tabular-nums text-zinc-600">
+              {ticks.map((l, i) => <span key={i}>{l}</span>)}
             </div>
             <div className="mt-2 text-[10px] text-zinc-600">
               주로 <span className="text-zinc-300 font-semibold">{end_modal_range}</span> 구간에서 충전 종료

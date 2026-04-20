@@ -220,17 +220,17 @@ export async function GET() {
         ORDER BY range_used_km ASC LIMIT 1
       `, [carId]),
 
-      // 충전 시작 레벨 히스토그램 (10개 구간)
+      // 충전 시작 레벨 히스토그램 (50개 구간, 2% 단위)
       pool.query(`
-        SELECT LEAST(FLOOR(start_battery_level / 10)::int, 9) AS bucket, COUNT(*)::int AS cnt
+        SELECT LEAST(FLOOR(start_battery_level / 2)::int, 49) AS bucket, COUNT(*)::int AS cnt
         FROM charging_processes
         WHERE car_id = $1 AND start_battery_level IS NOT NULL
         GROUP BY bucket ORDER BY bucket
       `, [carId]),
 
-      // 충전 종료 레벨 히스토그램 (10개 구간)
+      // 충전 종료 레벨 히스토그램 (50개 구간, 2% 단위)
       pool.query(`
-        SELECT LEAST(FLOOR(end_battery_level / 10)::int, 9) AS bucket, COUNT(*)::int AS cnt
+        SELECT LEAST(FLOOR(end_battery_level / 2)::int, 49) AS bucket, COUNT(*)::int AS cnt
         FROM charging_processes
         WHERE car_id = $1 AND end_battery_level IS NOT NULL
         GROUP BY bucket ORDER BY bucket
@@ -460,8 +460,8 @@ export async function GET() {
       consume_kwh: parseFloat((parseFloat(row.range_used_km) * KWH_PER_KM).toFixed(1)),
     } : null;
 
-    // 히스토그램
-    const buildHist = (rows) => Array.from({ length: 10 }, (_, i) => {
+    // 히스토그램 (50빈, 2% 단위)
+    const buildHist = (rows) => Array.from({ length: 50 }, (_, i) => {
       const row = rows.find(r => r.bucket === i);
       return row?.cnt || 0;
     });
@@ -576,8 +576,8 @@ export async function GET() {
       histogram: {
         start_level: histStart,
         end_level: histEnd,
-        start_modal_range: `${startModal * 10}–${startModal * 10 + 10}%`,
-        end_modal_range: `${endModal * 10}–${endModal * 10 + 10}%`,
+        start_modal_range: `${startModal * 2}–${startModal * 2 + 2}%`,
+        end_modal_range: `${endModal * 2}–${endModal * 2 + 2}%`,
       },
       health: {
         score: healthScore,
