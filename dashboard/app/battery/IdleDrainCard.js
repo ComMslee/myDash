@@ -52,10 +52,6 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
         const dayIdleH = items.reduce((s, r) => s + r.idle_hours, 0);
         const dayDropRaw = items.reduce((s, r) => s + r.soc_drop, 0);
         const dayDrop = Math.round(dayDropRaw * 10) / 10;
-        // 드레인 속도 최댓값(해당 일 기준)으로 색 농도 정규화
-        const maxRate = items.length > 0
-          ? Math.max(0.1, ...items.map(r => r.idle_hours > 0 ? r.soc_drop / r.idle_hours : 0))
-          : 0.1;
         return (
           <div key={key} className="border-t border-white/[0.04]">
             <div className="px-4 py-1.5 bg-white/[0.02] flex items-center justify-between">
@@ -77,13 +73,11 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                   const visibleH = Math.min(24 - hourOffset, r.idle_hours);
                   const widthPct = (visibleH / 24) * 100;
                   if (widthPct <= 0) return null;
-                  const rate = r.idle_hours > 0 ? r.soc_drop / r.idle_hours : 0;
                   const isZero = r.soc_drop < 0.05;
                   const isPreCharge = r.next_type === 'charge';
-                  const intensity = isZero ? 0 : Math.max(0.35, Math.min(1, rate / maxRate));
                   const bg = isZero
                     ? (isPreCharge ? 'rgba(234,179,8,0.3)' : 'rgba(16,185,129,0.3)')
-                    : (isPreCharge ? `rgba(234,179,8,${intensity})` : `rgba(239,68,68,${intensity})`);
+                    : (isPreCharge ? 'rgba(234,179,8,0.85)' : 'rgba(239,68,68,0.85)');
                   const showLabel = widthPct >= 10;
                   return (
                     <div

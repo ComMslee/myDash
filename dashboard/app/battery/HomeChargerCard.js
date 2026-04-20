@@ -1,17 +1,9 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 
-const TYPE_LABEL = {
-  '01': 'DC차데모', '02': 'AC완속', '03': 'DC차데모+AC3상', '04': 'DC콤보',
-  '05': 'DC차데모+DC콤보', '06': 'DC차데모+AC3상+DC콤보', '07': 'AC3상', '08': 'DC콤보(완속)',
-};
-
 const ID_OFFSET = 95110; // chgerId + 95110 = 차지비 앱 ID
-const FAVORITE_GROUPS = [
-  { label: '그룹 1', ids: ['04', '05'] }, // 앱 번호 14, 15
-  { label: '그룹 2', ids: ['12', '13'] }, // 앱 번호 22, 23
-];
-const FAVORITE_IDS = new Set(FAVORITE_GROUPS.flatMap(g => g.ids));
+const FAVORITE_IDS_ORDERED = ['04', '05', '12', '13']; // 앱 번호 14, 15, 22, 23
+const FAVORITE_IDS = new Set(FAVORITE_IDS_ORDERED);
 
 const STAT_META = {
   '2': { label: '대기',     dot: 'bg-emerald-500', text: 'text-emerald-400', cellBg: 'bg-emerald-500/80', cellText: 'text-white' },
@@ -85,8 +77,6 @@ export default function HomeChargerCard() {
     acc[c.stat] = (acc[c.stat] || 0) + 1;
     return acc;
   }, {});
-  const typeLabel = TYPE_LABEL[chargers[0]?.chgerType] || '';
-  const output = chargers[0]?.output;
   void tick; // keep dependency for relative time re-render
 
   return (
@@ -100,19 +90,6 @@ export default function HomeChargerCard() {
         <div className="mb-3">
           <div className="text-[15px] font-semibold text-white">{station.statNm}</div>
           <div className="text-[11px] text-zinc-500 mt-0.5">{station.addr}</div>
-          <div className="text-[11px] text-zinc-500 mt-1">
-            <span className="text-zinc-400">{station.busiNm}</span>
-            <span className="mx-1.5 text-zinc-700">·</span>
-            <span>{typeLabel}{output ? ` ${output}kW` : ''}</span>
-            <span className="mx-1.5 text-zinc-700">·</span>
-            <span>총 {chargers.length}기</span>
-            {station.parkingFree && (
-              <>
-                <span className="mx-1.5 text-zinc-700">·</span>
-                <span className="text-emerald-400/80">주차무료</span>
-              </>
-            )}
-          </div>
         </div>
 
         {(() => {
@@ -137,16 +114,16 @@ export default function HomeChargerCard() {
           };
           return (
             <div className="mb-3 space-y-2">
-              {FAVORITE_GROUPS.map(g => {
-                const groupChargers = g.ids.map(id => byId.get(id)).filter(Boolean);
-                if (!groupChargers.length) return null;
+              {(() => {
+                const favChargers = FAVORITE_IDS_ORDERED.map(id => byId.get(id)).filter(Boolean);
+                if (!favChargers.length) return null;
                 return (
-                  <div key={g.label} className="flex items-center gap-2">
-                    <span className="text-[10px] text-zinc-600 mr-0.5 w-10 shrink-0">{g.label}</span>
-                    {groupChargers.map(c => renderCell(c, 'lg'))}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-zinc-600 mr-0.5 w-10 shrink-0">자주</span>
+                    {favChargers.map(c => renderCell(c, 'lg'))}
                   </div>
                 );
-              })}
+              })()}
               <div className="grid grid-cols-12 gap-1 pt-1">
                 {mainGroup.map(c => renderCell(c, 'md'))}
               </div>
@@ -155,6 +132,7 @@ export default function HomeChargerCard() {
         })()}
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] tabular-nums">
+          <span className="text-zinc-400">총 {chargers.length}기</span>
           {['2', '3', '5', '1', '4', '9'].map(k => {
             const n = counts[k];
             if (!n) return null;
