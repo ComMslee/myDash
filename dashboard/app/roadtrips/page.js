@@ -677,9 +677,6 @@ function DrivesInner() {
                           {dayTotal && (
                             <div className="flex items-center gap-2 tabular-nums">
                               <span className="text-[10px] font-bold text-blue-400">{dayTotal.distance.toFixed(1)}<span className="text-zinc-600 font-normal ml-0.5">km</span></span>
-                              {dayTotal.kwh > 0 && (
-                                <span className="text-[10px] text-green-400/80">{dayTotal.kwh.toFixed(1)}<span className="text-zinc-600 ml-0.5">kWh</span></span>
-                              )}
                               {dayTotal.usedPct > 0 && (
                                 <span className="text-[10px] text-zinc-500">{dayTotal.usedPct}%</span>
                               )}
