@@ -20,7 +20,7 @@ function formatDate(dateStr) {
   return `${prefix}${mm}/${dd} ${hh}:${mi}`;
 }
 
-export default function IdleDrainCard({ records }) {
+export default function IdleDrainCard({ records, chargingSessions = [] }) {
   if (!records || records.length === 0) {
     return (
       <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-6 text-center">
@@ -60,6 +60,35 @@ export default function IdleDrainCard({ records }) {
         soc_start: socStart != null ? Math.round(socStart * 10) / 10 : null,
         soc_end: socEnd != null ? Math.round(socEnd * 10) / 10 : null,
         next_type: r.next_type,
+      });
+      cursor = segEnd;
+    }
+  });
+
+  // 충전 세션도 자정 기준 분할 후 KST 일자별 그룹화
+  const chargingByDay = {};
+  chargingSessions.forEach(c => {
+    const startMs = new Date(c.start).getTime();
+    const endMs = c.end ? new Date(c.end).getTime() : Date.now();
+    if (endMs <= startMs) return;
+    let cursor = startMs;
+    while (cursor < endMs) {
+      const kstCursor = new Date(cursor + 9 * 3600 * 1000);
+      const nextKstMidnight = Date.UTC(
+        kstCursor.getUTCFullYear(),
+        kstCursor.getUTCMonth(),
+        kstCursor.getUTCDate() + 1
+      ) - 9 * 3600 * 1000;
+      const segEnd = Math.min(endMs, nextKstMidnight);
+      const kstDay = `${kstCursor.getUTCFullYear()}-${String(kstCursor.getUTCMonth() + 1).padStart(2, '0')}-${String(kstCursor.getUTCDate()).padStart(2, '0')}`;
+      if (!chargingByDay[kstDay]) chargingByDay[kstDay] = [];
+      chargingByDay[kstDay].push({
+        start: new Date(cursor).toISOString(),
+        end: new Date(segEnd).toISOString(),
+        hours: (segEnd - cursor) / 3600000,
+        soc_start: c.soc_start,
+        soc_end: c.soc_end,
+        soc_added: c.soc_added,
       });
       cursor = segEnd;
     }
@@ -112,6 +141,8 @@ export default function IdleDrainCard({ records }) {
           if (!seen[key]) seen[key] = [];
           seen[key].push(r);
         });
+        // 충전만 있는 날짜도 포함
+        Object.keys(chargingByDay).forEach(k => { if (!seen[k]) seen[k] = []; });
         // 각 일자 내 idle_start 역순 + 일자별 키 역순
         Object.values(seen).forEach(items =>
           items.sort((a, b) => new Date(b.idle_start) - new Date(a.idle_start))
@@ -131,7 +162,9 @@ export default function IdleDrainCard({ records }) {
             return `${String(kst.getUTCHours()).padStart(2, '0')}:${String(kst.getUTCMinutes()).padStart(2, '0')}`;
           };
           // 드레인 속도 최댓값(해당 일 기준)으로 색 농도 정규화
-          const maxRate = Math.max(0.1, ...items.map(r => r.idle_hours > 0 ? r.soc_drop / r.idle_hours : 0));
+          const maxRate = items.length > 0
+            ? Math.max(0.1, ...items.map(r => r.idle_hours > 0 ? r.soc_drop / r.idle_hours : 0))
+            : 0.1;
           return (
             <div key={key} className="border-t border-white/[0.04]">
               <div className="px-4 py-1.5 bg-white/[0.02] flex items-center justify-between">
@@ -170,6 +203,27 @@ export default function IdleDrainCard({ records }) {
                         title={`${formatHM(r.idle_start)}~${r.idle_end ? formatHM(r.idle_end) : '현재'} · ${formatDuration(r.idle_hours)} · ${r.soc_start}→${r.soc_end}% · ${isZero ? '0%' : `-${fmtDrop(r.soc_drop)}%`}${isPreCharge ? ' · ⚡충전 전 대기' : ''}`}
                       >
                         {showLabel ? (isZero ? '0' : `-${fmtDrop(r.soc_drop)}%`) : ''}
+                      </div>
+                    );
+                  })}
+                  {/* 충전 세션 (노랑) */}
+                  {(chargingByDay[key] || []).map((c, ci) => {
+                    const st = new Date(c.start);
+                    const kstStart = new Date(st.getTime() + 9 * 3600 * 1000);
+                    const hourOffset = kstStart.getUTCHours() + kstStart.getUTCMinutes() / 60 + kstStart.getUTCSeconds() / 3600;
+                    const leftPct = (hourOffset / 24) * 100;
+                    const visibleH = Math.min(24 - hourOffset, c.hours);
+                    const widthPct = (visibleH / 24) * 100;
+                    if (widthPct <= 0) return null;
+                    const showLabel = widthPct >= 8;
+                    return (
+                      <div
+                        key={`c-${ci}`}
+                        className="absolute top-0 bottom-0 flex items-center justify-center text-[9px] font-bold tabular-nums text-black/85"
+                        style={{ left: `${leftPct}%`, width: `${widthPct}%`, background: 'rgba(234,179,8,0.85)' }}
+                        title={`⚡ 충전 ${formatHM(c.start)}~${formatHM(c.end)} · ${formatDuration(c.hours)} · ${c.soc_start}→${c.soc_end}% (+${c.soc_added}%)`}
+                      >
+                        {showLabel ? `⚡+${c.soc_added}%` : '⚡'}
                       </div>
                     );
                   })}

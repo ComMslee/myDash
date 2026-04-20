@@ -62,7 +62,7 @@ export default function BatteryPage() {
             <FastChargeCard />
 
             {/* 대기 소모 */}
-            <IdleDrainCard records={data.idle_drain} />
+            <IdleDrainCard records={data.idle_drain} chargingSessions={data.charging_sessions} />
           </>
         ) : null}
       </div>
