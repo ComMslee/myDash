@@ -1,5 +1,6 @@
 import {
   getCache,
+  getLastError,
   getStatIds,
   isFresh,
   loadStations,
@@ -19,6 +20,7 @@ export async function GET(req) {
   const force = searchParams.get('refresh') === '1';
 
   if (force) {
+    let upstreamError = null;
     try {
       const stations = await loadStations(statIds, key);
       if (stations.length) {
@@ -26,12 +28,14 @@ export async function GET(req) {
         setCache(payload);
         return Response.json(payload);
       }
+      upstreamError = `스테이션 매칭 없음 (요청 ${statIds.join(',')})`;
     } catch (e) {
-      console.error('[home-charger] upstream error:', e.message);
+      upstreamError = e.message || '조회 실패';
+      console.error('[home-charger] upstream error:', upstreamError);
     }
     const c = getCache();
-    if (c.data) return Response.json({ ...c.data, stale: true });
-    return Response.json({ error: '조회 실패' }, { status: 500 });
+    if (c.data) return Response.json({ ...c.data, stale: true, lastError: upstreamError });
+    return Response.json({ error: upstreamError || '조회 실패' }, { status: 500 });
   }
 
   const cache = getCache();
@@ -39,7 +43,11 @@ export async function GET(req) {
     if (!isFresh()) {
       warmIfNeeded().catch(e => console.warn('[home-charger] bg warm failed:', e.message));
     }
-    return Response.json(isFresh() ? cache.data : { ...cache.data, stale: true });
+    const stale = !isFresh();
+    const body = stale ? { ...cache.data, stale: true } : cache.data;
+    const err = getLastError();
+    if (stale && err) body.lastError = err;
+    return Response.json(body);
   }
 
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -53,5 +61,9 @@ export async function GET(req) {
     if (c.data) return Response.json(c.data);
     if (attempt < 2) await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
   }
-  return Response.json({ error: '스테이션을 찾지 못했습니다.' }, { status: 404 });
+  const err = getLastError();
+  return Response.json(
+    { error: err || '스테이션을 찾지 못했습니다.', statIds },
+    { status: 404 }
+  );
 }
