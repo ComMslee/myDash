@@ -109,7 +109,11 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
   // 일 모드 — 해당 일의 모든 주행 경로 병렬 로드
   useEffect(() => {
     if (!dayMode || isMock || drives.length === 0) { setDayRoutes([]); return; }
-    const dayDrives = drives.filter(d => driveDayStr(d) === dayMode);
+    // 하루 주행을 시간 순(ASC)으로 정렬 → 지도 번호 배지 1번 = 그날 첫 주행
+    const dayDrives = drives
+      .filter(d => driveDayStr(d) === dayMode)
+      .slice()
+      .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
     if (dayDrives.length === 0) { setDayRoutes([]); return; }
     setLoadingRoute(true);
     if (dayAbortRef.current) dayAbortRef.current.abort();
