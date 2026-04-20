@@ -70,8 +70,7 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
         <button
           type="button"
           onClick={() => onDayClick(g.dateStr)}
-          className="flex-shrink-0 w-16 bg-white/[0.02] hover:bg-white/[0.05] active:bg-blue-500/10 border-r border-white/[0.06] flex flex-col items-center justify-start py-2.5 gap-0.5 tabular-nums sticky self-start transition-colors"
-          style={{ top: 0 }}
+          className="flex-shrink-0 w-16 bg-white/[0.02] hover:bg-white/[0.05] active:bg-blue-500/10 border-r border-white/[0.06] flex flex-col items-center justify-center py-2.5 gap-0.5 tabular-nums transition-colors"
         >
           <span className="text-sm font-bold text-zinc-300 leading-none">{g.firstDate.getMonth() + 1}/{g.firstDate.getDate()}</span>
           <span className="text-[10px] text-zinc-600 leading-none mt-0.5">{weekday}</span>
