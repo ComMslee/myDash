@@ -271,8 +271,13 @@ function DrivesInner() {
                     </p>
                     <p className="text-sm text-zinc-300 leading-snug break-words">
                       {(() => {
-                        const chain = [first.start_address, ...dayDrives.map(d => d.end_address)]
+                        const raw = [first.start_address, ...dayDrives.map(d => d.end_address)]
                           .map(a => shortAddr(a) || '?');
+                        // 연속 중복 주소 축약 (집→집 → 집)
+                        const chain = [];
+                        for (const addr of raw) {
+                          if (chain.length === 0 || chain[chain.length - 1] !== addr) chain.push(addr);
+                        }
                         return chain.map((addr, i) => (
                           <span key={i}>
                             {i > 0 && <span className="text-zinc-600 mx-1">→</span>}
