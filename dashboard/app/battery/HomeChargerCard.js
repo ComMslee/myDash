@@ -60,20 +60,24 @@ function StationBlock({ station, chargers, withFavorites }) {
     ? chargers.filter(c => !FAVORITE_IDS.has(c.chgerId) && !SECOND_LINE_IDS.has(c.chgerId))
     : chargers;
 
+  // favChargers = [04→14, 05→15, 12→22, 13→23] — 15|22 사이에 divider
+  const favLeft  = favChargers.slice(0, 2); // 14, 15
+  const favRight = favChargers.slice(2);    // 22, 23
+
   return (
     <div>
       <div className="text-[13px] font-medium text-white mb-2">{station.statNm}</div>
       <div className="space-y-2">
-        {favChargers.length > 0 && (
+        {(favChargers.length > 0 || secondChargers.length > 0) && (
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-zinc-600 mr-0.5 w-10 shrink-0">자주</span>
-            {favChargers.map(c => renderCell(c, 'lg'))}
-          </div>
-        )}
-        {secondChargers.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="w-10 shrink-0" aria-hidden="true" />
+            {/* 16~21 */}
             {secondChargers.map(c => renderCell(c, 'lg'))}
+            {/* 14 15 | 22 23 — 우측 정렬 */}
+            <span className="flex-1" />
+            {favLeft.map(c => renderCell(c, 'lg'))}
+            <span className="w-px h-8 bg-white/10 mx-0.5" />
+            {favRight.map(c => renderCell(c, 'lg'))}
           </div>
         )}
         {mainGroup.length > 0 && (
