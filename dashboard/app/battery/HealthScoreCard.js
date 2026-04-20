@@ -62,11 +62,12 @@ export default function HealthScoreCard({ data, trend }) {
         </div>
         <div className="w-px h-8 bg-white/[0.06]" />
         <div className="text-center">
-          <p className="text-[10px] text-zinc-600 mb-0.5">추이</p>
+          <p className="text-[10px] text-zinc-600 mb-0.5">예상/원래</p>
           <p className="text-xl font-black leading-none tabular-nums" style={{ color: trendColor }}>
-            {trendPct != null ? (
+            {lastCap != null && firstCap != null ? (
               <>
-                {trendPct.toFixed(1)}<span className="text-xs text-zinc-600 font-normal ml-0.5">%</span>
+                {lastCap.toFixed(1)}<span className="text-xs text-zinc-600 font-normal mx-0.5">/</span>{firstCap.toFixed(1)}
+                <span className="text-[10px] text-zinc-600 font-normal ml-0.5">kWh</span>
               </>
             ) : (
               <span className="text-zinc-600">—</span>
