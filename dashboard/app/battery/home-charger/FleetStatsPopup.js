@@ -59,10 +59,10 @@ export default function FleetStatsPopup({ onClose }) {
       aria-modal="true"
     >
       <div
-        className="w-full sm:max-w-lg bg-[#161618] border-t sm:border sm:rounded-2xl border-white/[0.08] rounded-t-2xl h-[75vh] sm:h-auto sm:max-h-[80vh] flex flex-col overscroll-contain"
+        className="w-full sm:max-w-lg bg-[#161618] border-t sm:border sm:rounded-2xl border-white/[0.08] rounded-t-2xl max-h-[85dvh] sm:max-h-[85vh] overflow-y-auto overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="shrink-0 bg-[#161618] border-b border-white/[0.06] px-4 py-2 flex items-center justify-between">
+        <div className="sticky top-0 z-10 bg-[#161618] border-b border-white/[0.06] px-4 py-2 flex items-center justify-between">
           <h3 className="text-sm font-bold text-zinc-200">집충전기 상세 현황</h3>
           <button
             type="button"
@@ -74,7 +74,7 @@ export default function FleetStatsPopup({ onClose }) {
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-2.5 space-y-3">
+        <div className="px-4 py-2.5 space-y-3 pb-6">
           {/* 기간 슬라이더 */}
           <div>
             <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
