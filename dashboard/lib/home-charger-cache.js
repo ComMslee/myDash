@@ -5,7 +5,7 @@ import pool from '@/lib/db';
 
 const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 
-// 공공 API 일일 쿼터 1,000회/일 고려하여 시간대별 TTL 설정
+// 공공 API 일일 쿼터 1,000회/일 고려하여 시간대별 TTL 설정 (fallback)
 const CACHE_TIERS = [
   { start:  0, end:  6, ttlMs: 40 * 60_000 }, // 심야
   { start:  6, end: 12, ttlMs: 15 * 60_000 }, // 오전
@@ -16,12 +16,20 @@ const CACHE_TIERS = [
 ];
 const FALLBACK_TTL_MS = 15 * 60_000;
 
+// 동적 TTL: 실제 충전 히스토리(최근 90일)에서 학습
+const TTL_MIN_MS = 3 * 60_000;   // 피크 시간대 최소 3분
+const TTL_MAX_MS = 40 * 60_000;  // 한산한 시간대 최대 40분
+const DYN_REFRESH_MS = 24 * 60 * 60_000; // 24시간마다 재계산
+let dynamicTtls = null;  // [24] ms 배열, null이면 static fallback
+let ttlComputedAt = 0;
+let dynRefreshing = false;
+
 let cache = { ts: 0, data: null };
 let inflight = null;
 let lastError = null;
 let quotaCooldownUntil = 0; // 쿼터 초과 감지 시 이 시각까지 백그라운드 호출 억제
 
-export function cacheTtlMs(now = new Date()) {
+function staticTtlMs(now) {
   const kstHour = (now.getUTCHours() + 9) % 24;
   for (const t of CACHE_TIERS) {
     const inTier = t.start < t.end
@@ -32,10 +40,110 @@ export function cacheTtlMs(now = new Date()) {
   return FALLBACK_TTL_MS;
 }
 
+export function cacheTtlMs(now = new Date()) {
+  // 24시간 지났으면 백그라운드로 동적 TTL 갱신 트리거 (await 안 함)
+  if (Date.now() - ttlComputedAt > DYN_REFRESH_MS) {
+    refreshDynamicTtls().catch(e => console.warn('[home-charger] dyn ttl refresh failed:', e.message));
+  }
+  if (dynamicTtls) {
+    const kstHour = (now.getUTCHours() + 9) % 24;
+    return dynamicTtls[kstHour];
+  }
+  return staticTtlMs(now);
+}
+
+// 실제 충전 히스토그램 기반 TTL 산출 (하이브리드: 시작×2 + 커버리지×1)
+async function refreshDynamicTtls() {
+  if (dynRefreshing) return;
+  dynRefreshing = true;
+  try {
+    const [startRes, coverRes] = await Promise.all([
+      pool.query(`
+        SELECT EXTRACT(HOUR FROM start_date + INTERVAL '9 hours')::int AS h, COUNT(*)::int AS n
+        FROM charging_processes
+        WHERE start_date > NOW() - INTERVAL '90 days'
+        GROUP BY 1
+      `),
+      pool.query(`
+        SELECT EXTRACT(HOUR FROM gs + INTERVAL '9 hours')::int AS h, COUNT(*)::int AS n
+        FROM charging_processes,
+          LATERAL generate_series(
+            date_trunc('hour', start_date),
+            date_trunc('hour', COALESCE(end_date, start_date)),
+            INTERVAL '1 hour'
+          ) AS gs
+        WHERE start_date > NOW() - INTERVAL '90 days'
+        GROUP BY 1
+      `),
+    ]);
+    const startH = new Array(24).fill(0);
+    const coverH = new Array(24).fill(0);
+    for (const r of startRes.rows) startH[r.h] = r.n;
+    for (const r of coverRes.rows) coverH[r.h] = r.n;
+    // 하이브리드 점수: 시작 시각 가중 2배 + 세션 커버리지
+    const scores = startH.map((s, i) => s * 2 + coverH[i]);
+    const total = scores.reduce((a, b) => a + b, 0);
+    if (total === 0) {
+      // 데이터 없음 → static fallback 유지
+      dynamicTtls = null;
+      ttlComputedAt = Date.now();
+      console.log('[home-charger] dyn ttl: no charging history, using static');
+      return;
+    }
+    // 기존 static TTL을 앵커로, 사용 빈도에 따라 위아래로 조정
+    // ratio = 해당 시간대 점수 / 평균 점수
+    //   ratio > 1 (평균보다 바쁨) → static TTL을 줄임 (짧게)
+    //   ratio < 1 (평균보다 한산) → static TTL을 늘림 (길게)
+    //   ratio = 0 (활동 전무)   → 최대 4배로 늘림
+    // 최종 [3, 40]분 범위로 clamp
+    const avg = total / 24;
+    const ttls = scores.map((n, h) => {
+      const base = staticTtlMs(new Date(Date.UTC(2000, 0, 1, h - 9))); // KST h시의 static
+      const ratio = avg > 0 ? n / avg : 0;
+      // multiplier = 1 / clamp(ratio, 0.25, 4) → 범위 [0.25, 4]
+      // ratio=0이면 ratio 대체값 0.25 써서 multiplier=4 (최대 늘림)
+      const effRatio = Math.max(0.25, Math.min(4, ratio || 0.25));
+      const multiplier = 1 / effRatio;
+      const ms = base * multiplier;
+      return Math.max(TTL_MIN_MS, Math.min(TTL_MAX_MS, Math.round(ms / 60_000) * 60_000));
+    });
+    dynamicTtls = ttls;
+    ttlComputedAt = Date.now();
+    const peakH = scores.indexOf(Math.max(...scores));
+    const minTtlMin = Math.min(...ttls) / 60_000;
+    const maxTtlMin = Math.max(...ttls) / 60_000;
+    console.log(`[home-charger] dyn ttl: peak ${peakH}h, range ${minTtlMin}~${maxTtlMin}m`);
+  } finally {
+    dynRefreshing = false;
+  }
+}
+
 export function getCache() { return cache; }
 export function setCache(data) { cache = { ts: Date.now(), data }; }
 export function isFresh() { return !!cache.data && Date.now() - cache.ts < cacheTtlMs(); }
 export function getLastError() { return lastError; }
+
+// UI 마우스 오버에 표시할 폴링 주기 정보
+export function getTtlInfo() {
+  const now = new Date();
+  const kstHour = (now.getUTCHours() + 9) % 24;
+  const currentMs = cacheTtlMs(now);
+  // 24시간 스케줄 (분 단위)
+  const schedule = [];
+  for (let h = 0; h < 24; h++) {
+    const ms = dynamicTtls
+      ? dynamicTtls[h]
+      : staticTtlMs(new Date(Date.UTC(2000, 0, 1, h - 9)));
+    schedule.push(Math.round(ms / 60_000));
+  }
+  return {
+    dynamic: !!dynamicTtls,
+    currentMin: Math.round(currentMs / 60_000),
+    currentHour: kstHour,
+    schedule, // [24] 분 배열
+    updatedAt: ttlComputedAt,
+  };
+}
 
 export function getStatIds() {
   const multi = process.env.HOME_CHARGER_STAT_IDS;

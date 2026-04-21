@@ -48,6 +48,27 @@ function computeRanks(usage) {
   return ranks;
 }
 
+// 폴링 주기 정보 → 마우스 오버 텍스트
+function buildTtlTooltip(ttlInfo) {
+  if (!ttlInfo) return '';
+  const { dynamic, currentMin, currentHour, schedule } = ttlInfo;
+  const lines = [];
+  lines.push(`현재 ${currentHour}시 · 갱신 주기 ${currentMin}분`);
+  lines.push(dynamic ? '자동 학습 (최근 90일 충전 패턴 기반)' : '기본 스케줄');
+  lines.push('');
+  // 24시간 스케줄 (6시간씩 4줄)
+  for (let block = 0; block < 4; block++) {
+    const row = [];
+    for (let i = 0; i < 6; i++) {
+      const h = block * 6 + i;
+      const mark = h === currentHour ? '▶' : ' ';
+      row.push(`${mark}${String(h).padStart(2)}시 ${String(schedule[h]).padStart(2)}분`);
+    }
+    lines.push(row.join('  '));
+  }
+  return lines.join('\n');
+}
+
 function timeAgoKo(iso) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -187,7 +208,7 @@ export default function HomeChargerCard() {
     );
   }
 
-  const { stations = [], fetchedAt, stale, lastError } = data;
+  const { stations = [], fetchedAt, stale, lastError, ttlInfo } = data;
   const usage = data?.usage || {};
   const ranks = computeRanks(usage);
   const errMsg = error || lastError;
@@ -237,7 +258,14 @@ export default function HomeChargerCard() {
           );
         })}
         <span className="ml-auto flex items-center gap-1.5 text-zinc-500">
-          {fetchedAt && <span>{timeAgoKo(fetchedAt)}</span>}
+          {fetchedAt && (
+            <span
+              className="cursor-help"
+              title={ttlInfo ? buildTtlTooltip(ttlInfo) : '갱신 시각'}
+            >
+              {timeAgoKo(fetchedAt)}
+            </span>
+          )}
           <button
             type="button"
             onClick={() => load(true)}
