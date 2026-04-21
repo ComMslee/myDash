@@ -87,20 +87,17 @@ function renderCell(c, size = 'md', highlight = null) {
   const sizeClass = size === 'lg'
     ? 'w-10 h-10 text-sm'
     : 'aspect-square text-[10px]';
-  // 하단 highlight — box-shadow로 border-radius 관계없이 일관되게 표시
-  const shadow = highlight === 'high'
-    ? '0 3px 0 0 rgb(251 191 36 / 0.95)'
-    : highlight === 'mid'
-    ? '0 3px 0 0 rgb(251 191 36 / 0.35)'
-    : undefined;
+  const dotColor = highlight === 'high' ? 'bg-amber-400' : highlight === 'mid' ? 'bg-amber-400/50' : null;
   return (
     <div
       key={c.chgerId}
-      className={`${sizeClass} rounded-md flex items-center justify-center font-bold tabular-nums ${meta.cellBg} ${meta.cellText}`}
-      style={shadow ? { boxShadow: shadow } : undefined}
+      className={`${sizeClass} relative rounded-md flex items-center justify-center font-bold tabular-nums ${meta.cellBg} ${meta.cellText}`}
       title={`${localId} · ${meta.label}${highlight ? ` · 자주 사용(${highlight})` : ''}`}
     >
       {label}
+      {dotColor && (
+        <span className={`absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full ${dotColor}`} />
+      )}
     </div>
   );
 }
