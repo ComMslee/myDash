@@ -64,9 +64,9 @@ export function UnifiedCell({ c, highlight, count, hourly, now }) {
   const label = localId - 95100;
   const sizeClass = 'w-10 h-10 text-sm';
   const ringClass = highlight?.tier === 'top3'
-    ? 'ring-2 ring-amber-300 shadow-[0_0_6px_rgba(252,211,77,0.6)]'
+    ? 'ring-[3px] ring-yellow-300 shadow-[0_0_8px_rgba(253,224,71,0.9)]'
     : highlight?.tier === 'top10'
-    ? 'ring-1 ring-amber-400/70'
+    ? 'ring-2 ring-yellow-400'
     : '';
   const elapsed = elapsedLabel(c, now);
   const isCharging = c.stat === '3';
@@ -94,7 +94,7 @@ export function UnifiedCell({ c, highlight, count, hourly, now }) {
         </div>
         {highlight?.tier === 'top3' && (
           <span
-            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-300 text-black text-[9px] font-extrabold tabular-nums flex items-center justify-center leading-none shadow-[0_0_4px_rgba(252,211,77,0.8)]"
+            className="absolute -top-1.5 -right-1.5 w-[18px] h-[18px] rounded-full bg-yellow-300 text-black text-[10px] font-extrabold tabular-nums flex items-center justify-center leading-none shadow-[0_0_6px_rgba(253,224,71,0.9)] ring-1 ring-black/30"
             aria-label={`${highlight.rank}위`}
           >
             {highlight.rank}
