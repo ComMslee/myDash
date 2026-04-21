@@ -18,8 +18,9 @@ export const P1_107_IDS = ['12', '13'];                          // 앱 번호 2
 // P2 (2순위): 102동 앞 · 104동 앞
 export const P2_102_IDS = ['06', '07', '08', '09', '10', '11'];  // 앱 번호 16~21
 export const P2_104_IDS = ['14', '15', '16'];                    // 앱 번호 24, 25, 26
-// P3 (참고 그룹): 105동 앞
-export const P3_105_IDS = ['17', '18', '19'];                    // 앱 번호 27, 28, 29
+// P3 (참고 그룹): PI795111 내 동별 분류
+export const P3_105_IDS = ['17', '18', '19'];                    // 105동 앞 — 앱 번호 27, 28, 29
+export const P3_115_IDS = ['01', '02', '03'];                    // 115동 지상 — 앱 번호 11, 12, 13
 
 export const PRIORITY_IDS = new Set([
   ...P1_108_IDS, ...P1_107_IDS, ...P2_102_IDS, ...P2_104_IDS,
@@ -28,6 +29,7 @@ export const PRIORITY_IDS = new Set([
 // P3 섹션에서 동별로 분리해 표시할 그룹 (타일 형식)
 export const P3_GROUPS = [
   { title: '105동', ids: P3_105_IDS },
+  { title: '115동(지상)', ids: P3_115_IDS },
 ];
 export const P3_GROUPED_IDS = new Set(P3_GROUPS.flatMap(g => g.ids));
 
@@ -35,7 +37,7 @@ export const COMPLEX_NAME = '망포늘푸른벽산아파트';
 
 export const STATION_CONFIG = {
   'PI795111': { loc: null,      label: 'PI795111' },
-  'PI313299': { loc: '115 B1',  label: '115동 B1' },
+  'PI313299': { loc: '115 B1',  label: '115동(지하)' },
   'PIH01089': { loc: '119F',    label: '119동 앞' },
 };
 
