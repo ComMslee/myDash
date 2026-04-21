@@ -96,7 +96,7 @@ async function refreshDynamicTtls() {
     //   ratio > 1 (평균보다 바쁨) → static TTL을 줄임 (짧게)
     //   ratio < 1 (평균보다 한산) → static TTL을 늘림 (길게)
     //   ratio = 0 (활동 전무)   → 최대 4배로 늘림
-    // 최종 [3, 40]분 범위로 clamp
+    // 최종 [3, 30]분 범위로 clamp
     const avg = total / 24;
     const ttls = scores.map((n, h) => {
       const base = staticTtlMs(new Date(Date.UTC(2000, 0, 1, h - 9))); // KST h시의 static
