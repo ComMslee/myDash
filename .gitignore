@@ -17,7 +17,8 @@ tesla_auth/
 
 # ─── Claude Code / OMC 로컬 세션 ──────────────────────────
 .omc/
-.claude/
+.claude/*
+!.claude/skills/
 dashboard/.omc/
 
 # ─── Windows PowerShell 스크립트 (개인용) ─────────────────
