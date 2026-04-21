@@ -7,14 +7,14 @@ const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 
 // 공공 API 일일 쿼터 1,000회/일 고려하여 시간대별 TTL 설정
 const CACHE_TIERS = [
-  { start:  0, end:  6, ttlMs: 60 * 60_000 }, // 심야 1시간
-  { start:  6, end: 12, ttlMs: 10 * 60_000 }, // 오전
-  { start: 12, end: 15, ttlMs:  5 * 60_000 }, // 점심
-  { start: 15, end: 17, ttlMs: 10 * 60_000 }, // 오후
-  { start: 17, end: 22, ttlMs:  3 * 60_000 }, // 귀가/충전 피크
-  { start: 22, end: 24, ttlMs: 10 * 60_000 }, // 저녁~자정
+  { start:  0, end:  6, ttlMs: 40 * 60_000 }, // 심야
+  { start:  6, end: 12, ttlMs: 15 * 60_000 }, // 오전
+  { start: 12, end: 15, ttlMs:  4 * 60_000 }, // 점심 피크
+  { start: 15, end: 17, ttlMs: 15 * 60_000 }, // 오후
+  { start: 17, end: 22, ttlMs:  4 * 60_000 }, // 귀가/충전 피크
+  { start: 22, end: 24, ttlMs: 15 * 60_000 }, // 저녁~자정
 ];
-const FALLBACK_TTL_MS = 10 * 60_000;
+const FALLBACK_TTL_MS = 15 * 60_000;
 
 let cache = { ts: 0, data: null };
 let inflight = null;
