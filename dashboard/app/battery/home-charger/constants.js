@@ -29,7 +29,7 @@ export const PRIORITY_IDS = new Set([
 // P3 섹션에서 동별로 분리해 표시할 단일-스테이션 그룹 (타일 형식)
 // 115동은 지상(PI795111)과 지하(PI313299) 교차 스테이션이라 별도 합성 렌더
 export const P3_GROUPS = [
-  { title: '105동', ids: P3_105_IDS },
+  { title: '105', ids: P3_105_IDS },
 ];
 export const P3_GROUPED_IDS = new Set([
   ...P3_GROUPS.flatMap(g => g.ids),
@@ -43,8 +43,8 @@ export const COMPLEX_NAME = '망포늘푸른벽산아파트';
 
 export const STATION_CONFIG = {
   'PI795111': { loc: null,      label: 'PI795111' },
-  'PI313299': { loc: '115 B1',  label: '115동(지하)' },
-  'PIH01089': { loc: '119F',    label: '119동 앞' },
+  'PI313299': { loc: '115 B1',  label: '115(지하)' },
+  'PIH01089': { loc: '119F',    label: '119 앞' },
 };
 
 // 환경공단 API 상태 코드별 UI 메타

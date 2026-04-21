@@ -165,16 +165,16 @@ export default function HomeChargerCard() {
       )}
 
       <div className="px-4 py-3 space-y-3">
-        {/* P1: 108동 · 107동 */}
-        <div className="space-y-1.5">
-          <TileBox title="108동" chargers={cells108} {...tileProps} />
-          <TileBox title="107동" chargers={cells107} {...tileProps} />
+        {/* P1: 108 · 107 — 1줄 2열, 셀 넘치면 자동 개행 */}
+        <div className="grid grid-cols-2 gap-1.5">
+          <TileBox title="108" chargers={cells108} {...tileProps} />
+          <TileBox title="107" chargers={cells107} {...tileProps} />
         </div>
 
-        {/* P2: 102동 · 104동 */}
-        <div className="space-y-1.5">
-          <TileBox title="102동" chargers={cells102} {...tileProps} />
-          <TileBox title="104동" chargers={cells104} {...tileProps} />
+        {/* P2: 102 · 104 — 1줄 2열, 셀 넘치면 자동 개행 */}
+        <div className="grid grid-cols-2 gap-1.5">
+          <TileBox title="102" chargers={cells102} {...tileProps} />
+          <TileBox title="104" chargers={cells104} {...tileProps} />
         </div>
 
         {/* P3: 참고 (접힘) */}
@@ -195,7 +195,7 @@ export default function HomeChargerCard() {
             {showP3 && (
               <div className="space-y-2 pt-2">
                 {(p3GroupCells.length > 0 || show115) && (
-                  <div className="space-y-1.5">
+                  <div className="grid grid-cols-2 gap-1.5">
                     {p3GroupCells.map(g => (
                       <TileBox
                         key={g.title}
@@ -209,7 +209,7 @@ export default function HomeChargerCard() {
                     ))}
                     {show115 && (
                       <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg p-2 flex items-center gap-2">
-                        <div className="text-[11px] text-zinc-300 font-medium w-12 text-center shrink-0">115동</div>
+                        <div className="text-[11px] text-zinc-300 font-medium w-12 text-center shrink-0">115</div>
                         <div className="flex-1 min-w-0 space-y-1">
                           {cells115Ground.length > 0 && (
                             <div className="flex items-center gap-1.5">
