@@ -57,15 +57,16 @@ export function MiniGrid({ chargers, statId, ranks, usage, now, className = '' }
 
 // 통일 셀 — 색 배경 + 번호, 하단에 경과시간(충전중) 또는 사용횟수(비사용), 랭크 링
 // 모든 셀 크기/폰트 통일 (P1/P2/P3 동일 포맷)
+// highlight: { tier: 'top3'|'top10', rank: number } | null
 export function UnifiedCell({ c, highlight, count, hourly, now }) {
   const meta = STAT_META[c.stat] || STAT_META['9'];
   const localId = ID_OFFSET + Number(c.chgerId);
   const label = localId - 95100;
   const sizeClass = 'w-10 h-10 text-sm';
-  const ringClass = highlight === 'high'
+  const ringClass = highlight?.tier === 'top3'
     ? 'ring-2 ring-amber-300 shadow-[0_0_6px_rgba(252,211,77,0.6)]'
-    : highlight === 'mid'
-    ? 'ring-2 ring-amber-500/70'
+    : highlight?.tier === 'top10'
+    ? 'ring-1 ring-amber-400/70'
     : '';
   const elapsed = elapsedLabel(c, now);
   const isCharging = c.stat === '3';
@@ -76,7 +77,7 @@ export function UnifiedCell({ c, highlight, count, hourly, now }) {
   if (elapsed) titleParts.push(`${elapsed} 경과`);
   titleParts.push(count > 0 ? `누적 ${count}회 사용` : '미사용');
   if (peak) titleParts.push(`피크 ${peak.hour}시 (${peak.count}회)`);
-  if (highlight) titleParts.push(highlight === 'high' ? '자주 사용' : '가끔 사용');
+  if (highlight) titleParts.push(`${highlight.rank}위${highlight.tier === 'top3' ? ' · 자주 사용' : ''}`);
 
   // 셀 하단 텍스트 — 충전중일 때만 경과시간 (누적 횟수는 호버에서 확인)
   const bottomText = isCharging ? elapsed : '';
@@ -84,11 +85,21 @@ export function UnifiedCell({ c, highlight, count, hourly, now }) {
 
   return (
     <div className="flex flex-col items-center gap-0.5 min-w-0">
-      <div
-        className={`${sizeClass} rounded-md flex items-center justify-center font-bold tabular-nums cursor-help ${meta.cellBg} ${meta.cellText} ${ringClass}`}
-        title={titleParts.join(' · ')}
-      >
-        {label}
+      <div className="relative">
+        <div
+          className={`${sizeClass} rounded-md flex items-center justify-center font-bold tabular-nums cursor-help ${meta.cellBg} ${meta.cellText} ${ringClass}`}
+          title={titleParts.join(' · ')}
+        >
+          {label}
+        </div>
+        {highlight?.tier === 'top3' && (
+          <span
+            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-300 text-black text-[9px] font-extrabold tabular-nums flex items-center justify-center leading-none shadow-[0_0_4px_rgba(252,211,77,0.8)]"
+            aria-label={`${highlight.rank}위`}
+          >
+            {highlight.rank}
+          </span>
+        )}
       </div>
       <div className={`text-[9px] tabular-nums leading-none min-h-[10px] ${bottomClass}`}>
         {bottomText}
