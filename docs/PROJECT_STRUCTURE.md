@@ -13,12 +13,12 @@ myDash/
     ├── tailwind.config.js
     ├── postcss.config.js
     ├── jsconfig.json             # @/ → dashboard/ 경로 별칭
-    ├── instrumentation.js        # Next.js 기동 시 집충전기 캐시 warm-up
+    ├── instrumentation.js        # Next.js 기동 시 집충전기 캐시 warm-up (2분 주기 keep-warm)
     ├── lib/
     │   ├── db.js                 # PostgreSQL 커넥션 풀 (싱글턴)
     │   ├── constants.js          # KWH_PER_KM, RATED_RANGE_MAX_KM
     │   ├── format.js             # formatDuration, formatDate, shortAddr, formatKorDate
-    │   └── home-charger-cache.js # 환경공단 API 캐시 + 동적 TTL 학습
+    │   └── home-charger-cache.js # 환경공단 API 캐시 + 동적 TTL(3~30분) + DB 스냅샷 영속화 + 시간당 사용 카운트
     ├── app/
     │   ├── layout.js             # 루트 레이아웃 (MockProvider, GlobalHeader, BottomNav)
     │   ├── globals.css           # Tailwind 지시어 + Leaflet 다크 테마 오버라이드

@@ -6,19 +6,20 @@ import pool from '@/lib/db';
 const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 
 // 공공 API 일일 쿼터 1,000회/일 고려하여 시간대별 TTL 설정 (fallback)
+// 범위: 3~30분
 const CACHE_TIERS = [
-  { start:  0, end:  6, ttlMs: 40 * 60_000 }, // 심야
+  { start:  0, end:  6, ttlMs: 30 * 60_000 }, // 심야
   { start:  6, end: 12, ttlMs: 15 * 60_000 }, // 오전
-  { start: 12, end: 15, ttlMs:  4 * 60_000 }, // 점심 피크
+  { start: 12, end: 15, ttlMs:  5 * 60_000 }, // 점심 피크
   { start: 15, end: 17, ttlMs: 15 * 60_000 }, // 오후
-  { start: 17, end: 22, ttlMs:  4 * 60_000 }, // 귀가/충전 피크
+  { start: 17, end: 22, ttlMs:  3 * 60_000 }, // 귀가/충전 피크
   { start: 22, end: 24, ttlMs: 15 * 60_000 }, // 저녁~자정
 ];
 const FALLBACK_TTL_MS = 15 * 60_000;
 
 // 동적 TTL: 실제 충전 히스토리(최근 90일)에서 학습
-const TTL_MIN_MS = 3 * 60_000;   // 피크 시간대 최소 3분
-const TTL_MAX_MS = 40 * 60_000;  // 한산한 시간대 최대 40분
+const TTL_MIN_MS =  3 * 60_000;  // 피크 시간대 최소 3분
+const TTL_MAX_MS = 30 * 60_000;  // 한산한 시간대 최대 30분
 const DYN_REFRESH_MS = 24 * 60 * 60_000; // 24시간마다 재계산
 let dynamicTtls = null;  // [24] ms 배열, null이면 static fallback
 let ttlComputedAt = 0;
@@ -95,7 +96,7 @@ async function refreshDynamicTtls() {
     //   ratio > 1 (평균보다 바쁨) → static TTL을 줄임 (짧게)
     //   ratio < 1 (평균보다 한산) → static TTL을 늘림 (길게)
     //   ratio = 0 (활동 전무)   → 최대 4배로 늘림
-    // 최종 [3, 40]분 범위로 clamp
+    // 최종 [3, 30]분 범위로 clamp
     const avg = total / 24;
     const ttls = scores.map((n, h) => {
       const base = staticTtlMs(new Date(Date.UTC(2000, 0, 1, h - 9))); // KST h시의 static
@@ -119,7 +120,11 @@ async function refreshDynamicTtls() {
 }
 
 export function getCache() { return cache; }
-export function setCache(data) { cache = { ts: Date.now(), data }; }
+export function setCache(data) {
+  cache = { ts: Date.now(), data };
+  // DB 스냅샷 저장 (fire-and-forget)
+  saveSnapshotToDb(data).catch(() => {});
+}
 export function isFresh() { return !!cache.data && Date.now() - cache.ts < cacheTtlMs(); }
 export function getLastError() { return lastError; }
 
@@ -274,10 +279,9 @@ let tableReady = false;
 
 async function ensureTable() {
   if (tableReady) return;
-  // stat_id 없는 구버전 테이블 교체 (방금 생성된 빈 테이블이므로 DROP 무해)
-  await pool.query(`DROP TABLE IF EXISTS charger_usage`);
+  // 컨테이너 재시작(배포)마다 카운트 보존 — DROP 금지, IF NOT EXISTS로만 생성
   await pool.query(`
-    CREATE TABLE charger_usage (
+    CREATE TABLE IF NOT EXISTS charger_usage (
       stat_id    VARCHAR(20) NOT NULL,
       chger_id   VARCHAR(20) NOT NULL,
       hour       SMALLINT    NOT NULL,
@@ -286,9 +290,67 @@ async function ensureTable() {
       PRIMARY KEY (stat_id, chger_id, hour)
     )
   `);
+  // 과거 구버전 스키마에서 업그레이드 — 컬럼 누락 시 ALTER로 보강 (DROP 금지)
+  await pool.query(`ALTER TABLE charger_usage ADD COLUMN IF NOT EXISTS stat_id VARCHAR(20) NOT NULL DEFAULT 'PI795111'`);
+  await pool.query(`ALTER TABLE charger_usage ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  // 환경공단 API 응답 스냅샷 — 컨테이너 재시작 간 캐시 영속화
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS home_charger_snapshot (
+      cache_key  VARCHAR(20) PRIMARY KEY,
+      payload    JSONB       NOT NULL,
+      fetched_at TIMESTAMPTZ NOT NULL
+    )
+  `);
   tableReady = true;
 }
 
+const SNAPSHOT_KEY = 'main';
+
+async function saveSnapshotToDb(payload) {
+  try {
+    await ensureTable();
+    await pool.query(
+      `INSERT INTO home_charger_snapshot (cache_key, payload, fetched_at)
+       VALUES ($1, $2::jsonb, NOW())
+       ON CONFLICT (cache_key) DO UPDATE
+         SET payload = EXCLUDED.payload, fetched_at = EXCLUDED.fetched_at`,
+      [SNAPSHOT_KEY, JSON.stringify(payload)]
+    );
+  } catch (e) {
+    console.warn('[home-charger] snapshot save failed:', e.message);
+  }
+}
+
+async function loadSnapshotFromDb() {
+  try {
+    await ensureTable();
+    const res = await pool.query(
+      `SELECT payload, fetched_at FROM home_charger_snapshot WHERE cache_key = $1`,
+      [SNAPSHOT_KEY]
+    );
+    if (!res.rows.length) return null;
+    return { data: res.rows[0].payload, ts: new Date(res.rows[0].fetched_at).getTime() };
+  } catch (e) {
+    console.warn('[home-charger] snapshot load failed:', e.message);
+    return null;
+  }
+}
+
+// 컨테이너 기동 직후 DB에 저장된 마지막 스냅샷을 메모리 캐시로 복원 (1회)
+let bootstrapDone = false;
+export async function bootstrapCacheFromDb() {
+  if (bootstrapDone) return;
+  bootstrapDone = true;
+  if (cache.data) return; // 이미 메모리에 있으면 스킵
+  const snap = await loadSnapshotFromDb();
+  if (snap?.data) {
+    cache = snap;
+    console.log(`[home-charger] restored snapshot from DB (age ${Math.round((Date.now() - snap.ts) / 1000)}s)`);
+  }
+}
+
+// 30분당 최대 1회 증가 — 같은 (stat_id, chger_id, hour) 버킷은 30분 간격으로 +1
+// 직전 업데이트로부터 30분 미경과면 스킵 (시간당 최대 2, 하루 최대 48)
 export async function recordUsageDb(stations) {
   try {
     await ensureTable();
@@ -302,8 +364,10 @@ export async function recordUsageDb(stations) {
     await pool.query(
       `INSERT INTO charger_usage (stat_id, chger_id, hour, count)
        SELECT unnest($1::text[]), unnest($2::text[]), $3::smallint, 1
-       ON CONFLICT (stat_id, chger_id, hour)
-       DO UPDATE SET count = charger_usage.count + 1, updated_at = NOW()`,
+       ON CONFLICT (stat_id, chger_id, hour) DO UPDATE
+         SET count = charger_usage.count + 1,
+             updated_at = NOW()
+         WHERE charger_usage.updated_at < NOW() - INTERVAL '30 minutes'`,
       [statIds, chgerIds, kstHour]
     );
   } catch (e) {
@@ -357,6 +421,8 @@ export async function loadStations(statIds, key) {
 export async function warmIfNeeded() {
   const key = process.env.EV_CHARGER_API_KEY;
   if (!key) return null;
+  // 최초 호출 시 DB 스냅샷 복원 (컨테이너 재시작 직후 마지막 상태 즉시 노출)
+  await bootstrapCacheFromDb();
   const statIds = getStatIds();
   if (isFresh()) return cache.data;
   if (isQuotaCooldown()) return cache.data; // 쿼터 초과 중엔 호출 억제, 기존 캐시만 사용

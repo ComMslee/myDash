@@ -89,4 +89,4 @@ export async function GET(req) {
 ## 참고 문서
 
 - 공공데이터포털: <https://www.data.go.kr/data/15076352/openapi.do>
-- 활용가이드: `한국환경공단_전기자동차 충전소 정보_OpenAPI활용가이드_v1.22.docx` (포털에서 다운로드)
+- 활용가이드: `한국환경공단_전기자동차 충전소 정보_OpenAPI활용가이드_v1.23.docx` (포털에서 다운로드)

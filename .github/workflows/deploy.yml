@@ -27,6 +27,20 @@ jobs:
             cd ~/myDash
             git fetch --all --prune
             git reset --hard origin/master
+            # nginx htpasswd는 gitignore 처리됨 — 서버에 없으면 임시 자격증명 생성
+            # (docker가 볼륨 마운트 시 파일 없으면 디렉토리로 만드는 케이스 포함 정리)
+            if [ -d nginx-teslamate.htpasswd ]; then
+              echo "[deploy] nginx-teslamate.htpasswd이 디렉토리로 생성돼있어 제거"
+              sudo docker compose stop teslamate-auth 2>/dev/null || true
+              sudo rm -rf nginx-teslamate.htpasswd
+            fi
+            if [ ! -f nginx-teslamate.htpasswd ]; then
+              echo "[deploy] nginx-teslamate.htpasswd 없음 — 임시 자격증명 생성"
+              TEMP_PASS=$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)
+              printf "admin:%s\n" "$(openssl passwd -apr1 "$TEMP_PASS")" > nginx-teslamate.htpasswd
+              echo "[deploy] ⚠️ 임시 admin 비밀번호 생성됨 — 로그에서 확인 후 변경 권고:"
+              echo "[deploy] user=admin pass=$TEMP_PASS"
+            fi
             sudo docker compose build dashboard
             sudo docker compose up -d dashboard
             sudo docker compose restart teslamate-auth

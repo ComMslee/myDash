@@ -10,9 +10,6 @@ export const CLOCK_INTERVAL_MS = 1_000;   // 경과시간 갱신용 tick
 // 상태 배지 표시 순서 (대기 > 충전중 > 점검중 > 통신이상 > 운영중지 > 확인불가)
 export const STATUS_ORDER = ['2', '3', '5', '1', '4', '9'];
 
-// P3 미니 그리드 컬럼 수
-export const P3_GRID_COLS = 15;
-
 export const ID_OFFSET = 95110; // chgerId + 95110 = 차지비 앱 ID
 
 // P1 (1순위): 108동 앞 · 107동 앞
