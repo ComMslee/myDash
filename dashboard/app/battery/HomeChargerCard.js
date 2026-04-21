@@ -70,7 +70,6 @@ function StationBlock({ station, chargers, withFavorites }) {
       <div className="space-y-2">
         {(favChargers.length > 0 || secondChargers.length > 0) && (
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-zinc-600 mr-0.5 w-10 shrink-0">자주</span>
             {/* 108F: 14 15 */}
             <span className="text-[9px] text-zinc-600 mr-0.5">108F</span>
             {favLeft.map(c => renderCell(c, 'lg'))}
