@@ -4,6 +4,26 @@ import { formatHours } from '@/lib/format';
 import { toKstDate, formatHM } from '@/lib/kst';
 import { useIdleDrainDays } from './useIdleDrainDays';
 
+// 대기 손실 5단계 색상 (신호등형 그라데이션)
+// < 0.05%: 사실상 0 (에메랄드 밝음)  ·  0-1%: 에메랄드 어두움  ·  1-2%: 앰버  ·  2-3%: 오렌지  ·  3-4%: 레드  ·  4%+: 다크레드
+function dropTextClass(drop) {
+  if (drop < 0.05) return 'text-emerald-400';
+  if (drop < 1) return 'text-emerald-700';
+  if (drop < 2) return 'text-amber-500';
+  if (drop < 3) return 'text-orange-500';
+  if (drop < 4) return 'text-red-500';
+  return 'text-red-700';
+}
+
+// 24h 타임라인 바 배경 (0.85 알파)
+function dropBarBg(drop) {
+  if (drop < 1) return 'rgba(4,120,87,0.85)';     // emerald-700
+  if (drop < 2) return 'rgba(245,158,11,0.85)';   // amber-500
+  if (drop < 3) return 'rgba(249,115,22,0.85)';   // orange-500
+  if (drop < 4) return 'rgba(239,68,68,0.85)';    // red-500
+  return 'rgba(185,28,28,0.85)';                   // red-700
+}
+
 export default function IdleDrainCard({ records, chargingSessions = [] }) {
   const { grouped, chargingByDay, stats } = useIdleDrainDays(records, chargingSessions);
 
@@ -42,7 +62,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
         </div>
         <div className="text-center py-3">
           <div className="text-[10px] text-zinc-600 mb-1">평균 손실</div>
-          <div className={`text-sm font-extrabold tabular-nums ${avgDrop <= 2 ? 'text-red-700' : 'text-red-400'}`}>{avgDrop}%</div>
+          <div className={`text-sm font-extrabold tabular-nums ${dropTextClass(avgDrop)}`}>{avgDrop}%</div>
           <div className="text-[9px] text-zinc-600 mt-0.5">드레인 {withDrainCount}회</div>
         </div>
       </div>
@@ -58,7 +78,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
               <span className="text-[10px] font-semibold text-zinc-500 tabular-nums">{formatDateLabel(key)}</span>
               <div className="flex items-center gap-2 tabular-nums">
                 <span className="text-[10px] text-zinc-600">{formatHours(dayIdleH)}</span>
-                <span className={`text-[10px] font-bold ${dayDrop < 0.05 ? 'text-emerald-400' : dayDrop <= 2 ? 'text-red-700' : 'text-red-400'}`}>
+                <span className={`text-[10px] font-bold ${dropTextClass(dayDrop)}`}>
                   {dayDrop < 0.05 ? '0%' : `-${fmtDrop(dayDrop)}%`}
                 </span>
               </div>
@@ -77,7 +97,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                   const isPreCharge = r.next_type === 'charge';
                   const bg = isZero
                     ? (isPreCharge ? 'rgba(234,179,8,0.3)' : 'rgba(16,185,129,0.3)')
-                    : (isPreCharge ? 'rgba(234,179,8,0.85)' : r.soc_drop <= 2 ? 'rgba(185,28,28,0.85)' : 'rgba(239,68,68,0.85)');
+                    : (isPreCharge ? 'rgba(234,179,8,0.85)' : dropBarBg(r.soc_drop));
                   const showLabel = widthPct >= 10;
                   return (
                     <div
