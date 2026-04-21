@@ -7,6 +7,13 @@ const FAVORITE_IDS = new Set(FAVORITE_IDS_ORDERED);
 const SECOND_LINE_IDS_ORDERED = ['06', '07', '08', '09', '10', '11']; // 앱 번호 16~21
 const SECOND_LINE_IDS = new Set(SECOND_LINE_IDS_ORDERED);
 
+const COMPLEX_NAME = '망포늘푸른벽산아파트';
+const STATION_CONFIG = {
+  'PI795111': { loc: null },
+  'PI313299': { loc: '115 B1' },
+  'PIH01089': { loc: '119F' },
+};
+
 const STAT_META = {
   '2': { label: '대기',     dot: 'bg-emerald-500', text: 'text-emerald-400', cellBg: 'bg-emerald-500/80', cellText: 'text-white' },
   '3': { label: '충전중',   dot: 'bg-blue-500',    text: 'text-blue-400',    cellBg: 'bg-blue-500/80',    cellText: 'text-white' },
@@ -48,6 +55,13 @@ function renderCell(c, size = 'md') {
   );
 }
 
+function stationLabel(statId) {
+  const cfg = STATION_CONFIG[statId];
+  const loc = cfg?.loc;
+  if (loc) return `${loc} (${statId} : ${COMPLEX_NAME})`;
+  return `${COMPLEX_NAME} (${statId})`;
+}
+
 function StationBlock({ station, chargers, withFavorites }) {
   const byId = new Map(chargers.map(c => [c.chgerId, c]));
   const favChargers = withFavorites
@@ -66,7 +80,7 @@ function StationBlock({ station, chargers, withFavorites }) {
 
   return (
     <div>
-      <div className="text-[13px] font-medium text-white mb-2">{station.statNm}</div>
+      <div className="text-[11px] text-zinc-400 mb-2">{stationLabel(station.statId)}</div>
       <div className="space-y-2">
         {(favChargers.length > 0 || secondChargers.length > 0) && (
           <div className="flex items-center gap-2">
