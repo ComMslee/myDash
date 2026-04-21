@@ -1,0 +1,19 @@
+{
+  "active": true,
+  "current_phase": "interview",
+  "task_description": "TeslaMate 커스텀 대시보드 앱 개발",
+  "interview_id": "teslamate-dashboard-001",
+  "type": "greenfield",
+  "initial_idea": "Grafana 같은 앱을 만들자 - TeslaMate 데이터 시각화 커스텀 대시보드",
+  "rounds": [],
+  "current_ambiguity": 1,
+  "threshold": 0.2,
+  "challenge_modes_used": [],
+  "ontology_snapshots": [],
+  "_meta": {
+    "mode": "deep-interview",
+    "sessionId": null,
+    "updatedAt": "2026-04-13T00:17:15.823Z",
+    "updatedBy": "state_write_tool"
+  }
+}

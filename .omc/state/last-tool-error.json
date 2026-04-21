@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"ls \\\"C:\\\\_litbig\\\\_src_util\\\\teslamate\\\\docs\\\\\\\" 2>/dev/null; cp \\\"C:\\\\Users\\\\lg\\\\Downloads\\\\한국환경공단_전기자동차 충전소 정보_OpenAPI활용가이드_v1.23.docx\\\" \\\"C:\\\\_litbig\\\\_src_util\\\\teslamate\\\\docs\\\\\\\" && ...",
+  "error": "Exit code 2\nls: cannot access 'C:\\_litbig\\_src_util\\teslamate\\docs\" 2>/dev/null; cp C:UserslgDownloads�'$'\\225\\234''�'$'\\255''�'$'\\231\\230''경공�'$'\\213''�_�'$'\\204''기�'$'\\236\\220''�'$'\\217\\231''차': No such file or directory\nls: cannot access '충�'$'\\204''�'$'\\206\\214': No such file or directory\nls: cannot access '�'$'\\225''보_OpenAPI�'$'\\231\\234''�'$'\\232''��'$'\\200''�'$'\\235''��'$'\\223\\234''_v1.23.docx C:_litbig_src_utilteslamatedocs\"': No such file or directory",
+  "timestamp": "2026-04-20T23:26:13.882Z",
+  "retry_count": 2
+}

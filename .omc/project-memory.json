@@ -1,0 +1,432 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1776726358786,
+  "projectRoot": "C:\\_litbig\\_src_util\\teslamate",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "dashboard": {
+      "path": "dashboard",
+      "purpose": null,
+      "fileCount": 9,
+      "lastAccessed": 1776726358740,
+      "keyFiles": [
+        "Dockerfile",
+        "instrumentation.js",
+        "jsconfig.json",
+        "next.config.js",
+        "package-lock.json"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 6,
+      "lastAccessed": 1776726358741,
+      "keyFiles": [
+        "ACCESS.md",
+        "DEPLOY.md",
+        "EV_CHARGER_API.md",
+        "OPERATIONS.md",
+        "README.md"
+      ]
+    },
+    "import": {
+      "path": "import",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1776726358741,
+      "keyFiles": []
+    },
+    "skills": {
+      "path": "skills",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1776726358742,
+      "keyFiles": [
+        "README.md"
+      ]
+    },
+    "tesla_auth": {
+      "path": "tesla_auth",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1776726358743,
+      "keyFiles": [
+        "CHANGELOG.md",
+        "LICENSE",
+        "README.md",
+        "tesla_auth.exe"
+      ]
+    },
+    "dashboard\\app": {
+      "path": "dashboard\\app",
+      "purpose": "Application code",
+      "fileCount": 3,
+      "lastAccessed": 1776726358743,
+      "keyFiles": [
+        "globals.css",
+        "layout.js",
+        "page.js"
+      ]
+    },
+    "dashboard\\lib": {
+      "path": "dashboard\\lib",
+      "purpose": "Library code",
+      "fileCount": 7,
+      "lastAccessed": 1776726358744,
+      "keyFiles": [
+        "constants.js",
+        "db.js",
+        "effColor.js"
+      ]
+    },
+    "dashboard\\node_modules": {
+      "path": "dashboard\\node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 1,
+      "lastAccessed": 1776726358746,
+      "keyFiles": []
+    },
+    "docs\\scripts": {
+      "path": "docs\\scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 8,
+      "lastAccessed": 1776726358747,
+      "keyFiles": [
+        "aws-status.sh",
+        "logs.sh",
+        "reboot.sh"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "dashboard\\app\\battery\\HomeChargerCard.js",
+      "accessCount": 63,
+      "lastAccessed": 1776738396542,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\roadtrips\\page.js",
+      "accessCount": 42,
+      "lastAccessed": 1776671412181,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\battery\\IdleDrainCard.js",
+      "accessCount": 35,
+      "lastAccessed": 1776671217887,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\api\\car\\route.js",
+      "accessCount": 31,
+      "lastAccessed": 1776673876366,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\api\\battery\\route.js",
+      "accessCount": 30,
+      "lastAccessed": 1776654006234,
+      "type": "file"
+    },
+    {
+      "path": "dashboard",
+      "accessCount": 24,
+      "lastAccessed": 1776734753629,
+      "type": "directory"
+    },
+    {
+      "path": "dashboard\\app\\components\\GlobalHeader.js",
+      "accessCount": 22,
+      "lastAccessed": 1776674126059,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\battery\\page.js",
+      "accessCount": 12,
+      "lastAccessed": 1776737165939,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\roadtrips\\DriveListView.js",
+      "accessCount": 11,
+      "lastAccessed": 1776674422514,
+      "type": "file"
+    },
+    {
+      "path": "dashboard/app/roadtrips/page.js",
+      "accessCount": 9,
+      "lastAccessed": 1776647491398,
+      "type": "directory"
+    },
+    {
+      "path": "dashboard/app/api/battery/route.js",
+      "accessCount": 7,
+      "lastAccessed": 1776652327204,
+      "type": "directory"
+    },
+    {
+      "path": "dashboard\\app\\battery\\RecordsHabit.js",
+      "accessCount": 6,
+      "lastAccessed": 1776652694755,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\battery\\SlowChargeCard.js",
+      "accessCount": 5,
+      "lastAccessed": 1776672878707,
+      "type": "file"
+    },
+    {
+      "path": "docker-compose.yml",
+      "accessCount": 5,
+      "lastAccessed": 1776728563315,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\battery\\ChargeSummaryCard.js",
+      "accessCount": 4,
+      "lastAccessed": 1776643410991,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\lib\\kakao-geo.js",
+      "accessCount": 4,
+      "lastAccessed": 1776645644771,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\api\\drives\\route.js",
+      "accessCount": 4,
+      "lastAccessed": 1776653802890,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\api\\charges\\route.js",
+      "accessCount": 4,
+      "lastAccessed": 1776653806244,
+      "type": "file"
+    },
+    {
+      "path": "dashboard/app/api/car/route.js",
+      "accessCount": 4,
+      "lastAccessed": 1776673552062,
+      "type": "directory"
+    },
+    {
+      "path": "dashboard\\lib\\format.js",
+      "accessCount": 3,
+      "lastAccessed": 1776653697428,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 3,
+      "lastAccessed": 1776658220441,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\drives\\page.js",
+      "accessCount": 3,
+      "lastAccessed": 1776672297842,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\battery\\HealthScoreCard.js",
+      "accessCount": 3,
+      "lastAccessed": 1776672407507,
+      "type": "file"
+    },
+    {
+      "path": "nginx-teslamate.htpasswd",
+      "accessCount": 2,
+      "lastAccessed": 1776642829691,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\battery\\BatteryTrendCard.js",
+      "accessCount": 2,
+      "lastAccessed": 1776644876403,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\lib\\kst.js",
+      "accessCount": 2,
+      "lastAccessed": 1776653787031,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app",
+      "accessCount": 2,
+      "lastAccessed": 1776653817480,
+      "type": "directory"
+    },
+    {
+      "path": "dashboard/app/components/GlobalHeader.js",
+      "accessCount": 2,
+      "lastAccessed": 1776673448286,
+      "type": "directory"
+    },
+    {
+      "path": "dashboard\\package.json",
+      "accessCount": 2,
+      "lastAccessed": 1776734768875,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\Dockerfile",
+      "accessCount": 1,
+      "lastAccessed": 1776385404405,
+      "type": "file"
+    },
+    {
+      "path": "nginx-teslamate.conf",
+      "accessCount": 1,
+      "lastAccessed": 1776642628764,
+      "type": "file"
+    },
+    {
+      "path": "docs\\scripts\\ssh.sh",
+      "accessCount": 1,
+      "lastAccessed": 1776642670826,
+      "type": "file"
+    },
+    {
+      "path": "dashboard/app",
+      "accessCount": 1,
+      "lastAccessed": 1776643322564,
+      "type": "directory"
+    },
+    {
+      "path": "dashboard/app/context/mock.js",
+      "accessCount": 1,
+      "lastAccessed": 1776643567143,
+      "type": "directory"
+    },
+    {
+      "path": "dashboard/app/battery/IdleDrainCard.js",
+      "accessCount": 1,
+      "lastAccessed": 1776644749777,
+      "type": "directory"
+    },
+    {
+      "path": "dashboard/app/rankings/page.js",
+      "accessCount": 1,
+      "lastAccessed": 1776644925259,
+      "type": "directory"
+    },
+    {
+      "path": "dashboard\\app\\rankings\\page.js",
+      "accessCount": 1,
+      "lastAccessed": 1776644928329,
+      "type": "file"
+    },
+    {
+      "path": "dashboard/app/battery/page.js",
+      "accessCount": 1,
+      "lastAccessed": 1776649964412,
+      "type": "directory"
+    },
+    {
+      "path": "dashboard\\app\\battery\\FastChargeCard.js",
+      "accessCount": 1,
+      "lastAccessed": 1776651818684,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\api\\fast-charges\\route.js",
+      "accessCount": 1,
+      "lastAccessed": 1776651834035,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\api\\slow-charges\\route.js",
+      "accessCount": 1,
+      "lastAccessed": 1776651847915,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\api",
+      "accessCount": 1,
+      "lastAccessed": 1776653341941,
+      "type": "directory"
+    },
+    {
+      "path": "dashboard\\lib\\queries\\battery-capacity.js",
+      "accessCount": 1,
+      "lastAccessed": 1776653898222,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\lib\\queries\\battery-health.js",
+      "accessCount": 1,
+      "lastAccessed": 1776653924142,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\lib\\queries\\battery-records.js",
+      "accessCount": 1,
+      "lastAccessed": 1776653937603,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\lib\\queries\\battery-idle.js",
+      "accessCount": 1,
+      "lastAccessed": 1776653950027,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\components\\DriveMap.js",
+      "accessCount": 1,
+      "lastAccessed": 1776654106610,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\roadtrips\\useDriveData.js",
+      "accessCount": 1,
+      "lastAccessed": 1776654267138,
+      "type": "file"
+    },
+    {
+      "path": "dashboard\\app\\battery\\useIdleDrainDays.js",
+      "accessCount": 1,
+      "lastAccessed": 1776654355576,
+      "type": "file"
+    },
+    {
+      "path": "dashboard/app/drives/page.js",
+      "accessCount": 1,
+      "lastAccessed": 1776672285270,
+      "type": "directory"
+    }
+  ],
+  "userDirectives": []
+}
