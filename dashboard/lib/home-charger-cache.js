@@ -29,6 +29,7 @@ let cache = { ts: 0, data: null };
 let inflight = null;
 let lastError = null;
 let quotaCooldownUntil = 0; // 쿼터 초과 감지 시 이 시각까지 백그라운드 호출 억제
+let failureCooldownUntil = 0; // 일반 실패(네트워크/파싱 등) 시 10분 쿨다운
 
 function staticTtlMs(now) {
   const kstHour = (now.getUTCHours() + 9) % 24;
@@ -272,8 +273,17 @@ function applyQuotaCooldown() {
   lastError = `일일 쿼터 초과 — ${formatKstTime(quotaCooldownUntil)} 재시도 예정`;
 }
 
+// 일반 실패(네트워크/파싱 등) 시 10분 대기 후 재시도
+const FAILURE_COOLDOWN_MS = 10 * 60_000;
+function applyFailureCooldown(reason) {
+  failureCooldownUntil = Date.now() + FAILURE_COOLDOWN_MS;
+  console.warn(`[home-charger] failure cooldown — ${reason} · retry at ${formatKstTime(failureCooldownUntil)}`);
+}
+
 export function isQuotaCooldown() { return Date.now() < quotaCooldownUntil; }
 export function getQuotaCooldownUntil() { return quotaCooldownUntil; }
+export function isFailureCooldown() { return Date.now() < failureCooldownUntil; }
+export function getFailureCooldownUntil() { return failureCooldownUntil; }
 
 let tableReady = false;
 
@@ -539,6 +549,7 @@ export async function warmIfNeeded() {
   const statIds = getStatIds();
   if (isFresh()) return cache.data;
   if (isQuotaCooldown()) return cache.data; // 쿼터 초과 중엔 호출 억제, 기존 캐시만 사용
+  if (isFailureCooldown()) return cache.data; // 일반 실패 후 10분간 재호출 억제
   if (inflight) return inflight;
   inflight = (async () => {
     try {
@@ -548,15 +559,20 @@ export async function warmIfNeeded() {
         const usage = await fetchUsageDb(stations.map(s => s.station.statId));
         const payload = { stations, fetchedAt: new Date().toISOString(), usage };
         setCache(payload);
-        if (stations.length === statIds.length) lastError = null;
+        if (stations.length === statIds.length) {
+          lastError = null;
+          failureCooldownUntil = 0; // 전부 성공 시 실패 쿨다운 해제
+        }
         console.log(`[home-charger] warm cache loaded (${stations.length}/${statIds.length} station(s), ${stations.reduce((s,x)=>s+x.chargers.length,0)} chargers)`);
         return payload;
       }
       if (!lastError) lastError = `스테이션 매칭 없음 (요청 ${statIds.join(',')})`;
+      applyFailureCooldown(lastError);
       return null;
     } catch (e) {
       lastError = e.message || String(e);
       console.warn('[home-charger] warm failed:', lastError);
+      applyFailureCooldown(lastError);
       return null;
     } finally {
       inflight = null;
