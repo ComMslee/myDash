@@ -12,7 +12,7 @@ const CACHE_TIERS = [
   { start:  6, end: 12, ttlMs: 15 * 60_000 }, // 오전
   { start: 12, end: 15, ttlMs:  5 * 60_000 }, // 점심 피크
   { start: 15, end: 17, ttlMs: 15 * 60_000 }, // 오후
-  { start: 17, end: 22, ttlMs:  5 * 60_000 }, // 귀가/충전 피크
+  { start: 17, end: 22, ttlMs:  3 * 60_000 }, // 귀가/충전 피크
   { start: 22, end: 24, ttlMs: 15 * 60_000 }, // 저녁~자정
 ];
 const FALLBACK_TTL_MS = 15 * 60_000;
