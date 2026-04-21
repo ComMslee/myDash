@@ -139,11 +139,11 @@ export default function HomeChargerCard() {
             type="button"
             onClick={() => setShowFleetStats(true)}
             aria-label="상세 현황"
-            className="w-6 h-6 rounded-md hover:bg-white/[0.06] active:bg-white/[0.08] flex items-center justify-center text-zinc-400 hover:text-zinc-200"
+            className="h-7 px-2 rounded-md bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.12] flex items-center gap-1 text-zinc-300 hover:text-zinc-100 text-[11px] font-medium"
           >
             <svg
               viewBox="0 0 20 20"
-              className="w-3.5 h-3.5"
+              className="w-4 h-4"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
@@ -155,6 +155,7 @@ export default function HomeChargerCard() {
               <path d="M15 17v-7" />
               <path d="M3 4h14" />
             </svg>
+            <span>상세</span>
           </button>
           <button
             type="button"
