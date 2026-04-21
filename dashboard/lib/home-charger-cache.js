@@ -6,9 +6,9 @@ import pool from '@/lib/db';
 const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 
 // 공공 API 일일 쿼터 1,000회/일 고려하여 시간대별 TTL 설정 (fallback)
-// 범위: 3~30분
+// 범위: 3~15분
 const CACHE_TIERS = [
-  { start:  0, end:  6, ttlMs: 30 * 60_000 }, // 심야
+  { start:  0, end:  6, ttlMs: 15 * 60_000 }, // 심야
   { start:  6, end: 12, ttlMs: 15 * 60_000 }, // 오전
   { start: 12, end: 15, ttlMs:  5 * 60_000 }, // 점심 피크
   { start: 15, end: 17, ttlMs: 15 * 60_000 }, // 오후
@@ -19,7 +19,7 @@ const FALLBACK_TTL_MS = 15 * 60_000;
 
 // 동적 TTL: 실제 충전 히스토리(최근 90일)에서 학습
 const TTL_MIN_MS =  3 * 60_000;  // 피크 시간대 최소 3분
-const TTL_MAX_MS = 30 * 60_000;  // 한산한 시간대 최대 30분
+const TTL_MAX_MS = 15 * 60_000;  // 한산한 시간대 최대 15분
 const DYN_REFRESH_MS = 24 * 60 * 60_000; // 24시간마다 재계산
 let dynamicTtls = null;  // [24] ms 배열, null이면 static fallback
 let ttlComputedAt = 0;
