@@ -39,10 +39,10 @@ export default function FleetStatsPopup({ onClose }) {
   }, [months]);
 
   const topN = (data?.perCharger || []).slice(0, 5);
-  const bottomN = (data?.perCharger || []).slice(-5).reverse();
-  // Top은 내림차순이라 [0]이 최대, Bottom은 오름차순이라 마지막이 그룹 내 최대
+  // Bottom도 desc 정렬 유지 — Top과 동일한 방향 (큰 것 위, 작은 것 아래)
+  const bottomN = (data?.perCharger || []).slice(-5);
   const topMax = topN[0]?.count || 1;
-  const bottomMax = bottomN.length ? bottomN[bottomN.length - 1].count : 1;
+  const bottomMax = bottomN[0]?.count || 1;
 
   // 팝업 열렸을 때 body 스크롤 잠금 (모바일에서 백드롭 스크롤 체이닝 방지)
   useEffect(() => {
@@ -59,10 +59,10 @@ export default function FleetStatsPopup({ onClose }) {
       aria-modal="true"
     >
       <div
-        className="w-full sm:max-w-lg bg-[#161618] border-t sm:border sm:rounded-2xl border-white/[0.08] rounded-t-2xl h-[90vh] sm:h-auto sm:max-h-[90vh] flex flex-col overscroll-contain"
+        className="w-full sm:max-w-lg bg-[#161618] border-t sm:border sm:rounded-2xl border-white/[0.08] rounded-t-2xl h-[75vh] sm:h-auto sm:max-h-[80vh] flex flex-col overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="shrink-0 bg-[#161618] border-b border-white/[0.06] px-4 py-3 flex items-center justify-between">
+        <div className="shrink-0 bg-[#161618] border-b border-white/[0.06] px-4 py-2 flex items-center justify-between">
           <h3 className="text-sm font-bold text-zinc-200">집충전기 상세 현황</h3>
           <button
             type="button"
@@ -74,7 +74,7 @@ export default function FleetStatsPopup({ onClose }) {
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-2.5 space-y-3">
           {/* 기간 슬라이더 */}
           <div>
             <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
@@ -167,24 +167,23 @@ export default function FleetStatsPopup({ onClose }) {
                     </div>
                   </div>
 
-                  {/* 시간대 — 선택 기간 */}
+                  {/* 시간대 — 기간 데이터 있으면 기간, 없으면 전체 누적 폴백 */}
                   <div>
-                    <div className="text-[11px] text-zinc-400 mb-1.5">📈 시간대별 (24시간) <span className="text-zinc-600">· 지난 {data.months}개월</span></div>
-                    {data.total === 0 ? (
-                      <div className="text-[11px] text-zinc-600 py-2">
-                        선택 기간에 기록 없음 — 기간을 늘리거나 대기 필요
-                      </div>
-                    ) : (
-                      <HourlyChart hourly={data.hourly} />
-                    )}
+                    <div className="text-[11px] text-zinc-400 mb-1.5">
+                      📈 시간대별 (24시간)
+                      <span className="text-zinc-600"> · {data.total > 0 ? `지난 ${data.months}개월` : '전체 기간 (수집 중)'}</span>
+                    </div>
+                    <HourlyChart hourly={data.total > 0 ? data.hourly : data.hourlyAllTime} />
                   </div>
 
-                  {/* 요일 — 선택 기간 */}
+                  {/* 요일 — 선택 기간 (일별 수집 전엔 불가) */}
                   <div>
-                    <div className="text-[11px] text-zinc-400 mb-1.5">📅 요일별 활성도 <span className="text-zinc-600">· 지난 {data.months}개월</span></div>
-                    {data.total === 0 ? (
+                    <div className="text-[11px] text-zinc-400 mb-1.5">
+                      📅 요일별 활성도 <span className="text-zinc-600">· 지난 {data.months}개월</span>
+                    </div>
+                    {data.daysCovered === 0 ? (
                       <div className="text-[11px] text-zinc-600 py-2">
-                        선택 기간에 기록 없음
+                        요일별 집계는 일별 수집 시작일부터 가능 — 며칠 뒤 확인
                       </div>
                     ) : (
                       <DowChart dow={data.dow} />

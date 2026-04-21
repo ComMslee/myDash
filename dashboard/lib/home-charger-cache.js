@@ -409,6 +409,7 @@ export async function fetchFleetStatsDb(statIds, months) {
   const clampMonths = Math.max(1, Math.min(12, Math.floor(Number(months) || 3)));
   const empty = {
     hourly: Array(24).fill(0),
+    hourlyAllTime: Array(24).fill(0),
     dow: Array(7).fill(0),
     perCharger: [],
     total: 0,
@@ -458,8 +459,22 @@ export async function fetchFleetStatsDb(statIds, months) {
     }));
     const allTimeTotal = perCharger.reduce((s, e) => s + e.count, 0);
 
+    // 3) 전체 누적 시간대 히스토그램 — daily 데이터 부족 시 폴백 표시용
+    const hourlyAllRes = await pool.query(
+      `SELECT hour, SUM(count)::bigint AS total
+         FROM charger_usage
+        WHERE stat_id = ANY($1)
+        GROUP BY hour`,
+      [statIds]
+    );
+    const hourlyAllTime = new Array(24).fill(0);
+    for (const r of hourlyAllRes.rows) {
+      hourlyAllTime[Number(r.hour)] = Number(r.total);
+    }
+
     return {
       hourly,
+      hourlyAllTime,
       dow,
       perCharger,
       total: periodTotal,
