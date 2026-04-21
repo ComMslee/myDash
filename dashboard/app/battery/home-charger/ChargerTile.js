@@ -78,11 +78,9 @@ export function UnifiedCell({ c, highlight, count, hourly, now }) {
   if (peak) titleParts.push(`피크 ${peak.hour}시 (${peak.count}회)`);
   if (highlight) titleParts.push(highlight === 'high' ? '자주 사용' : '가끔 사용');
 
-  // 셀 하단 텍스트 — 충전중이면 경과시간, 아니면 사용횟수 요약
-  const bottomText = isCharging
-    ? elapsed
-    : count > 0 ? `×${count}` : '';
-  const bottomClass = isCharging ? meta.text : 'text-zinc-500';
+  // 셀 하단 텍스트 — 충전중일 때만 경과시간 (누적 횟수는 호버에서 확인)
+  const bottomText = isCharging ? elapsed : '';
+  const bottomClass = meta.text;
 
   return (
     <div className="flex flex-col items-center gap-0.5 min-w-0">
