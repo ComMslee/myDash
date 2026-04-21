@@ -4,6 +4,7 @@ import {
   getLastError,
   getQuotaCooldownUntil,
   getStatIds,
+  getTtlInfo,
   isFresh,
   isQuotaCooldown,
   loadStations,
@@ -23,6 +24,8 @@ export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const force = searchParams.get('refresh') === '1';
 
+  const withTtl = (body) => ({ ...body, ttlInfo: getTtlInfo() });
+
   if (force) {
     let upstreamError = null;
     try {
@@ -32,7 +35,7 @@ export async function GET(req) {
         const usage = await fetchUsageDb(stations.map(s => s.station.statId));
         const payload = { stations, fetchedAt: new Date().toISOString(), usage };
         setCache(payload);
-        return Response.json(payload);
+        return Response.json(withTtl(payload));
       }
       upstreamError = `스테이션 매칭 없음 (요청 ${statIds.join(',')})`;
     } catch (e) {
@@ -40,7 +43,7 @@ export async function GET(req) {
       console.error('[home-charger] upstream error:', upstreamError);
     }
     const c = getCache();
-    if (c.data) return Response.json({ ...c.data, stale: true, lastError: upstreamError });
+    if (c.data) return Response.json(withTtl({ ...c.data, stale: true, lastError: upstreamError }));
     return Response.json({ error: upstreamError || '조회 실패' }, { status: 500 });
   }
 
@@ -54,18 +57,18 @@ export async function GET(req) {
     const err = getLastError();
     if (stale && err) body.lastError = err;
     if (isQuotaCooldown()) body.quotaCooldownUntil = getQuotaCooldownUntil();
-    return Response.json(body);
+    return Response.json(withTtl(body));
   }
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const payload = await warmIfNeeded();
-      if (payload) return Response.json(payload);
+      if (payload) return Response.json(withTtl(payload));
     } catch (e) {
       console.error(`[home-charger] cold load attempt ${attempt + 1} failed:`, e.message);
     }
     const c = getCache();
-    if (c.data) return Response.json(c.data);
+    if (c.data) return Response.json(withTtl(c.data));
     if (isQuotaCooldown()) break; // 쿠다운 중이면 더 시도 무의미
     if (attempt < 2) await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
   }
