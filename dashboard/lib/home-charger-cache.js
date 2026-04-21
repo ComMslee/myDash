@@ -290,6 +290,77 @@ export function getQuotaCooldownUntil() { return quotaCooldownUntil; }
 export function isFailureCooldown() { return Date.now() < failureCooldownUntil; }
 export function getFailureCooldownUntil() { return failureCooldownUntil; }
 
+// 폴링 로그 기록 — 시간 단위 버킷에 시도/성공/재시도/쿼터 카운트 누적
+async function recordPollLog({ attempts = 0, successes = 0, partial = 0, retries = 0, quotaHits = 0 } = {}) {
+  try {
+    await ensureTable();
+    const nowKstMs = Date.now() + 9 * 60 * 60_000;
+    const nowKst = new Date(nowKstMs);
+    const kstHour = nowKst.getUTCHours();
+    const kstDate = `${nowKst.getUTCFullYear()}-${String(nowKst.getUTCMonth() + 1).padStart(2, '0')}-${String(nowKst.getUTCDate()).padStart(2, '0')}`;
+    await pool.query(
+      `INSERT INTO home_charger_poll_log (date, hour, attempts, successes, partial, retries, quota_hits)
+       VALUES ($1::date, $2::smallint, $3, $4, $5, $6, $7)
+       ON CONFLICT (date, hour) DO UPDATE
+         SET attempts   = home_charger_poll_log.attempts   + EXCLUDED.attempts,
+             successes  = home_charger_poll_log.successes  + EXCLUDED.successes,
+             partial    = home_charger_poll_log.partial    + EXCLUDED.partial,
+             retries    = home_charger_poll_log.retries    + EXCLUDED.retries,
+             quota_hits = home_charger_poll_log.quota_hits + EXCLUDED.quota_hits,
+             updated_at = NOW()`,
+      [kstDate, kstHour, attempts, successes, partial, retries, quotaHits]
+    );
+  } catch (e) {
+    console.warn('[home-charger] poll log failed:', e.message);
+  }
+}
+
+// 특정 날짜(기본 오늘)의 24시간 폴링 로그 조회
+export async function fetchPollLogDb(date) {
+  try {
+    await ensureTable();
+    let target = date;
+    if (!target) {
+      const nowKstMs = Date.now() + 9 * 60 * 60_000;
+      const nowKst = new Date(nowKstMs);
+      target = `${nowKst.getUTCFullYear()}-${String(nowKst.getUTCMonth() + 1).padStart(2, '0')}-${String(nowKst.getUTCDate()).padStart(2, '0')}`;
+    }
+    const res = await pool.query(
+      `SELECT hour, attempts, successes, partial, retries, quota_hits
+         FROM home_charger_poll_log
+        WHERE date = $1::date
+        ORDER BY hour`,
+      [target]
+    );
+    const rowsByHour = {};
+    for (const r of res.rows) {
+      rowsByHour[Number(r.hour)] = {
+        hour: Number(r.hour),
+        attempts: Number(r.attempts),
+        successes: Number(r.successes),
+        partial: Number(r.partial),
+        retries: Number(r.retries),
+        quotaHits: Number(r.quota_hits),
+      };
+    }
+    const hourly = [];
+    for (let h = 0; h < 24; h++) {
+      hourly.push(rowsByHour[h] || { hour: h, attempts: 0, successes: 0, partial: 0, retries: 0, quotaHits: 0 });
+    }
+    const totals = hourly.reduce((a, r) => ({
+      attempts: a.attempts + r.attempts,
+      successes: a.successes + r.successes,
+      partial: a.partial + r.partial,
+      retries: a.retries + r.retries,
+      quotaHits: a.quotaHits + r.quotaHits,
+    }), { attempts: 0, successes: 0, partial: 0, retries: 0, quotaHits: 0 });
+    return { date: target, hourly, totals };
+  } catch (e) {
+    console.warn('[home-charger] poll log fetch failed:', e.message);
+    return { date: null, hourly: [], totals: {} };
+  }
+}
+
 let tableReady = false;
 
 async function ensureTable() {
@@ -321,6 +392,21 @@ async function ensureTable() {
     )
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS charger_usage_daily_date_idx ON charger_usage_daily (date)`);
+  // 폴링 시도/성공/재시도 로그 — 디버그 팝업용
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS home_charger_poll_log (
+      date        DATE     NOT NULL,
+      hour        SMALLINT NOT NULL,
+      attempts    INTEGER  NOT NULL DEFAULT 0,
+      successes   INTEGER  NOT NULL DEFAULT 0,
+      partial     INTEGER  NOT NULL DEFAULT 0,
+      retries     INTEGER  NOT NULL DEFAULT 0,
+      quota_hits  INTEGER  NOT NULL DEFAULT 0,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (date, hour)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS home_charger_poll_log_date_idx ON home_charger_poll_log (date)`);
   // 환경공단 API 응답 스냅샷 — 컨테이너 재시작 간 캐시 영속화
   await pool.query(`
     CREATE TABLE IF NOT EXISTS home_charger_snapshot (
@@ -567,17 +653,26 @@ export async function warmIfNeeded() {
         if (stations.length === statIds.length) {
           lastError = null;
           failureCooldownUntil = 0; // 전부 성공 시 실패 쿨다운 해제
+          recordPollLog({ attempts: 1, successes: 1 });
+        } else {
+          recordPollLog({ attempts: 1, partial: 1 });
         }
         console.log(`[home-charger] warm cache loaded (${stations.length}/${statIds.length} station(s), ${stations.reduce((s,x)=>s+x.chargers.length,0)} chargers)`);
         return payload;
       }
       if (!lastError) lastError = `스테이션 매칭 없음 (요청 ${statIds.join(',')})`;
-      applyFailureCooldown(lastError);
+      if (isQuotaCooldown()) {
+        recordPollLog({ attempts: 1, quotaHits: 1 });
+      } else {
+        applyFailureCooldown(lastError);
+        recordPollLog({ attempts: 1, retries: 1 });
+      }
       return null;
     } catch (e) {
       lastError = e.message || String(e);
       console.warn('[home-charger] warm failed:', lastError);
       applyFailureCooldown(lastError);
+      recordPollLog({ attempts: 1, retries: 1 });
       return null;
     } finally {
       inflight = null;
