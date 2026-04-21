@@ -3,6 +3,9 @@ import { batchReverseGeocode } from '@/lib/kakao-geo';
 
 export const dynamic = 'force-dynamic';
 
+// 지오펜스 이름이 아래와 일치하면 "자주 가는 곳" 목록에서 분리해 상단 pin으로 표시
+const PINNED_GEOFENCE_NAMES = ['집', '회사', 'Home', 'Work'];
+
 export async function GET() {
   try {
     const carResult = await pool.query(`SELECT id FROM cars LIMIT 1`);
@@ -38,7 +41,7 @@ export async function GET() {
            ROUND(COALESCE(g.longitude, a.longitude)::numeric, 3)
        ) sub
        ORDER BY visit_count DESC
-       LIMIT 12`,
+       LIMIT 100`,
       [carId]
     );
 
@@ -102,28 +105,45 @@ export async function GET() {
     }));
     const kakaoLabels = await batchReverseGeocode(coords);
 
-    return Response.json({
-      places: result.rows.map((p, i) => {
-        // 지오펜스 이름 > Kakao 한국어 주소 > DB 영어 주소 > 기본값
-        const geofenceName = p.geofence_name || null;
-        const kakaoLabel = kakaoLabels[i] || null;
-        const dbLabel = p.label || null;
-        const label = geofenceName || kakaoLabel || dbLabel || '알 수 없는 장소';
-        return {
-          id: p.place_key,
-          label,
-          city: p.city || null,
-          lat: p.place_lat ? parseFloat(p.place_lat) : null,
-          lng: p.place_lng ? parseFloat(p.place_lng) : null,
-          visit_count: parseInt(p.visit_count),
-          last_visit: p.last_visit || null,
-          first_visit: p.first_visit || null,
-          avg_distance: parseFloat(p.avg_distance.toFixed(1)),
-          avg_duration: Math.round(p.avg_duration),
-          origins: originMap[p.place_key] || [],
-        };
-      }),
+    const allPlaces = result.rows.map((p, i) => {
+      // 지오펜스 이름 > Kakao 한국어 주소 > DB 영어 주소 > 기본값
+      const geofenceName = p.geofence_name || null;
+      const kakaoLabel = kakaoLabels[i] || null;
+      const dbLabel = p.label || null;
+      const label = geofenceName || kakaoLabel || dbLabel || '알 수 없는 장소';
+      return {
+        id: p.place_key,
+        label,
+        geofence_name: geofenceName,
+        city: p.city || null,
+        lat: p.place_lat ? parseFloat(p.place_lat) : null,
+        lng: p.place_lng ? parseFloat(p.place_lng) : null,
+        visit_count: parseInt(p.visit_count),
+        last_visit: p.last_visit || null,
+        first_visit: p.first_visit || null,
+        avg_distance: parseFloat(p.avg_distance.toFixed(1)),
+        avg_duration: Math.round(p.avg_duration),
+        origins: originMap[p.place_key] || [],
+      };
     });
+
+    // 집/회사 지오펜스는 별도 pinned 목록으로 분리
+    const pinned = [];
+    const places = [];
+    for (const p of allPlaces) {
+      if (p.geofence_name && PINNED_GEOFENCE_NAMES.includes(p.geofence_name)) {
+        pinned.push(p);
+      } else {
+        places.push(p);
+      }
+    }
+    // pinned 정렬: 집 > 회사 > 나머지 (PINNED_GEOFENCE_NAMES 순서)
+    pinned.sort((a, b) =>
+      PINNED_GEOFENCE_NAMES.indexOf(a.geofence_name) -
+      PINNED_GEOFENCE_NAMES.indexOf(b.geofence_name)
+    );
+
+    return Response.json({ pinned, places });
   } catch (err) {
     console.error('/api/frequent-places error:', err);
     return Response.json({ error: 'DB error', detail: err.message }, { status: 500 });

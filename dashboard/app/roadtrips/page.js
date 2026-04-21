@@ -67,7 +67,7 @@ function DrivesInner() {
   };
 
   const {
-    drives, places,
+    drives, places, pinnedPlaces,
     selectedDrive, setSelectedDrive,
     positions, setPositions,
     routeData,
@@ -116,6 +116,35 @@ function DrivesInner() {
   return (
     <main className="bg-[#0f0f0f] text-white">
       <div className="max-w-2xl mx-auto flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 57px - 58px - env(safe-area-inset-bottom, 0px))' }}>
+
+      {/* 집/회사 고정 pin */}
+      {pinnedPlaces && pinnedPlaces.length > 0 && !placesCollapsed && (
+        <div className="flex-shrink-0 px-4 pt-3 pb-0">
+          <div className="flex items-stretch gap-2">
+            {pinnedPlaces.map(p => {
+              const icon = (p.geofence_name === '집' || p.geofence_name === 'Home') ? '🏠' : '🏢';
+              const active = selectedPlace?.id === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMapEverShown(true); setViewMode('map'); }}
+                  className={`flex-1 flex items-center gap-2 border rounded-xl px-3 py-2.5 text-left transition-colors ${
+                    active
+                      ? 'bg-amber-500/10 border-amber-500/30'
+                      : 'bg-zinc-800/60 border-white/[0.06] hover:bg-zinc-800/90'
+                  }`}
+                >
+                  <span className="text-lg leading-none">{icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-zinc-200 text-sm font-semibold leading-none">{p.geofence_name}</p>
+                    <p className="text-zinc-500 text-[11px] mt-1 leading-none tabular-nums">{p.visit_count}회</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 자주 방문하는 장소 */}
       {places.length > 0 && (
