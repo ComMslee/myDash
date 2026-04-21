@@ -2,10 +2,14 @@
 import { useState, useEffect, useCallback } from 'react';
 
 const ID_OFFSET = 95110; // chgerId + 95110 = 차지비 앱 ID
+// P1 (1순위): 108동 앞 · 107동 앞
 const FAVORITE_IDS_ORDERED = ['04', '05', '12', '13']; // 앱 번호 14, 15, 22, 23
 const FAVORITE_IDS = new Set(FAVORITE_IDS_ORDERED);
-const SECOND_LINE_IDS_ORDERED = ['06', '07', '08', '09', '10', '11']; // 앱 번호 16~21
+// P2 (2순위): 102동 앞 · 104동 앞
+const SECOND_LINE_IDS_ORDERED = ['06', '07', '08', '09', '10', '11']; // 102F 앱 번호 16~21
 const SECOND_LINE_IDS = new Set(SECOND_LINE_IDS_ORDERED);
+const THIRD_LINE_IDS_ORDERED = ['14', '15', '16']; // 104F 앱 번호 24, 25, 26
+const THIRD_LINE_IDS = new Set(THIRD_LINE_IDS_ORDERED);
 
 const COMPLEX_NAME = '망포늘푸른벽산아파트';
 const STATION_CONFIG = {
@@ -96,13 +100,20 @@ function StationBlock({ station, chargers, withFavorites, ranks, usage }) {
   const secondChargers = withFavorites
     ? SECOND_LINE_IDS_ORDERED.map(id => byId.get(id)).filter(Boolean)
     : [];
+  const thirdChargers = withFavorites
+    ? THIRD_LINE_IDS_ORDERED.map(id => byId.get(id)).filter(Boolean)
+    : [];
   const mainGroup = withFavorites
-    ? chargers.filter(c => !FAVORITE_IDS.has(c.chgerId) && !SECOND_LINE_IDS.has(c.chgerId))
+    ? chargers.filter(c =>
+        !FAVORITE_IDS.has(c.chgerId) &&
+        !SECOND_LINE_IDS.has(c.chgerId) &&
+        !THIRD_LINE_IDS.has(c.chgerId)
+      )
     : chargers;
 
-  // favChargers = [04→14, 05→15, 12→22, 13→23] — 15|22 사이에 divider
-  const favLeft  = favChargers.slice(0, 2); // 14, 15
-  const favRight = favChargers.slice(2);    // 22, 23
+  // favChargers = [04→14, 05→15, 12→22, 13→23]
+  const favLeft  = favChargers.slice(0, 2); // 108F: 14, 15
+  const favRight = favChargers.slice(2);    // 107F: 22, 23
 
   const key = (c) => `${station.statId}_${c.chgerId}`;
   const hl  = (c) => ranks.get(key(c)) ?? null;
@@ -112,30 +123,42 @@ function StationBlock({ station, chargers, withFavorites, ranks, usage }) {
     <div>
       <div className="text-[11px] text-zinc-500 mb-2">{stationHeader(station.statId)}</div>
       <div className="space-y-2">
-        {(favChargers.length > 0 || secondChargers.length > 0) && (
+        {/* P1: 108F + 107F (큰 셀) */}
+        {favChargers.length > 0 && (
           <div className="flex items-center gap-2">
-            {/* 108F: 14 15 */}
             <span className="text-[9px] text-zinc-600 mr-0.5">108F</span>
             {favLeft.map(c => renderCell(c, 'lg', hl(c), cnt(c)))}
             <span className="w-px h-8 bg-white/10 mx-0.5" />
-            {/* 107F: 22 23 */}
             <span className="text-[9px] text-zinc-600 mr-0.5">107F</span>
             {favRight.map(c => renderCell(c, 'lg', hl(c), cnt(c)))}
-            {/* 102F: 16~21 — 우측 정렬 */}
-            <span className="flex-1" />
-            <span className="w-px h-8 bg-white/10 mx-0.5" />
-            <span className="text-[9px] text-zinc-600 mr-0.5">102F</span>
-            {secondChargers.map(c => renderCell(c, 'lg', hl(c), cnt(c)))}
           </div>
         )}
+        {/* P2: 102F + 104F (중간 셀) */}
+        {(secondChargers.length > 0 || thirdChargers.length > 0) && (
+          <div className="flex items-center gap-2">
+            {secondChargers.length > 0 && (
+              <>
+                <span className="text-[9px] text-zinc-600 mr-0.5">102F</span>
+                {secondChargers.map(c => renderCell(c, 'lg', hl(c), cnt(c)))}
+              </>
+            )}
+            {thirdChargers.length > 0 && (
+              <>
+                <span className="w-px h-8 bg-white/10 mx-0.5" />
+                <span className="text-[9px] text-zinc-600 mr-0.5">104F</span>
+                {thirdChargers.map(c => renderCell(c, 'lg', hl(c), cnt(c)))}
+              </>
+            )}
+          </div>
+        )}
+        {/* P3: 나머지 참고용 */}
         {mainGroup.length > 0 && (() => {
           const loc = STATION_CONFIG[station.statId]?.loc;
           if (!withFavorites && loc) {
-            const size = 'lg';
             return (
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[11px] text-zinc-500 shrink-0">{loc}</span>
-                {mainGroup.map(c => renderCell(c, size, hl(c), cnt(c)))}
+                {mainGroup.map(c => renderCell(c, 'lg', hl(c), cnt(c)))}
               </div>
             );
           }
