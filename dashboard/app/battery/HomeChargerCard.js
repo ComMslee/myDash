@@ -285,14 +285,14 @@ export default function HomeChargerCard() {
       <div className="px-4 py-3 space-y-3">
         {/* P1: 108동 + 107동 */}
         <div className="flex gap-2">
-          <TileBox title="108동 앞" chargers={cells108} ranks={ranks} usage={usage} statId="PI795111" now={now} />
-          <TileBox title="107동 앞" chargers={cells107} ranks={ranks} usage={usage} statId="PI795111" now={now} />
+          <TileBox title="108동" chargers={cells108} ranks={ranks} usage={usage} statId="PI795111" now={now} />
+          <TileBox title="107동" chargers={cells107} ranks={ranks} usage={usage} statId="PI795111" now={now} />
         </div>
 
         {/* P2: 102동 + 104동 */}
         <div className="flex gap-2">
-          <TileBox title="102동 앞" chargers={cells102} ranks={ranks} usage={usage} statId="PI795111" now={now} />
-          <TileBox title="104동 앞" chargers={cells104} ranks={ranks} usage={usage} statId="PI795111" now={now} />
+          <TileBox title="102동" chargers={cells102} ranks={ranks} usage={usage} statId="PI795111" now={now} />
+          <TileBox title="104동" chargers={cells104} ranks={ranks} usage={usage} statId="PI795111" now={now} />
         </div>
 
         {/* P3: 참고 (접힘) */}
