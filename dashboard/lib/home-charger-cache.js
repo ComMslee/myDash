@@ -274,8 +274,13 @@ function applyQuotaCooldown() {
 }
 
 // 일반 실패(네트워크/파싱 등) 시 10분 대기 후 재시도
+// 단, 현재 TTL이 10분 미만이면 쿨다운 미적용 — 자연 폴링 주기로 충분히 자주 재시도됨
 const FAILURE_COOLDOWN_MS = 10 * 60_000;
 function applyFailureCooldown(reason) {
+  if (cacheTtlMs() < FAILURE_COOLDOWN_MS) {
+    console.warn(`[home-charger] fail (TTL<10m, no cooldown) — ${reason}`);
+    return;
+  }
   failureCooldownUntil = Date.now() + FAILURE_COOLDOWN_MS;
   console.warn(`[home-charger] failure cooldown — ${reason} · retry at ${formatKstTime(failureCooldownUntil)}`);
 }
