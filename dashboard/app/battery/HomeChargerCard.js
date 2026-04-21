@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   MAIN_STATION_ID, POLL_INTERVAL_MS, CLOCK_INTERVAL_MS,
   P1_108_IDS, P1_107_IDS, P2_102_IDS, P2_104_IDS,
-  PRIORITY_IDS, STATION_CONFIG,
+  PRIORITY_IDS, P3_GROUPS, P3_GROUPED_IDS, STATION_CONFIG,
 } from './home-charger/constants';
 import { computeRanks, buildTtlTooltip, timeAgoKo } from './home-charger/utils';
 import { TileBox, StatusBadges, MiniGrid } from './home-charger/ChargerTile';
@@ -87,10 +87,16 @@ export default function HomeChargerCard() {
   const cells104 = pick(P2_104_IDS);
 
   // P3: 메인 스테이션에서 P1/P2 제외 + 나머지 스테이션 전체
-  const mainLeftover = (mainStation?.chargers || []).filter(c => !PRIORITY_IDS.has(c.chgerId));
+  const mainRest = (mainStation?.chargers || []).filter(c => !PRIORITY_IDS.has(c.chgerId));
+  // P3 그룹(105동 등) 분리
+  const p3GroupCells = P3_GROUPS.map(g => ({
+    title: g.title,
+    chargers: mainRest.filter(c => g.ids.includes(c.chgerId)),
+  })).filter(g => g.chargers.length > 0);
+  const mainLeftover = mainRest.filter(c => !P3_GROUPED_IDS.has(c.chgerId));
   const refStations = stations.filter(s => s.station.statId !== MAIN_STATION_ID);
   const p3AllChargers = [
-    ...mainLeftover,
+    ...mainRest,
     ...refStations.flatMap(s => s.chargers),
   ];
   const p3Counts = countByStat(p3AllChargers);
@@ -176,6 +182,21 @@ export default function HomeChargerCard() {
             </button>
             {showP3 && (
               <div className="space-y-2 pt-2">
+                {p3GroupCells.length > 0 && (
+                  <div className="flex gap-2">
+                    {p3GroupCells.map(g => (
+                      <TileBox
+                        key={g.title}
+                        title={g.title}
+                        chargers={g.chargers}
+                        ranks={ranks}
+                        usage={usage}
+                        statId={MAIN_STATION_ID}
+                        now={now}
+                      />
+                    ))}
+                  </div>
+                )}
                 {mainLeftover.length > 0 && (
                   <div>
                     <div className="text-[10px] text-zinc-500 mb-1">

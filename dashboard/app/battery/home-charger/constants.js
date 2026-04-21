@@ -18,10 +18,18 @@ export const P1_107_IDS = ['12', '13'];                          // 앱 번호 2
 // P2 (2순위): 102동 앞 · 104동 앞
 export const P2_102_IDS = ['06', '07', '08', '09', '10', '11'];  // 앱 번호 16~21
 export const P2_104_IDS = ['14', '15', '16'];                    // 앱 번호 24, 25, 26
+// P3 (참고 그룹): 105동 앞
+export const P3_105_IDS = ['17', '18', '19'];                    // 앱 번호 27, 28, 29
 
 export const PRIORITY_IDS = new Set([
   ...P1_108_IDS, ...P1_107_IDS, ...P2_102_IDS, ...P2_104_IDS,
 ]);
+
+// P3 섹션에서 동별로 분리해 표시할 그룹 (타일 형식)
+export const P3_GROUPS = [
+  { title: '105동', ids: P3_105_IDS },
+];
+export const P3_GROUPED_IDS = new Set(P3_GROUPS.flatMap(g => g.ids));
 
 export const COMPLEX_NAME = '망포늘푸른벽산아파트';
 
