@@ -165,14 +165,14 @@ export default function HomeChargerCard() {
       )}
 
       <div className="px-4 py-3 space-y-3">
-        {/* P1: 108동 + 107동 */}
-        <div className="flex gap-2">
+        {/* P1: 108동 · 107동 */}
+        <div className="space-y-1.5">
           <TileBox title="108동" chargers={cells108} {...tileProps} />
           <TileBox title="107동" chargers={cells107} {...tileProps} />
         </div>
 
-        {/* P2: 102동 + 104동 */}
-        <div className="flex gap-2">
+        {/* P2: 102동 · 104동 */}
+        <div className="space-y-1.5">
           <TileBox title="102동" chargers={cells102} {...tileProps} />
           <TileBox title="104동" chargers={cells104} {...tileProps} />
         </div>
@@ -195,7 +195,7 @@ export default function HomeChargerCard() {
             {showP3 && (
               <div className="space-y-2 pt-2">
                 {(p3GroupCells.length > 0 || show115) && (
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="space-y-1.5">
                     {p3GroupCells.map(g => (
                       <TileBox
                         key={g.title}
@@ -208,23 +208,19 @@ export default function HomeChargerCard() {
                       />
                     ))}
                     {show115 && (
-                      <div className="flex-1 min-w-0 bg-[#1a1a1c] border border-white/[0.06] rounded-lg p-2">
-                        <div className="text-[10px] text-zinc-400 mb-1.5 font-medium text-center">115동</div>
-                        <div className="space-y-1.5">
+                      <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg p-2 flex items-center gap-2">
+                        <div className="text-[11px] text-zinc-300 font-medium w-12 text-center shrink-0">115동</div>
+                        <div className="flex-1 min-w-0 space-y-1">
                           {cells115Ground.length > 0 && (
-                            <div>
-                              <div className="text-[9px] text-zinc-500 mb-0.5 text-center">지상</div>
-                              <div className="flex justify-center">
-                                <MiniGrid chargers={cells115Ground} statId={MAIN_STATION_ID} ranks={ranks} usage={usage} now={now} />
-                              </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] text-zinc-500 w-6 shrink-0">지상</span>
+                              <MiniGrid chargers={cells115Ground} statId={MAIN_STATION_ID} ranks={ranks} usage={usage} now={now} />
                             </div>
                           )}
                           {cells115Under.length > 0 && (
-                            <div>
-                              <div className="text-[9px] text-zinc-500 mb-0.5 text-center">지하</div>
-                              <div className="flex justify-center">
-                                <MiniGrid chargers={cells115Under} statId={STATION_115_UNDERGROUND} ranks={ranks} usage={usage} now={now} />
-                              </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] text-zinc-500 w-6 shrink-0">지하</span>
+                              <MiniGrid chargers={cells115Under} statId={STATION_115_UNDERGROUND} ranks={ranks} usage={usage} now={now} />
                             </div>
                           )}
                         </div>

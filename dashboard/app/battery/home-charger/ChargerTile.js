@@ -97,14 +97,14 @@ export function UnifiedCell({ c, highlight, count, hourly, now }) {
   );
 }
 
-// 동별 타일 박스 — 제목 + 셀들
+// 동별 타일 박스 — 왼쪽에 동 이름, 오른쪽에 셀 나열
 export function TileBox({ title, chargers, ranks, usage, statId, now }) {
   if (!chargers.length) return null;
   const keyOf = (c) => `${statId}_${c.chgerId}`;
   return (
-    <div className="flex-1 min-w-0 bg-[#1a1a1c] border border-white/[0.06] rounded-lg p-2">
-      <div className="text-[10px] text-zinc-400 mb-1.5 font-medium text-center">{title}</div>
-      <div className="flex justify-center items-start flex-wrap gap-1.5">
+    <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg p-2 flex items-center gap-2">
+      <div className="text-[11px] text-zinc-300 font-medium w-12 text-center shrink-0">{title}</div>
+      <div className="flex items-start flex-wrap gap-1.5 flex-1 min-w-0">
         {chargers.map(c => {
           const u = usage[keyOf(c)];
           return (
