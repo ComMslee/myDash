@@ -198,7 +198,7 @@ export default function HomeChargerCard() {
           <TileBox title="107" chargers={cells107} {...tileProps} />
         </div>
 
-        {/* 참고 (접힘) — 102 · 104 · 105 · 115 · 기타 */}
+        {/* 더보기 (접힘) — 102 · 104 → 105 · 115 → 111 · 117 → 119 (전폭) */}
         {p3AllChargers.length > 0 && (
           <div className="pt-1 border-t border-white/[0.04]">
             <button
@@ -207,57 +207,51 @@ export default function HomeChargerCard() {
               className="w-full flex items-center justify-between py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300"
             >
               <span className="flex items-center gap-2">
-                <span>참고 {p3AllChargers.length}대</span>
+                <span>더보기 {p3AllChargers.length}대</span>
                 <span className="text-zinc-600">·</span>
                 <StatusBadges counts={p3Counts} size="sm" />
               </span>
               <span>{showP3 ? '접기 ▲' : '펼치기 ▼'}</span>
             </button>
             {showP3 && (
-              <div className="space-y-2 pt-2">
-                {(cells102.length > 0 || cells104.length > 0) && (
-                  <div className="space-y-1.5">
-                    <TileBox title="102" chargers={cells102} {...tileProps} />
-                    <TileBox title="104" chargers={cells104} {...tileProps} />
-                  </div>
-                )}
-                {(p3GroupCells.length > 0 || show115) && (
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {p3GroupCells.map(g => (
-                      <TileBox
-                        key={g.title}
-                        title={g.title}
-                        chargers={g.chargers}
-                        ranks={ranks}
-                        usage={usage}
-                        statId={MAIN_STATION_ID}
-                        now={now}
-                      />
-                    ))}
-                    {show115 && (
-                      <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg p-2 flex items-center gap-2">
-                        <div className="text-[11px] text-zinc-300 font-medium shrink-0 flex flex-col items-center leading-none tabular-nums">
-                          {Array.from('115').map((d, i) => <span key={i}>{d}</span>)}
-                        </div>
-                        <div className="flex-1 min-w-0 space-y-1">
-                          {cells115Ground.length > 0 && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] text-zinc-500 w-6 shrink-0">지상</span>
-                              <MiniGrid chargers={cells115Ground} statId={MAIN_STATION_ID} ranks={ranks} usage={usage} now={now} className="flex-1 justify-center" />
-                            </div>
-                          )}
-                          {cells115Under.length > 0 && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] text-zinc-500 w-6 shrink-0">지하</span>
-                              <MiniGrid chargers={cells115Under} statId={STATION_115_UNDERGROUND} ranks={ranks} usage={usage} now={now} className="flex-1 justify-center" />
-                            </div>
-                          )}
-                        </div>
+              <div className="space-y-1.5 pt-2">
+                <div className="grid grid-cols-2 gap-1.5">
+                  <TileBox title="102" chargers={cells102} {...tileProps} />
+                  <TileBox title="104" chargers={cells104} {...tileProps} />
+                  {(() => {
+                    const g105 = p3GroupCells.find(g => g.title === '105');
+                    return g105 ? <TileBox title="105" chargers={g105.chargers} {...tileProps} /> : null;
+                  })()}
+                  {show115 && (
+                    <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg p-2 flex items-center gap-2">
+                      <div className="text-[11px] text-zinc-300 font-medium shrink-0 flex flex-col items-center leading-none tabular-nums">
+                        {Array.from('115').map((d, i) => <span key={i}>{d}</span>)}
                       </div>
-                    )}
-                  </div>
-                )}
-                <TileBox title="기타" chargers={mainLeftover} {...tileProps} />
+                      <div className="flex-1 min-w-0 space-y-1">
+                        {cells115Ground.length > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] text-zinc-500 w-6 shrink-0">지상</span>
+                            <MiniGrid chargers={cells115Ground} statId={MAIN_STATION_ID} ranks={ranks} usage={usage} now={now} className="flex-1 justify-center" />
+                          </div>
+                        )}
+                        {cells115Under.length > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] text-zinc-500 w-6 shrink-0">지하</span>
+                            <MiniGrid chargers={cells115Under} statId={STATION_115_UNDERGROUND} ranks={ranks} usage={usage} now={now} className="flex-1 justify-center" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {(() => {
+                    const g111 = p3GroupCells.find(g => g.title === '111');
+                    return g111 ? <TileBox title="111" chargers={g111.chargers} {...tileProps} /> : null;
+                  })()}
+                  {(() => {
+                    const g117 = p3GroupCells.find(g => g.title === '117');
+                    return g117 ? <TileBox title="117" chargers={g117.chargers} {...tileProps} /> : null;
+                  })()}
+                </div>
                 {refStations.map(s => {
                   const stationTitle = (STATION_CONFIG[s.station.statId]?.label || s.station.statId).replace(/\s*앞$/, '');
                   return (
