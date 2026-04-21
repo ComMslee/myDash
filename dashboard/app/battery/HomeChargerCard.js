@@ -87,17 +87,18 @@ function renderCell(c, size = 'md', highlight = null) {
   const sizeClass = size === 'lg'
     ? 'w-10 h-10 text-sm'
     : 'aspect-square text-[10px]';
-  const dotColor = highlight === 'high' ? 'bg-amber-400' : highlight === 'mid' ? 'bg-amber-400/50' : null;
+  const ringClass = highlight === 'high'
+    ? 'ring-2 ring-amber-400 ring-offset-1 ring-offset-[#161618]'
+    : highlight === 'mid'
+    ? 'ring-1 ring-amber-400/50 ring-offset-1 ring-offset-[#161618]'
+    : '';
   return (
     <div
       key={c.chgerId}
-      className={`${sizeClass} relative rounded-md flex items-center justify-center font-bold tabular-nums ${meta.cellBg} ${meta.cellText}`}
+      className={`${sizeClass} rounded-md flex items-center justify-center font-bold tabular-nums ${meta.cellBg} ${meta.cellText} ${ringClass}`}
       title={`${localId} · ${meta.label}${highlight ? ` · 자주 사용(${highlight})` : ''}`}
     >
       {label}
-      {dotColor && (
-        <span className={`absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full ${dotColor}`} />
-      )}
     </div>
   );
 }
