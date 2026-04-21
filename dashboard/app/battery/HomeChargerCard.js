@@ -3,7 +3,8 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   MAIN_STATION_ID, POLL_INTERVAL_MS, CLOCK_INTERVAL_MS,
   P1_108_IDS, P1_107_IDS, P2_102_IDS, P2_104_IDS,
-  PRIORITY_IDS, P3_GROUPS, P3_GROUPED_IDS, STATION_CONFIG,
+  PRIORITY_IDS, P3_GROUPS, P3_GROUPED_IDS, P3_115_IDS,
+  STATION_115_UNDERGROUND, STATION_CONFIG,
 } from './home-charger/constants';
 import { computeRanks, buildTtlTooltip, timeAgoKo } from './home-charger/utils';
 import { TileBox, StatusBadges, MiniGrid } from './home-charger/ChargerTile';
@@ -88,15 +89,26 @@ export default function HomeChargerCard() {
 
   // P3: 메인 스테이션에서 P1/P2 제외 + 나머지 스테이션 전체
   const mainRest = (mainStation?.chargers || []).filter(c => !PRIORITY_IDS.has(c.chgerId));
-  // P3 그룹(105동 등) 분리
+  // P3 단일-스테이션 그룹(105동 등) 분리
   const p3GroupCells = P3_GROUPS.map(g => ({
     title: g.title,
     chargers: mainRest.filter(c => g.ids.includes(c.chgerId)),
   })).filter(g => g.chargers.length > 0);
+  // 115동 합성 타일 — 지상(PI795111) + 지하(PI313299)
+  const cells115Ground = mainRest.filter(c => P3_115_IDS.includes(c.chgerId));
+  const underStation = stations.find(s => s.station.statId === STATION_115_UNDERGROUND);
+  const cells115Under = underStation?.chargers || [];
+  const show115 = cells115Ground.length + cells115Under.length > 0;
+  // mainLeftover: 105동/115동 지상 제외 나머지
   const mainLeftover = mainRest.filter(c => !P3_GROUPED_IDS.has(c.chgerId));
-  const refStations = stations.filter(s => s.station.statId !== MAIN_STATION_ID);
+  // refStations: 115동 지하는 별도 115동 타일에서 렌더하므로 제외
+  const refStations = stations.filter(s =>
+    s.station.statId !== MAIN_STATION_ID &&
+    s.station.statId !== STATION_115_UNDERGROUND
+  );
   const p3AllChargers = [
     ...mainRest,
+    ...cells115Under,
     ...refStations.flatMap(s => s.chargers),
   ];
   const p3Counts = countByStat(p3AllChargers);
@@ -182,8 +194,8 @@ export default function HomeChargerCard() {
             </button>
             {showP3 && (
               <div className="space-y-2 pt-2">
-                {p3GroupCells.length > 0 && (
-                  <div className="flex gap-2">
+                {(p3GroupCells.length > 0 || show115) && (
+                  <div className="flex gap-2 flex-wrap">
                     {p3GroupCells.map(g => (
                       <TileBox
                         key={g.title}
@@ -195,6 +207,29 @@ export default function HomeChargerCard() {
                         now={now}
                       />
                     ))}
+                    {show115 && (
+                      <div className="flex-1 min-w-0 bg-[#1a1a1c] border border-white/[0.06] rounded-lg p-2">
+                        <div className="text-[10px] text-zinc-400 mb-1.5 font-medium text-center">115동</div>
+                        <div className="space-y-1.5">
+                          {cells115Ground.length > 0 && (
+                            <div>
+                              <div className="text-[9px] text-zinc-500 mb-0.5 text-center">지상</div>
+                              <div className="flex justify-center">
+                                <MiniGrid chargers={cells115Ground} statId={MAIN_STATION_ID} ranks={ranks} usage={usage} now={now} />
+                              </div>
+                            </div>
+                          )}
+                          {cells115Under.length > 0 && (
+                            <div>
+                              <div className="text-[9px] text-zinc-500 mb-0.5 text-center">지하</div>
+                              <div className="flex justify-center">
+                                <MiniGrid chargers={cells115Under} statId={STATION_115_UNDERGROUND} ranks={ranks} usage={usage} now={now} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 {mainLeftover.length > 0 && (

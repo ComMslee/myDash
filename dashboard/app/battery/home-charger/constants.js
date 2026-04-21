@@ -26,12 +26,18 @@ export const PRIORITY_IDS = new Set([
   ...P1_108_IDS, ...P1_107_IDS, ...P2_102_IDS, ...P2_104_IDS,
 ]);
 
-// P3 섹션에서 동별로 분리해 표시할 그룹 (타일 형식)
+// P3 섹션에서 동별로 분리해 표시할 단일-스테이션 그룹 (타일 형식)
+// 115동은 지상(PI795111)과 지하(PI313299) 교차 스테이션이라 별도 합성 렌더
 export const P3_GROUPS = [
   { title: '105동', ids: P3_105_IDS },
-  { title: '115동(지상)', ids: P3_115_IDS },
 ];
-export const P3_GROUPED_IDS = new Set(P3_GROUPS.flatMap(g => g.ids));
+export const P3_GROUPED_IDS = new Set([
+  ...P3_GROUPS.flatMap(g => g.ids),
+  ...P3_115_IDS, // 115동 지상도 mainLeftover에서 제외 (별도 115동 타일에서 렌더)
+]);
+
+// 115동 지하 스테이션 ID (지상과 묶어 한 타일로 표시)
+export const STATION_115_UNDERGROUND = 'PI313299';
 
 export const COMPLEX_NAME = '망포늘푸른벽산아파트';
 
