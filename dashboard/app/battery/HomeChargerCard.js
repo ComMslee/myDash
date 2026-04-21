@@ -101,8 +101,9 @@ function StationBlock({ station, chargers, withFavorites, ranks, usage }) {
   const favLeft  = favChargers.slice(0, 2); // 14, 15
   const favRight = favChargers.slice(2);    // 22, 23
 
-  const hl  = (c) => ranks.get(c.chgerId) ?? null;
-  const cnt = (c) => usage[c.chgerId]?.t ?? 0;
+  const key = (c) => `${station.statId}_${c.chgerId}`;
+  const hl  = (c) => ranks.get(key(c)) ?? null;
+  const cnt = (c) => usage[key(c)]?.t ?? 0;
 
   return (
     <div>

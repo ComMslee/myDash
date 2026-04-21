@@ -29,8 +29,7 @@ export async function GET(req) {
       const stations = await loadStations(statIds, key);
       if (stations.length) {
         await recordUsageDb(stations);
-        const chgerIds = stations.flatMap(s => s.chargers.map(c => c.chgerId));
-        const usage = await fetchUsageDb(chgerIds);
+        const usage = await fetchUsageDb(stations.map(s => s.station.statId));
         const payload = { stations, fetchedAt: new Date().toISOString(), usage };
         setCache(payload);
         return Response.json(payload);
