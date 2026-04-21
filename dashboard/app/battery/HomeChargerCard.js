@@ -86,9 +86,9 @@ function TileCell({ c, highlight, count, now }) {
   const localId = ID_OFFSET + Number(c.chgerId);
   const label = localId - 95100;
   const ringClass = highlight === 'high'
-    ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-[#1a1a1c]'
+    ? 'ring-1 ring-amber-400'
     : highlight === 'mid'
-    ? 'ring-1 ring-amber-400/40 ring-offset-2 ring-offset-[#1a1a1c]'
+    ? 'ring-1 ring-amber-400/40'
     : '';
   const elapsed = elapsedLabel(c, now);
   const titleParts = [`${localId} · ${meta.label}`];
@@ -115,7 +115,7 @@ function TileBox({ title, chargers, ranks, usage, statId, now, compact = false }
   return (
     <div className={`flex-1 min-w-0 bg-[#1a1a1c] border border-white/[0.06] rounded-lg ${compact ? 'p-1.5' : 'p-2'}`}>
       <div className="text-[10px] text-zinc-400 mb-1.5 font-medium text-center">{title}</div>
-      <div className="flex justify-center items-start flex-wrap gap-0.5">
+      <div className="flex justify-center items-start flex-wrap gap-1.5">
         {chargers.map(c => (
           <TileCell
             key={c.chgerId}
