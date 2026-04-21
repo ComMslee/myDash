@@ -284,28 +284,15 @@ export default function HomeChargerCard() {
 
       <div className="px-4 py-3 space-y-3">
         {/* P1: 108동 + 107동 */}
-        <div>
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <span className="text-amber-400 text-[11px]">⭐</span>
-            <span className="text-[11px] text-zinc-300 font-medium">1순위</span>
-            <span className="text-[10px] text-zinc-600">· 내 집 근처</span>
-          </div>
-          <div className="flex gap-2">
-            <TileBox title="108동 앞" chargers={cells108} ranks={ranks} usage={usage} statId="PI795111" now={now} />
-            <TileBox title="107동 앞" chargers={cells107} ranks={ranks} usage={usage} statId="PI795111" now={now} />
-          </div>
+        <div className="flex gap-2">
+          <TileBox title="108동 앞" chargers={cells108} ranks={ranks} usage={usage} statId="PI795111" now={now} />
+          <TileBox title="107동 앞" chargers={cells107} ranks={ranks} usage={usage} statId="PI795111" now={now} />
         </div>
 
         {/* P2: 102동 + 104동 */}
-        <div>
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <span className="text-[11px] text-zinc-300 font-medium">2순위</span>
-            <span className="text-[10px] text-zinc-600">· 가까운 동</span>
-          </div>
-          <div className="flex gap-2">
-            <TileBox title="102동 앞" chargers={cells102} ranks={ranks} usage={usage} statId="PI795111" now={now} />
-            <TileBox title="104동 앞" chargers={cells104} ranks={ranks} usage={usage} statId="PI795111" now={now} />
-          </div>
+        <div className="flex gap-2">
+          <TileBox title="102동 앞" chargers={cells102} ranks={ranks} usage={usage} statId="PI795111" now={now} />
+          <TileBox title="104동 앞" chargers={cells104} ranks={ranks} usage={usage} statId="PI795111" now={now} />
         </div>
 
         {/* P3: 참고 (접힘) */}
