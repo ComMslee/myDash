@@ -11,14 +11,23 @@ export function Bar({ value, max, className = '' }) {
   );
 }
 
-// Top/Bottom 순위 행 — [아이콘][라벨][막대][횟수]
-export function RankRow({ icon, label, count, max }) {
+// Top/Bottom 순위 행 — 주행 탭 패턴과 통일된 오파시티 막대 스타일
+// [아이콘][라벨][오파시티 막대][카운트]
+export function RankRow({ icon, label, count, max, isPeak = false }) {
+  const ratio = max > 0 ? count / max : 0;
   return (
-    <div className="grid grid-cols-[2rem_4.5rem_1fr_3rem] items-center gap-2 text-[12px] tabular-nums">
+    <div className="grid grid-cols-[1.75rem_4rem_1fr_2.5rem] items-center gap-1.5 text-[11px] tabular-nums">
       <span className="text-zinc-500 text-center">{icon}</span>
       <span className="text-zinc-200">{label}</span>
-      <Bar value={count} max={max} />
-      <span className="text-zinc-400 text-right">{count}</span>
+      <div
+        className="w-full h-3 rounded-[3px]"
+        style={{
+          background: isPeak ? '#f59e0b' : '#3b82f6',
+          opacity: count === 0 ? 0.08 : 0.18 + ratio * 0.82,
+        }}
+        title={`${label}: ${count}회`}
+      />
+      <span className={`text-right ${isPeak ? 'text-amber-400 font-semibold' : 'text-zinc-400'}`}>{count}</span>
     </div>
   );
 }
