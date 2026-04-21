@@ -42,7 +42,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
         </div>
         <div className="text-center py-3">
           <div className="text-[10px] text-zinc-600 mb-1">평균 손실</div>
-          <div className="text-sm font-extrabold tabular-nums text-red-400">{avgDrop}%</div>
+          <div className={`text-sm font-extrabold tabular-nums ${avgDrop <= 2 ? 'text-red-700' : 'text-red-400'}`}>{avgDrop}%</div>
           <div className="text-[9px] text-zinc-600 mt-0.5">드레인 {withDrainCount}회</div>
         </div>
       </div>
@@ -58,7 +58,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
               <span className="text-[10px] font-semibold text-zinc-500 tabular-nums">{formatDateLabel(key)}</span>
               <div className="flex items-center gap-2 tabular-nums">
                 <span className="text-[10px] text-zinc-600">{formatHours(dayIdleH)}</span>
-                <span className={`text-[10px] font-bold ${dayDrop < 0.05 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <span className={`text-[10px] font-bold ${dayDrop < 0.05 ? 'text-emerald-400' : dayDrop <= 2 ? 'text-red-700' : 'text-red-400'}`}>
                   {dayDrop < 0.05 ? '0%' : `-${fmtDrop(dayDrop)}%`}
                 </span>
               </div>
@@ -77,7 +77,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                   const isPreCharge = r.next_type === 'charge';
                   const bg = isZero
                     ? (isPreCharge ? 'rgba(234,179,8,0.3)' : 'rgba(16,185,129,0.3)')
-                    : (isPreCharge ? 'rgba(234,179,8,0.85)' : 'rgba(239,68,68,0.85)');
+                    : (isPreCharge ? 'rgba(234,179,8,0.85)' : r.soc_drop <= 2 ? 'rgba(185,28,28,0.85)' : 'rgba(239,68,68,0.85)');
                   const showLabel = widthPct >= 10;
                   return (
                     <div
