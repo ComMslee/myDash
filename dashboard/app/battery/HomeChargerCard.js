@@ -209,7 +209,9 @@ export default function HomeChargerCard() {
                     ))}
                     {show115 && (
                       <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg p-2 flex items-center gap-2">
-                        <div className="text-[11px] text-zinc-300 font-medium w-12 text-center shrink-0">115</div>
+                        <div className="text-[11px] text-zinc-300 font-medium shrink-0 flex flex-col items-center leading-none tabular-nums">
+                          {Array.from('115').map((d, i) => <span key={i}>{d}</span>)}
+                        </div>
                         <div className="flex-1 min-w-0 space-y-1">
                           {cells115Ground.length > 0 && (
                             <div className="flex items-center gap-1.5">

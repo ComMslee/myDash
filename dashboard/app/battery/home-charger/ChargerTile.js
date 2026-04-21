@@ -103,7 +103,9 @@ export function TileBox({ title, chargers, ranks, usage, statId, now }) {
   const keyOf = (c) => `${statId}_${c.chgerId}`;
   return (
     <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg p-2 flex items-center gap-2">
-      <div className="text-[11px] text-zinc-300 font-medium w-12 text-center shrink-0">{title}</div>
+      <div className="text-[11px] text-zinc-300 font-medium shrink-0 flex flex-col items-center leading-none tabular-nums">
+        {Array.from(String(title)).map((d, i) => <span key={i}>{d}</span>)}
+      </div>
       <div className="flex items-start flex-wrap gap-1.5 flex-1 min-w-0">
         {chargers.map(c => {
           const u = usage[keyOf(c)];
