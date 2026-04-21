@@ -21,6 +21,8 @@ export const P2_104_IDS = ['14', '15', '16'];                    // 앱 번호 2
 // P3 (참고 그룹): PI795111 내 동별 분류
 export const P3_105_IDS = ['17', '18', '19'];                    // 105동 앞 — 앱 번호 27, 28, 29
 export const P3_115_IDS = ['01', '02', '03'];                    // 115동 지상 — 앱 번호 11, 12, 13
+export const P3_111_IDS = ['20', '21', '22'];                    // 111동 앞 — 앱 번호 30, 31, 32
+export const P3_117_IDS = ['23', '24', '25'];                    // 117동 앞 — 앱 번호 33, 34, 35
 
 export const PRIORITY_IDS = new Set([
   ...P1_108_IDS, ...P1_107_IDS, ...P2_102_IDS, ...P2_104_IDS,
@@ -28,8 +30,11 @@ export const PRIORITY_IDS = new Set([
 
 // P3 섹션에서 동별로 분리해 표시할 단일-스테이션 그룹 (타일 형식)
 // 115동은 지상(PI795111)과 지하(PI313299) 교차 스테이션이라 별도 합성 렌더
+// 순서 = 더보기 펼침 시 화면 노출 순서 (우선순위 높음 → 낮음)
 export const P3_GROUPS = [
   { title: '105', ids: P3_105_IDS },
+  { title: '111', ids: P3_111_IDS },
+  { title: '117', ids: P3_117_IDS },
 ];
 export const P3_GROUPED_IDS = new Set([
   ...P3_GROUPS.flatMap(g => g.ids),

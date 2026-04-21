@@ -1,7 +1,7 @@
 // 단지 충전기 식별자 → 표시용 문자열 변환 유틸
 import {
   P1_108_IDS, P1_107_IDS, P2_102_IDS, P2_104_IDS,
-  P3_105_IDS, P3_115_IDS,
+  P3_105_IDS, P3_115_IDS, P3_111_IDS, P3_117_IDS,
   MAIN_STATION_ID, STATION_115_UNDERGROUND, STATION_CONFIG,
   ID_OFFSET,
 } from './constants';
@@ -25,6 +25,8 @@ export function buildingOf(statId, chgerId) {
   if (P2_104_IDS.includes(chgerId)) return '104';
   if (P3_105_IDS.includes(chgerId)) return '105';
   if (P3_115_IDS.includes(chgerId)) return '115(지상)';
+  if (P3_111_IDS.includes(chgerId)) return '111';
+  if (P3_117_IDS.includes(chgerId)) return '117';
   return '기타';
 }
 
