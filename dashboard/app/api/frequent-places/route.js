@@ -127,23 +127,22 @@ export async function GET() {
       };
     });
 
-    // 집/회사 지오펜스는 별도 pinned 목록으로 분리
+    // 집/회사 지오펜스는 목록 맨 뒤로 이동 (visit_count가 커도 상위 노출 방지)
     const pinned = [];
-    const places = [];
+    const normal = [];
     for (const p of allPlaces) {
       if (p.geofence_name && PINNED_GEOFENCE_NAMES.includes(p.geofence_name)) {
         pinned.push(p);
       } else {
-        places.push(p);
+        normal.push(p);
       }
     }
-    // pinned 정렬: 집 > 회사 > 나머지 (PINNED_GEOFENCE_NAMES 순서)
     pinned.sort((a, b) =>
       PINNED_GEOFENCE_NAMES.indexOf(a.geofence_name) -
       PINNED_GEOFENCE_NAMES.indexOf(b.geofence_name)
     );
 
-    return Response.json({ pinned, places });
+    return Response.json({ places: [...normal, ...pinned] });
   } catch (err) {
     console.error('/api/frequent-places error:', err);
     return Response.json({ error: 'DB error', detail: err.message }, { status: 500 });

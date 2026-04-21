@@ -25,7 +25,6 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
   const [selectedDrive, setSelectedDrive] = useState(null);
   const [positions, setPositions] = useState([]);
   const [places, setPlaces] = useState([]);
-  const [pinnedPlaces, setPinnedPlaces] = useState([]);
   const [routeData, setRouteData] = useState(null);
   const [loadingDrives, setLoadingDrives] = useState(true);
   const [loadingRoute, setLoadingRoute] = useState(false);
@@ -54,7 +53,6 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
       const list = MOCK_DATA.drives.recent_drives;
       setDrives(list);
       setPlaces(MOCK_DATA.frequentPlaces);
-      setPinnedPlaces([]);
       setLoadingDrives(false);
       setSelectedDrive(pickPreselect(list));
       return;
@@ -66,12 +64,11 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
       fetch('/api/frequent-places').then(r => r.json()),
     ]).then(([drivesResult, placesResult]) => {
       const drivesData = drivesResult.status === 'fulfilled' ? drivesResult.value : { recent_drives: [] };
-      const placesData = placesResult.status === 'fulfilled' ? placesResult.value : { places: [], pinned: [] };
+      const placesData = placesResult.status === 'fulfilled' ? placesResult.value : { places: [] };
       if (drivesResult.status === 'rejected') setError('데이터를 불러오지 못했습니다.');
       const list = drivesData.recent_drives || [];
       setDrives(list);
       setPlaces(placesData.places || []);
-      setPinnedPlaces(placesData.pinned || []);
       setLoadingDrives(false);
       if (list.length > 0) {
         setSelectedDrive(pickPreselect(list));
@@ -143,7 +140,6 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
   return {
     drives,
     places,
-    pinnedPlaces,
     selectedDrive, setSelectedDrive,
     positions, setPositions,
     routeData,
