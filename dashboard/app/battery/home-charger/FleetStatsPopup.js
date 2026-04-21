@@ -167,13 +167,12 @@ export default function FleetStatsPopup({ onClose }) {
                     </div>
                   </div>
 
-                  {/* 시간대 — 기간 데이터 있으면 기간, 없으면 전체 누적 폴백 */}
+                  {/* 시간대 — 항상 전체 기간 누적 (랭크와 동일 소스 → 수치 일관성) */}
                   <div>
                     <div className="text-[11px] text-zinc-400 mb-1.5">
-                      📈 시간대별 (24시간)
-                      <span className="text-zinc-600"> · {data.total > 0 ? `지난 ${data.months}개월` : '전체 기간 (수집 중)'}</span>
+                      📈 시간대별 (24시간) <span className="text-zinc-600">· 전체 기간</span>
                     </div>
-                    <HourlyChart hourly={data.total > 0 ? data.hourly : data.hourlyAllTime} />
+                    <HourlyChart hourly={data.hourlyAllTime} />
                   </div>
 
                   {/* 요일 — 선택 기간 (일별 수집 전엔 불가) */}
