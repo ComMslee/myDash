@@ -23,63 +23,81 @@ export function RankRow({ icon, label, count, max }) {
   );
 }
 
-// 24시간 히스토그램 + 피크/한산 태그
+// 24시간 오파시티 바 (주행 탭 패턴 스타일) + 시간별 카운트 표시
 export function HourlyChart({ hourly }) {
   const max = Math.max(1, ...hourly);
   const peakHour = hourly.indexOf(max);
   const nonZero = hourly.filter(v => v > 0);
   const minNonZero = nonZero.length ? Math.min(...nonZero) : 0;
-  const zeroHours = [];
-  for (let h = 0; h < 24; h++) if (hourly[h] === 0) zeroHours.push(h);
+  const minHour = nonZero.length ? hourly.findIndex(v => v === minNonZero) : -1;
+  const total = hourly.reduce((s, v) => s + v, 0);
   return (
     <div>
-      <div className="flex items-end gap-[2px] h-24">
+      <div className="flex gap-0.5 h-4">
         {hourly.map((v, h) => {
-          const hPct = max > 0 ? Math.max(2, Math.round((v / max) * 100)) : 0;
+          const ratio = v / max;
           const isPeak = h === peakHour && v > 0;
           return (
             <div
               key={h}
-              className={`flex-1 rounded-t-sm ${v === 0 ? 'bg-zinc-800' : isPeak ? 'bg-amber-400' : 'bg-blue-500/70'}`}
-              style={{ height: `${hPct}%` }}
-              title={`${h}시 · ${v}회`}
+              className="flex-1 rounded-[3px]"
+              style={{
+                background: isPeak ? '#f59e0b' : '#3b82f6',
+                opacity: v === 0 ? 0.08 : 0.18 + ratio * 0.82,
+              }}
+              title={`${h}시: ${v}회`}
             />
           );
         })}
       </div>
-      <div className="flex justify-between text-[9px] text-zinc-500 mt-1 tabular-nums">
-        <span>0</span><span>6</span><span>12</span><span>18</span><span>23</span>
+      <div className="flex gap-0.5 mt-1">
+        {hourly.map((v, h) => (
+          <div
+            key={h}
+            className="flex-1 text-center text-[8px] text-zinc-500 tabular-nums overflow-hidden leading-none"
+          >
+            {v > 0 ? v : ''}
+          </div>
+        ))}
       </div>
-      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-zinc-400 mt-2">
-        {max > 0 && <span>🔥 피크 {peakHour}시 ({max})</span>}
-        {zeroHours.length > 0 && zeroHours.length <= 8 && (
-          <span>💤 비사용 {zeroHours.map(h => `${h}시`).join(',')}</span>
-        )}
-        {nonZero.length > 0 && (
-          <span>최소 {minNonZero}회</span>
-        )}
+      <div className="flex justify-between mt-1.5 text-[10px] text-zinc-500 tabular-nums px-px">
+        <span className="font-semibold">0시</span><span>6</span><span>12</span><span>18</span><span>23시</span>
       </div>
+      {max > 0 && (
+        <div className="mt-1.5 text-[10px] text-zinc-400 flex flex-wrap gap-x-2 gap-y-0.5 tabular-nums">
+          <span>🔥 피크 {peakHour}시 ({max}회)</span>
+          {minHour >= 0 && <span>💤 한산 {minHour}시 ({minNonZero}회)</span>}
+          <span>총 {total}회</span>
+        </div>
+      )}
     </div>
   );
 }
 
-// 요일별 가로 막대 차트
+// 요일별 오파시티 바 (주행 탭 WeekdayBars 스타일) + 카운트 표시
 export function DowChart({ dow }) {
   const max = Math.max(1, ...dow);
   const peakIdx = dow.indexOf(max);
   const nonZero = dow.filter(v => v > 0);
   const minVal = nonZero.length ? Math.min(...nonZero) : 0;
   return (
-    <div className="space-y-1">
+    <div className="flex gap-1">
       {dow.map((v, i) => {
+        const ratio = v / max;
         const isPeak = i === peakIdx && v > 0;
         const isLow = v === minVal && v > 0 && v < max;
         return (
-          <div key={i} className="grid grid-cols-[1.5rem_1fr_4rem] items-center gap-2 text-[12px] tabular-nums">
-            <span className="text-zinc-400">{DOW_LABELS[i]}</span>
-            <Bar value={v} max={max} />
-            <span className="text-zinc-400 text-right">
-              {v}{isPeak && ' 🔥'}{isLow && ' 💤'}
+          <div key={i} className="flex-1 flex flex-col items-center gap-1" title={`${DOW_LABELS[i]}: ${v}회`}>
+            <div
+              className="w-full h-4 rounded-[3px]"
+              style={{
+                background: isPeak ? '#f59e0b' : '#3b82f6',
+                opacity: v === 0 ? 0.08 : 0.18 + ratio * 0.82,
+              }}
+            />
+            <span className="text-[10px] text-zinc-500">{DOW_LABELS[i]}</span>
+            <span className={`text-[10px] tabular-nums ${isPeak ? 'text-amber-400 font-semibold' : 'text-zinc-400'}`}>
+              {v}{isPeak ? ' 🔥' : isLow ? ' 💤' : ''}
             </span>
           </div>
         );
