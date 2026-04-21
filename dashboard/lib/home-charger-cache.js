@@ -166,13 +166,16 @@ let tableReady = false;
 
 async function ensureTable() {
   if (tableReady) return;
+  // stat_id 없는 구버전 테이블 교체 (방금 생성된 빈 테이블이므로 DROP 무해)
+  await pool.query(`DROP TABLE IF EXISTS charger_usage`);
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS charger_usage (
+    CREATE TABLE charger_usage (
+      stat_id    VARCHAR(20) NOT NULL,
       chger_id   VARCHAR(20) NOT NULL,
       hour       SMALLINT    NOT NULL,
       count      INTEGER     NOT NULL DEFAULT 0,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (chger_id, hour)
+      PRIMARY KEY (stat_id, chger_id, hour)
     )
   `);
   tableReady = true;
@@ -182,35 +185,39 @@ export async function recordUsageDb(stations) {
   try {
     await ensureTable();
     const kstHour = (new Date().getUTCHours() + 9) % 24;
-    const charging = stations.flatMap(s =>
-      s.chargers.filter(c => c.stat === '3').map(c => c.chgerId)
+    const rows = stations.flatMap(s =>
+      s.chargers.filter(c => c.stat === '3').map(c => [s.station.statId, c.chgerId])
     );
-    if (!charging.length) return;
+    if (!rows.length) return;
+    const statIds  = rows.map(r => r[0]);
+    const chgerIds = rows.map(r => r[1]);
     await pool.query(
-      `INSERT INTO charger_usage (chger_id, hour, count)
-       SELECT unnest($1::text[]), $2::smallint, 1
-       ON CONFLICT (chger_id, hour)
+      `INSERT INTO charger_usage (stat_id, chger_id, hour, count)
+       SELECT unnest($1::text[]), unnest($2::text[]), $3::smallint, 1
+       ON CONFLICT (stat_id, chger_id, hour)
        DO UPDATE SET count = charger_usage.count + 1, updated_at = NOW()`,
-      [charging, kstHour]
+      [statIds, chgerIds, kstHour]
     );
   } catch (e) {
     console.warn('[home-charger] usage record failed:', e.message);
   }
 }
 
-export async function fetchUsageDb(chgerIds) {
+// statIds 배열로 조회, 반환 키는 "statId_chgerId"
+export async function fetchUsageDb(statIds) {
   try {
     await ensureTable();
-    if (!chgerIds.length) return {};
+    if (!statIds.length) return {};
     const res = await pool.query(
-      `SELECT chger_id, hour, count FROM charger_usage WHERE chger_id = ANY($1)`,
-      [chgerIds]
+      `SELECT stat_id, chger_id, hour, count FROM charger_usage WHERE stat_id = ANY($1)`,
+      [statIds]
     );
     const usage = {};
     for (const row of res.rows) {
-      if (!usage[row.chger_id]) usage[row.chger_id] = { h: new Array(24).fill(0), t: 0 };
-      usage[row.chger_id].h[row.hour] = Number(row.count);
-      usage[row.chger_id].t += Number(row.count);
+      const key = `${row.stat_id}_${row.chger_id}`;
+      if (!usage[key]) usage[key] = { h: new Array(24).fill(0), t: 0 };
+      usage[key].h[row.hour] = Number(row.count);
+      usage[key].t += Number(row.count);
     }
     return usage;
   } catch (e) {
@@ -251,8 +258,7 @@ export async function warmIfNeeded() {
       const stations = await loadStations(statIds, key);
       if (stations.length) {
         await recordUsageDb(stations);
-        const chgerIds = stations.flatMap(s => s.chargers.map(c => c.chgerId));
-        const usage = await fetchUsageDb(chgerIds);
+        const usage = await fetchUsageDb(stations.map(s => s.station.statId));
         const payload = { stations, fetchedAt: new Date().toISOString(), usage };
         setCache(payload);
         if (stations.length === statIds.length) lastError = null;
