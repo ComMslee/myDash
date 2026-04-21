@@ -55,11 +55,8 @@ function renderCell(c, size = 'md') {
   );
 }
 
-function stationLabel(statId) {
-  const cfg = STATION_CONFIG[statId];
-  const loc = cfg?.loc;
-  if (loc) return `${loc} (${statId} : ${COMPLEX_NAME})`;
-  return `${COMPLEX_NAME} (${statId})`;
+function stationHeader(statId) {
+  return `${statId} : ${COMPLEX_NAME}`;
 }
 
 function StationBlock({ station, chargers, withFavorites }) {
@@ -80,7 +77,7 @@ function StationBlock({ station, chargers, withFavorites }) {
 
   return (
     <div>
-      <div className="text-[11px] text-zinc-400 mb-2">{stationLabel(station.statId)}</div>
+      <div className="text-[11px] text-zinc-500 mb-2">{stationHeader(station.statId)}</div>
       <div className="space-y-2">
         {(favChargers.length > 0 || secondChargers.length > 0) && (
           <div className="flex items-center gap-2">
@@ -98,11 +95,24 @@ function StationBlock({ station, chargers, withFavorites }) {
             {secondChargers.map(c => renderCell(c, 'lg'))}
           </div>
         )}
-        {mainGroup.length > 0 && (
-          <div className="grid gap-1 pt-1" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
-            {mainGroup.map(c => renderCell(c, 'md'))}
-          </div>
-        )}
+        {mainGroup.length > 0 && (() => {
+          const loc = STATION_CONFIG[station.statId]?.loc;
+          if (!withFavorites && loc) {
+            // loc 레이블 인라인 표시
+            const size = mainGroup.length <= 4 ? 'lg' : 'md';
+            return (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] text-zinc-500 shrink-0">{loc}</span>
+                {mainGroup.map(c => renderCell(c, size))}
+              </div>
+            );
+          }
+          return (
+            <div className="grid gap-1 pt-1" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
+              {mainGroup.map(c => renderCell(c, 'md'))}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
