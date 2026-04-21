@@ -1,6 +1,6 @@
 // 집충전기 셀/타일 프리미티브 — UnifiedCell, TileBox, StatusBadges, MiniGrid
 
-import { ID_OFFSET, STAT_META, STATUS_ORDER, P3_GRID_COLS } from './constants';
+import { ID_OFFSET, STAT_META, STATUS_ORDER } from './constants';
 import { elapsedLabel } from './utils';
 
 // 상태별 카운트 배지 — 헤더/요약에서 공용
@@ -34,13 +34,10 @@ function peakHourOf(hourly) {
   return max > 0 ? { hour: idx, count: max } : null;
 }
 
-// P3 참고 섹션의 미니 그리드 — 동일한 그리드/셀 렌더링 중복 방지
+// P3 참고 섹션 — 셀 포맷은 P1/P2와 완전 동일, flex-wrap으로 자연 줄바꿈
 export function MiniGrid({ chargers, statId, ranks, usage, now }) {
   return (
-    <div
-      className="grid gap-1"
-      style={{ gridTemplateColumns: `repeat(${P3_GRID_COLS}, minmax(0, 1fr))` }}
-    >
+    <div className="flex flex-wrap gap-1.5">
       {chargers.map(c => {
         const u = usage[`${statId}_${c.chgerId}`];
         return (
@@ -59,13 +56,12 @@ export function MiniGrid({ chargers, statId, ranks, usage, now }) {
 }
 
 // 통일 셀 — 색 배경 + 번호, 하단에 경과시간(충전중) 또는 사용횟수(비사용), 랭크 링
-export function UnifiedCell({ c, highlight, count, hourly, now, size = 'md' }) {
+// 모든 셀 크기/폰트 통일 (P1/P2/P3 동일 포맷)
+export function UnifiedCell({ c, highlight, count, hourly, now }) {
   const meta = STAT_META[c.stat] || STAT_META['9'];
   const localId = ID_OFFSET + Number(c.chgerId);
   const label = localId - 95100;
-  const sizeClass = size === 'lg'
-    ? 'w-10 h-10 text-sm'
-    : 'aspect-square text-[10px]';
+  const sizeClass = 'w-10 h-10 text-sm';
   const ringClass = highlight === 'high'
     ? 'ring-2 ring-amber-300 shadow-[0_0_6px_rgba(252,211,77,0.6)]'
     : highlight === 'mid'
@@ -121,7 +117,6 @@ export function TileBox({ title, chargers, ranks, usage, statId, now }) {
               count={u?.t ?? 0}
               hourly={u?.h ?? null}
               now={now}
-              size="lg"
             />
           );
         })}
