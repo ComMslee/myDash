@@ -2,173 +2,47 @@
 
 TeslaMate PostgreSQL 데이터를 시각화하는 Next.js 14 기반 모바일 우선 대시보드.
 
-## 배포
-
-`master` 브랜치 push 시 GitHub Actions(self-hosted runner)가 자동 배포한다 (`.github/workflows/deploy.yml`). 따라서 일반적으로는 코드 수정 후 빌드/배포를 직접 실행하지 않는다.
-
-사용자가 명시적으로 요청할 때만 로컬 빌드/배포를 실행한다:
-
-```bash
-docker-compose build dashboard && docker-compose up -d dashboard
-```
-
 ## 기술 스택
 
 - **프레임워크**: Next.js 14 (App Router) — 포트 5000
 - **언어**: JavaScript (ESM, `"type": "module"`)
-- **스타일링**: Tailwind CSS 3 — 인라인 유틸리티 클래스, 커스텀 CSS 최소화
+- **스타일링**: Tailwind CSS 3 — 인라인 유틸리티 클래스
 - **DB**: PostgreSQL 16 (TeslaMate 스키마) — `pg` 라이브러리 직접 쿼리
 - **지도**: Leaflet 1.9 (CDN 동적 로드, CartoDB Dark 타일)
 - **컨테이너**: Docker (node:20-alpine)
 - **CI/CD**: GitHub Actions → self-hosted runner → docker compose
 
-## 프로젝트 구조
+## 배포
 
-```
-myDash/
-├── CLAUDE.md
-├── docker-compose.yml          # teslamate + database + mosquitto + dashboard
-├── .github/workflows/deploy.yml
-└── dashboard/
-    ├── Dockerfile
-    ├── package.json
-    ├── next.config.js
-    ├── tailwind.config.js
-    ├── postcss.config.js
-    ├── jsconfig.json             # @/ → dashboard/ 경로 별칭
-    ├── lib/
-    │   ├── db.js                 # PostgreSQL 커넥션 풀 (싱글턴)
-    │   ├── constants.js          # KWH_PER_KM, RATED_RANGE_MAX_KM
-    │   └── format.js             # formatDuration, formatDate, shortAddr, formatKorDate
-    ├── app/
-    │   ├── layout.js             # 루트 레이아웃 (MockProvider, GlobalHeader, BottomNav)
-    │   ├── globals.css           # Tailwind 지시어 + Leaflet 다크 테마 오버라이드
-    │   ├── page.js               # 홈 — 최근 주행 + 6개월 통합 카드
-    │   ├── context/
-    │   │   └── mock.js           # MockProvider + MOCK_DATA (개발용 가상 데이터)
-    │   ├── components/
-    │   │   ├── GlobalHeader.js   # 차량 상태/배터리/충전 상태 헤더 (sticky)
-    │   │   ├── BottomNav.js      # 하단 탭 네비게이션 (홈/주행/월별/배터리)
-    │   │   ├── PageLayout.js     # Card, Spinner, SectionLabel 공유 컴포넌트
-    │   │   └── ChartWidgets.js   # HourlyHeatmap, WeekdayBars 차트
-    │   ├── drives/
-    │   │   └── page.js           # 주행 상세 — 지도 + 주행 이력 리스트 + 자주 가는 곳
-    │   ├── monthly/
-    │   │   └── page.js           # 월별 — 달력 + 6개월 차트 + 효율 트렌드 + 연도별 통계
-    │   └── battery/
-    │       ├── page.js           # 배터리 — 건강/집충전기/충전 습관/충전 상세
-    │       ├── HealthScoreCard.js    # 점수(등급)·평균 SOC·용량 추이 + SOC 체류 분포
-    │       ├── IdleDrainCard.js      # 대기 소모 24h 타임라인
-    │       ├── HomeChargerCard.js    # 집충전기 실시간 상태 (환경공단 API)
-    │       ├── RecordsHabit.js       # 충전 시작/종료 SOC Range Bar
-    │       ├── MonthlyChargeCard.js
-    │       ├── ChargeHeatmap.js
-    │       ├── FastChargeCard.js
-    │       ├── SlowChargeCard.js
-    │       ├── CycleCard.js
-    │       └── WeeklyCard.js
-    └── app/api/                  # 서버사이드 API 라우트 (모두 GET, force-dynamic)
-        ├── car/route.js          # 차량 기본 정보 + 배터리 + 상태
-        ├── charging-status/route.js  # 현재 충전 상태
-        ├── drives/route.js       # 주행 통계(오늘/주/월) + 최근 주행 목록
-        ├── charges/route.js      # 충전 이력 + 월간/전체 비용
-        ├── insights/route.js     # 6개월 집계 + 시간대/요일 패턴
-        ├── monthly-history/route.js  # 24개월 월별 주행/충전/효율
-        ├── battery/route.js      # 배터리 건강 + 히스토그램 + 대기 소모
-        ├── battery-trend/route.js    # 배터리 용량/습관 월별 트렌드
-        ├── charge-all-time/route.js  # 누적 충전 비용
-        ├── frequent-places/route.js  # 자주 방문 장소 랭킹
-        ├── route-map/route.js    # 특정 주행의 GPS 경로
-        ├── heatmap/route.js      # 히트맵 데이터
-        └── home-charger/route.js # 집충전기 실시간 (환경공단 EvCharger API + 시간대별 캐시)
+`master` 브랜치 push 시 GitHub Actions(self-hosted runner)가 자동 배포한다 (`.github/workflows/deploy.yml`). **코드 수정 후 항상 즉시 서버 반영**되므로 별도 빌드/배포 명령은 실행하지 않는다.
+
+사용자가 명시적으로 요청할 때만 로컬 빌드:
+
+```bash
+docker-compose build dashboard && docker-compose up -d dashboard
 ```
 
-## 페이지 (4탭)
+## 상세 문서 (`docs/`)
 
-| 경로 | 탭 이름 | 설명 |
-|------|---------|------|
-| `/` | 홈 | 최근 주행 통계(오늘/이번주/저번주/이번달) + 최근 3건 + 6개월 통합(주행/충전 탭) |
-| `/drives` | 주행 | Leaflet 지도 + 주행 이력 리스트(200건) + 자주 가는 곳 TOP5 |
-| `/monthly` | 월별 | 달력(일별 km/충전) + 6개월 바 차트 + 효율 트렌드 + 연도별 요약 |
-| `/battery` | 배터리 | 건강 점수(등급/평균SOC/추이) + 대기 소모 + **집충전기 실시간** + 충전 습관 + 급속/완속 기록 |
-
-## 데이터베이스
-
-TeslaMate가 관리하는 PostgreSQL 스키마. 직접 쿼리만 사용 (ORM 없음).
-
-### 주요 테이블
-
-| 테이블 | 용도 |
-|--------|------|
-| `cars` | 차량 정보 (id, name) |
-| `drives` | 주행 기록 (distance, duration_min, start/end_rated_range_km, speed_max) |
-| `charging_processes` | 충전 기록 (charge_energy_added, cost, geofence_id) |
-| `positions` | GPS 위치 + 배터리 레벨 |
-| `states` | 차량 상태 (driving, parked, suspended, online) |
-| `addresses` | 주소 정보 (name, road, display_name) |
-| `geofences` | 지오펜스 (집충전 판별에 사용) |
-
-### 환경 변수
-
-| 변수 | 설명 |
+| 문서 | 내용 |
 |------|------|
-| `TM_DB_USER` | PostgreSQL 사용자명 |
-| `TM_DB_PASS` | PostgreSQL 비밀번호 |
-| `TM_DB_NAME` | 데이터베이스 이름 (기본값: `teslamate`) |
-| `DB_HOST` | DB 호스트 (기본값: `database`) |
-| `ENCRYPTION_KEY` | TeslaMate 암호화 키 |
-| `KAKAO_REST_API_KEY` | Kakao Local API 키 (역지오코딩). 없으면 DB 캐시만 사용 |
-| `EV_CHARGER_API_KEY` | 공공데이터포털 환경공단 EvCharger 일반 인증키 (64-hex). 없으면 집충전기 카드 비표시 |
-| `HOME_CHARGER_STAT_ID` | 환경공단 스테이션 ID (기본값: `PI795111`) |
+| [`docs/PROJECT_STRUCTURE.md`](./docs/PROJECT_STRUCTURE.md) | 전체 파일 트리 + 페이지(4탭) 구성 |
+| [`docs/DATABASE.md`](./docs/DATABASE.md) | PostgreSQL 테이블 · 환경 변수 · 공용 상수/유틸 |
+| [`docs/CODE_CONVENTIONS.md`](./docs/CODE_CONVENTIONS.md) | UI/데이터/컴포넌트 규칙 · 파일 분할 기준 · 커밋 스타일 |
+| [`docs/EV_CHARGER_API.md`](./docs/EV_CHARGER_API.md) | 환경공단 전기차 충전소 API 사용법 |
+| [`docs/DEPLOY.md`](./docs/DEPLOY.md) | 배포/운영 절차 |
+| [`docs/OPERATIONS.md`](./docs/OPERATIONS.md) | 운영 노트 |
+| [`docs/ACCESS.md`](./docs/ACCESS.md) | 접속 방법 |
+| [`docs/TAILSCALE.md`](./docs/TAILSCALE.md) | Tailscale 설정 |
 
-## 상수 (`lib/constants.js`)
+## 핵심 규칙 요약
 
-| 상수 | 값 | 용도 |
-|------|-----|------|
-| `KWH_PER_KM` | 0.150 | rated range km → kWh 환산 (Model 3 기준) |
-| `RATED_RANGE_MAX_KM` | 350 | 배터리 % 계산 기준 최대 주행거리 |
+- **한국어 UI** (모든 레이블/에러/단위)
+- **다크 테마**: 배경 `#0f0f0f`, 카드 `#161618`
+- **모바일 우선**: `max-w-2xl mx-auto` + 하단 탭
+- **KST(UTC+9)** 기준 시간 처리
+- API 라우트: `export const dynamic = 'force-dynamic'`
+- 단일 차량 가정: `SELECT id FROM cars LIMIT 1`
+- 커밋: `<type>: <설명>` (`feat`, `fix`, `refactor`, `tune`, `ci`, `docs`, `chore`)
 
-## 유틸리티 (`lib/format.js`)
-
-| 함수 | 설명 |
-|------|------|
-| `formatDuration(min)` | 분 → "X시간 Y분" 또는 "Y분" |
-| `formatDate(iso)` | ISO → "M월 D일 HH:MM" |
-| `shortAddr(addr)` | 주소의 첫 번째 쉼표 이전 부분만 반환 |
-| `formatKorDate(iso)` | ISO → "YY/MM/DD" 또는 "MM/DD" (올해면 연도 생략) |
-
-## 코딩 규칙
-
-### UI/UX
-- **한국어 UI** — 모든 레이블, 에러 메시지, 단위 표시
-- **다크 테마** — 배경 `#0f0f0f`, 카드 `#161618`, 테두리 `border-white/[0.06]`
-- **모바일 우선** — `max-w-2xl mx-auto`, 하단 탭 네비게이션(safe-area 대응)
-- **색상 팔레트**: 주행=blue-400, 충전=green-400, 효율=amber-400, 에러=red-400
-
-### 데이터
-- **KST(UTC+9)** 기준 날짜/시간 처리 — SQL에서 `+ INTERVAL '9 hours'` 또는 JS에서 수동 변환
-- **API 라우트**: 모두 `export const dynamic = 'force-dynamic'` (SSR 캐시 비활성화)
-- **단일 차량**: `SELECT id FROM cars LIMIT 1` 패턴으로 항상 첫 번째 차량만 조회
-- **30초 자동 갱신**: 홈, 헤더에서 setInterval(30000)로 폴링
-
-### 컴포넌트
-- `'use client'` 지시어 — 모든 페이지/컴포넌트에 사용
-- Tailwind 인라인 스타일 — 별도 CSS 파일 최소화
-- `tabular-nums` — 숫자 표시에 고정 폭 숫자 사용
-- 공유 컴포넌트는 `components/` 또는 `lib/`에, 페이지 전용은 해당 폴더에 배치
-
-### 개발 모드
-- Mock 시스템 (`context/mock.js`) — 개발 환경에서 "가상" 버튼으로 DB 없이 테스트
-- `NODE_ENV !== 'production'`일 때만 Mock 토글 버튼 표시
-
-## 커밋 스타일
-
-```
-<type>: <한글 또는 영문 설명>
-```
-
-타입: `feat`, `fix`, `ci`, `docs`
-
-## 외부 API 참고
-
-- **한국환경공단 전기자동차 충전소 정보** — 공공 충전소 위치/상태 조회 API. 엔드포인트, 인증키 보관, 호출 함정(HTTPS/UA/numOfRows), 오퍼레이션, Next.js 라우트 예시는 [`docs/EV_CHARGER_API.md`](./docs/EV_CHARGER_API.md) 참고.
+세부 규칙은 [`docs/CODE_CONVENTIONS.md`](./docs/CODE_CONVENTIONS.md) 참고.
