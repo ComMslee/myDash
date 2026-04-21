@@ -1,12 +1,53 @@
-dashboard/.next/
-dashboard/node_modules/
-dashboard/.omc/
+# ─── Secrets ───────────────────────────────────────────────
 .env
+.env.*
+!.env.example
 *.env.local
-
-# AWS / Lightsail
+*.key
 *.pem
+*.pfx
+*.p12
+nginx-*.htpasswd
+secrets/
+.tm_password.txt
 budget.json
 
-# Local secrets
-.tm_password.txt
+# ─── Tesla / 외부 인증 캐시 ───────────────────────────────
+tesla_auth/
+
+# ─── Claude Code / OMC 로컬 세션 ──────────────────────────
+.omc/
+.claude/
+dashboard/.omc/
+
+# ─── Windows PowerShell 스크립트 (개인용) ─────────────────
+/check_download.ps1
+/check_startup.ps1
+/extract_run.ps1
+/genkey.ps1
+/get_ip.ps1
+/install_tailscale.ps1
+/remove_grafana.ps1
+/tailscale_ip.ps1
+
+# ─── Node / Next.js ───────────────────────────────────────
+node_modules/
+dashboard/node_modules/
+.next/
+dashboard/.next/
+out/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── OS ───────────────────────────────────────────────────
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# ─── IDE ──────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
