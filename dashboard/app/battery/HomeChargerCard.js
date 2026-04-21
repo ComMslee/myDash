@@ -24,19 +24,22 @@ const STAT_META = {
 };
 
 // 상위 25% → 'high', 25~50% → 'mid', 나머지 → null
+// 동점(같은 count)은 항상 같은 등급으로 묶는다.
 function computeRanks(usage) {
   const entries = Object.entries(usage)
     .map(([id, d]) => ({ id, t: d.t }))
     .filter(e => e.t > 0)
     .sort((a, b) => b.t - a.t);
   if (!entries.length) return new Map();
-  const hi = Math.ceil(entries.length * 0.25);
-  const mi = Math.ceil(entries.length * 0.50);
+  const hiIdx = Math.ceil(entries.length * 0.25) - 1;
+  const miIdx = Math.ceil(entries.length * 0.50) - 1;
+  const hiThreshold = entries[Math.min(hiIdx, entries.length - 1)].t;
+  const miThreshold = entries[Math.min(miIdx, entries.length - 1)].t;
   const ranks = new Map();
-  entries.forEach((e, i) => {
-    if (i < hi) ranks.set(e.id, 'high');
-    else if (i < mi) ranks.set(e.id, 'mid');
-  });
+  for (const e of entries) {
+    if (e.t >= hiThreshold) ranks.set(e.id, 'high');
+    else if (e.t >= miThreshold) ranks.set(e.id, 'mid');
+  }
   return ranks;
 }
 // ─────────────────────────────────────────────────────────────────────────────
