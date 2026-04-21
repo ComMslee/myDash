@@ -23,31 +23,6 @@ const STAT_META = {
   '9': { label: '확인불가', dot: 'bg-zinc-700',    text: 'text-zinc-500',    cellBg: 'bg-zinc-800',       cellText: 'text-zinc-500' },
 };
 
-// ── 사용률 추적 (localStorage) ────────────────────────────────────────────────
-// 구조: { [chgerId]: { h: number[24], t: number } }
-const USAGE_KEY = 'hcc_usage_v1';
-
-function loadUsage() {
-  if (typeof localStorage === 'undefined') return {};
-  try { return JSON.parse(localStorage.getItem(USAGE_KEY) || '{}'); } catch { return {}; }
-}
-
-function recordUsage(stations) {
-  const kstHour = (new Date().getUTCHours() + 9) % 24;
-  const usage = loadUsage();
-  for (const s of stations) {
-    for (const c of s.chargers) {
-      if (c.stat === '3') { // 충전중일 때만 카운트
-        if (!usage[c.chgerId]) usage[c.chgerId] = { h: new Array(24).fill(0), t: 0 };
-        usage[c.chgerId].h[kstHour]++;
-        usage[c.chgerId].t++;
-      }
-    }
-  }
-  try { localStorage.setItem(USAGE_KEY, JSON.stringify(usage)); } catch {}
-  return usage;
-}
-
 // 상위 25% → 'high', 25~50% → 'mid', 나머지 → null
 function computeRanks(usage) {
   const entries = Object.entries(usage)
@@ -180,9 +155,6 @@ export default function HomeChargerCard() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [tick, setTick] = useState(0);
-  const [ranks, setRanks] = useState(() => computeRanks(loadUsage()));
-  const [usage, setUsage] = useState(() => loadUsage());
-
   const load = useCallback(async (force = false) => {
     try {
       if (force) setRefreshing(true);
@@ -193,10 +165,6 @@ export default function HomeChargerCard() {
         moduleCache = d;
         setData(d);
         setError(null);
-        // 사용률 기록 및 랭크 갱신
-        const usage = recordUsage(d.stations || []);
-        setUsage(usage);
-        setRanks(computeRanks(usage));
       }
     } catch (e) {
       setError(e.message || '조회 실패');
@@ -229,6 +197,8 @@ export default function HomeChargerCard() {
   }
 
   const { stations = [], fetchedAt, stale, lastError } = data;
+  const usage = data?.usage || {};
+  const ranks = computeRanks(usage);
   const errMsg = error || lastError;
   const allChargers = stations.flatMap(s => s.chargers);
   const counts = allChargers.reduce((acc, c) => {

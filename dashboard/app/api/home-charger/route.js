@@ -1,4 +1,5 @@
 import {
+  fetchUsageDb,
   getCache,
   getLastError,
   getQuotaCooldownUntil,
@@ -6,6 +7,7 @@ import {
   isFresh,
   isQuotaCooldown,
   loadStations,
+  recordUsageDb,
   setCache,
   warmIfNeeded,
 } from '@/lib/home-charger-cache';
@@ -26,7 +28,10 @@ export async function GET(req) {
     try {
       const stations = await loadStations(statIds, key);
       if (stations.length) {
-        const payload = { stations, fetchedAt: new Date().toISOString() };
+        await recordUsageDb(stations);
+        const chgerIds = stations.flatMap(s => s.chargers.map(c => c.chgerId));
+        const usage = await fetchUsageDb(chgerIds);
+        const payload = { stations, fetchedAt: new Date().toISOString(), usage };
         setCache(payload);
         return Response.json(payload);
       }

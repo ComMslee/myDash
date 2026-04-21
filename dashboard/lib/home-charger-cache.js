@@ -1,6 +1,8 @@
 // 집충전기(환경공단 EvCharger) 캐시 모듈.
 // 각 statId별로 getChargerInfo?statId=XXX 호출 (전국 풀스캔 불필요, 쿼터 대폭 절감).
 
+import pool from '@/lib/db';
+
 const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 
 // 공공 API 일일 쿼터 1,000회/일 고려하여 시간대별 TTL 설정
@@ -160,6 +162,63 @@ function applyQuotaCooldown() {
 export function isQuotaCooldown() { return Date.now() < quotaCooldownUntil; }
 export function getQuotaCooldownUntil() { return quotaCooldownUntil; }
 
+let tableReady = false;
+
+async function ensureTable() {
+  if (tableReady) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS charger_usage (
+      chger_id   VARCHAR(20) NOT NULL,
+      hour       SMALLINT    NOT NULL,
+      count      INTEGER     NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (chger_id, hour)
+    )
+  `);
+  tableReady = true;
+}
+
+export async function recordUsageDb(stations) {
+  try {
+    await ensureTable();
+    const kstHour = (new Date().getUTCHours() + 9) % 24;
+    const charging = stations.flatMap(s =>
+      s.chargers.filter(c => c.stat === '3').map(c => c.chgerId)
+    );
+    if (!charging.length) return;
+    await pool.query(
+      `INSERT INTO charger_usage (chger_id, hour, count)
+       SELECT unnest($1::text[]), $2::smallint, 1
+       ON CONFLICT (chger_id, hour)
+       DO UPDATE SET count = charger_usage.count + 1, updated_at = NOW()`,
+      [charging, kstHour]
+    );
+  } catch (e) {
+    console.warn('[home-charger] usage record failed:', e.message);
+  }
+}
+
+export async function fetchUsageDb(chgerIds) {
+  try {
+    await ensureTable();
+    if (!chgerIds.length) return {};
+    const res = await pool.query(
+      `SELECT chger_id, hour, count FROM charger_usage WHERE chger_id = ANY($1)`,
+      [chgerIds]
+    );
+    const usage = {};
+    for (const row of res.rows) {
+      if (!usage[row.chger_id]) usage[row.chger_id] = { h: new Array(24).fill(0), t: 0 };
+      usage[row.chger_id].h[row.hour] = Number(row.count);
+      usage[row.chger_id].t += Number(row.count);
+    }
+    return usage;
+  } catch (e) {
+    console.warn('[home-charger] usage fetch failed:', e.message);
+    return {};
+  }
+}
+
 export async function loadStations(statIds, key) {
   const results = await Promise.all(statIds.map(async id => {
     try {
@@ -191,7 +250,10 @@ export async function warmIfNeeded() {
     try {
       const stations = await loadStations(statIds, key);
       if (stations.length) {
-        const payload = { stations, fetchedAt: new Date().toISOString() };
+        await recordUsageDb(stations);
+        const chgerIds = stations.flatMap(s => s.chargers.map(c => c.chgerId));
+        const usage = await fetchUsageDb(chgerIds);
+        const payload = { stations, fetchedAt: new Date().toISOString(), usage };
         setCache(payload);
         if (stations.length === statIds.length) lastError = null;
         console.log(`[home-charger] warm cache loaded (${stations.length}/${statIds.length} station(s), ${stations.reduce((s,x)=>s+x.chargers.length,0)} chargers)`);
