@@ -23,6 +23,49 @@ const STAT_META = {
   '9': { label: '확인불가', dot: 'bg-zinc-700',    text: 'text-zinc-500',    cellBg: 'bg-zinc-800',       cellText: 'text-zinc-500' },
 };
 
+// ── 사용률 추적 (localStorage) ────────────────────────────────────────────────
+// 구조: { [chgerId]: { h: number[24], t: number } }
+const USAGE_KEY = 'hcc_usage_v1';
+
+function loadUsage() {
+  if (typeof localStorage === 'undefined') return {};
+  try { return JSON.parse(localStorage.getItem(USAGE_KEY) || '{}'); } catch { return {}; }
+}
+
+function recordUsage(stations) {
+  const kstHour = (new Date().getUTCHours() + 9) % 24;
+  const usage = loadUsage();
+  for (const s of stations) {
+    for (const c of s.chargers) {
+      if (c.stat === '3') { // 충전중일 때만 카운트
+        if (!usage[c.chgerId]) usage[c.chgerId] = { h: new Array(24).fill(0), t: 0 };
+        usage[c.chgerId].h[kstHour]++;
+        usage[c.chgerId].t++;
+      }
+    }
+  }
+  try { localStorage.setItem(USAGE_KEY, JSON.stringify(usage)); } catch {}
+  return usage;
+}
+
+// 상위 25% → 'high', 25~50% → 'mid', 나머지 → null
+function computeRanks(usage) {
+  const entries = Object.entries(usage)
+    .map(([id, d]) => ({ id, t: d.t }))
+    .filter(e => e.t > 0)
+    .sort((a, b) => b.t - a.t);
+  if (!entries.length) return new Map();
+  const hi = Math.ceil(entries.length * 0.25);
+  const mi = Math.ceil(entries.length * 0.50);
+  const ranks = new Map();
+  entries.forEach((e, i) => {
+    if (i < hi) ranks.set(e.id, 'high');
+    else if (i < mi) ranks.set(e.id, 'mid');
+  });
+  return ranks;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function timeAgoKo(iso) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -37,18 +80,25 @@ function timeAgoKo(iso) {
   return `${Math.floor(h / 24)}일 전`;
 }
 
-function renderCell(c, size = 'md') {
+function renderCell(c, size = 'md', highlight = null) {
   const meta = STAT_META[c.stat] || STAT_META['9'];
   const localId = ID_OFFSET + Number(c.chgerId);
   const label = localId - 95100;
   const sizeClass = size === 'lg'
     ? 'w-10 h-10 text-sm'
     : 'aspect-square text-[10px]';
+  // 하단 highlight — box-shadow로 border-radius 관계없이 일관되게 표시
+  const shadow = highlight === 'high'
+    ? '0 3px 0 0 rgb(251 191 36 / 0.95)'
+    : highlight === 'mid'
+    ? '0 3px 0 0 rgb(251 191 36 / 0.35)'
+    : undefined;
   return (
     <div
       key={c.chgerId}
       className={`${sizeClass} rounded-md flex items-center justify-center font-bold tabular-nums ${meta.cellBg} ${meta.cellText}`}
-      title={`${localId} · ${meta.label}`}
+      style={shadow ? { boxShadow: shadow } : undefined}
+      title={`${localId} · ${meta.label}${highlight ? ` · 자주 사용(${highlight})` : ''}`}
     >
       {label}
     </div>
@@ -59,7 +109,7 @@ function stationHeader(statId) {
   return `${statId} : ${COMPLEX_NAME}`;
 }
 
-function StationBlock({ station, chargers, withFavorites }) {
+function StationBlock({ station, chargers, withFavorites, ranks }) {
   const byId = new Map(chargers.map(c => [c.chgerId, c]));
   const favChargers = withFavorites
     ? FAVORITE_IDS_ORDERED.map(id => byId.get(id)).filter(Boolean)
@@ -75,6 +125,8 @@ function StationBlock({ station, chargers, withFavorites }) {
   const favLeft  = favChargers.slice(0, 2); // 14, 15
   const favRight = favChargers.slice(2);    // 22, 23
 
+  const hl = (c) => ranks.get(c.chgerId) ?? null;
+
   return (
     <div>
       <div className="text-[11px] text-zinc-500 mb-2">{stationHeader(station.statId)}</div>
@@ -83,33 +135,32 @@ function StationBlock({ station, chargers, withFavorites }) {
           <div className="flex items-center gap-2">
             {/* 108F: 14 15 */}
             <span className="text-[9px] text-zinc-600 mr-0.5">108F</span>
-            {favLeft.map(c => renderCell(c, 'lg'))}
+            {favLeft.map(c => renderCell(c, 'lg', hl(c)))}
             <span className="w-px h-8 bg-white/10 mx-0.5" />
             {/* 107F: 22 23 */}
             <span className="text-[9px] text-zinc-600 mr-0.5">107F</span>
-            {favRight.map(c => renderCell(c, 'lg'))}
+            {favRight.map(c => renderCell(c, 'lg', hl(c)))}
             {/* 102F: 16~21 — 우측 정렬 */}
             <span className="flex-1" />
             <span className="w-px h-8 bg-white/10 mx-0.5" />
             <span className="text-[9px] text-zinc-600 mr-0.5">102F</span>
-            {secondChargers.map(c => renderCell(c, 'lg'))}
+            {secondChargers.map(c => renderCell(c, 'lg', hl(c)))}
           </div>
         )}
         {mainGroup.length > 0 && (() => {
           const loc = STATION_CONFIG[station.statId]?.loc;
           if (!withFavorites && loc) {
-            // loc 레이블 인라인 표시
             const size = mainGroup.length <= 4 ? 'lg' : 'md';
             return (
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[11px] text-zinc-500 shrink-0">{loc}</span>
-                {mainGroup.map(c => renderCell(c, size))}
+                {mainGroup.map(c => renderCell(c, size, hl(c)))}
               </div>
             );
           }
           return (
             <div className="grid gap-1 pt-1" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
-              {mainGroup.map(c => renderCell(c, 'md'))}
+              {mainGroup.map(c => renderCell(c, 'md', hl(c)))}
             </div>
           );
         })()}
@@ -127,6 +178,7 @@ export default function HomeChargerCard() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [tick, setTick] = useState(0);
+  const [ranks, setRanks] = useState(() => computeRanks(loadUsage()));
 
   const load = useCallback(async (force = false) => {
     try {
@@ -134,7 +186,14 @@ export default function HomeChargerCard() {
       const res = await fetch(`/api/home-charger${force ? '?refresh=1' : ''}`);
       const d = await res.json();
       if (d.error) setError(d.error);
-      else { moduleCache = d; setData(d); setError(null); }
+      else {
+        moduleCache = d;
+        setData(d);
+        setError(null);
+        // 사용률 기록 및 랭크 갱신
+        const usage = recordUsage(d.stations || []);
+        setRanks(computeRanks(usage));
+      }
     } catch (e) {
       setError(e.message || '조회 실패');
     } finally {
@@ -229,7 +288,12 @@ export default function HomeChargerCard() {
       <div className="px-4 py-3 space-y-4">
         {stations.map((s, i) => (
           <div key={s.station.statId} className={i > 0 ? 'pt-3 border-t border-white/[0.04]' : ''}>
-            <StationBlock station={s.station} chargers={s.chargers} withFavorites={i === 0} />
+            <StationBlock
+              station={s.station}
+              chargers={s.chargers}
+              withFavorites={i === 0}
+              ranks={ranks}
+            />
           </div>
         ))}
       </div>
