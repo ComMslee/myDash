@@ -35,9 +35,9 @@ function peakHourOf(hourly) {
 }
 
 // P3 참고 섹션 — 셀 포맷은 P1/P2와 완전 동일, flex-wrap으로 자연 줄바꿈
-export function MiniGrid({ chargers, statId, ranks, usage, now }) {
+export function MiniGrid({ chargers, statId, ranks, usage, now, className = '' }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className={`flex flex-wrap gap-1.5 ${className}`}>
       {chargers.map(c => {
         const u = usage[`${statId}_${c.chgerId}`];
         return (
