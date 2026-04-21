@@ -80,11 +80,14 @@ function elapsedLabel(c, now) {
   return `${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`;
 }
 
-// Y안 타일 셀 — 번호(큼) + 신호등 + 경과시간(충전중만)
-function TileCell({ c, highlight, count, now }) {
+// 통일 셀 — 색 배경 + 번호, 하단에 경과 시간(충전중만), 랭크 링
+function UnifiedCell({ c, highlight, count, now, size = 'md' }) {
   const meta = STAT_META[c.stat] || STAT_META['9'];
   const localId = ID_OFFSET + Number(c.chgerId);
   const label = localId - 95100;
+  const sizeClass = size === 'lg'
+    ? 'w-10 h-10 text-sm'
+    : 'aspect-square text-[10px]';
   const ringClass = highlight === 'high'
     ? 'ring-1 ring-amber-400'
     : highlight === 'mid'
@@ -96,12 +99,13 @@ function TileCell({ c, highlight, count, now }) {
   if (count > 0) titleParts.push(`사용 ${count}회`);
   if (highlight) titleParts.push(highlight === 'high' ? '자주 사용' : '가끔 사용');
   return (
-    <div
-      className={`flex flex-col items-center justify-start gap-1 px-1.5 py-1.5 rounded-md min-w-[2.25rem] ${ringClass}`}
-      title={titleParts.join(' · ')}
-    >
-      <div className="text-sm font-bold tabular-nums text-zinc-100 leading-none">{label}</div>
-      <div className={`w-2.5 h-2.5 rounded-full ${meta.dot}`} />
+    <div className="flex flex-col items-center gap-0.5 min-w-0">
+      <div
+        className={`${sizeClass} rounded-md flex items-center justify-center font-bold tabular-nums ${meta.cellBg} ${meta.cellText} ${ringClass}`}
+        title={titleParts.join(' · ')}
+      >
+        {label}
+      </div>
       <div className={`text-[9px] tabular-nums leading-none min-h-[10px] ${meta.text}`}>
         {elapsed}
       </div>
@@ -109,38 +113,24 @@ function TileCell({ c, highlight, count, now }) {
   );
 }
 
-function TileBox({ title, chargers, ranks, usage, statId, now, compact = false }) {
+function TileBox({ title, chargers, ranks, usage, statId, now }) {
   if (!chargers.length) return null;
   const keyOf = (c) => `${statId}_${c.chgerId}`;
   return (
-    <div className={`flex-1 min-w-0 bg-[#1a1a1c] border border-white/[0.06] rounded-lg ${compact ? 'p-1.5' : 'p-2'}`}>
+    <div className="flex-1 min-w-0 bg-[#1a1a1c] border border-white/[0.06] rounded-lg p-2">
       <div className="text-[10px] text-zinc-400 mb-1.5 font-medium text-center">{title}</div>
       <div className="flex justify-center items-start flex-wrap gap-1.5">
         {chargers.map(c => (
-          <TileCell
+          <UnifiedCell
             key={c.chgerId}
             c={c}
             highlight={ranks.get(keyOf(c)) ?? null}
             count={usage[keyOf(c)]?.t ?? 0}
             now={now}
+            size="lg"
           />
         ))}
       </div>
-    </div>
-  );
-}
-
-// P3 참고용 mini 셀 (작은 네모)
-function MiniCell({ c }) {
-  const meta = STAT_META[c.stat] || STAT_META['9'];
-  const localId = ID_OFFSET + Number(c.chgerId);
-  const label = localId - 95100;
-  return (
-    <div
-      className={`aspect-square rounded text-[10px] flex items-center justify-center font-bold tabular-nums ${meta.cellBg} ${meta.cellText}`}
-      title={`${localId} · ${meta.label}`}
-    >
-      {label}
     </div>
   );
 }
@@ -326,7 +316,15 @@ export default function HomeChargerCard() {
                   <div>
                     <div className="text-[10px] text-zinc-500 mb-1">PI795111 · 기타 {mainLeftover.length}대</div>
                     <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
-                      {mainLeftover.map(c => <MiniCell key={c.chgerId} c={c} />)}
+                      {mainLeftover.map(c => (
+                        <UnifiedCell
+                          key={c.chgerId}
+                          c={c}
+                          highlight={ranks.get(`PI795111_${c.chgerId}`) ?? null}
+                          count={usage[`PI795111_${c.chgerId}`]?.t ?? 0}
+                          now={now}
+                        />
+                      ))}
                     </div>
                   </div>
                 )}
@@ -336,7 +334,15 @@ export default function HomeChargerCard() {
                       {STATION_CONFIG[s.station.statId]?.label || s.station.statId} · {s.chargers.length}대
                     </div>
                     <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
-                      {s.chargers.map(c => <MiniCell key={c.chgerId} c={c} />)}
+                      {s.chargers.map(c => (
+                        <UnifiedCell
+                          key={c.chgerId}
+                          c={c}
+                          highlight={ranks.get(`${s.station.statId}_${c.chgerId}`) ?? null}
+                          count={usage[`${s.station.statId}_${c.chgerId}`]?.t ?? 0}
+                          now={now}
+                        />
+                      ))}
                     </div>
                   </div>
                 ))}
