@@ -135,36 +135,36 @@ export default function FleetStatsPopup({ onClose }) {
                 </div>
               ) : (
                 <>
-                  {/* Top 5 — 전체 기간 누적 */}
-                  <div>
-                    <div className="text-[11px] text-zinc-400 mb-1.5">🏆 가장 많이 쓰는 충전기 Top 5 <span className="text-zinc-600">· 전체 기간</span></div>
-                    <div className="space-y-1">
-                      {topN.map((e, i) => (
-                        <RankRow
-                          key={e.key}
-                          icon={['🥇', '🥈', '🥉', '4', '5'][i]}
-                          label={formatEntry(e.key)}
-                          count={e.count}
-                          max={topMax}
-                          isPeak={i === 0}
-                        />
-                      ))}
+                  {/* Top / Bottom — 2열 그리드 (전체 기간 누적) */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-[11px] text-zinc-400 mb-1.5">🏆 Top 5</div>
+                      <div className="space-y-0.5">
+                        {topN.map((e, i) => (
+                          <RankRow
+                            key={e.key}
+                            icon={['🥇', '🥈', '🥉', '4', '5'][i]}
+                            label={formatEntry(e.key)}
+                            count={e.count}
+                            max={topMax}
+                            isPeak={i === 0}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Bottom 5 — 전체 기간 누적 */}
-                  <div>
-                    <div className="text-[11px] text-zinc-400 mb-1.5">🐢 가장 적게 쓰는 충전기 Bottom 5 <span className="text-zinc-600">· 전체 기간</span></div>
-                    <div className="space-y-1">
-                      {bottomN.map((e) => (
-                        <RankRow
-                          key={e.key}
-                          icon="·"
-                          label={formatEntry(e.key)}
-                          count={e.count}
-                          max={bottomMax}
-                        />
-                      ))}
+                    <div>
+                      <div className="text-[11px] text-zinc-400 mb-1.5">🐢 Bottom 5</div>
+                      <div className="space-y-0.5">
+                        {bottomN.map((e) => (
+                          <RankRow
+                            key={e.key}
+                            icon="·"
+                            label={formatEntry(e.key)}
+                            count={e.count}
+                            max={bottomMax}
+                          />
+                        ))}
+                      </div>
                     </div>
                   </div>
 
