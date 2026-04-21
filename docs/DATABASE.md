@@ -18,7 +18,26 @@ TeslaMate가 관리하는 PostgreSQL 16 스키마. 직접 쿼리만 사용 (ORM 
 
 | 테이블 | 용도 | 생성 위치 |
 |--------|------|-----------|
-| `charger_usage` | 집충전기 시간대별 사용 카운트 `(stat_id, chger_id, hour)` | `lib/home-charger-cache.js::ensureTable()` |
+| `charger_usage` | 집충전기 시간대별 사용 카운트 `(stat_id, chger_id, hour)` · 컨테이너 재시작 간 보존(DROP 금지) · 30분당 최대 1회 증가(시간당 최대 1회) | `lib/home-charger-cache.js::ensureTable()` |
+| `home_charger_snapshot` | 환경공단 API 응답 스냅샷 `(cache_key, payload JSONB, fetched_at)` · 컨테이너 재시작 직후 콜드 스타트 캐시 복원용 | `lib/home-charger-cache.js::ensureTable()` |
+
+### `charger_usage` 스키마
+
+| 컬럼 | 타입 | 비고 |
+|------|------|------|
+| `stat_id` | `VARCHAR(20) NOT NULL` | 환경공단 스테이션 ID (PK) |
+| `chger_id` | `VARCHAR(20) NOT NULL` | 충전기 ID (PK) |
+| `hour` | `SMALLINT NOT NULL` | KST 0~23 (PK) |
+| `count` | `INTEGER NOT NULL DEFAULT 0` | 누적 사용 횟수 |
+| `updated_at` | `TIMESTAMPTZ NOT NULL DEFAULT NOW()` | 마지막 증가 시각 (30분 쿨다운 판정용) |
+
+### `home_charger_snapshot` 스키마
+
+| 컬럼 | 타입 | 비고 |
+|------|------|------|
+| `cache_key` | `VARCHAR(20) PRIMARY KEY` | 현재 `'main'` 단일 키 |
+| `payload` | `JSONB NOT NULL` | API 응답 정규화 결과 |
+| `fetched_at` | `TIMESTAMPTZ NOT NULL` | 원본 fetch 시각 |
 
 ## 환경 변수
 
