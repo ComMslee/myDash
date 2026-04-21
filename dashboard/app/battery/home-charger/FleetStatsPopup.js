@@ -43,6 +43,13 @@ export default function FleetStatsPopup({ onClose }) {
   const topMax = topN[0]?.count || 1;
   const bottomMax = bottomN[0]?.count || 1;
 
+  // 팝업 열렸을 때 body 스크롤 잠금 (모바일에서 백드롭 스크롤 체이닝 방지)
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
@@ -51,10 +58,10 @@ export default function FleetStatsPopup({ onClose }) {
       aria-modal="true"
     >
       <div
-        className="w-full sm:max-w-lg bg-[#161618] border-t sm:border sm:rounded-2xl border-white/[0.08] rounded-t-2xl max-h-[90vh] overflow-y-auto"
+        className="w-full sm:max-w-lg bg-[#161618] border-t sm:border sm:rounded-2xl border-white/[0.08] rounded-t-2xl h-[90vh] sm:h-auto sm:max-h-[90vh] flex flex-col overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-[#161618] border-b border-white/[0.06] px-4 py-3 flex items-center justify-between">
+        <div className="shrink-0 bg-[#161618] border-b border-white/[0.06] px-4 py-3 flex items-center justify-between">
           <h3 className="text-sm font-bold text-zinc-200">집충전기 상세 현황</h3>
           <button
             type="button"
@@ -66,7 +73,7 @@ export default function FleetStatsPopup({ onClose }) {
           </button>
         </div>
 
-        <div className="px-4 py-3 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3 space-y-4">
           {/* 기간 슬라이더 */}
           <div>
             <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
@@ -107,6 +114,15 @@ export default function FleetStatsPopup({ onClose }) {
                 <div className="flex items-center justify-between tabular-nums mt-1">
                   <span className="text-zinc-500">집계 일수</span>
                   <span className="text-zinc-400">{data.daysCovered}일</span>
+                </div>
+                <div className="flex items-center justify-between tabular-nums mt-1">
+                  <span className="text-zinc-500">일 평균</span>
+                  <span className="text-zinc-400">
+                    {data.daysCovered > 0 ? (data.total / data.daysCovered).toFixed(1) : '-'}회/일
+                  </span>
+                </div>
+                <div className="text-[10px] text-zinc-600 mt-1.5 leading-snug">
+                  * 카운트 = 충전중 상태로 관측된 30분 버킷 수 (시간당 최대 2)
                 </div>
               </div>
 
