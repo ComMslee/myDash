@@ -40,8 +40,9 @@ export default function FleetStatsPopup({ onClose }) {
 
   const topN = (data?.perCharger || []).slice(0, 5);
   const bottomN = (data?.perCharger || []).slice(-5).reverse();
+  // Top은 내림차순이라 [0]이 최대, Bottom은 오름차순이라 마지막이 그룹 내 최대
   const topMax = topN[0]?.count || 1;
-  const bottomMax = bottomN[0]?.count || 1;
+  const bottomMax = bottomN.length ? bottomN[bottomN.length - 1].count : 1;
 
   // 팝업 열렸을 때 body 스크롤 잠금 (모바일에서 백드롭 스크롤 체이닝 방지)
   useEffect(() => {
