@@ -53,13 +53,13 @@ export default function FleetStatsPopup({ onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/60 backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="w-full sm:max-w-lg bg-[#161618] border-t sm:border sm:rounded-2xl border-white/[0.08] rounded-t-2xl max-h-[70dvh] sm:max-h-[75vh] overflow-y-auto overscroll-contain"
+        className="w-full sm:max-w-lg bg-[#161618] border border-white/[0.08] rounded-2xl max-h-[75dvh] sm:max-h-[75vh] overflow-y-auto overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 z-10 bg-[#161618] border-b border-white/[0.06] px-4 py-1.5 flex items-center justify-between">
