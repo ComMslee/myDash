@@ -11,23 +11,22 @@ export function Bar({ value, max, className = '' }) {
   );
 }
 
-// Top/Bottom 순위 행 — 주행 탭 패턴과 통일된 오파시티 막대 스타일
-// [아이콘][라벨][오파시티 막대][카운트]
+// Top/Bottom 순위 행 — 2열 그리드 컴팩트 버전
+// [좌측 강도 스트립][아이콘][라벨][카운트]
+// 강도는 4px 두께 세로 바의 오파시티로 표현 (시간/요일 차트와 동일 색상 규칙)
 export function RankRow({ icon, label, count, max, isPeak = false }) {
   const ratio = max > 0 ? count / max : 0;
+  const color = isPeak ? '#f59e0b' : '#3b82f6';
   return (
-    <div className="grid grid-cols-[1.75rem_4rem_1fr_2.5rem] items-center gap-1.5 text-[11px] tabular-nums">
-      <span className="text-zinc-500 text-center">{icon}</span>
-      <span className="text-zinc-200">{label}</span>
+    <div className="flex items-center gap-1.5 text-[10px] tabular-nums h-5">
       <div
-        className="w-full h-3 rounded-[3px]"
-        style={{
-          background: isPeak ? '#f59e0b' : '#3b82f6',
-          opacity: count === 0 ? 0.08 : 0.18 + ratio * 0.82,
-        }}
+        className="w-1 self-stretch rounded-full shrink-0"
+        style={{ background: color, opacity: count === 0 ? 0.1 : 0.2 + ratio * 0.8 }}
         title={`${label}: ${count}회`}
       />
-      <span className={`text-right ${isPeak ? 'text-amber-400 font-semibold' : 'text-zinc-400'}`}>{count}</span>
+      <span className="text-zinc-500 w-4 text-center shrink-0">{icon}</span>
+      <span className="text-zinc-200 flex-1 truncate">{label}</span>
+      <span className={isPeak ? 'text-amber-400 font-semibold' : 'text-zinc-400'}>{count}</span>
     </div>
   );
 }
