@@ -274,10 +274,9 @@ let tableReady = false;
 
 async function ensureTable() {
   if (tableReady) return;
-  // stat_id 없는 구버전 테이블 교체 (방금 생성된 빈 테이블이므로 DROP 무해)
-  await pool.query(`DROP TABLE IF EXISTS charger_usage`);
+  // 컨테이너 재시작(배포)마다 카운트 보존 — DROP 금지, IF NOT EXISTS로만 생성
   await pool.query(`
-    CREATE TABLE charger_usage (
+    CREATE TABLE IF NOT EXISTS charger_usage (
       stat_id    VARCHAR(20) NOT NULL,
       chger_id   VARCHAR(20) NOT NULL,
       hour       SMALLINT    NOT NULL,
