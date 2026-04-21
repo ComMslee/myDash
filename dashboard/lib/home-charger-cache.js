@@ -361,6 +361,46 @@ export async function fetchPollLogDb(date) {
   }
 }
 
+// 일별 집계 — 최근 N일 (기본 14일)
+export async function fetchPollLogDailyDb(days = 14) {
+  try {
+    await ensureTable();
+    const clampDays = Math.max(1, Math.min(90, Math.floor(Number(days) || 14)));
+    const res = await pool.query(
+      `SELECT to_char(date, 'YYYY-MM-DD') AS date_str,
+              SUM(attempts)::int   AS attempts,
+              SUM(successes)::int  AS successes,
+              SUM(partial)::int    AS partial,
+              SUM(retries)::int    AS retries,
+              SUM(quota_hits)::int AS quota_hits
+         FROM home_charger_poll_log
+        WHERE date >= (((NOW() AT TIME ZONE 'Asia/Seoul')::date) - ($1::int * INTERVAL '1 day'))::date
+        GROUP BY date
+        ORDER BY date DESC`,
+      [clampDays]
+    );
+    const daily = res.rows.map(r => ({
+      date: r.date_str,
+      attempts: Number(r.attempts),
+      successes: Number(r.successes),
+      partial: Number(r.partial),
+      retries: Number(r.retries),
+      quotaHits: Number(r.quota_hits),
+    }));
+    const totals = daily.reduce((a, r) => ({
+      attempts: a.attempts + r.attempts,
+      successes: a.successes + r.successes,
+      partial: a.partial + r.partial,
+      retries: a.retries + r.retries,
+      quotaHits: a.quotaHits + r.quotaHits,
+    }), { attempts: 0, successes: 0, partial: 0, retries: 0, quotaHits: 0 });
+    return { days: clampDays, daily, totals };
+  } catch (e) {
+    console.warn('[home-charger] poll log daily fetch failed:', e.message);
+    return { days: 0, daily: [], totals: {} };
+  }
+}
+
 let tableReady = false;
 
 async function ensureTable() {
