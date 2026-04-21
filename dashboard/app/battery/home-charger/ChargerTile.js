@@ -67,9 +67,9 @@ export function UnifiedCell({ c, highlight, count, hourly, now, size = 'md' }) {
     ? 'w-10 h-10 text-sm'
     : 'aspect-square text-[10px]';
   const ringClass = highlight === 'high'
-    ? 'ring-1 ring-amber-400'
+    ? 'ring-2 ring-amber-300 shadow-[0_0_6px_rgba(252,211,77,0.6)]'
     : highlight === 'mid'
-    ? 'ring-1 ring-amber-400/40'
+    ? 'ring-2 ring-amber-500/70'
     : '';
   const elapsed = elapsedLabel(c, now);
   const isCharging = c.stat === '3';
