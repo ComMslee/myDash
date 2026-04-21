@@ -129,14 +129,15 @@ export default function HomeChargerCard() {
         <span className="text-zinc-400">총 {allChargers.length}기</span>
         <StatusBadges counts={counts} />
         <span className="ml-auto flex items-center gap-1.5 text-zinc-500">
-          {fetchedAt && (
-            <span
-              className="cursor-help"
-              title={ttlInfo ? buildTtlTooltip(ttlInfo) : '갱신 시각'}
-            >
-              {timeAgoKo(fetchedAt)}
-            </span>
-          )}
+          <button
+            type="button"
+            onClick={() => setShowPollLog(true)}
+            aria-label="폴링 로그"
+            title="폴링 로그"
+            className="h-7 px-1.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.12] flex items-center gap-1 text-zinc-400 hover:text-zinc-200 text-[10px] font-medium"
+          >
+            로그
+          </button>
           <button
             type="button"
             onClick={() => setShowFleetStats(true)}
@@ -159,15 +160,14 @@ export default function HomeChargerCard() {
             </svg>
             <span>상세</span>
           </button>
-          <button
-            type="button"
-            onClick={() => setShowPollLog(true)}
-            aria-label="폴링 로그"
-            title="폴링 로그"
-            className="h-7 px-1.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.12] flex items-center gap-1 text-zinc-400 hover:text-zinc-200 text-[10px] font-medium"
-          >
-            로그
-          </button>
+          {fetchedAt && (
+            <span
+              className="cursor-help"
+              title={ttlInfo ? buildTtlTooltip(ttlInfo) : '갱신 시각'}
+            >
+              {timeAgoKo(fetchedAt)}
+            </span>
+          )}
           <button
             type="button"
             onClick={() => load(true)}
