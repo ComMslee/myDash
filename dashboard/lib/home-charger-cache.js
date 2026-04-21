@@ -285,9 +285,14 @@ async function ensureTable() {
       PRIMARY KEY (stat_id, chger_id, hour)
     )
   `);
+  // 과거 구버전 스키마에서 업그레이드 — 컬럼 누락 시 ALTER로 보강 (DROP 금지)
+  await pool.query(`ALTER TABLE charger_usage ADD COLUMN IF NOT EXISTS stat_id VARCHAR(20) NOT NULL DEFAULT 'PI795111'`);
+  await pool.query(`ALTER TABLE charger_usage ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   tableReady = true;
 }
 
+// 시간당 최대 1회 증가 — 같은 (stat_id, chger_id, hour) 버킷은 하루에 1번만 +1
+// 같은 버킷을 같은 KST 날짜에 이미 업데이트했으면 스킵, 날짜가 다르면 증가
 export async function recordUsageDb(stations) {
   try {
     await ensureTable();
@@ -301,8 +306,11 @@ export async function recordUsageDb(stations) {
     await pool.query(
       `INSERT INTO charger_usage (stat_id, chger_id, hour, count)
        SELECT unnest($1::text[]), unnest($2::text[]), $3::smallint, 1
-       ON CONFLICT (stat_id, chger_id, hour)
-       DO UPDATE SET count = charger_usage.count + 1, updated_at = NOW()`,
+       ON CONFLICT (stat_id, chger_id, hour) DO UPDATE
+         SET count = charger_usage.count + 1,
+             updated_at = NOW()
+         WHERE (charger_usage.updated_at + INTERVAL '9 hours')::date
+             <> (NOW() + INTERVAL '9 hours')::date`,
       [statIds, chgerIds, kstHour]
     );
   } catch (e) {
