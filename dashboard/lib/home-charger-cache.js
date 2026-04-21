@@ -119,7 +119,11 @@ async function refreshDynamicTtls() {
 }
 
 export function getCache() { return cache; }
-export function setCache(data) { cache = { ts: Date.now(), data }; }
+export function setCache(data) {
+  cache = { ts: Date.now(), data };
+  // DB 스냅샷 저장 (fire-and-forget)
+  saveSnapshotToDb(data).catch(() => {});
+}
 export function isFresh() { return !!cache.data && Date.now() - cache.ts < cacheTtlMs(); }
 export function getLastError() { return lastError; }
 
@@ -288,7 +292,60 @@ async function ensureTable() {
   // 과거 구버전 스키마에서 업그레이드 — 컬럼 누락 시 ALTER로 보강 (DROP 금지)
   await pool.query(`ALTER TABLE charger_usage ADD COLUMN IF NOT EXISTS stat_id VARCHAR(20) NOT NULL DEFAULT 'PI795111'`);
   await pool.query(`ALTER TABLE charger_usage ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  // 환경공단 API 응답 스냅샷 — 컨테이너 재시작 간 캐시 영속화
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS home_charger_snapshot (
+      cache_key  VARCHAR(20) PRIMARY KEY,
+      payload    JSONB       NOT NULL,
+      fetched_at TIMESTAMPTZ NOT NULL
+    )
+  `);
   tableReady = true;
+}
+
+const SNAPSHOT_KEY = 'main';
+
+async function saveSnapshotToDb(payload) {
+  try {
+    await ensureTable();
+    await pool.query(
+      `INSERT INTO home_charger_snapshot (cache_key, payload, fetched_at)
+       VALUES ($1, $2::jsonb, NOW())
+       ON CONFLICT (cache_key) DO UPDATE
+         SET payload = EXCLUDED.payload, fetched_at = EXCLUDED.fetched_at`,
+      [SNAPSHOT_KEY, JSON.stringify(payload)]
+    );
+  } catch (e) {
+    console.warn('[home-charger] snapshot save failed:', e.message);
+  }
+}
+
+async function loadSnapshotFromDb() {
+  try {
+    await ensureTable();
+    const res = await pool.query(
+      `SELECT payload, fetched_at FROM home_charger_snapshot WHERE cache_key = $1`,
+      [SNAPSHOT_KEY]
+    );
+    if (!res.rows.length) return null;
+    return { data: res.rows[0].payload, ts: new Date(res.rows[0].fetched_at).getTime() };
+  } catch (e) {
+    console.warn('[home-charger] snapshot load failed:', e.message);
+    return null;
+  }
+}
+
+// 컨테이너 기동 직후 DB에 저장된 마지막 스냅샷을 메모리 캐시로 복원 (1회)
+let bootstrapDone = false;
+export async function bootstrapCacheFromDb() {
+  if (bootstrapDone) return;
+  bootstrapDone = true;
+  if (cache.data) return; // 이미 메모리에 있으면 스킵
+  const snap = await loadSnapshotFromDb();
+  if (snap?.data) {
+    cache = snap;
+    console.log(`[home-charger] restored snapshot from DB (age ${Math.round((Date.now() - snap.ts) / 1000)}s)`);
+  }
 }
 
 // 시간당 최대 1회 증가 — 같은 (stat_id, chger_id, hour) 버킷은 하루에 1번만 +1
@@ -364,6 +421,8 @@ export async function loadStations(statIds, key) {
 export async function warmIfNeeded() {
   const key = process.env.EV_CHARGER_API_KEY;
   if (!key) return null;
+  // 최초 호출 시 DB 스냅샷 복원 (컨테이너 재시작 직후 마지막 상태 즉시 노출)
+  await bootstrapCacheFromDb();
   const statIds = getStatIds();
   if (isFresh()) return cache.data;
   if (isQuotaCooldown()) return cache.data; // 쿼터 초과 중엔 호출 억제, 기존 캐시만 사용
