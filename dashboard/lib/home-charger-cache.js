@@ -401,17 +401,28 @@ export async function recordUsageDb(stations) {
   }
 }
 
-// 단지 전체 집계 — 기간 필터(월) 및 선택 충전기 세트
-// 반환: { hourly: number[24], dow: number[7], perCharger: {key, count}[], total, daysCovered }
+// 단지 전체 집계
+// - 시간대/요일 히스토그램 · 집계 일수 · 기간 총합: charger_usage_daily (기간 필터)
+// - 충전기 순위(perCharger): charger_usage (전체 기간 누적 — 메인 카드와 동일 기준)
+// 반환: { hourly[24], dow[7], perCharger[], total(기간), daysCovered, allTimeTotal, months }
 export async function fetchFleetStatsDb(statIds, months) {
+  const clampMonths = Math.max(1, Math.min(12, Math.floor(Number(months) || 3)));
+  const empty = {
+    hourly: Array(24).fill(0),
+    dow: Array(7).fill(0),
+    perCharger: [],
+    total: 0,
+    daysCovered: 0,
+    allTimeTotal: 0,
+    months: clampMonths,
+  };
   try {
     await ensureTable();
-    if (!statIds.length) {
-      return { hourly: Array(24).fill(0), dow: Array(7).fill(0), perCharger: [], total: 0, daysCovered: 0 };
-    }
-    const clampMonths = Math.max(1, Math.min(12, Math.floor(Number(months) || 3)));
-    const res = await pool.query(
-      `SELECT stat_id, chger_id, to_char(date, 'YYYY-MM-DD') AS date_str, hour, count
+    if (!statIds.length) return empty;
+
+    // 1) 기간 스코프 (일별 테이블) — 시간대/요일
+    const dailyRes = await pool.query(
+      `SELECT to_char(date, 'YYYY-MM-DD') AS date_str, hour, count
          FROM charger_usage_daily
         WHERE stat_id = ANY($1)
           AND date >= (((NOW() AT TIME ZONE 'Asia/Seoul')::date) - ($2::int * INTERVAL '1 month'))::date
@@ -420,28 +431,45 @@ export async function fetchFleetStatsDb(statIds, months) {
     );
     const hourly = new Array(24).fill(0);
     const dow = new Array(7).fill(0);
-    const perMap = new Map(); // key: `${stat}_${chger}` → count
     const dateSet = new Set();
-    for (const row of res.rows) {
+    let periodTotal = 0;
+    for (const row of dailyRes.rows) {
       const c = Number(row.count);
+      periodTotal += c;
       hourly[row.hour] += c;
-      // to_char 결과는 'YYYY-MM-DD' 문자열 — tz 혼선 방지
       const [y, m, d] = row.date_str.split('-').map(Number);
-      // UTC 자정 기준 요일 — 실제 KST 해당일 요일과 동일
       const dowIdx = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
       dow[dowIdx] += c;
-      const key = `${row.stat_id}_${row.chger_id}`;
-      perMap.set(key, (perMap.get(key) || 0) + c);
       dateSet.add(row.date_str);
     }
-    const perCharger = [...perMap.entries()]
-      .map(([key, count]) => ({ key, count }))
-      .sort((a, b) => b.count - a.count);
-    const total = perCharger.reduce((s, e) => s + e.count, 0);
-    return { hourly, dow, perCharger, total, daysCovered: dateSet.size, months: clampMonths };
+
+    // 2) 전체 누적 (기존 시간 버킷 테이블) — Top/Bottom 순위
+    const rankRes = await pool.query(
+      `SELECT stat_id, chger_id, SUM(count)::bigint AS total
+         FROM charger_usage
+        WHERE stat_id = ANY($1)
+        GROUP BY stat_id, chger_id
+        ORDER BY total DESC`,
+      [statIds]
+    );
+    const perCharger = rankRes.rows.map(r => ({
+      key: `${r.stat_id}_${r.chger_id}`,
+      count: Number(r.total),
+    }));
+    const allTimeTotal = perCharger.reduce((s, e) => s + e.count, 0);
+
+    return {
+      hourly,
+      dow,
+      perCharger,
+      total: periodTotal,
+      daysCovered: dateSet.size,
+      allTimeTotal,
+      months: clampMonths,
+    };
   } catch (e) {
     console.warn('[home-charger] fleet stats failed:', e.message);
-    return { hourly: Array(24).fill(0), dow: Array(7).fill(0), perCharger: [], total: 0, daysCovered: 0, months: Math.max(1, Math.min(12, Math.floor(Number(months) || 3))) };
+    return empty;
   }
 }
 
