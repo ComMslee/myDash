@@ -3,19 +3,21 @@ import { useState, useEffect, useCallback } from 'react';
 
 const ID_OFFSET = 95110; // chgerId + 95110 = 차지비 앱 ID
 // P1 (1순위): 108동 앞 · 107동 앞
-const FAVORITE_IDS_ORDERED = ['04', '05', '12', '13']; // 앱 번호 14, 15, 22, 23
-const FAVORITE_IDS = new Set(FAVORITE_IDS_ORDERED);
+const P1_108_IDS = ['04', '05'];                             // 앱 번호 14, 15
+const P1_107_IDS = ['12', '13'];                             // 앱 번호 22, 23
 // P2 (2순위): 102동 앞 · 104동 앞
-const SECOND_LINE_IDS_ORDERED = ['06', '07', '08', '09', '10', '11']; // 102F 앱 번호 16~21
-const SECOND_LINE_IDS = new Set(SECOND_LINE_IDS_ORDERED);
-const THIRD_LINE_IDS_ORDERED = ['14', '15', '16']; // 104F 앱 번호 24, 25, 26
-const THIRD_LINE_IDS = new Set(THIRD_LINE_IDS_ORDERED);
+const P2_102_IDS = ['06', '07', '08', '09', '10', '11'];     // 앱 번호 16~21
+const P2_104_IDS = ['14', '15', '16'];                       // 앱 번호 24, 25, 26
+
+const PRIORITY_IDS = new Set([
+  ...P1_108_IDS, ...P1_107_IDS, ...P2_102_IDS, ...P2_104_IDS,
+]);
 
 const COMPLEX_NAME = '망포늘푸른벽산아파트';
 const STATION_CONFIG = {
-  'PI795111': { loc: null },
-  'PI313299': { loc: '115 B1' },
-  'PIH01089': { loc: '119F' },
+  'PI795111': { loc: null,      label: 'PI795111' },
+  'PI313299': { loc: '115 B1',  label: '115동 B1' },
+  'PIH01089': { loc: '119F',    label: '119동 앞' },
 };
 
 const STAT_META = {
@@ -27,8 +29,7 @@ const STAT_META = {
   '9': { label: '확인불가', dot: 'bg-zinc-700',    text: 'text-zinc-500',    cellBg: 'bg-zinc-800',       cellText: 'text-zinc-500' },
 };
 
-// 상위 25% → 'high', 25~50% → 'mid', 나머지 → null
-// 동점(같은 count)은 항상 같은 등급으로 묶는다.
+// 상위 25% → 'high', 25~50% → 'mid', 나머지 → null (동점은 같은 등급)
 function computeRanks(usage) {
   const entries = Object.entries(usage)
     .map(([id, d]) => ({ id, t: d.t }))
@@ -46,7 +47,6 @@ function computeRanks(usage) {
   }
   return ranks;
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
 function timeAgoKo(iso) {
   if (!iso) return '';
@@ -62,113 +62,85 @@ function timeAgoKo(iso) {
   return `${Math.floor(h / 24)}일 전`;
 }
 
-function renderCell(c, size = 'md', highlight = null, count = 0) {
+// "YYYYMMDDHHMMSS" (KST) → ms (UTC)
+function parseKstDt(s) {
+  if (!s || s.length < 14) return null;
+  const y = +s.slice(0,4), mo = +s.slice(4,6)-1, d = +s.slice(6,8);
+  const h = +s.slice(8,10), mi = +s.slice(10,12), se = +s.slice(12,14);
+  if (Number.isNaN(y) || Number.isNaN(mo) || Number.isNaN(d)) return null;
+  return Date.UTC(y, mo, d, h - 9, mi, se);
+}
+
+function elapsedLabel(c, now) {
+  if (c.stat !== '3') return '';
+  const startMs = parseKstDt(c.lastTsdt || c.statUpdDt);
+  if (!startMs) return '';
+  const m = Math.max(0, Math.floor((now - startMs) / 60000));
+  if (m < 60) return `${m}m`;
+  return `${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`;
+}
+
+// Y안 타일 셀 — 번호(큼) + 신호등 + 경과시간(충전중만)
+function TileCell({ c, highlight, count, now }) {
   const meta = STAT_META[c.stat] || STAT_META['9'];
   const localId = ID_OFFSET + Number(c.chgerId);
   const label = localId - 95100;
-  const sizeClass = size === 'lg'
-    ? 'w-10 h-10 text-sm'
-    : 'aspect-square text-[10px]';
   const ringClass = highlight === 'high'
-    ? 'ring-2 ring-amber-400 ring-offset-1 ring-offset-[#161618]'
+    ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-[#1a1a1c]'
     : highlight === 'mid'
-    ? 'ring-1 ring-amber-400/50 ring-offset-1 ring-offset-[#161618]'
+    ? 'ring-1 ring-amber-400/40 ring-offset-2 ring-offset-[#1a1a1c]'
     : '';
+  const elapsed = elapsedLabel(c, now);
   const titleParts = [`${localId} · ${meta.label}`];
+  if (elapsed) titleParts.push(`${elapsed} 경과`);
   if (count > 0) titleParts.push(`사용 ${count}회`);
-  if (highlight) titleParts.push(highlight === 'high' ? '자주 사용 (상위 25%)' : '가끔 사용 (상위 50%)');
+  if (highlight) titleParts.push(highlight === 'high' ? '자주 사용' : '가끔 사용');
   return (
     <div
-      key={c.chgerId}
-      className={`${sizeClass} rounded-md flex items-center justify-center font-bold tabular-nums ${meta.cellBg} ${meta.cellText} ${ringClass}`}
+      className={`flex flex-col items-center justify-start gap-1 px-1.5 py-1.5 rounded-md min-w-[2.25rem] ${ringClass}`}
       title={titleParts.join(' · ')}
     >
-      {label}
+      <div className="text-sm font-bold tabular-nums text-zinc-100 leading-none">{label}</div>
+      <div className={`w-2.5 h-2.5 rounded-full ${meta.dot}`} />
+      <div className={`text-[9px] tabular-nums leading-none min-h-[10px] ${meta.text}`}>
+        {elapsed}
+      </div>
     </div>
   );
 }
 
-function stationHeader(statId) {
-  return `${statId} : ${COMPLEX_NAME}`;
+function TileBox({ title, chargers, ranks, usage, statId, now, compact = false }) {
+  if (!chargers.length) return null;
+  const keyOf = (c) => `${statId}_${c.chgerId}`;
+  return (
+    <div className={`flex-1 min-w-0 bg-[#1a1a1c] border border-white/[0.06] rounded-lg ${compact ? 'p-1.5' : 'p-2'}`}>
+      <div className="text-[10px] text-zinc-400 mb-1.5 font-medium text-center">{title}</div>
+      <div className="flex justify-center items-start flex-wrap gap-0.5">
+        {chargers.map(c => (
+          <TileCell
+            key={c.chgerId}
+            c={c}
+            highlight={ranks.get(keyOf(c)) ?? null}
+            count={usage[keyOf(c)]?.t ?? 0}
+            now={now}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
-function StationBlock({ station, chargers, withFavorites, ranks, usage }) {
-  const byId = new Map(chargers.map(c => [c.chgerId, c]));
-  const favChargers = withFavorites
-    ? FAVORITE_IDS_ORDERED.map(id => byId.get(id)).filter(Boolean)
-    : [];
-  const secondChargers = withFavorites
-    ? SECOND_LINE_IDS_ORDERED.map(id => byId.get(id)).filter(Boolean)
-    : [];
-  const thirdChargers = withFavorites
-    ? THIRD_LINE_IDS_ORDERED.map(id => byId.get(id)).filter(Boolean)
-    : [];
-  const mainGroup = withFavorites
-    ? chargers.filter(c =>
-        !FAVORITE_IDS.has(c.chgerId) &&
-        !SECOND_LINE_IDS.has(c.chgerId) &&
-        !THIRD_LINE_IDS.has(c.chgerId)
-      )
-    : chargers;
-
-  // favChargers = [04→14, 05→15, 12→22, 13→23]
-  const favLeft  = favChargers.slice(0, 2); // 108F: 14, 15
-  const favRight = favChargers.slice(2);    // 107F: 22, 23
-
-  const key = (c) => `${station.statId}_${c.chgerId}`;
-  const hl  = (c) => ranks.get(key(c)) ?? null;
-  const cnt = (c) => usage[key(c)]?.t ?? 0;
-
+// P3 참고용 mini 셀 (작은 네모)
+function MiniCell({ c }) {
+  const meta = STAT_META[c.stat] || STAT_META['9'];
+  const localId = ID_OFFSET + Number(c.chgerId);
+  const label = localId - 95100;
   return (
-    <div>
-      <div className="text-[11px] text-zinc-500 mb-2">{stationHeader(station.statId)}</div>
-      <div className="space-y-2">
-        {/* P1: 108F + 107F (큰 셀) */}
-        {favChargers.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-[9px] text-zinc-600 mr-0.5">108F</span>
-            {favLeft.map(c => renderCell(c, 'lg', hl(c), cnt(c)))}
-            <span className="w-px h-8 bg-white/10 mx-0.5" />
-            <span className="text-[9px] text-zinc-600 mr-0.5">107F</span>
-            {favRight.map(c => renderCell(c, 'lg', hl(c), cnt(c)))}
-          </div>
-        )}
-        {/* P2: 102F + 104F (중간 셀) */}
-        {(secondChargers.length > 0 || thirdChargers.length > 0) && (
-          <div className="flex items-center gap-2">
-            {secondChargers.length > 0 && (
-              <>
-                <span className="text-[9px] text-zinc-600 mr-0.5">102F</span>
-                {secondChargers.map(c => renderCell(c, 'lg', hl(c), cnt(c)))}
-              </>
-            )}
-            {thirdChargers.length > 0 && (
-              <>
-                <span className="w-px h-8 bg-white/10 mx-0.5" />
-                <span className="text-[9px] text-zinc-600 mr-0.5">104F</span>
-                {thirdChargers.map(c => renderCell(c, 'lg', hl(c), cnt(c)))}
-              </>
-            )}
-          </div>
-        )}
-        {/* P3: 나머지 참고용 */}
-        {mainGroup.length > 0 && (() => {
-          const loc = STATION_CONFIG[station.statId]?.loc;
-          if (!withFavorites && loc) {
-            return (
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] text-zinc-500 shrink-0">{loc}</span>
-                {mainGroup.map(c => renderCell(c, 'lg', hl(c), cnt(c)))}
-              </div>
-            );
-          }
-          return (
-            <div className="grid gap-1 pt-1" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
-              {mainGroup.map(c => renderCell(c, 'md', hl(c), cnt(c)))}
-            </div>
-          );
-        })()}
-      </div>
+    <div
+      className={`aspect-square rounded text-[10px] flex items-center justify-center font-bold tabular-nums ${meta.cellBg} ${meta.cellText}`}
+      title={`${localId} · ${meta.label}`}
+    >
+      {label}
     </div>
   );
 }
@@ -182,6 +154,8 @@ export default function HomeChargerCard() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [tick, setTick] = useState(0);
+  const [showP3, setShowP3] = useState(false);
+
   const load = useCallback(async (force = false) => {
     try {
       if (force) setRefreshing(true);
@@ -232,7 +206,29 @@ export default function HomeChargerCard() {
     acc[c.stat] = (acc[c.stat] || 0) + 1;
     return acc;
   }, {});
+  const now = Date.now();
   void tick;
+
+  // 메인 스테이션(PI795111)의 P1/P2 차저 추출
+  const mainStation = stations.find(s => s.station.statId === 'PI795111');
+  const mainById = new Map((mainStation?.chargers || []).map(c => [c.chgerId, c]));
+  const pick = (ids) => ids.map(id => mainById.get(id)).filter(Boolean);
+  const cells108 = pick(P1_108_IDS);
+  const cells107 = pick(P1_107_IDS);
+  const cells102 = pick(P2_102_IDS);
+  const cells104 = pick(P2_104_IDS);
+
+  // P3: 메인 스테이션에서 P1/P2 제외 + 나머지 스테이션 전체
+  const mainLeftover = (mainStation?.chargers || []).filter(c => !PRIORITY_IDS.has(c.chgerId));
+  const refStations = stations.filter(s => s.station.statId !== 'PI795111');
+  const p3AllChargers = [
+    ...mainLeftover,
+    ...refStations.flatMap(s => s.chargers),
+  ];
+  const p3Counts = p3AllChargers.reduce((acc, c) => {
+    acc[c.stat] = (acc[c.stat] || 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
@@ -286,18 +282,81 @@ export default function HomeChargerCard() {
         </div>
       )}
 
-      <div className="px-4 py-3 space-y-4">
-        {stations.map((s, i) => (
-          <div key={s.station.statId} className={i > 0 ? 'pt-3 border-t border-white/[0.04]' : ''}>
-            <StationBlock
-              station={s.station}
-              chargers={s.chargers}
-              withFavorites={i === 0}
-              ranks={ranks}
-              usage={usage}
-            />
+      <div className="px-4 py-3 space-y-3">
+        {/* P1: 108동 + 107동 */}
+        <div>
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <span className="text-amber-400 text-[11px]">⭐</span>
+            <span className="text-[11px] text-zinc-300 font-medium">1순위</span>
+            <span className="text-[10px] text-zinc-600">· 내 집 근처</span>
           </div>
-        ))}
+          <div className="flex gap-2">
+            <TileBox title="108동 앞" chargers={cells108} ranks={ranks} usage={usage} statId="PI795111" now={now} />
+            <TileBox title="107동 앞" chargers={cells107} ranks={ranks} usage={usage} statId="PI795111" now={now} />
+          </div>
+        </div>
+
+        {/* P2: 102동 + 104동 */}
+        <div>
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <span className="text-[11px] text-zinc-300 font-medium">2순위</span>
+            <span className="text-[10px] text-zinc-600">· 가까운 동</span>
+          </div>
+          <div className="flex gap-2">
+            <TileBox title="102동 앞" chargers={cells102} ranks={ranks} usage={usage} statId="PI795111" now={now} />
+            <TileBox title="104동 앞" chargers={cells104} ranks={ranks} usage={usage} statId="PI795111" now={now} />
+          </div>
+        </div>
+
+        {/* P3: 참고 (접힘) */}
+        {p3AllChargers.length > 0 && (
+          <div className="pt-1 border-t border-white/[0.04]">
+            <button
+              type="button"
+              onClick={() => setShowP3(v => !v)}
+              className="w-full flex items-center justify-between py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300"
+            >
+              <span className="flex items-center gap-2">
+                <span>참고 {p3AllChargers.length}대</span>
+                <span className="text-zinc-600">·</span>
+                {['2','3','5','1','4','9'].map(k => {
+                  const n = p3Counts[k];
+                  if (!n) return null;
+                  const meta = STAT_META[k];
+                  return (
+                    <span key={k} className={`flex items-center gap-1 ${meta.text}`}>
+                      <span className={`w-1 h-1 rounded-full ${meta.dot}`} />
+                      {meta.label} {n}
+                    </span>
+                  );
+                })}
+              </span>
+              <span>{showP3 ? '접기 ▲' : '펼치기 ▼'}</span>
+            </button>
+            {showP3 && (
+              <div className="space-y-2 pt-2">
+                {mainLeftover.length > 0 && (
+                  <div>
+                    <div className="text-[10px] text-zinc-500 mb-1">PI795111 · 기타 {mainLeftover.length}대</div>
+                    <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
+                      {mainLeftover.map(c => <MiniCell key={c.chgerId} c={c} />)}
+                    </div>
+                  </div>
+                )}
+                {refStations.map(s => (
+                  <div key={s.station.statId}>
+                    <div className="text-[10px] text-zinc-500 mb-1">
+                      {STATION_CONFIG[s.station.statId]?.label || s.station.statId} · {s.chargers.length}대
+                    </div>
+                    <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
+                      {s.chargers.map(c => <MiniCell key={c.chgerId} c={c} />)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
