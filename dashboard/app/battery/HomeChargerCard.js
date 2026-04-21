@@ -147,7 +147,7 @@ function StationBlock({ station, chargers, withFavorites, ranks }) {
         {mainGroup.length > 0 && (() => {
           const loc = STATION_CONFIG[station.statId]?.loc;
           if (!withFavorites && loc) {
-            const size = mainGroup.length <= 4 ? 'lg' : 'md';
+            const size = 'lg';
             return (
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[11px] text-zinc-500 shrink-0">{loc}</span>
