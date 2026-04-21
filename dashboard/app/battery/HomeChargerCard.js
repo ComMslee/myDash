@@ -80,7 +80,7 @@ function timeAgoKo(iso) {
   return `${Math.floor(h / 24)}일 전`;
 }
 
-function renderCell(c, size = 'md', highlight = null) {
+function renderCell(c, size = 'md', highlight = null, count = 0) {
   const meta = STAT_META[c.stat] || STAT_META['9'];
   const localId = ID_OFFSET + Number(c.chgerId);
   const label = localId - 95100;
@@ -92,11 +92,14 @@ function renderCell(c, size = 'md', highlight = null) {
     : highlight === 'mid'
     ? 'ring-1 ring-amber-400/50 ring-offset-1 ring-offset-[#161618]'
     : '';
+  const titleParts = [`${localId} · ${meta.label}`];
+  if (count > 0) titleParts.push(`사용 ${count}회`);
+  if (highlight) titleParts.push(highlight === 'high' ? '자주 사용 (상위 25%)' : '가끔 사용 (상위 50%)');
   return (
     <div
       key={c.chgerId}
       className={`${sizeClass} rounded-md flex items-center justify-center font-bold tabular-nums ${meta.cellBg} ${meta.cellText} ${ringClass}`}
-      title={`${localId} · ${meta.label}${highlight ? ` · 자주 사용(${highlight})` : ''}`}
+      title={titleParts.join(' · ')}
     >
       {label}
     </div>
@@ -107,7 +110,7 @@ function stationHeader(statId) {
   return `${statId} : ${COMPLEX_NAME}`;
 }
 
-function StationBlock({ station, chargers, withFavorites, ranks }) {
+function StationBlock({ station, chargers, withFavorites, ranks, usage }) {
   const byId = new Map(chargers.map(c => [c.chgerId, c]));
   const favChargers = withFavorites
     ? FAVORITE_IDS_ORDERED.map(id => byId.get(id)).filter(Boolean)
@@ -123,7 +126,8 @@ function StationBlock({ station, chargers, withFavorites, ranks }) {
   const favLeft  = favChargers.slice(0, 2); // 14, 15
   const favRight = favChargers.slice(2);    // 22, 23
 
-  const hl = (c) => ranks.get(c.chgerId) ?? null;
+  const hl  = (c) => ranks.get(c.chgerId) ?? null;
+  const cnt = (c) => usage[c.chgerId]?.t ?? 0;
 
   return (
     <div>
@@ -133,16 +137,16 @@ function StationBlock({ station, chargers, withFavorites, ranks }) {
           <div className="flex items-center gap-2">
             {/* 108F: 14 15 */}
             <span className="text-[9px] text-zinc-600 mr-0.5">108F</span>
-            {favLeft.map(c => renderCell(c, 'lg', hl(c)))}
+            {favLeft.map(c => renderCell(c, 'lg', hl(c), cnt(c)))}
             <span className="w-px h-8 bg-white/10 mx-0.5" />
             {/* 107F: 22 23 */}
             <span className="text-[9px] text-zinc-600 mr-0.5">107F</span>
-            {favRight.map(c => renderCell(c, 'lg', hl(c)))}
+            {favRight.map(c => renderCell(c, 'lg', hl(c), cnt(c)))}
             {/* 102F: 16~21 — 우측 정렬 */}
             <span className="flex-1" />
             <span className="w-px h-8 bg-white/10 mx-0.5" />
             <span className="text-[9px] text-zinc-600 mr-0.5">102F</span>
-            {secondChargers.map(c => renderCell(c, 'lg', hl(c)))}
+            {secondChargers.map(c => renderCell(c, 'lg', hl(c), cnt(c)))}
           </div>
         )}
         {mainGroup.length > 0 && (() => {
@@ -152,13 +156,13 @@ function StationBlock({ station, chargers, withFavorites, ranks }) {
             return (
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[11px] text-zinc-500 shrink-0">{loc}</span>
-                {mainGroup.map(c => renderCell(c, size, hl(c)))}
+                {mainGroup.map(c => renderCell(c, size, hl(c), cnt(c)))}
               </div>
             );
           }
           return (
             <div className="grid gap-1 pt-1" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
-              {mainGroup.map(c => renderCell(c, 'md', hl(c)))}
+              {mainGroup.map(c => renderCell(c, 'md', hl(c), cnt(c)))}
             </div>
           );
         })()}
@@ -177,6 +181,7 @@ export default function HomeChargerCard() {
   const [error, setError] = useState(null);
   const [tick, setTick] = useState(0);
   const [ranks, setRanks] = useState(() => computeRanks(loadUsage()));
+  const [usage, setUsage] = useState(() => loadUsage());
 
   const load = useCallback(async (force = false) => {
     try {
@@ -190,6 +195,7 @@ export default function HomeChargerCard() {
         setError(null);
         // 사용률 기록 및 랭크 갱신
         const usage = recordUsage(d.stations || []);
+        setUsage(usage);
         setRanks(computeRanks(usage));
       }
     } catch (e) {
@@ -291,6 +297,7 @@ export default function HomeChargerCard() {
               chargers={s.chargers}
               withFavorites={i === 0}
               ranks={ranks}
+              usage={usage}
             />
           </div>
         ))}
