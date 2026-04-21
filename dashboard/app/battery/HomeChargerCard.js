@@ -8,6 +8,7 @@ import {
 } from './home-charger/constants';
 import { computeRanks, buildTtlTooltip, timeAgoKo } from './home-charger/utils';
 import { TileBox, StatusBadges, MiniGrid } from './home-charger/ChargerTile';
+import FleetStatsPopup from './home-charger/FleetStatsPopup';
 
 // 브라우저 세션 동안 유지 — 탭 재진입 시 스피너 없이 즉시 이전 데이터 노출
 let moduleCache = null;
@@ -27,6 +28,7 @@ export default function HomeChargerCard() {
   const [error, setError] = useState(null);
   const [tick, setTick] = useState(0);
   const [showP3, setShowP3] = useState(false);
+  const [showFleetStats, setShowFleetStats] = useState(false);
 
   const load = useCallback(async (force = false) => {
     try {
@@ -118,6 +120,7 @@ export default function HomeChargerCard() {
   const tileProps = { ranks, usage, statId: MAIN_STATION_ID, now };
 
   return (
+    <>
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       <div className="px-4 py-2.5 border-b border-white/[0.06] flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] tabular-nums">
         <span className="font-bold tracking-widest uppercase text-zinc-500 shrink-0">집충전기</span>
@@ -132,6 +135,27 @@ export default function HomeChargerCard() {
               {timeAgoKo(fetchedAt)}
             </span>
           )}
+          <button
+            type="button"
+            onClick={() => setShowFleetStats(true)}
+            aria-label="상세 현황"
+            className="w-6 h-6 rounded-md hover:bg-white/[0.06] active:bg-white/[0.08] flex items-center justify-center text-zinc-400 hover:text-zinc-200"
+          >
+            <svg
+              viewBox="0 0 20 20"
+              className="w-3.5 h-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 17v-5" />
+              <path d="M9 17v-9" />
+              <path d="M15 17v-7" />
+              <path d="M3 4h14" />
+            </svg>
+          </button>
           <button
             type="button"
             onClick={() => load(true)}
@@ -218,13 +242,13 @@ export default function HomeChargerCard() {
                           {cells115Ground.length > 0 && (
                             <div className="flex items-center gap-1.5">
                               <span className="text-[9px] text-zinc-500 w-6 shrink-0">지상</span>
-                              <MiniGrid chargers={cells115Ground} statId={MAIN_STATION_ID} ranks={ranks} usage={usage} now={now} />
+                              <MiniGrid chargers={cells115Ground} statId={MAIN_STATION_ID} ranks={ranks} usage={usage} now={now} className="flex-1 justify-center" />
                             </div>
                           )}
                           {cells115Under.length > 0 && (
                             <div className="flex items-center gap-1.5">
                               <span className="text-[9px] text-zinc-500 w-6 shrink-0">지하</span>
-                              <MiniGrid chargers={cells115Under} statId={STATION_115_UNDERGROUND} ranks={ranks} usage={usage} now={now} />
+                              <MiniGrid chargers={cells115Under} statId={STATION_115_UNDERGROUND} ranks={ranks} usage={usage} now={now} className="flex-1 justify-center" />
                             </div>
                           )}
                         </div>
@@ -232,39 +256,28 @@ export default function HomeChargerCard() {
                     )}
                   </div>
                 )}
-                {mainLeftover.length > 0 && (
-                  <div>
-                    <div className="text-[10px] text-zinc-500 mb-1">
-                      {MAIN_STATION_ID} · 기타 {mainLeftover.length}대
-                    </div>
-                    <MiniGrid
-                      chargers={mainLeftover}
-                      statId={MAIN_STATION_ID}
-                      ranks={ranks}
-                      usage={usage}
-                      now={now}
-                    />
-                  </div>
-                )}
-                {refStations.map(s => (
-                  <div key={s.station.statId}>
-                    <div className="text-[10px] text-zinc-500 mb-1">
-                      {STATION_CONFIG[s.station.statId]?.label || s.station.statId} · {s.chargers.length}대
-                    </div>
-                    <MiniGrid
+                <TileBox title="기타" chargers={mainLeftover} {...tileProps} />
+                {refStations.map(s => {
+                  const stationTitle = (STATION_CONFIG[s.station.statId]?.label || s.station.statId).replace(/\s*앞$/, '');
+                  return (
+                    <TileBox
+                      key={s.station.statId}
+                      title={stationTitle}
                       chargers={s.chargers}
-                      statId={s.station.statId}
                       ranks={ranks}
                       usage={usage}
+                      statId={s.station.statId}
                       now={now}
                     />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         )}
       </div>
     </div>
+    {showFleetStats && <FleetStatsPopup onClose={() => setShowFleetStats(false)} />}
+    </>
   );
 }

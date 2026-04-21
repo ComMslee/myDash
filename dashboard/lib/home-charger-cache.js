@@ -293,6 +293,19 @@ async function ensureTable() {
   // 과거 구버전 스키마에서 업그레이드 — 컬럼 누락 시 ALTER로 보강 (DROP 금지)
   await pool.query(`ALTER TABLE charger_usage ADD COLUMN IF NOT EXISTS stat_id VARCHAR(20) NOT NULL DEFAULT 'PI795111'`);
   await pool.query(`ALTER TABLE charger_usage ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  // 날짜 기반 일별 집계 — 기간 필터(1~12개월) 상세 팝업용
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS charger_usage_daily (
+      stat_id    VARCHAR(20) NOT NULL,
+      chger_id   VARCHAR(20) NOT NULL,
+      date       DATE        NOT NULL,
+      hour       SMALLINT    NOT NULL,
+      count      INTEGER     NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (stat_id, chger_id, date, hour)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS charger_usage_daily_date_idx ON charger_usage_daily (date)`);
   // 환경공단 API 응답 스냅샷 — 컨테이너 재시작 간 캐시 영속화
   await pool.query(`
     CREATE TABLE IF NOT EXISTS home_charger_snapshot (
@@ -351,10 +364,14 @@ export async function bootstrapCacheFromDb() {
 
 // 30분당 최대 1회 증가 — 같은 (stat_id, chger_id, hour) 버킷은 30분 간격으로 +1
 // 직전 업데이트로부터 30분 미경과면 스킵 (시간당 최대 2, 하루 최대 48)
+// daily 테이블에도 같은 30분 룰로 (date, hour) 단위 기록
 export async function recordUsageDb(stations) {
   try {
     await ensureTable();
-    const kstHour = (new Date().getUTCHours() + 9) % 24;
+    const nowKstMs = Date.now() + 9 * 60 * 60_000;
+    const nowKst = new Date(nowKstMs);
+    const kstHour = nowKst.getUTCHours();
+    const kstDate = `${nowKst.getUTCFullYear()}-${String(nowKst.getUTCMonth() + 1).padStart(2, '0')}-${String(nowKst.getUTCDate()).padStart(2, '0')}`;
     const rows = stations.flatMap(s =>
       s.chargers.filter(c => c.stat === '3').map(c => [s.station.statId, c.chgerId])
     );
@@ -370,8 +387,61 @@ export async function recordUsageDb(stations) {
          WHERE charger_usage.updated_at < NOW() - INTERVAL '30 minutes'`,
       [statIds, chgerIds, kstHour]
     );
+    await pool.query(
+      `INSERT INTO charger_usage_daily (stat_id, chger_id, date, hour, count)
+       SELECT unnest($1::text[]), unnest($2::text[]), $3::date, $4::smallint, 1
+       ON CONFLICT (stat_id, chger_id, date, hour) DO UPDATE
+         SET count = charger_usage_daily.count + 1,
+             updated_at = NOW()
+         WHERE charger_usage_daily.updated_at < NOW() - INTERVAL '30 minutes'`,
+      [statIds, chgerIds, kstDate, kstHour]
+    );
   } catch (e) {
     console.warn('[home-charger] usage record failed:', e.message);
+  }
+}
+
+// 단지 전체 집계 — 기간 필터(월) 및 선택 충전기 세트
+// 반환: { hourly: number[24], dow: number[7], perCharger: {key, count}[], total, daysCovered }
+export async function fetchFleetStatsDb(statIds, months) {
+  try {
+    await ensureTable();
+    if (!statIds.length) {
+      return { hourly: Array(24).fill(0), dow: Array(7).fill(0), perCharger: [], total: 0, daysCovered: 0 };
+    }
+    const clampMonths = Math.max(1, Math.min(12, Math.floor(Number(months) || 3)));
+    const res = await pool.query(
+      `SELECT stat_id, chger_id, to_char(date, 'YYYY-MM-DD') AS date_str, hour, count
+         FROM charger_usage_daily
+        WHERE stat_id = ANY($1)
+          AND date >= (((NOW() AT TIME ZONE 'Asia/Seoul')::date) - ($2::int * INTERVAL '1 month'))::date
+      `,
+      [statIds, clampMonths]
+    );
+    const hourly = new Array(24).fill(0);
+    const dow = new Array(7).fill(0);
+    const perMap = new Map(); // key: `${stat}_${chger}` → count
+    const dateSet = new Set();
+    for (const row of res.rows) {
+      const c = Number(row.count);
+      hourly[row.hour] += c;
+      // to_char 결과는 'YYYY-MM-DD' 문자열 — tz 혼선 방지
+      const [y, m, d] = row.date_str.split('-').map(Number);
+      // UTC 자정 기준 요일 — 실제 KST 해당일 요일과 동일
+      const dowIdx = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+      dow[dowIdx] += c;
+      const key = `${row.stat_id}_${row.chger_id}`;
+      perMap.set(key, (perMap.get(key) || 0) + c);
+      dateSet.add(row.date_str);
+    }
+    const perCharger = [...perMap.entries()]
+      .map(([key, count]) => ({ key, count }))
+      .sort((a, b) => b.count - a.count);
+    const total = perCharger.reduce((s, e) => s + e.count, 0);
+    return { hourly, dow, perCharger, total, daysCovered: dateSet.size, months: clampMonths };
+  } catch (e) {
+    console.warn('[home-charger] fleet stats failed:', e.message);
+    return { hourly: Array(24).fill(0), dow: Array(7).fill(0), perCharger: [], total: 0, daysCovered: 0, months: Math.max(1, Math.min(12, Math.floor(Number(months) || 3))) };
   }
 }
 
