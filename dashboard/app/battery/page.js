@@ -49,11 +49,11 @@ export default function BatteryPage() {
             {/* 배터리 건강 — 점수/평균SOC/추이 + SOC 체류 분포 */}
             <HealthScoreCard data={data.health} trend={trend} />
 
-            {/* 배터리 건강 — 대기 소모 */}
-            <IdleDrainCard records={data.idle_drain} chargingSessions={data.charging_sessions} />
-
             {/* 현재 상태 — 집충전기 실시간 */}
             <HomeChargerCard />
+
+            {/* 배터리 건강 — 대기 소모 */}
+            <IdleDrainCard records={data.idle_drain} chargingSessions={data.charging_sessions} />
 
             {/* 충전 습관 — SOC 시작/종료 분포 */}
             <LevelHabitCard histogram={data.histogram} />
