@@ -107,6 +107,8 @@ export default function HomeChargerCard() {
     s.station.statId !== STATION_115_UNDERGROUND
   );
   const p3AllChargers = [
+    ...cells102,
+    ...cells104,
     ...mainRest,
     ...cells115Under,
     ...refStations.flatMap(s => s.chargers),
@@ -171,13 +173,7 @@ export default function HomeChargerCard() {
           <TileBox title="107" chargers={cells107} {...tileProps} />
         </div>
 
-        {/* P2: 102 · 104 — 1줄 2열, 셀 넘치면 자동 개행 */}
-        <div className="grid grid-cols-2 gap-1.5">
-          <TileBox title="102" chargers={cells102} {...tileProps} />
-          <TileBox title="104" chargers={cells104} {...tileProps} />
-        </div>
-
-        {/* P3: 참고 (접힘) */}
+        {/* 참고 (접힘) — 102 · 104 · 105 · 115 · 기타 */}
         {p3AllChargers.length > 0 && (
           <div className="pt-1 border-t border-white/[0.04]">
             <button
@@ -194,6 +190,12 @@ export default function HomeChargerCard() {
             </button>
             {showP3 && (
               <div className="space-y-2 pt-2">
+                {(cells102.length > 0 || cells104.length > 0) && (
+                  <div className="space-y-1.5">
+                    <TileBox title="102" chargers={cells102} {...tileProps} />
+                    <TileBox title="104" chargers={cells104} {...tileProps} />
+                  </div>
+                )}
                 {(p3GroupCells.length > 0 || show115) && (
                   <div className="grid grid-cols-2 gap-1.5">
                     {p3GroupCells.map(g => (
