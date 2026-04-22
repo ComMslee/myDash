@@ -413,7 +413,7 @@ export default function PollLogPopup({ onClose }) {
               </div>
 
               <div className="text-[10px] text-zinc-600 leading-snug">
-                * 시도 = 성공 + 부분 + 재시도 + 쿼터  ·  성공률 = (성공 + 부분) / 시도
+                * 시도 = 성공 + 부분 + 재시도 + 쿼터  ·  성공률 = (성공 + 부분 + 재시도✓) / 시도
                 {view === 'hourly' && (
                   <>
                     <br />* 주기 = 해당 시간대의 현재 TTL (동적 학습 반영)

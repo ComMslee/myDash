@@ -9,12 +9,11 @@ const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 // 범위: 4~15분
 const CACHE_TIERS = [
   { start:  0, end:  1, ttlMs: 10 * 60_000 }, // 자정 직후
-  { start:  1, end:  6, ttlMs: 15 * 60_000 }, // 새벽
+  { start:  1, end:  6, ttlMs: 12 * 60_000 }, // 새벽
   { start:  6, end: 13, ttlMs: 12 * 60_000 }, // 아침~점심 전
-  { start: 13, end: 18, ttlMs: 10 * 60_000 }, // 오후
-  { start: 18, end: 20, ttlMs:  4 * 60_000 }, // 저녁 피크 1
-  { start: 20, end: 22, ttlMs:  5 * 60_000 }, // 저녁 피크 2
-  { start: 22, end: 24, ttlMs: 10 * 60_000 }, // 저녁 마감~심야 전환
+  { start: 13, end: 18, ttlMs: 15 * 60_000 }, // 오후
+  { start: 18, end: 22, ttlMs:  4 * 60_000 }, // 저녁 피크
+  { start: 22, end: 24, ttlMs:  6 * 60_000 }, // 저녁 마감~심야 전환
 ];
 const FALLBACK_TTL_MS = 12 * 60_000;
 
