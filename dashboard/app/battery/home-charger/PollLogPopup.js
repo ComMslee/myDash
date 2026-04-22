@@ -9,7 +9,8 @@ function kstTodayStr(offsetDays = 0) {
 
 function successRate(row) {
   if (!row || !row.attempts) return null;
-  return Math.round(((row.successes + row.partial) / row.attempts) * 100);
+  const ok = (row.successes || 0) + (row.partial || 0) + (row.retrySuccesses || 0);
+  return Math.round((ok / row.attempts) * 100);
 }
 
 function cellClass(v, base = 'text-zinc-300') {
@@ -52,8 +53,8 @@ function SummaryCard({ totals }) {
         </div>
       </div>
       <div className="border-t border-white/[0.06]" />
-      {/* 결과 · 성공률 */}
-      <div className="grid grid-cols-4 gap-1 text-center">
+      {/* 결과 · 재시도 · 성공률 */}
+      <div className="grid grid-cols-5 gap-1 text-center">
         <div>
           <div className="text-[10px] text-emerald-500">성공</div>
           <div className="text-emerald-400 font-semibold">{totals.successes || 0}</div>
@@ -63,7 +64,11 @@ function SummaryCard({ totals }) {
           <div className="text-amber-400 font-semibold">{totals.partial || 0}</div>
         </div>
         <div>
-          <div className="text-[10px] text-rose-500">재시도</div>
+          <div className="text-[10px] text-emerald-500" title="첫 시도 실패 후 1회 재시도에서 성공">재시도 ✓</div>
+          <div className="text-emerald-400 font-semibold">{totals.retrySuccesses || 0}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-rose-500" title="재시도도 실패">재시도 ✗</div>
           <div className="text-rose-400 font-semibold">{totals.retries || 0}</div>
         </div>
         <div>
@@ -72,6 +77,17 @@ function SummaryCard({ totals }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function RetryCell({ success, fail }) {
+  if (!success && !fail) return <span className="text-zinc-600">·</span>;
+  return (
+    <span className="tabular-nums">
+      {success > 0 && <span className="text-emerald-400">{success}</span>}
+      {success > 0 && fail > 0 && <span className="text-zinc-600 mx-0.5">/</span>}
+      {fail > 0 && <span className="text-rose-400">{fail}</span>}
+    </span>
   );
 }
 
@@ -85,7 +101,7 @@ function HourlyTable({ rows, schedule, nowHour, isToday }) {
           <th className="text-right font-normal py-1 px-1" title="시도 (수동)">시도</th>
           <th className="text-right font-normal py-1 px-1">성공</th>
           <th className="text-right font-normal py-1 px-1">부분</th>
-          <th className="text-right font-normal py-1 px-1">재시도</th>
+          <th className="text-right font-normal py-1 px-1" title="재시도 성공/실패">재시도</th>
           <th className="text-right font-normal py-1 px-1">쿼터</th>
           <th className="text-right font-normal py-1 px-1">성공률</th>
         </tr>
@@ -108,7 +124,9 @@ function HourlyTable({ rows, schedule, nowHour, isToday }) {
               </td>
               <td className={`py-1 px-1 text-right ${cellClass(r.successes, 'text-emerald-400')}`}>{r.successes || '·'}</td>
               <td className={`py-1 px-1 text-right ${cellClass(r.partial, 'text-amber-400')}`}>{r.partial || '·'}</td>
-              <td className={`py-1 px-1 text-right ${cellClass(r.retries, 'text-rose-400')}`}>{r.retries || '·'}</td>
+              <td className="py-1 px-1 text-right">
+                <RetryCell success={r.retrySuccesses || 0} fail={r.retries || 0} />
+              </td>
               <td className={`py-1 px-1 text-right ${cellClass(r.quotaHits, 'text-orange-400')}`}>{r.quotaHits || '·'}</td>
               <td className={`py-1 px-1 text-right ${rate == null ? 'text-zinc-600' : rate === 100 ? 'text-emerald-400' : rate >= 80 ? 'text-zinc-300' : 'text-rose-400'}`}>
                 {rate == null ? '·' : `${rate}%`}
@@ -130,7 +148,7 @@ function DailyTable({ rows, todayStr }) {
           <th className="text-right font-normal py-1 px-1" title="시도 (수동)">시도</th>
           <th className="text-right font-normal py-1 px-1">성공</th>
           <th className="text-right font-normal py-1 px-1">부분</th>
-          <th className="text-right font-normal py-1 px-1">재시도</th>
+          <th className="text-right font-normal py-1 px-1" title="재시도 성공/실패">재시도</th>
           <th className="text-right font-normal py-1 px-1">쿼터</th>
           <th className="text-right font-normal py-1 px-1">성공률</th>
         </tr>
@@ -152,7 +170,9 @@ function DailyTable({ rows, todayStr }) {
               </td>
               <td className={`py-1 px-1 text-right ${cellClass(r.successes, 'text-emerald-400')}`}>{r.successes || '·'}</td>
               <td className={`py-1 px-1 text-right ${cellClass(r.partial, 'text-amber-400')}`}>{r.partial || '·'}</td>
-              <td className={`py-1 px-1 text-right ${cellClass(r.retries, 'text-rose-400')}`}>{r.retries || '·'}</td>
+              <td className="py-1 px-1 text-right">
+                <RetryCell success={r.retrySuccesses || 0} fail={r.retries || 0} />
+              </td>
               <td className={`py-1 px-1 text-right ${cellClass(r.quotaHits, 'text-orange-400')}`}>{r.quotaHits || '·'}</td>
               <td className={`py-1 px-1 text-right ${rate == null ? 'text-zinc-600' : rate === 100 ? 'text-emerald-400' : rate >= 80 ? 'text-zinc-300' : 'text-rose-400'}`}>
                 {rate == null ? '·' : `${rate}%`}
