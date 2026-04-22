@@ -6,24 +6,24 @@ import pool from '@/lib/db';
 const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 
 // 공공 API 일일 쿼터 1,000회/일 고려하여 시간대별 TTL 설정 (fallback)
-// 범위: 3~20분
+// 범위: 4~15분
 const CACHE_TIERS = [
-  { start:  0, end:  2, ttlMs: 10 * 60_000 }, // 자정 직후
-  { start:  2, end:  5, ttlMs: 20 * 60_000 }, // 깊은 새벽
-  { start:  5, end: 13, ttlMs: 15 * 60_000 }, // 아침~점심 전
-  { start: 13, end: 18, ttlMs: 10 * 60_000 }, // 오후
-  { start: 18, end: 20, ttlMs:  3 * 60_000 }, // 저녁 피크 1
-  { start: 20, end: 22, ttlMs:  4 * 60_000 }, // 저녁 피크 2
-  { start: 22, end: 23, ttlMs:  5 * 60_000 }, // 저녁 마감
-  { start: 23, end: 24, ttlMs: 15 * 60_000 }, // 심야 전환
+  { start:  0, end:  2, ttlMs:  8 * 60_000 }, // 자정 직후
+  { start:  2, end:  5, ttlMs: 15 * 60_000 }, // 깊은 새벽
+  { start:  5, end: 13, ttlMs: 12 * 60_000 }, // 아침~점심 전
+  { start: 13, end: 18, ttlMs:  8 * 60_000 }, // 오후
+  { start: 18, end: 20, ttlMs:  4 * 60_000 }, // 저녁 피크 1
+  { start: 20, end: 22, ttlMs:  5 * 60_000 }, // 저녁 피크 2
+  { start: 22, end: 23, ttlMs:  6 * 60_000 }, // 저녁 마감
+  { start: 23, end: 24, ttlMs: 12 * 60_000 }, // 심야 전환
 ];
-const FALLBACK_TTL_MS = 15 * 60_000;
+const FALLBACK_TTL_MS = 12 * 60_000;
 
 // 동적 TTL: 실제 충전 히스토리(최근 90일)에서 학습
 // false로 두면 항상 위의 CACHE_TIERS(static)만 사용 — 사용자가 지정한 스케줄 그대로 유지
 const USE_DYNAMIC_TTL = false;
-const TTL_MIN_MS =  3 * 60_000;  // 피크 시간대 최소 3분
-const TTL_MAX_MS = 20 * 60_000;  // 한산한 시간대 최대 20분
+const TTL_MIN_MS =  4 * 60_000;  // 피크 시간대 최소 4분
+const TTL_MAX_MS = 15 * 60_000;  // 한산한 시간대 최대 15분
 const DYN_REFRESH_MS = 24 * 60 * 60_000; // 24시간마다 재계산
 let dynamicTtls = null;  // [24] ms 배열, null이면 static fallback
 let ttlComputedAt = 0;
@@ -279,12 +279,12 @@ function applyQuotaCooldown() {
   lastError = `일일 쿼터 초과 — ${formatKstTime(quotaCooldownUntil)} 재시도 예정`;
 }
 
-// 일반 실패(네트워크/파싱 등) 시 10분 대기 후 재시도
-// 단, 현재 TTL이 10분 미만이면 쿨다운 미적용 — 자연 폴링 주기로 충분히 자주 재시도됨
-const FAILURE_COOLDOWN_MS = 10 * 60_000;
+// 일반 실패(네트워크/파싱 등) 시 8분 대기 후 재시도
+// 단, 현재 TTL이 8분 미만이면 쿨다운 미적용 — 자연 폴링 주기로 충분히 자주 재시도됨
+const FAILURE_COOLDOWN_MS = 8 * 60_000;
 function applyFailureCooldown(reason) {
   if (cacheTtlMs() < FAILURE_COOLDOWN_MS) {
-    console.warn(`[home-charger] fail (TTL<10m, no cooldown) — ${reason}`);
+    console.warn(`[home-charger] fail (TTL<8m, no cooldown) — ${reason}`);
     return;
   }
   failureCooldownUntil = Date.now() + FAILURE_COOLDOWN_MS;
