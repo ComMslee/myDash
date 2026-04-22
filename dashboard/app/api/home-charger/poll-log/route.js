@@ -1,4 +1,4 @@
-import { fetchPollLogDb, fetchPollLogDailyDb, getTtlInfo } from '@/lib/home-charger-cache';
+import { fetchPollLogDb, fetchPollLogDailyDb, getTtlInfo, getLastQuotaHitAt } from '@/lib/home-charger-cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,9 +8,9 @@ export async function GET(req) {
   if (view === 'daily') {
     const days = Number(searchParams.get('days')) || 14;
     const data = await fetchPollLogDailyDb(days);
-    return Response.json(data);
+    return Response.json({ ...data, lastQuotaHitAt: getLastQuotaHitAt() });
   }
   const date = searchParams.get('date') || null;
   const data = await fetchPollLogDb(date);
-  return Response.json({ ...data, ttlInfo: getTtlInfo() });
+  return Response.json({ ...data, ttlInfo: getTtlInfo(), lastQuotaHitAt: getLastQuotaHitAt() });
 }
