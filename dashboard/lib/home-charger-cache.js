@@ -8,7 +8,7 @@ const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 // 공공 API 일일 쿼터 1,000회/일 고려하여 시간대별 TTL 설정 (fallback)
 // 범위: 4~20분
 const CACHE_TIERS = [
-  { start:  0, end:  2, ttlMs: 15 * 60_000 }, // 자정 직후
+  { start:  0, end:  2, ttlMs: 10 * 60_000 }, // 자정 직후
   { start:  2, end:  5, ttlMs: 20 * 60_000 }, // 깊은 새벽
   { start:  5, end: 13, ttlMs: 15 * 60_000 }, // 아침~점심 전
   { start: 13, end: 18, ttlMs: 10 * 60_000 }, // 오후
@@ -576,7 +576,8 @@ export async function fetchFleetStatsDb(statIds, months) {
     const dateSet = new Set();
     let periodTotal = 0;
     for (const row of dailyRes.rows) {
-      const c = Number(row.count);
+      // 시간당 최대 1포인트 정규화 — raw count(0~2)를 0/1로 clip
+      const c = Math.min(1, Number(row.count));
       periodTotal += c;
       hourly[row.hour] += c;
       const [y, m, d] = row.date_str.split('-').map(Number);
@@ -585,10 +586,11 @@ export async function fetchFleetStatsDb(statIds, months) {
       dateSet.add(row.date_str);
     }
 
-    // 2) 전체 누적 (기존 시간 버킷 테이블) — Top/Bottom 순위
+    // 2) Top/Bottom 순위 — charger_usage_daily에서 1시간당 최대 1포인트로 정규화
+    //    (기존 charger_usage는 30분 룰로 시간당 최대 2 포인트라 실제 "사용 시간 수"와 괴리)
     const rankRes = await pool.query(
-      `SELECT stat_id, chger_id, SUM(count)::bigint AS total
-         FROM charger_usage
+      `SELECT stat_id, chger_id, SUM(LEAST(count, 1))::bigint AS total
+         FROM charger_usage_daily
         WHERE stat_id = ANY($1)
         GROUP BY stat_id, chger_id
         ORDER BY total DESC`,
@@ -600,10 +602,10 @@ export async function fetchFleetStatsDb(statIds, months) {
     }));
     const allTimeTotal = perCharger.reduce((s, e) => s + e.count, 0);
 
-    // 3) 전체 누적 시간대 히스토그램 — daily 데이터 부족 시 폴백 표시용
+    // 3) 전체 누적 시간대 히스토그램 — 1시간당 최대 1포인트 정규화 (동일 규칙)
     const hourlyAllRes = await pool.query(
-      `SELECT hour, SUM(count)::bigint AS total
-         FROM charger_usage
+      `SELECT hour, SUM(LEAST(count, 1))::bigint AS total
+         FROM charger_usage_daily
         WHERE stat_id = ANY($1)
         GROUP BY hour`,
       [statIds]
