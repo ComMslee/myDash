@@ -35,10 +35,10 @@ export default function FleetStatsPopup({ onClose }) {
     return () => { alive = false; };
   }, []);
 
-  const topN = (data?.perCharger || []).slice(0, 10);
-  const restN = (data?.perCharger || []).slice(10);
+  const topN = (data?.perCharger || []).slice(0, 15);
+  const restN = (data?.perCharger || []).slice(15);
   const topMax = topN[0]?.count || 1;
-  const rankIcons = ['🥇', '🥈', '🥉', '4', '5', '6', '7', '8', '9', '10'];
+  const rankIcons = ['🥇', '🥈', '🥉', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15'];
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -89,7 +89,7 @@ export default function FleetStatsPopup({ onClose }) {
                 {/* Top / Bottom — 전체 기간 누적 */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <div className="text-[11px] text-zinc-400 mb-1.5">🏆 Top 10</div>
+                    <div className="text-[11px] text-zinc-400 mb-1.5">🏆 Top 15</div>
                     <div className="space-y-0.5">
                       {topN.map((e, i) => (
                         <RankRow
@@ -115,7 +115,7 @@ export default function FleetStatsPopup({ onClose }) {
                             className="flex items-center gap-1 text-[10px] tabular-nums h-5 cursor-help"
                             title={`${formatEntry(e.key)}: ${e.count}회`}
                           >
-                            <span className="text-zinc-500 w-5 text-right shrink-0">{i + 11}</span>
+                            <span className="text-zinc-500 w-5 text-right shrink-0">{i + 16}</span>
                             <span className="text-zinc-300 truncate">{formatEntry(e.key)}</span>
                           </div>
                         ))}

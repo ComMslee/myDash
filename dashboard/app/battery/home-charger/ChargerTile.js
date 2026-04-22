@@ -57,14 +57,14 @@ export function MiniGrid({ chargers, statId, ranks, usage, now, className = '' }
 
 // 통일 셀 — 색 배경 + 번호, 하단에 경과시간(충전중) 또는 사용횟수(비사용), 랭크 링
 // 모든 셀 크기/폰트 통일 (P1/P2/P3 동일 포맷)
-// highlight: { tier: 'top3'|'top10', rank: number } | null
+// highlight: { tier: 'top3'|'top15', rank: number } | null
 export function UnifiedCell({ c, highlight, count, hourly, now }) {
   const meta = STAT_META[c.stat] || STAT_META['9'];
   const localId = ID_OFFSET + Number(c.chgerId);
   const label = localId - 95100;
   const sizeClass = 'w-10 h-10 text-sm';
-  // top3은 트로피 이모지로 표시(링 없음), top10은 기존 얇은 노란 링
-  const ringClass = highlight?.tier === 'top10'
+  // top3은 트로피 이모지로 표시(링 없음), top15은 기존 얇은 앰버 링
+  const ringClass = highlight?.tier === 'top15'
     ? 'ring-2 ring-amber-400'
     : '';
   const trophy = highlight?.tier === 'top3' ? ['🥇', '🥈', '🥉'][highlight.rank - 1] : null;

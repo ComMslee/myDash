@@ -71,7 +71,8 @@ export default function GlobalHeader() {
   const lvl = isCharging ? (charging.battery_level ?? car?.battery_level ?? 0) : (car?.battery_level ?? 0);
   const limitLvl = charging?.charge_limit_soc ?? null;
   const estRange = car?.est_battery_range ?? null;
-  const color = lvl > 50 ? '#22c55e' : lvl > 20 ? '#f59e0b' : '#ef4444';
+  // SOC 체류 분포와 토큰 통일: ideal/good=emerald, caution=amber, stress=red
+  const color = lvl > 50 ? '#10b981' : lvl > 20 ? '#f59e0b' : '#ef4444';
 
   const timeLabel = lastRefresh
     ? lastRefresh.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
