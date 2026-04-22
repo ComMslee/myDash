@@ -273,8 +273,10 @@ function formatKstTime(ms) {
   return `${hh}:${mm}`;
 }
 
+let lastQuotaHitAt = 0;
 function applyQuotaCooldown() {
   // 429는 1시간 단위로 재확인
+  lastQuotaHitAt = Date.now();
   quotaCooldownUntil = Date.now() + 60 * 60_000;
   lastError = `일일 쿼터 초과 — ${formatKstTime(quotaCooldownUntil)} 재시도 예정`;
 }
@@ -300,6 +302,7 @@ function applyFailureCooldown(reason, { isRetry = false } = {}) {
 
 export function isQuotaCooldown() { return Date.now() < quotaCooldownUntil; }
 export function getQuotaCooldownUntil() { return quotaCooldownUntil; }
+export function getLastQuotaHitAt() { return lastQuotaHitAt; }
 export function isFailureCooldown() { return Date.now() < failureCooldownUntil; }
 export function getFailureCooldownUntil() { return failureCooldownUntil; }
 

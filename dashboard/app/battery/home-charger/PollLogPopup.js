@@ -31,10 +31,22 @@ function TabButton({ active, onClick, children }) {
   );
 }
 
-function SummaryCard({ totals }) {
+function formatHHMM(ms) {
+  if (!ms) return null;
+  const d = new Date(ms + 9 * 60 * 60_000);
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+}
+
+function SummaryCard({ totals, lastQuotaHitAt }) {
   const rate = successRate(totals);
   const manual = totals.manualAttempts || 0;
   const auto = Math.max(0, (totals.attempts || 0) - manual);
+  const quotaHits = totals.quotaHits || 0;
+  const successes = totals.successes || 0;
+  const partial = totals.partial || 0;
+  const retries = totals.retries || 0;
+  const retrySuccesses = totals.retrySuccesses || 0;
+  const quotaTime = formatHHMM(lastQuotaHitAt);
   return (
     <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg px-3 py-2 space-y-1.5 text-[12px] tabular-nums">
       {/* 호출 소스 · 쿼터 */}
@@ -49,27 +61,30 @@ function SummaryCard({ totals }) {
         </div>
         <div>
           <div className="text-[10px] text-orange-500">쿼터 히트</div>
-          <div className="text-orange-400 font-semibold">{totals.quotaHits || 0}</div>
+          <div className="text-orange-400 font-semibold">
+            {quotaHits}
+            {quotaHits > 0 && quotaTime && (
+              <span className="text-[9px] text-orange-300 ml-1">({quotaTime})</span>
+            )}
+          </div>
         </div>
       </div>
       <div className="border-t border-white/[0.06]" />
-      {/* 결과 · 재시도 · 성공률 */}
-      <div className="grid grid-cols-5 gap-1 text-center">
+      {/* 결과(부분) · 재시도(성공) · 성공률 */}
+      <div className="grid grid-cols-3 gap-1 text-center">
         <div>
-          <div className="text-[10px] text-emerald-500">성공</div>
-          <div className="text-emerald-400 font-semibold">{totals.successes || 0}</div>
+          <div className="text-[10px] text-emerald-500">성공 (부분)</div>
+          <div>
+            <span className="text-emerald-400 font-semibold">{successes}</span>
+            <span className="text-amber-400 text-[10px] ml-0.5">({partial})</span>
+          </div>
         </div>
         <div>
-          <div className="text-[10px] text-amber-500">부분</div>
-          <div className="text-amber-400 font-semibold">{totals.partial || 0}</div>
-        </div>
-        <div>
-          <div className="text-[10px] text-emerald-500" title="첫 시도 실패 후 1회 재시도에서 성공">재시도 ✓</div>
-          <div className="text-emerald-400 font-semibold">{totals.retrySuccesses || 0}</div>
-        </div>
-        <div>
-          <div className="text-[10px] text-rose-500" title="재시도도 실패">재시도 ✗</div>
-          <div className="text-rose-400 font-semibold">{totals.retries || 0}</div>
+          <div className="text-[10px] text-rose-500">재시도 (성공)</div>
+          <div>
+            <span className="text-rose-400 font-semibold">{retries}</span>
+            <span className="text-emerald-400 text-[10px] ml-0.5">({retrySuccesses})</span>
+          </div>
         </div>
         <div>
           <div className="text-[10px] text-zinc-500">성공률</div>
@@ -313,7 +328,7 @@ export default function PollLogPopup({ onClose }) {
 
           {!loading && !error && data && (
             <>
-              <SummaryCard totals={data.totals || {}} />
+              <SummaryCard totals={data.totals || {}} lastQuotaHitAt={data.lastQuotaHitAt || 0} />
               <div className="overflow-x-auto">
                 {view === 'hourly' ? (
                   <HourlyTable
