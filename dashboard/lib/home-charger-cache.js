@@ -18,6 +18,8 @@ const CACHE_TIERS = [
 const FALLBACK_TTL_MS = 15 * 60_000;
 
 // 동적 TTL: 실제 충전 히스토리(최근 90일)에서 학습
+// false로 두면 항상 위의 CACHE_TIERS(static)만 사용 — 사용자가 지정한 스케줄 그대로 유지
+const USE_DYNAMIC_TTL = false;
 const TTL_MIN_MS =  4 * 60_000;  // 피크 시간대 최소 4분
 const TTL_MAX_MS = 20 * 60_000;  // 한산한 시간대 최대 20분
 const DYN_REFRESH_MS = 24 * 60 * 60_000; // 24시간마다 재계산
@@ -43,13 +45,14 @@ function staticTtlMs(now) {
 }
 
 export function cacheTtlMs(now = new Date()) {
-  // 24시간 지났으면 백그라운드로 동적 TTL 갱신 트리거 (await 안 함)
-  if (Date.now() - ttlComputedAt > DYN_REFRESH_MS) {
-    refreshDynamicTtls().catch(e => console.warn('[home-charger] dyn ttl refresh failed:', e.message));
-  }
-  if (dynamicTtls) {
-    const kstHour = (now.getUTCHours() + 9) % 24;
-    return dynamicTtls[kstHour];
+  if (USE_DYNAMIC_TTL) {
+    if (Date.now() - ttlComputedAt > DYN_REFRESH_MS) {
+      refreshDynamicTtls().catch(e => console.warn('[home-charger] dyn ttl refresh failed:', e.message));
+    }
+    if (dynamicTtls) {
+      const kstHour = (now.getUTCHours() + 9) % 24;
+      return dynamicTtls[kstHour];
+    }
   }
   return staticTtlMs(now);
 }
@@ -135,15 +138,16 @@ export function getTtlInfo() {
   const kstHour = (now.getUTCHours() + 9) % 24;
   const currentMs = cacheTtlMs(now);
   // 24시간 스케줄 (분 단위)
+  const useDyn = USE_DYNAMIC_TTL && !!dynamicTtls;
   const schedule = [];
   for (let h = 0; h < 24; h++) {
-    const ms = dynamicTtls
+    const ms = useDyn
       ? dynamicTtls[h]
       : staticTtlMs(new Date(Date.UTC(2000, 0, 1, h - 9)));
     schedule.push(Math.round(ms / 60_000));
   }
   return {
-    dynamic: !!dynamicTtls,
+    dynamic: useDyn,
     currentMin: Math.round(currentMs / 60_000),
     currentHour: kstHour,
     schedule, // [24] 분 배열
