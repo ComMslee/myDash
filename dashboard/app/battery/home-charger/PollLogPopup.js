@@ -80,18 +80,9 @@ function SummaryCard({ totals }) {
   );
 }
 
-function RetryCell({ success, fail }) {
-  if (!success && !fail) return <span className="text-zinc-600">·</span>;
-  return (
-    <span className="tabular-nums">
-      {success > 0 && <span className="text-emerald-400">{success}</span>}
-      {success > 0 && fail > 0 && <span className="text-zinc-600 mx-0.5">/</span>}
-      {fail > 0 && <span className="text-rose-400">{fail}</span>}
-    </span>
-  );
-}
-
 function HourlyTable({ rows, schedule, nowHour, isToday }) {
+  // 구분선 — 부분 | 재시도 · 재시도✓ | 성공률
+  const sep = 'border-l border-white/[0.05]';
   return (
     <table className="w-full text-[11px] tabular-nums">
       <thead className="text-zinc-500">
@@ -101,9 +92,9 @@ function HourlyTable({ rows, schedule, nowHour, isToday }) {
           <th className="text-right font-normal py-1 px-1" title="시도 (수동)">시도</th>
           <th className="text-right font-normal py-1 px-1">성공</th>
           <th className="text-right font-normal py-1 px-1">부분</th>
-          <th className="text-right font-normal py-1 px-1" title="재시도 성공/실패">재시도</th>
-          <th className="text-right font-normal py-1 px-1">쿼터</th>
-          <th className="text-right font-normal py-1 px-1">성공률</th>
+          <th className={`text-right font-normal py-1 px-1 ${sep}`} title="재시도 실패">재시도</th>
+          <th className="text-right font-normal py-1 px-1" title="재시도 성공">재시도✓</th>
+          <th className={`text-right font-normal py-1 px-1 ${sep}`}>성공률</th>
         </tr>
       </thead>
       <tbody>
@@ -124,11 +115,9 @@ function HourlyTable({ rows, schedule, nowHour, isToday }) {
               </td>
               <td className={`py-1 px-1 text-right ${cellClass(r.successes, 'text-emerald-400')}`}>{r.successes || '·'}</td>
               <td className={`py-1 px-1 text-right ${cellClass(r.partial, 'text-amber-400')}`}>{r.partial || '·'}</td>
-              <td className="py-1 px-1 text-right">
-                <RetryCell success={r.retrySuccesses || 0} fail={r.retries || 0} />
-              </td>
-              <td className={`py-1 px-1 text-right ${cellClass(r.quotaHits, 'text-orange-400')}`}>{r.quotaHits || '·'}</td>
-              <td className={`py-1 px-1 text-right ${rate == null ? 'text-zinc-600' : rate === 100 ? 'text-emerald-400' : rate >= 80 ? 'text-zinc-300' : 'text-rose-400'}`}>
+              <td className={`py-1 px-1 text-right ${cellClass(r.retries, 'text-rose-400')} ${sep}`}>{r.retries || '·'}</td>
+              <td className={`py-1 px-1 text-right ${cellClass(r.retrySuccesses, 'text-emerald-400')}`}>{r.retrySuccesses || '·'}</td>
+              <td className={`py-1 px-1 text-right ${sep} ${rate == null ? 'text-zinc-600' : rate === 100 ? 'text-emerald-400' : rate >= 80 ? 'text-zinc-300' : 'text-rose-400'}`}>
                 {rate == null ? '·' : `${rate}%`}
               </td>
             </tr>
@@ -140,6 +129,7 @@ function HourlyTable({ rows, schedule, nowHour, isToday }) {
 }
 
 function DailyTable({ rows, todayStr }) {
+  const sep = 'border-l border-white/[0.05]';
   return (
     <table className="w-full text-[11px] tabular-nums">
       <thead className="text-zinc-500">
@@ -148,9 +138,9 @@ function DailyTable({ rows, todayStr }) {
           <th className="text-right font-normal py-1 px-1" title="시도 (수동)">시도</th>
           <th className="text-right font-normal py-1 px-1">성공</th>
           <th className="text-right font-normal py-1 px-1">부분</th>
-          <th className="text-right font-normal py-1 px-1" title="재시도 성공/실패">재시도</th>
-          <th className="text-right font-normal py-1 px-1">쿼터</th>
-          <th className="text-right font-normal py-1 px-1">성공률</th>
+          <th className={`text-right font-normal py-1 px-1 ${sep}`} title="재시도 실패">재시도</th>
+          <th className="text-right font-normal py-1 px-1" title="재시도 성공">재시도✓</th>
+          <th className={`text-right font-normal py-1 px-1 ${sep}`}>성공률</th>
         </tr>
       </thead>
       <tbody>
@@ -170,11 +160,9 @@ function DailyTable({ rows, todayStr }) {
               </td>
               <td className={`py-1 px-1 text-right ${cellClass(r.successes, 'text-emerald-400')}`}>{r.successes || '·'}</td>
               <td className={`py-1 px-1 text-right ${cellClass(r.partial, 'text-amber-400')}`}>{r.partial || '·'}</td>
-              <td className="py-1 px-1 text-right">
-                <RetryCell success={r.retrySuccesses || 0} fail={r.retries || 0} />
-              </td>
-              <td className={`py-1 px-1 text-right ${cellClass(r.quotaHits, 'text-orange-400')}`}>{r.quotaHits || '·'}</td>
-              <td className={`py-1 px-1 text-right ${rate == null ? 'text-zinc-600' : rate === 100 ? 'text-emerald-400' : rate >= 80 ? 'text-zinc-300' : 'text-rose-400'}`}>
+              <td className={`py-1 px-1 text-right ${cellClass(r.retries, 'text-rose-400')} ${sep}`}>{r.retries || '·'}</td>
+              <td className={`py-1 px-1 text-right ${cellClass(r.retrySuccesses, 'text-emerald-400')}`}>{r.retrySuccesses || '·'}</td>
+              <td className={`py-1 px-1 text-right ${sep} ${rate == null ? 'text-zinc-600' : rate === 100 ? 'text-emerald-400' : rate >= 80 ? 'text-zinc-300' : 'text-rose-400'}`}>
                 {rate == null ? '·' : `${rate}%`}
               </td>
             </tr>
