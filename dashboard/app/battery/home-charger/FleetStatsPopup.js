@@ -106,26 +106,26 @@ export default function FleetStatsPopup({ onClose }) {
 
           {!loading && !error && data && (
             <>
-              {/* 총괄 — 기간(시간대/요일) + 전체(순위) */}
+              {/* 총괄 — 모든 값은 시간당 최대 1로 정규화 */}
               <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg px-3 py-2 text-[12px] space-y-1">
                 <div className="flex items-center justify-between tabular-nums">
-                  <span className="text-zinc-400">전체 기간 누적</span>
-                  <span className="text-zinc-200 font-semibold">{data.allTimeTotal}회</span>
+                  <span className="text-zinc-400">누적 충전 시간</span>
+                  <span className="text-zinc-200 font-semibold">{data.allTimeTotal}시간</span>
                 </div>
                 <div className="flex items-center justify-between tabular-nums">
-                  <span className="text-zinc-500">지난 {data.months}개월 기록</span>
-                  <span className="text-zinc-400">{data.total}회 · {data.daysCovered}일</span>
+                  <span className="text-zinc-500">지난 {data.months}개월</span>
+                  <span className="text-zinc-400">{data.total}시간 · {data.daysCovered}일</span>
                 </div>
                 <div className="flex items-center justify-between tabular-nums">
                   <span className="text-zinc-500">일 평균 (기간)</span>
                   <span className="text-zinc-400">
-                    {data.daysCovered > 0 ? (data.total / data.daysCovered).toFixed(1) : '-'}회/일
+                    {data.daysCovered > 0 ? (data.total / data.daysCovered).toFixed(1) : '-'}시간/일
                   </span>
                 </div>
                 <div className="text-[10px] text-zinc-600 leading-snug pt-0.5">
-                  * 카운트 = 충전중 상태로 관측된 30분 버킷 수 (시간당 최대 2)
+                  * 카운트 = 충전중으로 관측된 시간 수 (같은 시간대 여러 번 관측돼도 1로 셈)
                   <br />
-                  * Top/Bottom 순위는 <b>전체 기간</b>, 시간대/요일은 <b>선택 기간</b> 기준
+                  * 시간대/요일은 <b>선택 기간</b> · Top/Bottom은 <b>일별 수집 시작일부터 전체</b>
                 </div>
               </div>
 
