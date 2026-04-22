@@ -32,27 +32,44 @@ function TabButton({ active, onClick, children }) {
 
 function SummaryCard({ totals }) {
   const rate = successRate(totals);
+  const manual = totals.manualAttempts || 0;
+  const auto = Math.max(0, (totals.attempts || 0) - manual);
   return (
-    <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg px-3 py-2 text-[12px] grid grid-cols-5 gap-1 tabular-nums text-center">
-      <div>
-        <div className="text-[10px] text-zinc-500">시도</div>
-        <div className="text-zinc-200 font-semibold">{totals.attempts || 0}</div>
+    <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg px-3 py-2 space-y-1.5 text-[12px] tabular-nums">
+      {/* 호출 소스 · 쿼터 */}
+      <div className="grid grid-cols-3 gap-1 text-center">
+        <div>
+          <div className="text-[10px] text-sky-500">폴링</div>
+          <div className="text-sky-400 font-semibold">{auto}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-indigo-400">수동</div>
+          <div className="text-indigo-300 font-semibold">{manual}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-orange-500">쿼터 히트</div>
+          <div className="text-orange-400 font-semibold">{totals.quotaHits || 0}</div>
+        </div>
       </div>
-      <div>
-        <div className="text-[10px] text-emerald-500">성공</div>
-        <div className="text-emerald-400 font-semibold">{totals.successes || 0}</div>
-      </div>
-      <div>
-        <div className="text-[10px] text-amber-500">부분</div>
-        <div className="text-amber-400 font-semibold">{totals.partial || 0}</div>
-      </div>
-      <div>
-        <div className="text-[10px] text-rose-500">재시도</div>
-        <div className="text-rose-400 font-semibold">{totals.retries || 0}</div>
-      </div>
-      <div>
-        <div className="text-[10px] text-zinc-500">성공률</div>
-        <div className="text-zinc-200 font-semibold">{rate != null ? `${rate}%` : '-'}</div>
+      <div className="border-t border-white/[0.06]" />
+      {/* 결과 · 성공률 */}
+      <div className="grid grid-cols-4 gap-1 text-center">
+        <div>
+          <div className="text-[10px] text-emerald-500">성공</div>
+          <div className="text-emerald-400 font-semibold">{totals.successes || 0}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-amber-500">부분</div>
+          <div className="text-amber-400 font-semibold">{totals.partial || 0}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-rose-500">재시도</div>
+          <div className="text-rose-400 font-semibold">{totals.retries || 0}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-zinc-500">성공률</div>
+          <div className="text-zinc-200 font-semibold">{rate != null ? `${rate}%` : '-'}</div>
+        </div>
       </div>
     </div>
   );
@@ -65,7 +82,7 @@ function HourlyTable({ rows, schedule, nowHour, isToday }) {
         <tr className="border-b border-white/[0.06]">
           <th className="text-left font-normal py-1 px-1">시간</th>
           <th className="text-right font-normal py-1 px-1">주기</th>
-          <th className="text-right font-normal py-1 px-1">시도</th>
+          <th className="text-right font-normal py-1 px-1" title="시도 (수동)">시도</th>
           <th className="text-right font-normal py-1 px-1">성공</th>
           <th className="text-right font-normal py-1 px-1">부분</th>
           <th className="text-right font-normal py-1 px-1">재시도</th>
@@ -78,13 +95,17 @@ function HourlyTable({ rows, schedule, nowHour, isToday }) {
           const rate = successRate(r);
           const isCurrent = isToday && r.hour === nowHour;
           const ttl = schedule?.[r.hour];
+          const manual = r.manualAttempts || 0;
           return (
             <tr key={r.hour} className={`border-b border-white/[0.04] ${isCurrent ? 'bg-white/[0.04]' : ''}`}>
               <td className={`py-1 px-1 ${isCurrent ? 'text-amber-400 font-bold' : 'text-zinc-400'}`}>
                 {String(r.hour).padStart(2, '0')}시
               </td>
               <td className="py-1 px-1 text-right text-zinc-500">{ttl != null ? `${ttl}분` : '-'}</td>
-              <td className={`py-1 px-1 text-right ${cellClass(r.attempts, 'text-zinc-300')}`}>{r.attempts || '·'}</td>
+              <td className={`py-1 px-1 text-right ${cellClass(r.attempts, 'text-zinc-300')}`}>
+                {r.attempts ? r.attempts : '·'}
+                {manual > 0 && <span className="text-indigo-400 text-[9px] ml-0.5">({manual})</span>}
+              </td>
               <td className={`py-1 px-1 text-right ${cellClass(r.successes, 'text-emerald-400')}`}>{r.successes || '·'}</td>
               <td className={`py-1 px-1 text-right ${cellClass(r.partial, 'text-amber-400')}`}>{r.partial || '·'}</td>
               <td className={`py-1 px-1 text-right ${cellClass(r.retries, 'text-rose-400')}`}>{r.retries || '·'}</td>
@@ -106,7 +127,7 @@ function DailyTable({ rows, todayStr }) {
       <thead className="text-zinc-500">
         <tr className="border-b border-white/[0.06]">
           <th className="text-left font-normal py-1 px-1">날짜</th>
-          <th className="text-right font-normal py-1 px-1">시도</th>
+          <th className="text-right font-normal py-1 px-1" title="시도 (수동)">시도</th>
           <th className="text-right font-normal py-1 px-1">성공</th>
           <th className="text-right font-normal py-1 px-1">부분</th>
           <th className="text-right font-normal py-1 px-1">재시도</th>
@@ -118,13 +139,17 @@ function DailyTable({ rows, todayStr }) {
         {rows.map(r => {
           const rate = successRate(r);
           const isToday = r.date === todayStr;
+          const manual = r.manualAttempts || 0;
           return (
             <tr key={r.date} className={`border-b border-white/[0.04] ${isToday ? 'bg-white/[0.04]' : ''}`}>
               <td className={`py-1 px-1 ${isToday ? 'text-amber-400 font-bold' : 'text-zinc-400'}`}>
                 {r.date.slice(5).replace('-', '/')}
                 {isToday ? ' (오늘)' : ''}
               </td>
-              <td className={`py-1 px-1 text-right ${cellClass(r.attempts, 'text-zinc-300')}`}>{r.attempts || '·'}</td>
+              <td className={`py-1 px-1 text-right ${cellClass(r.attempts, 'text-zinc-300')}`}>
+                {r.attempts || '·'}
+                {manual > 0 && <span className="text-indigo-400 text-[9px] ml-0.5">({manual})</span>}
+              </td>
               <td className={`py-1 px-1 text-right ${cellClass(r.successes, 'text-emerald-400')}`}>{r.successes || '·'}</td>
               <td className={`py-1 px-1 text-right ${cellClass(r.partial, 'text-amber-400')}`}>{r.partial || '·'}</td>
               <td className={`py-1 px-1 text-right ${cellClass(r.retries, 'text-rose-400')}`}>{r.retries || '·'}</td>

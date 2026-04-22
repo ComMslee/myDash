@@ -8,6 +8,7 @@ import {
   isFresh,
   isQuotaCooldown,
   loadStations,
+  recordPollLog,
   recordUsageDb,
   setCache,
   warmIfNeeded,
@@ -28,6 +29,7 @@ export async function GET(req) {
 
   if (force) {
     let upstreamError = null;
+    let logOutcome = null; // 'success' | 'partial' | 'retry' | 'quota'
     try {
       const stations = await loadStations(statIds, key);
       if (stations.length) {
@@ -35,13 +37,28 @@ export async function GET(req) {
         const usage = await fetchUsageDb(stations.map(s => s.station.statId));
         const payload = { stations, fetchedAt: new Date().toISOString(), usage };
         setCache(payload);
+        logOutcome = stations.length === statIds.length ? 'success' : 'partial';
+        await recordPollLog({
+          attempts: 1,
+          manualAttempts: 1,
+          successes: logOutcome === 'success' ? 1 : 0,
+          partial:   logOutcome === 'partial' ? 1 : 0,
+        });
         return Response.json(withTtl(payload));
       }
       upstreamError = `스테이션 매칭 없음 (요청 ${statIds.join(',')})`;
+      logOutcome = isQuotaCooldown() ? 'quota' : 'retry';
     } catch (e) {
       upstreamError = e.message || '조회 실패';
       console.error('[home-charger] upstream error:', upstreamError);
+      logOutcome = 'retry';
     }
+    await recordPollLog({
+      attempts: 1,
+      manualAttempts: 1,
+      retries:    logOutcome === 'retry' ? 1 : 0,
+      quotaHits:  logOutcome === 'quota' ? 1 : 0,
+    });
     const c = getCache();
     if (c.data) return Response.json(withTtl({ ...c.data, stale: true, lastError: upstreamError }));
     return Response.json({ error: upstreamError || '조회 실패' }, { status: 500 });

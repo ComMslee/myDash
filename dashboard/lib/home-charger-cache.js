@@ -6,13 +6,15 @@ import pool from '@/lib/db';
 const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 
 // 공공 API 일일 쿼터 1,000회/일 고려하여 시간대별 TTL 설정 (fallback)
-// 범위: 4~20분
+// 범위: 3~20분
 const CACHE_TIERS = [
   { start:  0, end:  2, ttlMs: 10 * 60_000 }, // 자정 직후
   { start:  2, end:  5, ttlMs: 20 * 60_000 }, // 깊은 새벽
   { start:  5, end: 13, ttlMs: 15 * 60_000 }, // 아침~점심 전
   { start: 13, end: 18, ttlMs: 10 * 60_000 }, // 오후
-  { start: 18, end: 23, ttlMs:  4 * 60_000 }, // 저녁 귀가/충전 피크
+  { start: 18, end: 20, ttlMs:  3 * 60_000 }, // 저녁 피크 1
+  { start: 20, end: 22, ttlMs:  4 * 60_000 }, // 저녁 피크 2
+  { start: 22, end: 23, ttlMs:  5 * 60_000 }, // 저녁 마감
   { start: 23, end: 24, ttlMs: 15 * 60_000 }, // 심야 전환
 ];
 const FALLBACK_TTL_MS = 15 * 60_000;
@@ -20,7 +22,7 @@ const FALLBACK_TTL_MS = 15 * 60_000;
 // 동적 TTL: 실제 충전 히스토리(최근 90일)에서 학습
 // false로 두면 항상 위의 CACHE_TIERS(static)만 사용 — 사용자가 지정한 스케줄 그대로 유지
 const USE_DYNAMIC_TTL = false;
-const TTL_MIN_MS =  4 * 60_000;  // 피크 시간대 최소 4분
+const TTL_MIN_MS =  3 * 60_000;  // 피크 시간대 최소 3분
 const TTL_MAX_MS = 20 * 60_000;  // 한산한 시간대 최대 20분
 const DYN_REFRESH_MS = 24 * 60 * 60_000; // 24시간마다 재계산
 let dynamicTtls = null;  // [24] ms 배열, null이면 static fallback
@@ -295,7 +297,8 @@ export function isFailureCooldown() { return Date.now() < failureCooldownUntil; 
 export function getFailureCooldownUntil() { return failureCooldownUntil; }
 
 // 폴링 로그 기록 — 시간 단위 버킷에 시도/성공/재시도/쿼터 카운트 누적
-async function recordPollLog({ attempts = 0, successes = 0, partial = 0, retries = 0, quotaHits = 0 } = {}) {
+// manualAttempts: /api/home-charger?refresh=1 경로 (수동 갱신 버튼)
+export async function recordPollLog({ attempts = 0, successes = 0, partial = 0, retries = 0, quotaHits = 0, manualAttempts = 0 } = {}) {
   try {
     await ensureTable();
     const nowKstMs = Date.now() + 9 * 60 * 60_000;
@@ -303,16 +306,17 @@ async function recordPollLog({ attempts = 0, successes = 0, partial = 0, retries
     const kstHour = nowKst.getUTCHours();
     const kstDate = `${nowKst.getUTCFullYear()}-${String(nowKst.getUTCMonth() + 1).padStart(2, '0')}-${String(nowKst.getUTCDate()).padStart(2, '0')}`;
     await pool.query(
-      `INSERT INTO home_charger_poll_log (date, hour, attempts, successes, partial, retries, quota_hits)
-       VALUES ($1::date, $2::smallint, $3, $4, $5, $6, $7)
+      `INSERT INTO home_charger_poll_log (date, hour, attempts, successes, partial, retries, quota_hits, manual_attempts)
+       VALUES ($1::date, $2::smallint, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (date, hour) DO UPDATE
-         SET attempts   = home_charger_poll_log.attempts   + EXCLUDED.attempts,
-             successes  = home_charger_poll_log.successes  + EXCLUDED.successes,
-             partial    = home_charger_poll_log.partial    + EXCLUDED.partial,
-             retries    = home_charger_poll_log.retries    + EXCLUDED.retries,
-             quota_hits = home_charger_poll_log.quota_hits + EXCLUDED.quota_hits,
-             updated_at = NOW()`,
-      [kstDate, kstHour, attempts, successes, partial, retries, quotaHits]
+         SET attempts        = home_charger_poll_log.attempts        + EXCLUDED.attempts,
+             successes       = home_charger_poll_log.successes       + EXCLUDED.successes,
+             partial         = home_charger_poll_log.partial         + EXCLUDED.partial,
+             retries         = home_charger_poll_log.retries         + EXCLUDED.retries,
+             quota_hits      = home_charger_poll_log.quota_hits      + EXCLUDED.quota_hits,
+             manual_attempts = home_charger_poll_log.manual_attempts + EXCLUDED.manual_attempts,
+             updated_at      = NOW()`,
+      [kstDate, kstHour, attempts, successes, partial, retries, quotaHits, manualAttempts]
     );
   } catch (e) {
     console.warn('[home-charger] poll log failed:', e.message);
@@ -330,7 +334,7 @@ export async function fetchPollLogDb(date) {
       target = `${nowKst.getUTCFullYear()}-${String(nowKst.getUTCMonth() + 1).padStart(2, '0')}-${String(nowKst.getUTCDate()).padStart(2, '0')}`;
     }
     const res = await pool.query(
-      `SELECT hour, attempts, successes, partial, retries, quota_hits
+      `SELECT hour, attempts, successes, partial, retries, quota_hits, manual_attempts
          FROM home_charger_poll_log
         WHERE date = $1::date
         ORDER BY hour`,
@@ -345,11 +349,13 @@ export async function fetchPollLogDb(date) {
         partial: Number(r.partial),
         retries: Number(r.retries),
         quotaHits: Number(r.quota_hits),
+        manualAttempts: Number(r.manual_attempts),
       };
     }
+    const empty = { attempts: 0, successes: 0, partial: 0, retries: 0, quotaHits: 0, manualAttempts: 0 };
     const hourly = [];
     for (let h = 0; h < 24; h++) {
-      hourly.push(rowsByHour[h] || { hour: h, attempts: 0, successes: 0, partial: 0, retries: 0, quotaHits: 0 });
+      hourly.push(rowsByHour[h] || { hour: h, ...empty });
     }
     const totals = hourly.reduce((a, r) => ({
       attempts: a.attempts + r.attempts,
@@ -357,7 +363,8 @@ export async function fetchPollLogDb(date) {
       partial: a.partial + r.partial,
       retries: a.retries + r.retries,
       quotaHits: a.quotaHits + r.quotaHits,
-    }), { attempts: 0, successes: 0, partial: 0, retries: 0, quotaHits: 0 });
+      manualAttempts: a.manualAttempts + r.manualAttempts,
+    }), { ...empty });
     return { date: target, hourly, totals };
   } catch (e) {
     console.warn('[home-charger] poll log fetch failed:', e.message);
@@ -372,11 +379,12 @@ export async function fetchPollLogDailyDb(days = 14) {
     const clampDays = Math.max(1, Math.min(90, Math.floor(Number(days) || 14)));
     const res = await pool.query(
       `SELECT to_char(date, 'YYYY-MM-DD') AS date_str,
-              SUM(attempts)::int   AS attempts,
-              SUM(successes)::int  AS successes,
-              SUM(partial)::int    AS partial,
-              SUM(retries)::int    AS retries,
-              SUM(quota_hits)::int AS quota_hits
+              SUM(attempts)::int        AS attempts,
+              SUM(successes)::int       AS successes,
+              SUM(partial)::int         AS partial,
+              SUM(retries)::int         AS retries,
+              SUM(quota_hits)::int      AS quota_hits,
+              SUM(manual_attempts)::int AS manual_attempts
          FROM home_charger_poll_log
         WHERE date >= (((NOW() AT TIME ZONE 'Asia/Seoul')::date) - ($1::int * INTERVAL '1 day'))::date
         GROUP BY date
@@ -390,6 +398,7 @@ export async function fetchPollLogDailyDb(days = 14) {
       partial: Number(r.partial),
       retries: Number(r.retries),
       quotaHits: Number(r.quota_hits),
+      manualAttempts: Number(r.manual_attempts),
     }));
     const totals = daily.reduce((a, r) => ({
       attempts: a.attempts + r.attempts,
@@ -397,7 +406,8 @@ export async function fetchPollLogDailyDb(days = 14) {
       partial: a.partial + r.partial,
       retries: a.retries + r.retries,
       quotaHits: a.quotaHits + r.quotaHits,
-    }), { attempts: 0, successes: 0, partial: 0, retries: 0, quotaHits: 0 });
+      manualAttempts: a.manualAttempts + r.manualAttempts,
+    }), { attempts: 0, successes: 0, partial: 0, retries: 0, quotaHits: 0, manualAttempts: 0 });
     return { days: clampDays, daily, totals };
   } catch (e) {
     console.warn('[home-charger] poll log daily fetch failed:', e.message);
@@ -439,17 +449,19 @@ async function ensureTable() {
   // 폴링 시도/성공/재시도 로그 — 디버그 팝업용
   await pool.query(`
     CREATE TABLE IF NOT EXISTS home_charger_poll_log (
-      date        DATE     NOT NULL,
-      hour        SMALLINT NOT NULL,
-      attempts    INTEGER  NOT NULL DEFAULT 0,
-      successes   INTEGER  NOT NULL DEFAULT 0,
-      partial     INTEGER  NOT NULL DEFAULT 0,
-      retries     INTEGER  NOT NULL DEFAULT 0,
-      quota_hits  INTEGER  NOT NULL DEFAULT 0,
-      updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      date             DATE     NOT NULL,
+      hour             SMALLINT NOT NULL,
+      attempts         INTEGER  NOT NULL DEFAULT 0,
+      successes        INTEGER  NOT NULL DEFAULT 0,
+      partial          INTEGER  NOT NULL DEFAULT 0,
+      retries          INTEGER  NOT NULL DEFAULT 0,
+      quota_hits       INTEGER  NOT NULL DEFAULT 0,
+      manual_attempts  INTEGER  NOT NULL DEFAULT 0,
+      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (date, hour)
     )
   `);
+  await pool.query(`ALTER TABLE home_charger_poll_log ADD COLUMN IF NOT EXISTS manual_attempts INTEGER NOT NULL DEFAULT 0`);
   await pool.query(`CREATE INDEX IF NOT EXISTS home_charger_poll_log_date_idx ON home_charger_poll_log (date)`);
   // 환경공단 API 응답 스냅샷 — 컨테이너 재시작 간 캐시 영속화
   await pool.query(`
