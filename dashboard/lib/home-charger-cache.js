@@ -34,11 +34,20 @@ let lastError = null;
 let quotaCooldownUntil = 0; // 쿼터 초과 감지 시 이 시각까지 백그라운드 호출 억제
 let failureCooldownUntil = 0; // 일반 실패(네트워크/파싱 등) 시 10분 쿨다운
 // 진단: 서버 인스트루멘테이션/클라이언트 폴링 동작 여부 확인용
-let warmCallCount = 0;     // 실제 upstream fetch 실행 횟수 (fresh면 no-op이라 증가 안 함)
-let lastWarmAt = 0;
-let tickCallCount = 0;     // setInterval 콜백이 진입한 횟수 (no-op 여부와 무관하게 루프 생존 신호)
-let lastTickAt = 0;
-const processStartedAt = Date.now();
+// NOTE: Next.js가 instrumentation-node와 API route를 별도 번들로 만들어
+// 이 모듈의 복사본이 2개 이상 생길 수 있음 → 모듈 레벨 let은 상태 공유 실패.
+// globalThis에 싱글톤으로 묶어 번들 경계를 우회.
+const DIAG_KEY = '__homeChargerDiag__';
+if (!globalThis[DIAG_KEY]) {
+  globalThis[DIAG_KEY] = {
+    warmCallCount: 0,   // 실제 upstream fetch 실행 횟수 (fresh면 no-op이라 증가 안 함)
+    lastWarmAt: 0,
+    tickCallCount: 0,   // setInterval 콜백 진입 횟수 (no-op 여부와 무관하게 루프 생존 신호)
+    lastTickAt: 0,
+    processStartedAt: Date.now(),
+  };
+}
+const diag = globalThis[DIAG_KEY];
 
 function staticTtlMs(now) {
   const kstHour = (now.getUTCHours() + 9) % 24;
@@ -311,17 +320,17 @@ export function getLastQuotaHitAt() { return lastQuotaHitAt; }
 export function isFailureCooldown() { return Date.now() < failureCooldownUntil; }
 export function getFailureCooldownUntil() { return failureCooldownUntil; }
 export function recordTick() {
-  tickCallCount++;
-  lastTickAt = Date.now();
+  diag.tickCallCount++;
+  diag.lastTickAt = Date.now();
 }
 export function getWarmDiag() {
   return {
-    warmCallCount,
-    lastWarmAt,
-    tickCallCount,
-    lastTickAt,
-    processStartedAt,
-    uptimeMs: Date.now() - processStartedAt,
+    warmCallCount: diag.warmCallCount,
+    lastWarmAt: diag.lastWarmAt,
+    tickCallCount: diag.tickCallCount,
+    lastTickAt: diag.lastTickAt,
+    processStartedAt: diag.processStartedAt,
+    uptimeMs: Date.now() - diag.processStartedAt,
   };
 }
 
@@ -744,8 +753,8 @@ export async function loadStations(statIds, key) {
 
 export async function warmIfNeeded() {
   // 진단: 진입할 때마다 카운트 (fresh/cooldown으로 skip 되어도 1회 집계)
-  warmCallCount++;
-  lastWarmAt = Date.now();
+  diag.warmCallCount++;
+  diag.lastWarmAt = Date.now();
   // fire-and-forget — 로그 실패해도 원래 로직 영향 없음
   recordPollLog({ warmCalls: 1 }).catch(() => {});
   const key = process.env.EV_CHARGER_API_KEY;
