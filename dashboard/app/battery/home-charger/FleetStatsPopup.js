@@ -36,9 +36,8 @@ export default function FleetStatsPopup({ onClose }) {
   }, []);
 
   const topN = (data?.perCharger || []).slice(0, 10);
-  const bottomN = (data?.perCharger || []).slice(-10);
+  const restN = (data?.perCharger || []).slice(10);
   const topMax = topN[0]?.count || 1;
-  const bottomMax = bottomN[0]?.count || 1;
   const rankIcons = ['🥇', '🥈', '🥉', '4', '5', '6', '7', '8', '9', '10'];
 
   useEffect(() => {
@@ -105,18 +104,23 @@ export default function FleetStatsPopup({ onClose }) {
                     </div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-zinc-400 mb-1.5">🐢 Bottom 10</div>
-                    <div className="space-y-0.5">
-                      {bottomN.map((e) => (
-                        <RankRow
-                          key={e.key}
-                          icon="·"
-                          label={formatEntry(e.key)}
-                          count={e.count}
-                          max={bottomMax}
-                        />
-                      ))}
-                    </div>
+                    <div className="text-[11px] text-zinc-400 mb-1.5">🐢 하위</div>
+                    {restN.length === 0 ? (
+                      <div className="text-[10px] text-zinc-600 py-1">없음</div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                        {restN.map((e, i) => (
+                          <div
+                            key={e.key}
+                            className="flex items-center gap-1 text-[10px] tabular-nums h-5 cursor-help"
+                            title={`${formatEntry(e.key)}: ${e.count}회`}
+                          >
+                            <span className="text-zinc-500 w-5 text-right shrink-0">{i + 11}</span>
+                            <span className="text-zinc-300 truncate">{formatEntry(e.key)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
