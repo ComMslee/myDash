@@ -8,7 +8,7 @@ const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 // 공공 API 일일 쿼터 1,000회/일 고려하여 시간대별 TTL 설정 (fallback)
 // 범위: 4~20분
 const CACHE_TIERS = [
-  { start:  0, end:  2, ttlMs: 15 * 60_000 }, // 자정 직후
+  { start:  0, end:  2, ttlMs: 10 * 60_000 }, // 자정 직후
   { start:  2, end:  5, ttlMs: 20 * 60_000 }, // 깊은 새벽
   { start:  5, end: 13, ttlMs: 15 * 60_000 }, // 아침~점심 전
   { start: 13, end: 18, ttlMs: 10 * 60_000 }, // 오후
