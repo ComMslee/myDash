@@ -629,6 +629,7 @@ export async function fetchFleetStatsDb(statIds, months) {
     hourly: Array(24).fill(0),
     hourlyAllTime: Array(24).fill(0),
     dow: Array(7).fill(0),
+    dowAllTime: Array(7).fill(0),
     perCharger: [],
     total: 0,
     daysCovered: 0,
@@ -692,10 +693,24 @@ export async function fetchFleetStatsDb(statIds, months) {
       hourlyAllTime[Number(r.hour)] = Number(r.total);
     }
 
+    // 4) 전체 누적 요일 히스토그램 — 일자별로 우선 집계 후 DoW 변환 (KST 기준 date)
+    const dowAllRes = await pool.query(
+      `SELECT EXTRACT(DOW FROM date)::int AS dow, SUM(LEAST(count, 1))::bigint AS total
+         FROM charger_usage_daily
+        WHERE stat_id = ANY($1)
+        GROUP BY dow`,
+      [statIds]
+    );
+    const dowAllTime = new Array(7).fill(0);
+    for (const r of dowAllRes.rows) {
+      dowAllTime[Number(r.dow)] = Number(r.total);
+    }
+
     return {
       hourly,
       hourlyAllTime,
       dow,
+      dowAllTime,
       perCharger,
       total: periodTotal,
       daysCovered: dateSet.size,
