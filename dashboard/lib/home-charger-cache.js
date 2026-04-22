@@ -279,16 +279,23 @@ function applyQuotaCooldown() {
   lastError = `일일 쿼터 초과 — ${formatKstTime(quotaCooldownUntil)} 재시도 예정`;
 }
 
-// 일반 실패(네트워크/파싱 등) 시 8분 대기 후 재시도
-// 단, 현재 TTL이 8분 미만이면 쿨다운 미적용 — 자연 폴링 주기로 충분히 자주 재시도됨
+// 실패 처리:
+//  · 첫 실패 → 3분 후 1회 재시도 (retryPending=true 로 다음 warm 호출을 retry로 식별)
+//  · 재시도도 실패 → 본격 쿨다운 8분
+// TTL 자체가 각 대기 시간보다 짧으면 쿨다운 미적용 (자연 폴링 주기로 충분)
+const RETRY_DELAY_MS = 3 * 60_000;
 const FAILURE_COOLDOWN_MS = 8 * 60_000;
-function applyFailureCooldown(reason) {
-  if (cacheTtlMs() < FAILURE_COOLDOWN_MS) {
-    console.warn(`[home-charger] fail (TTL<8m, no cooldown) — ${reason}`);
+let retryPending = false;
+function applyFailureCooldown(reason, { isRetry = false } = {}) {
+  const ms = isRetry ? FAILURE_COOLDOWN_MS : RETRY_DELAY_MS;
+  if (cacheTtlMs() < ms) {
+    console.warn(`[home-charger] fail (TTL<${ms/60_000}m, no cooldown) — ${reason}`);
+    retryPending = !isRetry; // 첫 실패는 다음 시도를 재시도로 표시 (쿨다운 없어도)
     return;
   }
-  failureCooldownUntil = Date.now() + FAILURE_COOLDOWN_MS;
-  console.warn(`[home-charger] failure cooldown — ${reason} · retry at ${formatKstTime(failureCooldownUntil)}`);
+  failureCooldownUntil = Date.now() + ms;
+  retryPending = !isRetry;
+  console.warn(`[home-charger] ${isRetry ? 'retry also failed — backoff 8m' : 'fail — retry in 3m'} · ${reason} · next at ${formatKstTime(failureCooldownUntil)}`);
 }
 
 export function isQuotaCooldown() { return Date.now() < quotaCooldownUntil; }
@@ -297,8 +304,14 @@ export function isFailureCooldown() { return Date.now() < failureCooldownUntil; 
 export function getFailureCooldownUntil() { return failureCooldownUntil; }
 
 // 폴링 로그 기록 — 시간 단위 버킷에 시도/성공/재시도/쿼터 카운트 누적
-// manualAttempts: /api/home-charger?refresh=1 경로 (수동 갱신 버튼)
-export async function recordPollLog({ attempts = 0, successes = 0, partial = 0, retries = 0, quotaHits = 0, manualAttempts = 0 } = {}) {
+// manualAttempts:  /api/home-charger?refresh=1 경로 (수동 갱신 버튼)
+// retrySuccesses:  첫 시도 실패 후 즉시 1회 재시도에서 성공
+// retries:         재시도도 실패
+export async function recordPollLog({
+  attempts = 0, successes = 0, partial = 0,
+  retries = 0, retrySuccesses = 0,
+  quotaHits = 0, manualAttempts = 0,
+} = {}) {
   try {
     await ensureTable();
     const nowKstMs = Date.now() + 9 * 60 * 60_000;
@@ -306,17 +319,18 @@ export async function recordPollLog({ attempts = 0, successes = 0, partial = 0, 
     const kstHour = nowKst.getUTCHours();
     const kstDate = `${nowKst.getUTCFullYear()}-${String(nowKst.getUTCMonth() + 1).padStart(2, '0')}-${String(nowKst.getUTCDate()).padStart(2, '0')}`;
     await pool.query(
-      `INSERT INTO home_charger_poll_log (date, hour, attempts, successes, partial, retries, quota_hits, manual_attempts)
-       VALUES ($1::date, $2::smallint, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO home_charger_poll_log (date, hour, attempts, successes, partial, retries, retry_successes, quota_hits, manual_attempts)
+       VALUES ($1::date, $2::smallint, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (date, hour) DO UPDATE
          SET attempts        = home_charger_poll_log.attempts        + EXCLUDED.attempts,
              successes       = home_charger_poll_log.successes       + EXCLUDED.successes,
              partial         = home_charger_poll_log.partial         + EXCLUDED.partial,
              retries         = home_charger_poll_log.retries         + EXCLUDED.retries,
+             retry_successes = home_charger_poll_log.retry_successes + EXCLUDED.retry_successes,
              quota_hits      = home_charger_poll_log.quota_hits      + EXCLUDED.quota_hits,
              manual_attempts = home_charger_poll_log.manual_attempts + EXCLUDED.manual_attempts,
              updated_at      = NOW()`,
-      [kstDate, kstHour, attempts, successes, partial, retries, quotaHits, manualAttempts]
+      [kstDate, kstHour, attempts, successes, partial, retries, retrySuccesses, quotaHits, manualAttempts]
     );
   } catch (e) {
     console.warn('[home-charger] poll log failed:', e.message);
@@ -334,7 +348,7 @@ export async function fetchPollLogDb(date) {
       target = `${nowKst.getUTCFullYear()}-${String(nowKst.getUTCMonth() + 1).padStart(2, '0')}-${String(nowKst.getUTCDate()).padStart(2, '0')}`;
     }
     const res = await pool.query(
-      `SELECT hour, attempts, successes, partial, retries, quota_hits, manual_attempts
+      `SELECT hour, attempts, successes, partial, retries, retry_successes, quota_hits, manual_attempts
          FROM home_charger_poll_log
         WHERE date = $1::date
         ORDER BY hour`,
@@ -348,11 +362,12 @@ export async function fetchPollLogDb(date) {
         successes: Number(r.successes),
         partial: Number(r.partial),
         retries: Number(r.retries),
+        retrySuccesses: Number(r.retry_successes),
         quotaHits: Number(r.quota_hits),
         manualAttempts: Number(r.manual_attempts),
       };
     }
-    const empty = { attempts: 0, successes: 0, partial: 0, retries: 0, quotaHits: 0, manualAttempts: 0 };
+    const empty = { attempts: 0, successes: 0, partial: 0, retries: 0, retrySuccesses: 0, quotaHits: 0, manualAttempts: 0 };
     const hourly = [];
     for (let h = 0; h < 24; h++) {
       hourly.push(rowsByHour[h] || { hour: h, ...empty });
@@ -379,12 +394,13 @@ export async function fetchPollLogDailyDb(days = 14) {
     const clampDays = Math.max(1, Math.min(90, Math.floor(Number(days) || 14)));
     const res = await pool.query(
       `SELECT to_char(date, 'YYYY-MM-DD') AS date_str,
-              SUM(attempts)::int        AS attempts,
-              SUM(successes)::int       AS successes,
-              SUM(partial)::int         AS partial,
-              SUM(retries)::int         AS retries,
-              SUM(quota_hits)::int      AS quota_hits,
-              SUM(manual_attempts)::int AS manual_attempts
+              SUM(attempts)::int         AS attempts,
+              SUM(successes)::int        AS successes,
+              SUM(partial)::int          AS partial,
+              SUM(retries)::int          AS retries,
+              SUM(retry_successes)::int  AS retry_successes,
+              SUM(quota_hits)::int       AS quota_hits,
+              SUM(manual_attempts)::int  AS manual_attempts
          FROM home_charger_poll_log
         WHERE date >= (((NOW() AT TIME ZONE 'Asia/Seoul')::date) - ($1::int * INTERVAL '1 day'))::date
         GROUP BY date
@@ -397,6 +413,7 @@ export async function fetchPollLogDailyDb(days = 14) {
       successes: Number(r.successes),
       partial: Number(r.partial),
       retries: Number(r.retries),
+      retrySuccesses: Number(r.retry_successes),
       quotaHits: Number(r.quota_hits),
       manualAttempts: Number(r.manual_attempts),
     }));
@@ -405,9 +422,10 @@ export async function fetchPollLogDailyDb(days = 14) {
       successes: a.successes + r.successes,
       partial: a.partial + r.partial,
       retries: a.retries + r.retries,
+      retrySuccesses: a.retrySuccesses + r.retrySuccesses,
       quotaHits: a.quotaHits + r.quotaHits,
       manualAttempts: a.manualAttempts + r.manualAttempts,
-    }), { attempts: 0, successes: 0, partial: 0, retries: 0, quotaHits: 0, manualAttempts: 0 });
+    }), { attempts: 0, successes: 0, partial: 0, retries: 0, retrySuccesses: 0, quotaHits: 0, manualAttempts: 0 });
     return { days: clampDays, daily, totals };
   } catch (e) {
     console.warn('[home-charger] poll log daily fetch failed:', e.message);
@@ -447,6 +465,8 @@ async function ensureTable() {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS charger_usage_daily_date_idx ON charger_usage_daily (date)`);
   // 폴링 시도/성공/재시도 로그 — 디버그 팝업용
+  // retries         = 재시도 후에도 실패한 건수
+  // retry_successes = 재시도 후 성공한 건수 (첫 시도 실패 → 즉시 1회 retry)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS home_charger_poll_log (
       date             DATE     NOT NULL,
@@ -455,6 +475,7 @@ async function ensureTable() {
       successes        INTEGER  NOT NULL DEFAULT 0,
       partial          INTEGER  NOT NULL DEFAULT 0,
       retries          INTEGER  NOT NULL DEFAULT 0,
+      retry_successes  INTEGER  NOT NULL DEFAULT 0,
       quota_hits       INTEGER  NOT NULL DEFAULT 0,
       manual_attempts  INTEGER  NOT NULL DEFAULT 0,
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -462,6 +483,7 @@ async function ensureTable() {
     )
   `);
   await pool.query(`ALTER TABLE home_charger_poll_log ADD COLUMN IF NOT EXISTS manual_attempts INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE home_charger_poll_log ADD COLUMN IF NOT EXISTS retry_successes INTEGER NOT NULL DEFAULT 0`);
   await pool.query(`CREATE INDEX IF NOT EXISTS home_charger_poll_log_date_idx ON home_charger_poll_log (date)`);
   // 환경공단 API 응답 스냅샷 — 컨테이너 재시작 간 캐시 영속화
   await pool.query(`
@@ -700,6 +722,7 @@ export async function warmIfNeeded() {
   if (isQuotaCooldown()) return cache.data; // 쿼터 초과 중엔 호출 억제, 기존 캐시만 사용
   if (isFailureCooldown()) return cache.data; // 일반 실패 후 10분간 재호출 억제
   if (inflight) return inflight;
+  const isRetryAttempt = retryPending;
   inflight = (async () => {
     try {
       const stations = await loadStations(statIds, key);
@@ -708,28 +731,35 @@ export async function warmIfNeeded() {
         const usage = await fetchUsageDb(stations.map(s => s.station.statId));
         const payload = { stations, fetchedAt: new Date().toISOString(), usage };
         setCache(payload);
-        if (stations.length === statIds.length) {
+        const full = stations.length === statIds.length;
+        if (full) {
           lastError = null;
-          failureCooldownUntil = 0; // 전부 성공 시 실패 쿨다운 해제
+          failureCooldownUntil = 0;
+          retryPending = false;
+        }
+        if (isRetryAttempt) {
+          recordPollLog({ attempts: 1, retrySuccesses: 1, partial: full ? 0 : 1 });
+        } else if (full) {
           recordPollLog({ attempts: 1, successes: 1 });
         } else {
           recordPollLog({ attempts: 1, partial: 1 });
         }
-        console.log(`[home-charger] warm cache loaded (${stations.length}/${statIds.length} station(s), ${stations.reduce((s,x)=>s+x.chargers.length,0)} chargers)`);
+        console.log(`[home-charger] warm cache loaded (${stations.length}/${statIds.length} station(s), ${stations.reduce((s,x)=>s+x.chargers.length,0)} chargers)${isRetryAttempt ? ' · retry succeeded' : ''}`);
         return payload;
       }
+
       if (!lastError) lastError = `스테이션 매칭 없음 (요청 ${statIds.join(',')})`;
       if (isQuotaCooldown()) {
         recordPollLog({ attempts: 1, quotaHits: 1 });
       } else {
-        applyFailureCooldown(lastError);
+        applyFailureCooldown(lastError, { isRetry: isRetryAttempt });
         recordPollLog({ attempts: 1, retries: 1 });
       }
       return null;
     } catch (e) {
       lastError = e.message || String(e);
       console.warn('[home-charger] warm failed:', lastError);
-      applyFailureCooldown(lastError);
+      applyFailureCooldown(lastError, { isRetry: isRetryAttempt });
       recordPollLog({ attempts: 1, retries: 1 });
       return null;
     } finally {
