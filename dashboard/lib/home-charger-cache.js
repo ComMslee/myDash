@@ -34,8 +34,10 @@ let lastError = null;
 let quotaCooldownUntil = 0; // 쿼터 초과 감지 시 이 시각까지 백그라운드 호출 억제
 let failureCooldownUntil = 0; // 일반 실패(네트워크/파싱 등) 시 10분 쿨다운
 // 진단: 서버 인스트루멘테이션/클라이언트 폴링 동작 여부 확인용
-let warmCallCount = 0;
+let warmCallCount = 0;     // 실제 upstream fetch 실행 횟수 (fresh면 no-op이라 증가 안 함)
 let lastWarmAt = 0;
+let tickCallCount = 0;     // setInterval 콜백이 진입한 횟수 (no-op 여부와 무관하게 루프 생존 신호)
+let lastTickAt = 0;
 const processStartedAt = Date.now();
 
 function staticTtlMs(now) {
@@ -308,10 +310,16 @@ export function getQuotaCooldownUntil() { return quotaCooldownUntil; }
 export function getLastQuotaHitAt() { return lastQuotaHitAt; }
 export function isFailureCooldown() { return Date.now() < failureCooldownUntil; }
 export function getFailureCooldownUntil() { return failureCooldownUntil; }
+export function recordTick() {
+  tickCallCount++;
+  lastTickAt = Date.now();
+}
 export function getWarmDiag() {
   return {
     warmCallCount,
     lastWarmAt,
+    tickCallCount,
+    lastTickAt,
     processStartedAt,
     uptimeMs: Date.now() - processStartedAt,
   };

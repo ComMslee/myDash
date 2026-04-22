@@ -47,36 +47,59 @@ function formatDuration(ms) {
   return `${h}h${String(m % 60).padStart(2, '0')}`;
 }
 
-// 서버 인스트루멘테이션 진단 카드 — 백그라운드 폴링 동작 여부 체크
+// 서버 인스트루멘테이션 진단 카드 — 백그라운드 폴링 루프 생존 여부 체크
+// 주의: lastWarmAt은 실제 upstream fetch 시점이라 캐시가 fresh하면 오래돼 보이는 게 정상.
+//       루프 생존은 tickCallCount(setInterval 콜백 카운터)로 판정.
+const TICK_INTERVAL_MS = 2 * 60_000;
 function WarmDiagCard({ diag }) {
   if (!diag) return null;
   const now = Date.now();
-  const sinceLast = diag.lastWarmAt ? now - diag.lastWarmAt : null;
+  const sinceLastWarm = diag.lastWarmAt ? now - diag.lastWarmAt : null;
+  const sinceLastTick = diag.lastTickAt ? now - diag.lastTickAt : null;
   const sinceBoot = diag.processStartedAt ? now - diag.processStartedAt : null;
-  // 2분 주기 인스트루멘테이션 기대 → 3분 초과면 의심
-  const stale = sinceLast != null && sinceLast > 3 * 60_000;
+  // 기대 tick 수 = floor(uptime / interval) + 1 (기동 즉시 1회 포함)
+  const expectedTicks = sinceBoot != null ? Math.floor(sinceBoot / TICK_INTERVAL_MS) + 1 : 0;
+  const actualTicks = diag.tickCallCount || 0;
+  // tick이 interval+여유(30s) 이상 안 뛰거나, 기대치 대비 2회 이상 빠지면 정체
+  const tickStale =
+    (sinceLastTick != null && sinceLastTick > TICK_INTERVAL_MS + 30_000) ||
+    (expectedTicks - actualTicks >= 2);
   return (
     <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] tabular-nums space-y-1">
       <div className="text-[10px] text-zinc-500 font-semibold">서버 백그라운드 상태</div>
-      <div className="grid grid-cols-3 gap-1 text-center">
+      <div className="grid grid-cols-4 gap-1 text-center">
         <div>
-          <div className="text-[10px] text-zinc-500">마지막 warm</div>
-          <div className={stale ? 'text-rose-400 font-semibold' : 'text-emerald-400 font-semibold'}>
-            {sinceLast != null ? `${formatDuration(sinceLast)} 전` : '-'}
+          <div className="text-[10px] text-zinc-500">마지막 tick</div>
+          <div className={tickStale ? 'text-rose-400 font-semibold' : 'text-emerald-400 font-semibold'}>
+            {sinceLastTick != null ? `${formatDuration(sinceLastTick)} 전` : '-'}
           </div>
         </div>
         <div>
-          <div className="text-[10px] text-zinc-500">warm 호출 수</div>
-          <div className="text-zinc-200 font-semibold">{diag.warmCallCount || 0}</div>
+          <div className="text-[10px] text-zinc-500">tick 수</div>
+          <div className="text-zinc-200 font-semibold">
+            {actualTicks}
+            {expectedTicks > 0 && (
+              <span className="text-[9px] text-zinc-500 ml-0.5">/{expectedTicks}</span>
+            )}
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] text-zinc-500">warm 수</div>
+          <div className="text-zinc-300 font-semibold">
+            {diag.warmCallCount || 0}
+            {sinceLastWarm != null && (
+              <span className="text-[9px] text-zinc-500 ml-0.5">({formatDuration(sinceLastWarm)})</span>
+            )}
+          </div>
         </div>
         <div>
           <div className="text-[10px] text-zinc-500">기동 후</div>
           <div className="text-zinc-300 font-semibold">{sinceBoot != null ? formatDuration(sinceBoot) : '-'}</div>
         </div>
       </div>
-      {stale && (
+      {tickStale && (
         <div className="text-[10px] text-rose-400">
-          ⚠️ 2분 주기 인스트루멘테이션이 정체된 것 같습니다.
+          ⚠️ 2분 주기 tick이 정체. 인스트루멘테이션 루프가 죽었을 수 있음.
         </div>
       )}
     </div>
