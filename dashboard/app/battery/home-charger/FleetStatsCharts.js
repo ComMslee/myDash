@@ -1,6 +1,17 @@
 // FleetStatsPopup 내부에서 재사용되는 차트 프리미티브
 import { DOW_LABELS } from './fleet-stats-utils';
 
+// 누적치 대응 — 1.2k / 34k / 1.2M 축약. title/호버엔 원본값 유지.
+function compact(n) {
+  if (n == null) return '';
+  const v = Number(n);
+  if (!Number.isFinite(v)) return String(n);
+  if (v < 1000) return String(v);
+  if (v < 10000) return (v / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  if (v < 1_000_000) return Math.round(v / 1000) + 'k';
+  return (v / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+}
+
 // 수평 막대 — 최댓값 대비 비율로 채움 (최소 2%로 가시성 확보)
 export function Bar({ value, max, className = '' }) {
   const pct = max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0;
@@ -26,7 +37,12 @@ export function RankRow({ icon, label, count, max, isPeak = false }) {
       />
       <span className="text-zinc-500 w-4 text-center shrink-0">{icon}</span>
       <span className="text-zinc-200 flex-1 truncate">{label}</span>
-      <span className={isPeak ? 'text-amber-400 font-semibold' : 'text-zinc-400'}>{count}</span>
+      <span
+        className={`shrink-0 tabular-nums ${isPeak ? 'text-amber-400 font-semibold' : 'text-zinc-400'}`}
+        title={`${count}회`}
+      >
+        {compact(count)}
+      </span>
     </div>
   );
 }
@@ -58,24 +74,14 @@ export function HourlyChart({ hourly }) {
           );
         })}
       </div>
-      <div className="flex gap-0.5 mt-1">
-        {hourly.map((v, h) => (
-          <div
-            key={h}
-            className="flex-1 text-center text-[8px] text-zinc-500 tabular-nums overflow-hidden leading-none"
-          >
-            {v > 0 ? v : ''}
-          </div>
-        ))}
-      </div>
       <div className="flex justify-between mt-1.5 text-[10px] text-zinc-500 tabular-nums px-px">
         <span className="font-semibold">0시</span><span>6</span><span>12</span><span>18</span><span>23시</span>
       </div>
       {max > 0 && (
         <div className="mt-1.5 text-[10px] text-zinc-400 flex flex-wrap gap-x-2 gap-y-0.5 tabular-nums">
-          <span>🔥 피크 {peakHour}시 ({max}회)</span>
-          {minHour >= 0 && <span>💤 한산 {minHour}시 ({minNonZero}회)</span>}
-          <span>총 {total}회</span>
+          <span title={`${max}회`}>🔥 피크 {peakHour}시 ({compact(max)}회)</span>
+          {minHour >= 0 && <span title={`${minNonZero}회`}>💤 한산 {minHour}시 ({compact(minNonZero)}회)</span>}
+          <span title={`${total}회`}>총 {compact(total)}회</span>
         </div>
       )}
     </div>
@@ -95,7 +101,7 @@ export function DowChart({ dow }) {
         const isPeak = i === peakIdx && v > 0;
         const isLow = v === minVal && v > 0 && v < max;
         return (
-          <div key={i} className="flex-1 flex flex-col items-center gap-1" title={`${DOW_LABELS[i]}: ${v}회`}>
+          <div key={i} className="flex-1 flex flex-col items-center gap-1 min-w-0" title={`${DOW_LABELS[i]}: ${v}회`}>
             <div
               className="w-full h-4 rounded-[3px]"
               style={{
@@ -104,8 +110,8 @@ export function DowChart({ dow }) {
               }}
             />
             <span className="text-[10px] text-zinc-500">{DOW_LABELS[i]}</span>
-            <span className={`text-[10px] tabular-nums ${isPeak ? 'text-amber-400 font-semibold' : 'text-zinc-400'}`}>
-              {v}{isPeak ? ' 🔥' : isLow ? ' 💤' : ''}
+            <span className={`text-[10px] tabular-nums truncate max-w-full ${isPeak ? 'text-amber-400 font-semibold' : 'text-zinc-400'}`}>
+              {compact(v)}{isPeak ? ' 🔥' : isLow ? ' 💤' : ''}
             </span>
           </div>
         );
