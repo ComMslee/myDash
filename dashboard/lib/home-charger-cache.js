@@ -678,6 +678,20 @@ export async function fetchFleetStatsDb(statIds, months) {
       key: `${r.stat_id}_${r.chger_id}`,
       count: Number(r.total),
     }));
+    // 캐시된 스테이션 목록에서 미사용(카운트 0) 충전기도 순위에 포함
+    const cachedStations = cache.data?.stations || [];
+    const existingKeys = new Set(perCharger.map(e => e.key));
+    for (const s of cachedStations) {
+      if (!statIds.includes(s.station.statId)) continue;
+      for (const c of s.chargers) {
+        const key = `${s.station.statId}_${c.chgerId}`;
+        if (!existingKeys.has(key)) {
+          perCharger.push({ key, count: 0 });
+          existingKeys.add(key);
+        }
+      }
+    }
+    perCharger.sort((a, b) => b.count - a.count);
     const allTimeTotal = perCharger.reduce((s, e) => s + e.count, 0);
 
     // 3) 전체 누적 시간대 히스토그램 — 1시간당 최대 1포인트 정규화 (동일 규칙)
@@ -724,12 +738,16 @@ export async function fetchFleetStatsDb(statIds, months) {
 }
 
 // statIds 배열로 조회, 반환 키는 "statId_chgerId"
+// charger_usage_daily를 시간당 최대 1포인트로 정규화 — 팝업 랭킹과 동일 기준
 export async function fetchUsageDb(statIds) {
   try {
     await ensureTable();
     if (!statIds.length) return {};
     const res = await pool.query(
-      `SELECT stat_id, chger_id, hour, count FROM charger_usage WHERE stat_id = ANY($1)`,
+      `SELECT stat_id, chger_id, hour, SUM(LEAST(count, 1))::int AS count
+         FROM charger_usage_daily
+        WHERE stat_id = ANY($1)
+        GROUP BY stat_id, chger_id, hour`,
       [statIds]
     );
     const usage = {};
