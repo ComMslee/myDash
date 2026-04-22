@@ -35,10 +35,11 @@ export default function FleetStatsPopup({ onClose }) {
     return () => { alive = false; };
   }, []);
 
-  const topN = (data?.perCharger || []).slice(0, 5);
-  const bottomN = (data?.perCharger || []).slice(-5);
+  const topN = (data?.perCharger || []).slice(0, 10);
+  const bottomN = (data?.perCharger || []).slice(-10);
   const topMax = topN[0]?.count || 1;
   const bottomMax = bottomN[0]?.count || 1;
+  const rankIcons = ['🥇', '🥈', '🥉', '4', '5', '6', '7', '8', '9', '10'];
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -89,12 +90,12 @@ export default function FleetStatsPopup({ onClose }) {
                 {/* Top / Bottom — 전체 기간 누적 */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <div className="text-[11px] text-zinc-400 mb-1.5">🏆 Top 5</div>
+                    <div className="text-[11px] text-zinc-400 mb-1.5">🏆 Top 10</div>
                     <div className="space-y-0.5">
                       {topN.map((e, i) => (
                         <RankRow
                           key={e.key}
-                          icon={['🥇', '🥈', '🥉', '4', '5'][i]}
+                          icon={rankIcons[i]}
                           label={formatEntry(e.key)}
                           count={e.count}
                           max={topMax}
@@ -104,7 +105,7 @@ export default function FleetStatsPopup({ onClose }) {
                     </div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-zinc-400 mb-1.5">🐢 Bottom 5</div>
+                    <div className="text-[11px] text-zinc-400 mb-1.5">🐢 Bottom 10</div>
                     <div className="space-y-0.5">
                       {bottomN.map((e) => (
                         <RankRow

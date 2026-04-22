@@ -63,11 +63,11 @@ export function UnifiedCell({ c, highlight, count, hourly, now }) {
   const localId = ID_OFFSET + Number(c.chgerId);
   const label = localId - 95100;
   const sizeClass = 'w-10 h-10 text-sm';
-  const ringClass = highlight?.tier === 'top3'
-    ? 'ring-[3px] ring-yellow-300 shadow-[0_0_8px_rgba(253,224,71,0.9)]'
-    : highlight?.tier === 'top10'
+  // top3은 트로피 이모지로 표시(링 없음), top10은 기존 얇은 노란 링
+  const ringClass = highlight?.tier === 'top10'
     ? 'ring-2 ring-yellow-400'
     : '';
+  const trophy = highlight?.tier === 'top3' ? ['🥇', '🥈', '🥉'][highlight.rank - 1] : null;
   const elapsed = elapsedLabel(c, now);
   const isCharging = c.stat === '3';
   const peak = peakHourOf(hourly);
@@ -92,12 +92,12 @@ export function UnifiedCell({ c, highlight, count, hourly, now }) {
         >
           {label}
         </div>
-        {highlight?.tier === 'top3' && (
+        {trophy && (
           <span
-            className="absolute -top-1.5 -right-1.5 w-[18px] h-[18px] rounded-full bg-yellow-300 text-black text-[10px] font-extrabold tabular-nums flex items-center justify-center leading-none shadow-[0_0_6px_rgba(253,224,71,0.9)] ring-1 ring-black/30"
+            className="absolute -top-2 -right-2 text-[16px] leading-none drop-shadow-[0_0_3px_rgba(0,0,0,0.8)] pointer-events-none"
             aria-label={`${highlight.rank}위`}
           >
-            {highlight.rank}
+            {trophy}
           </span>
         )}
       </div>
