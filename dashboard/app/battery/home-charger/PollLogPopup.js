@@ -37,6 +37,52 @@ function formatHHMM(ms) {
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 }
 
+function formatDuration(ms) {
+  if (!ms || ms < 0) return '-';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}초`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}분`;
+  const h = Math.floor(m / 60);
+  return `${h}h${String(m % 60).padStart(2, '0')}`;
+}
+
+// 서버 인스트루멘테이션 진단 카드 — 백그라운드 폴링 동작 여부 체크
+function WarmDiagCard({ diag }) {
+  if (!diag) return null;
+  const now = Date.now();
+  const sinceLast = diag.lastWarmAt ? now - diag.lastWarmAt : null;
+  const sinceBoot = diag.processStartedAt ? now - diag.processStartedAt : null;
+  // 2분 주기 인스트루멘테이션 기대 → 3분 초과면 의심
+  const stale = sinceLast != null && sinceLast > 3 * 60_000;
+  return (
+    <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] tabular-nums space-y-1">
+      <div className="text-[10px] text-zinc-500 font-semibold">서버 백그라운드 상태</div>
+      <div className="grid grid-cols-3 gap-1 text-center">
+        <div>
+          <div className="text-[10px] text-zinc-500">마지막 warm</div>
+          <div className={stale ? 'text-rose-400 font-semibold' : 'text-emerald-400 font-semibold'}>
+            {sinceLast != null ? `${formatDuration(sinceLast)} 전` : '-'}
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] text-zinc-500">warm 호출 수</div>
+          <div className="text-zinc-200 font-semibold">{diag.warmCallCount || 0}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-zinc-500">기동 후</div>
+          <div className="text-zinc-300 font-semibold">{sinceBoot != null ? formatDuration(sinceBoot) : '-'}</div>
+        </div>
+      </div>
+      {stale && (
+        <div className="text-[10px] text-rose-400">
+          ⚠️ 2분 주기 인스트루멘테이션이 정체된 것 같습니다.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SummaryCard({ totals, lastQuotaHitAt }) {
   const rate = successRate(totals);
   const manual = totals.manualAttempts || 0;
@@ -329,6 +375,7 @@ export default function PollLogPopup({ onClose }) {
           {!loading && !error && data && (
             <>
               <SummaryCard totals={data.totals || {}} lastQuotaHitAt={data.lastQuotaHitAt || 0} />
+              <WarmDiagCard diag={data.warmDiag} />
               <div className="overflow-x-auto">
                 {view === 'hourly' ? (
                   <HourlyTable
