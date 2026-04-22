@@ -5,20 +5,10 @@ import { useSearchParams } from 'next/navigation';
 import { useMock } from '../context/mock';
 import { KWH_PER_KM } from '../../lib/constants';
 import { formatDuration, shortAddr } from '../../lib/format';
+import { formatTimeRange } from '../../lib/kst';
 import DriveMap from '../components/DriveMap';
 import DriveListView from './DriveListView';
 import { useDriveData } from './useDriveData';
-
-function formatTimeRange(start, end) {
-  if (!start) return '—';
-  const s = new Date(start);
-  const datePart = `${s.getMonth() + 1}/${s.getDate()}`;
-  const sTime = `${String(s.getHours()).padStart(2, '0')}:${String(s.getMinutes()).padStart(2, '0')}`;
-  if (!end) return `${datePart} ${sTime}`;
-  const e = new Date(end);
-  const eTime = `${String(e.getHours()).padStart(2, '0')}:${String(e.getMinutes()).padStart(2, '0')}`;
-  return `${datePart} ${sTime}~${eTime}`;
-}
 
 function efficiency(d) {
   if (!d.start_rated_range_km || !d.end_rated_range_km || !d.distance) return null;

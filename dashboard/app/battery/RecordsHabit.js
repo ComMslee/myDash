@@ -2,46 +2,6 @@
 import { useState } from 'react';
 import { formatKorDate } from '@/lib/format';
 
-function HistBar({ counts, color }) {
-  const total = counts.reduce((a, b) => a + b, 0);
-  const maxCount = Math.max(1, ...counts);
-  const maxH = 56;
-  const maxIdx = counts.indexOf(maxCount);
-
-  if (total === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-1.5 py-4 text-zinc-600">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M9 9h.01M15 9h.01" />
-          <path d="M9 15s1 1 3 1 3-1 3-1" />
-        </svg>
-        <span className="text-[10px]">충전 기록이 없어요</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-end gap-0.5" style={{ height: maxH }}>
-      {counts.map((cnt, i) => {
-        const h = maxCount > 0 ? Math.max(2, Math.round((cnt / maxCount) * maxH)) : 2;
-        const isModal = i === maxIdx && cnt > 0;
-        return (
-          <div key={i} className="flex-1 rounded-t-sm transition-all duration-500"
-            style={{
-              height: h,
-              background: isModal ? color : color,
-              opacity: cnt === 0 ? 0.12 : isModal ? 1 : 0.55,
-              outline: isModal ? `1.5px solid ${color}` : 'none',
-            }}
-            title={`${i * 2}–${i * 2 + 2}%: ${cnt}회`}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
 const PERIODS = [
   { key: 'all', label: '전체' },
   { key: 'six_month', label: '6개월' },
@@ -77,7 +37,7 @@ export function DailyRecordsCard({ records }) {
       data: r.min_charge,
       mainVal: r.min_charge ? `${r.min_charge.kwh} kWh` : null,
       subVal: r.min_charge ? `+${r.min_charge.charge_pct}%` : null,
-      valClass: 'text-emerald-300',
+      valClass: 'text-emerald-400',
       accentClass: 'bg-emerald-500',
     },
     {
@@ -86,7 +46,7 @@ export function DailyRecordsCard({ records }) {
       data: r.min_consume,
       mainVal: r.min_consume ? `${r.min_consume.consume_kwh} kWh` : null,
       subVal: r.min_consume ? `-${r.min_consume.consume_pct}%` : null,
-      valClass: 'text-blue-300',
+      valClass: 'text-blue-400',
       accentClass: 'bg-blue-500',
     },
   ];
@@ -134,7 +94,7 @@ export function DailyRecordsCard({ records }) {
               />
               <div className="flex items-center gap-1.5 mb-1.5">
                 <span className={`text-base ${!hasData ? 'grayscale' : ''}`}>{c.icon}</span>
-                <span className="text-[9px] uppercase tracking-wider text-zinc-600">{c.label}</span>
+                <span className="text-[10px] uppercase tracking-wider text-zinc-500">{c.label}</span>
               </div>
               {hasData ? (
                 <div className="flex items-baseline gap-1.5 flex-wrap">

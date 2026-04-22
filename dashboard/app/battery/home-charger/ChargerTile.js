@@ -65,7 +65,7 @@ export function UnifiedCell({ c, highlight, count, hourly, now }) {
   const sizeClass = 'w-10 h-10 text-sm';
   // top3은 트로피 이모지로 표시(링 없음), top10은 기존 얇은 노란 링
   const ringClass = highlight?.tier === 'top10'
-    ? 'ring-2 ring-yellow-400'
+    ? 'ring-2 ring-amber-400'
     : '';
   const trophy = highlight?.tier === 'top3' ? ['🥇', '🥈', '🥉'][highlight.rank - 1] : null;
   const elapsed = elapsedLabel(c, now);

@@ -2,6 +2,7 @@
 // 각 statId별로 getChargerInfo?statId=XXX 호출 (전국 풀스캔 불필요, 쿼터 대폭 절감).
 
 import pool from '@/lib/db';
+import { formatHM, kstDateStr, KST_OFFSET_MS } from '@/lib/kst';
 
 const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 
@@ -279,19 +280,12 @@ function toStationPayload(items) {
   return { station, chargers };
 }
 
-function formatKstTime(ms) {
-  const d = new Date(ms + 9 * 60 * 60 * 1000);
-  const hh = String(d.getUTCHours()).padStart(2, '0');
-  const mm = String(d.getUTCMinutes()).padStart(2, '0');
-  return `${hh}:${mm}`;
-}
-
 let lastQuotaHitAt = 0;
 function applyQuotaCooldown() {
   // 429는 1시간 단위로 재확인
   lastQuotaHitAt = Date.now();
   quotaCooldownUntil = Date.now() + 60 * 60_000;
-  lastError = `일일 쿼터 초과 — ${formatKstTime(quotaCooldownUntil)} 재시도 예정`;
+  lastError = `일일 쿼터 초과 — ${formatHM(quotaCooldownUntil)} 재시도 예정`;
 }
 
 // 실패 처리:
@@ -310,7 +304,7 @@ function applyFailureCooldown(reason, { isRetry = false } = {}) {
   }
   failureCooldownUntil = Date.now() + ms;
   retryPending = !isRetry;
-  console.warn(`[home-charger] ${isRetry ? 'retry also failed — backoff 8m' : 'fail — retry in 3m'} · ${reason} · next at ${formatKstTime(failureCooldownUntil)}`);
+  console.warn(`[home-charger] ${isRetry ? 'retry also failed — backoff 8m' : 'fail — retry in 3m'} · ${reason} · next at ${formatHM(failureCooldownUntil)}`);
 }
 
 export function isQuotaCooldown() { return Date.now() < quotaCooldownUntil; }
@@ -344,10 +338,9 @@ export async function recordPollLog({
 } = {}) {
   try {
     await ensureTable();
-    const nowKstMs = Date.now() + 9 * 60 * 60_000;
-    const nowKst = new Date(nowKstMs);
-    const kstHour = nowKst.getUTCHours();
-    const kstDate = `${nowKst.getUTCFullYear()}-${String(nowKst.getUTCMonth() + 1).padStart(2, '0')}-${String(nowKst.getUTCDate()).padStart(2, '0')}`;
+    const now = Date.now();
+    const kstHour = new Date(now + KST_OFFSET_MS).getUTCHours();
+    const kstDate = kstDateStr(now);
     await pool.query(
       `INSERT INTO home_charger_poll_log (date, hour, attempts, successes, partial, retries, retry_successes, quota_hits, manual_attempts, warm_calls)
        VALUES ($1::date, $2::smallint, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -372,12 +365,7 @@ export async function recordPollLog({
 export async function fetchPollLogDb(date) {
   try {
     await ensureTable();
-    let target = date;
-    if (!target) {
-      const nowKstMs = Date.now() + 9 * 60 * 60_000;
-      const nowKst = new Date(nowKstMs);
-      target = `${nowKst.getUTCFullYear()}-${String(nowKst.getUTCMonth() + 1).padStart(2, '0')}-${String(nowKst.getUTCDate()).padStart(2, '0')}`;
-    }
+    const target = date || kstDateStr(Date.now());
     const res = await pool.query(
       `SELECT hour, attempts, successes, partial, retries, retry_successes, quota_hits, manual_attempts, warm_calls
          FROM home_charger_poll_log
@@ -585,10 +573,9 @@ export async function bootstrapCacheFromDb() {
 export async function recordUsageDb(stations) {
   try {
     await ensureTable();
-    const nowKstMs = Date.now() + 9 * 60 * 60_000;
-    const nowKst = new Date(nowKstMs);
-    const kstHour = nowKst.getUTCHours();
-    const kstDate = `${nowKst.getUTCFullYear()}-${String(nowKst.getUTCMonth() + 1).padStart(2, '0')}-${String(nowKst.getUTCDate()).padStart(2, '0')}`;
+    const now = Date.now();
+    const kstHour = new Date(now + KST_OFFSET_MS).getUTCHours();
+    const kstDate = kstDateStr(now);
     const rows = stations.flatMap(s =>
       s.chargers.filter(c => c.stat === '3').map(c => [s.station.statId, c.chgerId])
     );

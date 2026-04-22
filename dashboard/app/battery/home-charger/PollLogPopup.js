@@ -1,11 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-
-function kstTodayStr(offsetDays = 0) {
-  const nowKstMs = Date.now() + 9 * 60 * 60_000 + offsetDays * 24 * 60 * 60_000;
-  const d = new Date(nowKstMs);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
-}
+import { formatHM, kstDateStr, KST_OFFSET_MS } from '@/lib/kst';
 
 function successRate(row) {
   if (!row || !row.attempts) return null;
@@ -29,12 +24,6 @@ function TabButton({ active, onClick, children }) {
       {children}
     </button>
   );
-}
-
-function formatHHMM(ms) {
-  if (!ms) return null;
-  const d = new Date(ms + 9 * 60 * 60_000);
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 }
 
 function formatDuration(ms) {
@@ -115,7 +104,7 @@ function SummaryCard({ totals, lastQuotaHitAt }) {
   const partial = totals.partial || 0;
   const retries = totals.retries || 0;
   const retrySuccesses = totals.retrySuccesses || 0;
-  const quotaTime = formatHHMM(lastQuotaHitAt);
+  const quotaTime = lastQuotaHitAt ? formatHM(lastQuotaHitAt) : null;
   return (
     <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg px-3 py-2 space-y-1.5 text-[12px] tabular-nums">
       {/* 호출 소스 · 쿼터 */}
@@ -292,7 +281,7 @@ export default function PollLogPopup({ onClose }) {
         if (view === 'daily') {
           url = `/api/home-charger/poll-log?view=daily&days=${days}`;
         } else {
-          const dateStr = kstTodayStr(offset);
+          const dateStr = kstDateStr(Date.now(), offset);
           url = `/api/home-charger/poll-log?date=${dateStr}`;
         }
         const res = await fetch(url, { cache: 'no-store' });
@@ -309,12 +298,9 @@ export default function PollLogPopup({ onClose }) {
     return () => { alive = false; };
   }, [view, offset, days]);
 
-  const nowHour = (() => {
-    const n = new Date(Date.now() + 9 * 60 * 60_000);
-    return n.getUTCHours();
-  })();
+  const nowHour = new Date(Date.now() + KST_OFFSET_MS).getUTCHours();
   const isToday = offset === 0;
-  const todayStr = kstTodayStr(0);
+  const todayStr = kstDateStr(Date.now());
 
   return (
     <div

@@ -13,9 +13,10 @@ export function toKstDate(input) {
   return new Date(d.getTime() + KST_OFFSET_MS);
 }
 
-/** KST 기준 'YYYY-MM-DD' 문자열 반환 */
-export function kstDateStr(input) {
-  const kst = toKstDate(input);
+/** KST 기준 'YYYY-MM-DD' 문자열 반환. offsetDays로 앞/뒤 날짜 이동 가능. */
+export function kstDateStr(input, offsetDays = 0) {
+  const base = input instanceof Date ? input.getTime() : new Date(input).getTime();
+  const kst = new Date(base + KST_OFFSET_MS + offsetDays * 24 * 60 * 60 * 1000);
   const y = kst.getUTCFullYear();
   const m = String(kst.getUTCMonth() + 1).padStart(2, '0');
   const d = String(kst.getUTCDate()).padStart(2, '0');
@@ -30,12 +31,13 @@ export function formatHM(input) {
   return `${hh}:${mm}`;
 }
 
-/** 'M/D HH:MM~HH:MM' — start~end 범위를 KST로 포맷 */
+/** 'M/D HH:MM~HH:MM' — start~end 범위를 KST로 포맷. end 없으면 'M/D HH:MM' */
 export function formatTimeRange(start, end) {
+  if (!start) return '—';
   const s = toKstDate(start);
-  const e = toKstDate(end);
   const mm = s.getUTCMonth() + 1;
   const dd = s.getUTCDate();
+  if (!end) return `${mm}/${dd} ${formatHM(start)}`;
   return `${mm}/${dd} ${formatHM(start)}~${formatHM(end)}`;
 }
 

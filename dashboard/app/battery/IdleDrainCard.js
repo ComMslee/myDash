@@ -102,8 +102,8 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                   return (
                     <div
                       key={i}
-                      className="absolute top-0 bottom-0 flex items-center justify-center text-[9px] font-bold tabular-nums text-white/90"
-                      style={{ left: `${leftPct}%`, width: `${widthPct}%`, background: bg }}
+                      className="absolute top-0 bottom-0 flex items-center justify-center text-[10px] font-bold tabular-nums text-white"
+                      style={{ left: `${leftPct}%`, width: `${widthPct}%`, background: bg, textShadow: '0 0 2px rgba(0,0,0,0.6)' }}
                       title={`${formatHM(r.idle_start)}~${r.idle_end ? formatHM(r.idle_end) : '현재'} · ${formatHours(r.idle_hours)} · ${r.soc_start}→${r.soc_end}% · ${isZero ? '0%' : `-${fmtDrop(r.soc_drop)}%`}${isPreCharge ? ' · ⚡충전 전 대기' : ''}`}
                     >
                       {showLabel ? (isZero ? '0' : `-${fmtDrop(r.soc_drop)}%`) : ''}

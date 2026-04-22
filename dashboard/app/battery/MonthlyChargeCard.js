@@ -58,11 +58,11 @@ export default function MonthlyChargeCard() {
         {/* 완속 / 급속 */}
         <div className="mb-4">
           <div className="flex justify-between text-xs mb-1.5">
-            <span className="text-blue-400">완속 {data.slow_charges}회</span>
+            <span className="text-emerald-400">완속 {data.slow_charges}회</span>
             <span className="text-rose-400">급속 {data.fast_charges}회</span>
           </div>
           <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden flex">
-            <div className="h-full bg-blue-500 transition-all" style={{ width: `${slowRatio * 100}%` }} />
+            <div className="h-full bg-emerald-500 transition-all" style={{ width: `${slowRatio * 100}%` }} />
             <div className="h-full bg-rose-500 transition-all" style={{ width: `${fastRatio * 100}%` }} />
           </div>
           <div className="flex justify-between text-xs text-zinc-600 mt-1">
@@ -73,8 +73,8 @@ export default function MonthlyChargeCard() {
 
         {/* 시간대별 / 요일별 */}
         <div className="pt-4 border-t border-white/[0.06] space-y-4">
-          <HourlyHeatmap data={data.charge_hourly} hexColor="#22c55e" />
-          <WeekdayBars data={data.charge_weekday} hexColor="#22c55e" />
+          <HourlyHeatmap data={data.charge_hourly} hexColor="#4ade80" />
+          <WeekdayBars data={data.charge_weekday} hexColor="#4ade80" />
         </div>
       </div>
     </div>
