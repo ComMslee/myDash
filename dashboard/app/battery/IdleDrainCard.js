@@ -107,24 +107,20 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
       {/* 요약 */}
       <div className="grid grid-cols-3 border-b border-white/[0.06]">
         <div className="text-center py-3 border-r border-white/[0.06]">
-          <div className="text-[10px] text-zinc-600 mb-1">
-            일평균 손실
-            {(totalClimatePct != null || totalSentryPct != null) && (
-              <span className="ml-1 tabular-nums">
-                {totalClimatePct != null && (
-                  <span className="text-sky-700 opacity-80" title={`공조 작동 ${Math.round(totalClimateMin)}분`}>
-                    <span aria-hidden="true">🌀</span>{totalClimatePct}%
-                  </span>
-                )}
-                {totalSentryPct != null && (
-                  <span className="text-fuchsia-400 opacity-80 ml-1" title={`센트리 의심 ${Math.round(totalSentryMin)}분`}>
-                    <span aria-hidden="true">🛡</span>{totalSentryPct}%
-                  </span>
-                )}
+          <div className="text-[10px] text-zinc-600 mb-1">일평균 손실</div>
+          <div className="text-sm font-extrabold tabular-nums text-amber-400">
+            {avgDrainPerDay}%
+            {totalClimatePct != null && (
+              <span className="text-[10px] font-normal text-sky-700 opacity-80 ml-1" title={`공조 작동 ${Math.round(totalClimateMin)}분`}>
+                <span aria-hidden="true">🌀</span>{totalClimatePct}%
+              </span>
+            )}
+            {totalSentryPct != null && (
+              <span className="text-[10px] font-normal text-fuchsia-400 opacity-80 ml-1" title={`센트리 의심 ${Math.round(totalSentryMin)}분`}>
+                <span aria-hidden="true">🛡</span>{totalSentryPct}%
               </span>
             )}
           </div>
-          <div className="text-sm font-extrabold tabular-nums text-amber-400">{avgDrainPerDay}%</div>
           <div className="text-[9px] text-zinc-600 mt-0.5">/일</div>
         </div>
         <div className="text-center py-3 border-r border-white/[0.06]">
