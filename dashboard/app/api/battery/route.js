@@ -246,6 +246,10 @@ export async function GET() {
         climate_spans: Array.isArray(r.climate_spans)
           ? r.climate_spans.map(sp => ({ s: Number(sp.s), e: Number(sp.e) }))
           : [],
+        online_minutes: parseFloat(r.online_minutes) || 0,
+        online_spans: Array.isArray(r.online_spans)
+          ? r.online_spans.map(sp => ({ s: Number(sp.s), e: Number(sp.e) }))
+          : [],
       })),
       charging_sessions: chargingSessionsResult.rows.map(r => ({
         start: r.start_date,

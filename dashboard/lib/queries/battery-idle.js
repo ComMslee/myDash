@@ -45,7 +45,9 @@ export function queryIdleDrain(carId) {
     SELECT f.idle_start, f.idle_end, f.soc_start, f.soc_end, f.next_type,
       f.soc_drop, f.idle_hours,
       COALESCE(c.climate_minutes, 0)::float AS climate_minutes,
-      COALESCE(c.spans, '[]'::jsonb) AS climate_spans
+      COALESCE(c.spans, '[]'::jsonb) AS climate_spans,
+      COALESCE(o.online_minutes, 0)::float AS online_minutes,
+      COALESCE(o.spans, '[]'::jsonb) AS online_spans
     FROM filtered f
     LEFT JOIN LATERAL (
       -- LATERAL 안에는 CTE 대신 중첩 서브쿼리 사용 (Postgres planner 호환)
@@ -87,6 +89,29 @@ export function queryIdleDrain(carId) {
         HAVING EXTRACT(EPOCH FROM (MAX(row_end) - MIN(date))) >= 180
       ) runs
     ) c ON true
+    LEFT JOIN LATERAL (
+      -- states.state='online' 구간을 idle에 클리핑. 센트리 의심 구간 추정용.
+      SELECT
+        COALESCE(
+          jsonb_agg(jsonb_build_object(
+            's', FLOOR(EXTRACT(EPOCH FROM seg_start) * 1000)::bigint,
+            'e', FLOOR(EXTRACT(EPOCH FROM seg_end) * 1000)::bigint
+          ) ORDER BY seg_start),
+          '[]'::jsonb
+        ) AS spans,
+        ROUND(COALESCE(SUM(EXTRACT(EPOCH FROM (seg_end - seg_start))), 0)::numeric / 60, 1) AS online_minutes
+      FROM (
+        SELECT
+          GREATEST(s.start_date, f.idle_start) AS seg_start,
+          LEAST(COALESCE(s.end_date, NOW()), f.idle_end) AS seg_end
+        FROM states s
+        WHERE s.car_id = $1
+          AND s.state = 'online'
+          AND s.start_date < f.idle_end
+          AND COALESCE(s.end_date, NOW()) > f.idle_start
+      ) clipped
+      WHERE seg_end > seg_start
+    ) o ON true
     ORDER BY f.idle_start DESC
   `, [carId]);
 }

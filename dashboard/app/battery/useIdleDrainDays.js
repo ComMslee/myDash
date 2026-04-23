@@ -28,17 +28,20 @@ export function useIdleDrainDays(records, chargingSessions = []) {
       if (endMs <= startMs) return;
       const totalMs = endMs - startMs;
       const totalDrop = r.soc_drop || 0;
-      const spans = Array.isArray(r.climate_spans) ? r.climate_spans : [];
+      const climateSpansAll = Array.isArray(r.climate_spans) ? r.climate_spans : [];
+      const onlineSpansAll = Array.isArray(r.online_spans) ? r.online_spans : [];
+      const clipSpans = (list, segStart, segEnd) => list
+        .map(sp => ({ s: Math.max(sp.s, segStart), e: Math.min(sp.e, segEnd) }))
+        .filter(sp => sp.e > sp.s);
+      const sumSpansMs = (list) => list.reduce((t, sp) => t + (sp.e - sp.s), 0);
       for (const seg of splitByKstMidnight(startMs, endMs)) {
         const segMs = seg.endMs - seg.startMs;
         const segRatio = segMs / totalMs;
         const segDrop = Math.round(totalDrop * segRatio * 10) / 10;
-        // 공조 구간은 세그먼트 [startMs, endMs]로 클리핑 → 실측값으로 분배
-        const segSpans = spans
-          .map(sp => ({ s: Math.max(sp.s, seg.startMs), e: Math.min(sp.e, seg.endMs) }))
-          .filter(sp => sp.e > sp.s);
-        const segClimateMs = segSpans.reduce((t, sp) => t + (sp.e - sp.s), 0);
-        const segClimate = Math.round(segClimateMs / 60000 * 10) / 10;
+        const segClimateSpans = clipSpans(climateSpansAll, seg.startMs, seg.endMs);
+        const segOnlineSpans = clipSpans(onlineSpansAll, seg.startMs, seg.endMs);
+        const segClimate = Math.round(sumSpansMs(segClimateSpans) / 60000 * 10) / 10;
+        const segOnline = Math.round(sumSpansMs(segOnlineSpans) / 60000 * 10) / 10;
         const socStart = r.soc_start != null ? r.soc_start - totalDrop * ((seg.startMs - startMs) / totalMs) : null;
         const socEnd = r.soc_start != null ? r.soc_start - totalDrop * ((seg.endMs - startMs) / totalMs) : null;
         expandedRecords.push({
@@ -47,7 +50,9 @@ export function useIdleDrainDays(records, chargingSessions = []) {
           idle_hours: segMs / 3600000,
           soc_drop: segDrop,
           climate_minutes: segClimate,
-          climate_spans: segSpans,
+          climate_spans: segClimateSpans,
+          online_minutes: segOnline,
+          online_spans: segOnlineSpans,
           soc_start: socStart != null ? Math.round(socStart * 10) / 10 : null,
           soc_end: socEnd != null ? Math.round(socEnd * 10) / 10 : null,
           next_type: r.next_type,

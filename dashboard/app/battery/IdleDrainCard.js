@@ -5,14 +5,20 @@ import { formatHours } from '@/lib/format';
 import { toKstDate, formatHM } from '@/lib/kst';
 import { useIdleDrainDays } from './useIdleDrainDays';
 
-// 공조(HVAC) 밴드 색 — sky-400 솔리드 (drain 바 아래에 별도 라인)
+// 하단 밴드 색 — 공조(sky-400) > 센트리 의심(violet-400) 순서로 레이어
 const CLIMATE_BG = 'rgba(56,189,248,0.9)';
+const SENTRY_BG = 'rgba(167,139,250,0.85)';
 
-// 공조 비중 (%) — idle 전체 대비 공조 작동 분 비율. 1% 미만이면 null
-function climatePct(climateMin, idleHours) {
+// idle 전체 대비 퍼센트 — 1% 미만이면 null
+function pctOf(minutes, idleHours) {
   if (!idleHours || idleHours <= 0) return null;
-  const pct = Math.round((climateMin / (idleHours * 60)) * 100);
+  const pct = Math.round((minutes / (idleHours * 60)) * 100);
   return pct >= 1 ? pct : null;
+}
+
+// 센트리 의심 분 = 온라인 - 공조 (음수면 0)
+function sentryMin(onlineMin, climateMin) {
+  return Math.max(0, (onlineMin || 0) - (climateMin || 0));
 }
 
 // 대기 손실 5단계 색상 (신호등형 그라데이션)
@@ -84,7 +90,10 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
         const dayDropRaw = items.reduce((s, r) => s + r.soc_drop, 0);
         const dayDrop = Math.round(dayDropRaw * 10) / 10;
         const dayClimateMin = items.reduce((s, r) => s + (r.climate_minutes || 0), 0);
-        const dayClimatePct = climatePct(dayClimateMin, dayIdleH);
+        const dayOnlineMin = items.reduce((s, r) => s + (r.online_minutes || 0), 0);
+        const daySentryMin = sentryMin(dayOnlineMin, dayClimateMin);
+        const dayClimatePct = pctOf(dayClimateMin, dayIdleH);
+        const daySentryPct = pctOf(daySentryMin, dayIdleH);
         return (
           <div key={key} className="border-t border-white/[0.04]">
             <div className="px-4 py-1.5 bg-white/[0.02] flex items-center justify-between">
@@ -100,6 +109,14 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                       (<span aria-hidden="true">🌀</span>{dayClimatePct}%)
                     </span>
                   )}
+                  {daySentryPct != null && (
+                    <span
+                      className="text-violet-700 ml-1 opacity-80"
+                      title={`센트리 의심(공조 제외 온라인) 추정 ${Math.round(daySentryMin)}분`}
+                    >
+                      (<span aria-hidden="true">🛡</span>{daySentryPct}%)
+                    </span>
+                  )}
                 </span>
                 <span className={`text-[10px] font-bold ${dropTextClass(dayDrop)}`}>
                   {dayDrop < 0.05 ? '0%' : `-${fmtDrop(dayDrop)}%`}
@@ -107,8 +124,8 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
               </div>
             </div>
             <div className="px-4 py-2.5">
-              {/* 24h 타임라인 — 상단: drain 바(24px) · 하단: 공조 밴드(8px) */}
-              <div className="relative w-full h-8 rounded-md overflow-hidden bg-white/[0.05]">
+              {/* 24h 타임라인 — 상단 drain(32px) + 하단 공조/센트리 밴드(16px) */}
+              <div className="relative w-full h-12 rounded-md overflow-hidden bg-white/[0.05]">
                 {items.map((r, i) => {
                   const kstStart = toKstDate(r.idle_start);
                   const hourOffset = kstStart.getUTCHours() + kstStart.getUTCMinutes() / 60 + kstStart.getUTCSeconds() / 3600;
@@ -122,7 +139,10 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                     ? (isPreCharge ? 'rgba(234,179,8,0.3)' : 'rgba(16,185,129,0.3)')
                     : (isPreCharge ? 'rgba(234,179,8,0.85)' : dropBarBg(r.soc_drop));
                   const climateMin = r.climate_minutes || 0;
+                  const onlineMin = r.online_minutes || 0;
+                  const itemSentryMin = sentryMin(onlineMin, climateMin);
                   const climateSpans = r.climate_spans || [];
+                  const onlineSpans = r.online_spans || [];
                   const showLabel = widthPct >= 10;
                   const titleParts = [
                     `${formatHM(r.idle_start)}~${r.idle_end ? formatHM(r.idle_end) : '현재'}`,
@@ -131,16 +151,18 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                     isZero ? '0%' : `-${fmtDrop(r.soc_drop)}%`,
                   ];
                   if (isPreCharge) titleParts.push('⚡충전 전 대기');
-                  const itemClimatePct = climatePct(climateMin, r.idle_hours);
+                  const itemClimatePct = pctOf(climateMin, r.idle_hours);
+                  const itemSentryPct = pctOf(itemSentryMin, r.idle_hours);
                   if (itemClimatePct != null) titleParts.push(`🌀 공조 ${itemClimatePct}%`);
+                  if (itemSentryPct != null) titleParts.push(`🛡 센트리 의심 ${itemSentryPct}%`);
                   return (
                     <Fragment key={i}>
-                      {/* drain 바 — 상단 24px */}
+                      {/* drain 바 — 상단 32px */}
                       <div
                         className="absolute left-0 flex items-center justify-center text-[10px] font-bold tabular-nums text-white"
                         style={{
                           top: 0,
-                          height: '24px',
+                          height: '32px',
                           left: `${leftPct}%`,
                           width: `${widthPct}%`,
                           background: bg,
@@ -150,7 +172,28 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                       >
                         {showLabel ? (isZero ? '0' : `-${fmtDrop(r.soc_drop)}%`) : ''}
                       </div>
-                      {/* 공조 구간 밴드 — 하단 8px, 해당 좌표에만 솔리드 sky */}
+                      {/* 센트리 의심 밴드 — 온라인 전체 구간 (violet). 공조 밴드가 위에서 덮음 */}
+                      {onlineSpans.map((sp, spi) => {
+                        const spKst = toKstDate(new Date(sp.s).toISOString());
+                        const spHour = spKst.getUTCHours() + spKst.getUTCMinutes() / 60 + spKst.getUTCSeconds() / 3600;
+                        const spLeft = (spHour / 24) * 100;
+                        const spWidth = ((sp.e - sp.s) / 3600000 / 24) * 100;
+                        if (spWidth <= 0) return null;
+                        return (
+                          <div
+                            key={`on-${i}-${spi}`}
+                            className="absolute pointer-events-none"
+                            style={{
+                              bottom: 0,
+                              height: '16px',
+                              left: `${spLeft}%`,
+                              width: `${spWidth}%`,
+                              background: SENTRY_BG,
+                            }}
+                          />
+                        );
+                      })}
+                      {/* 공조 구간 밴드 — 센트리 위에 덮음 (우선 표시) */}
                       {climateSpans.map((sp, spi) => {
                         const spKst = toKstDate(new Date(sp.s).toISOString());
                         const spHour = spKst.getUTCHours() + spKst.getUTCMinutes() / 60 + spKst.getUTCSeconds() / 3600;
@@ -163,7 +206,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                             className="absolute pointer-events-none"
                             style={{
                               bottom: 0,
-                              height: '8px',
+                              height: '16px',
                               left: `${spLeft}%`,
                               width: `${spWidth}%`,
                               background: CLIMATE_BG,
