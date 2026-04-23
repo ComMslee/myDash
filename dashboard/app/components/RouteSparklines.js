@@ -127,23 +127,47 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
     );
   };
 
-  // 기본 요약 (미선택 시): 속도=최고, 고도=순증감, 온도=범위
-  const speedDefault = maxSpeed != null ? `최고 ${maxSpeed}km/h` : null;
+  // 기본 요약: 속도=최고, 고도=순증감 (온도는 기본 표시 없음 — 선택 시에만)
+  const speedDefault = maxSpeed != null ? `최고 ${maxSpeed}` : null;
   const elevDefault = elevGain != null
-    ? `${elevGain >= 0 ? '+' : ''}${elevGain}m`
-    : (minElev != null ? `${minElev}~${maxElev}m` : null);
-  const tempDefault = minTemp != null ? `${minTemp}~${maxTemp}°C` : null;
+    ? `${elevGain >= 0 ? '+' : ''}${elevGain}`
+    : null;
 
+  // 선택 시: "기본 > 선택값" 형식 (온도는 선택값만)
   const rowSummary = (key) => {
-    if (hasSel && sel[key] != null) {
-      const v = sel[key];
-      const txt = key === 'speed' ? `${Math.round(v)}km/h`
-        : key === 'elev' ? `${Math.round(v)}m`
-        : `${(Math.round(v * 10) / 10).toFixed(1)}°C`;
-      return <span className="text-fuchsia-400">{txt}</span>;
+    if (key === 'temp') {
+      if (hasSel && sel.temp != null) {
+        return (
+          <span className="text-fuchsia-400">
+            {(Math.round(sel.temp * 10) / 10).toFixed(1)}°C
+          </span>
+        );
+      }
+      return null;
     }
-    const def = key === 'speed' ? speedDefault : key === 'elev' ? elevDefault : tempDefault;
-    return def ? <span className="text-zinc-500">{def}</span> : null;
+    if (key === 'speed') {
+      if (speedDefault == null) return null;
+      return (
+        <span className="text-zinc-500">
+          {speedDefault}
+          {hasSel && sel.speed != null && (
+            <> <span className="text-zinc-700">{'>'}</span> <span className="text-fuchsia-400">{Math.round(sel.speed)}</span></>
+          )}
+          <span className="text-zinc-600">km/h</span>
+        </span>
+      );
+    }
+    // elev
+    if (elevDefault == null) return null;
+    return (
+      <span className="text-zinc-500">
+        {elevDefault}
+        {hasSel && sel.elev != null && (
+          <> <span className="text-zinc-700">{'>'}</span> <span className="text-fuchsia-400">{Math.round(sel.elev)}</span></>
+        )}
+        <span className="text-zinc-600">m</span>
+      </span>
+    );
   };
 
   return (
@@ -214,7 +238,7 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
       </div>
 
       {/* 우: 요약/선택값 */}
-      <div className="flex flex-col flex-shrink-0 text-[10px] tabular-nums text-right" style={{ width: 84 }}>
+      <div className="flex flex-col flex-shrink-0 text-[10px] tabular-nums text-right whitespace-nowrap" style={{ width: 108 }}>
         <span className="flex items-center justify-end" style={{ height: ROW_H }}>{rowSummary('speed')}</span>
         <span className="flex items-center justify-end" style={{ height: ROW_H }}>{rowSummary('elev')}</span>
         <span className="flex items-center justify-end" style={{ height: ROW_H }}>{rowSummary('temp')}</span>
