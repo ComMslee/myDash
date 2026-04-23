@@ -112,7 +112,34 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
 
   const hasSel = selectedIdx != null && selectedIdx >= 0 && selectedIdx < n;
   const selX = hasSel ? xOf(selectedIdx) : null;
-  const sel = hasSel ? flat[selectedIdx] : null;
+
+  // 선택 idx에 해당 key 값이 null이면 같은 drive 내 앞/뒤 non-null 샘플로 선형 보간
+  // (sparkline 라인이 실제로 그려진 위치와 값이 일치하게)
+  const interpAt = (idx, key) => {
+    if (!hasSel) return null;
+    const row = flat[idx];
+    if (!row) return null;
+    if (row[key] != null) return row[key];
+    const di = row.driveIdx;
+    let L = -1, R = -1;
+    for (let i = idx - 1; i >= 0; i--) {
+      if (flat[i].driveIdx !== di) break;
+      if (flat[i][key] != null) { L = i; break; }
+    }
+    for (let i = idx + 1; i < n; i++) {
+      if (flat[i].driveIdx !== di) break;
+      if (flat[i][key] != null) { R = i; break; }
+    }
+    if (L < 0 && R < 0) return null;
+    if (L < 0) return flat[R][key];
+    if (R < 0) return flat[L][key];
+    const t = (idx - L) / (R - L);
+    return flat[L][key] + (flat[R][key] - flat[L][key]) * t;
+  };
+
+  const selSpeedVal = hasSel ? interpAt(selectedIdx, 'speed') : null;
+  const selElevVal  = hasSel ? interpAt(selectedIdx, 'elev')  : null;
+  const selTempVal  = hasSel ? interpAt(selectedIdx, 'temp')  : null;
   const totalH = ROW_H * 3;
 
   // 시간 라벨 엣지 클램프 — 첫/끝(인덱스) 또는 극단 ratio 라벨은 컨테이너 가장자리에 밀착
@@ -147,14 +174,14 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
       defRange = maxSpeed != null ? String(maxSpeed) : null;
       selCenter = avgSpeed;
       unit = 'km/h';
-      if (hasSel && sel.speed != null) selValTxt = Math.round(sel.speed);
+      if (selSpeedVal != null) selValTxt = Math.round(selSpeedVal);
     } else if (key === 'elev') {
       if (elevGain == null && avgElev == null) return null;
       defA = elevGain != null ? `${elevGain >= 0 ? '+' : ''}${elevGain}` : String(avgElev);
       defRange = (minElev != null && maxElev != null) ? `${minElev}~${maxElev}` : null;
       selCenter = avgElev;
       unit = 'm';
-      if (hasSel && sel.elev != null) selValTxt = Math.round(sel.elev);
+      if (selElevVal != null) selValTxt = Math.round(selElevVal);
     } else { // temp
       if (avgTemp == null) return null;
       defA = avgTemp;
@@ -163,14 +190,15 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
         : null;
       selCenter = avgTemp;
       unit = '°C';
-      if (hasSel && sel.temp != null) selValTxt = (Math.round(sel.temp * 10) / 10).toFixed(1);
+      if (selTempVal != null) selValTxt = (Math.round(selTempVal * 10) / 10).toFixed(1);
     }
 
     if (selValTxt != null) {
       return (
         <span className="text-zinc-500">
           {selCenter}
-          <> <span className="text-zinc-700">{'>'}</span> <span className="text-fuchsia-400">{selValTxt}</span></>
+          <span className="text-zinc-600 mx-1">→</span>
+          <span className="text-fuchsia-400 font-semibold">{selValTxt}</span>
           <span className="text-zinc-600">{unit}</span>
         </span>
       );
@@ -220,14 +248,14 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
             <>
               <line x1={selX} y1={0} x2={selX} y2={totalH}
                 stroke="#e879f9" strokeWidth={1} strokeDasharray="2 3" opacity={0.8} />
-              {sel.speed != null && speed.yOf && (
-                <circle cx={selX} cy={speed.yOf(sel.speed)} r={2.5} fill="#e879f9" />
+              {selSpeedVal != null && speed.yOf && (
+                <circle cx={selX} cy={speed.yOf(selSpeedVal)} r={2.5} fill="#e879f9" />
               )}
-              {sel.elev != null && elev.yOf && (
-                <circle cx={selX} cy={ROW_H + elev.yOf(sel.elev)} r={2.5} fill="#e879f9" />
+              {selElevVal != null && elev.yOf && (
+                <circle cx={selX} cy={ROW_H + elev.yOf(selElevVal)} r={2.5} fill="#e879f9" />
               )}
-              {sel.temp != null && temp.yOf && (
-                <circle cx={selX} cy={ROW_H * 2 + temp.yOf(sel.temp)} r={2.5} fill="#e879f9" />
+              {selTempVal != null && temp.yOf && (
+                <circle cx={selX} cy={ROW_H * 2 + temp.yOf(selTempVal)} r={2.5} fill="#e879f9" />
               )}
             </>
           )}
