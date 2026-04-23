@@ -98,10 +98,10 @@ function DrivesInner() {
     if (dayMode && dayRoutes?.length) {
       return dayRoutes
         .filter(r => r.positions?.length >= 2)
-        .map(r => ({ positions: r.positions, startDate: r.startDate }));
+        .map(r => ({ positions: r.positions, startDate: r.startDate, color: r.color }));
     }
     if (selectedDrive && positions?.length >= 2) {
-      return [{ positions, startDate: selectedDrive.start_date }];
+      return [{ positions, startDate: selectedDrive.start_date, color: '#3b82f6' }];
     }
     return [];
   }, [dayMode, dayRoutes, selectedDrive, positions]);

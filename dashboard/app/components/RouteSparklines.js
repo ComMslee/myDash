@@ -24,16 +24,23 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
     const boundaries = [];
     const labels = [];
     let idx = 0;
+    let lastColor = null;
     (routes || []).forEach((r, di) => {
       const pos = r?.positions;
       if (!pos || pos.length === 0) return;
       if (idx > 0) boundaries.push(idx);
-      labels.push({ atIdx: idx, time: formatHM(r.startDate || pos[0]?.date) });
+      // 지도 배지와 동일 — 첫 주행=S, 나머지=주행번호(1, 2, ...)
+      labels.push({ atIdx: idx, label: di === 0 ? 'S' : String(di), color: r.color || '#71717a' });
       for (const p of pos) {
         flat.push({ speed: p.speed, elev: p.elev, temp: p.temp, driveIdx: di });
         idx++;
       }
+      lastColor = r.color || '#71717a';
     });
+    // 마지막 주행의 종료 지점 E 마커
+    if (labels.length > 0 && idx > 0) {
+      labels.push({ atIdx: idx - 1, label: 'E', color: lastColor });
+    }
     return { flat, boundaries, labels };
   }, [routes]);
 
@@ -203,17 +210,17 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
           )}
         </svg>
 
-        {labels.length > 1 && (
-          <div className="mt-1 relative h-3 text-[9px] text-zinc-600 tabular-nums">
+        {labels.length > 2 && (
+          <div className="mt-1 relative h-4">
             {labels.map((lbl, i) => {
               const ratio = lbl.atIdx / (n - 1);
               return (
                 <span
                   key={i}
-                  className="absolute whitespace-nowrap"
-                  style={labelAlign(ratio, i, labels.length)}
+                  className="absolute inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-[8px] font-bold text-white leading-none shadow"
+                  style={{ backgroundColor: lbl.color, ...labelAlign(ratio, i, labels.length) }}
                 >
-                  {lbl.time}
+                  {lbl.label}
                 </span>
               );
             })}
