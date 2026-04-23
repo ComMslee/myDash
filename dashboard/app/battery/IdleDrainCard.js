@@ -80,12 +80,26 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
   const { avgDrainPerDay, avgIdleHours, avgDrop, withDrainCount, totalRecords } = stats;
   const fmtDrop = (n) => (Math.round(n * 10) / 10).toString();
 
-  // 일자 라벨 포맷 (올해면 연도 생략)
+  // 전체 평균 공조/센트리 비율 (idle 전체 대비)
+  let totalIdleH = 0, totalClimateMin = 0, totalSentryMin = 0;
+  for (const { items } of grouped) {
+    for (const r of items) {
+      totalIdleH += r.idle_hours;
+      totalClimateMin += r.climate_minutes || 0;
+      totalSentryMin += sumSpansMin(computeSentrySpans(r.online_spans, r.climate_spans));
+    }
+  }
+  const totalClimatePct = pctOf(totalClimateMin, totalIdleH);
+  const totalSentryPct = pctOf(totalSentryMin, totalIdleH);
+
+  // 일자 라벨 포맷 (올해면 연도 생략, 요일 표시)
+  const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
   const formatDateLabel = (key) => {
     const [y, m, d] = key.split('-');
     const currentYear = new Date().getFullYear();
     const prefix = parseInt(y) !== currentYear ? `${String(y).slice(2)}/` : '';
-    return `${prefix}${parseInt(m)}/${parseInt(d)}`;
+    const dow = WEEKDAYS[new Date(parseInt(y), parseInt(m) - 1, parseInt(d)).getDay()];
+    return `${prefix}${parseInt(m)}/${parseInt(d)} (${dow})`;
   };
 
   return (
@@ -93,7 +107,23 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
       {/* 요약 */}
       <div className="grid grid-cols-3 border-b border-white/[0.06]">
         <div className="text-center py-3 border-r border-white/[0.06]">
-          <div className="text-[10px] text-zinc-600 mb-1">일평균 손실</div>
+          <div className="text-[10px] text-zinc-600 mb-1">
+            일평균 손실
+            {(totalClimatePct != null || totalSentryPct != null) && (
+              <span className="ml-1 tabular-nums">
+                {totalClimatePct != null && (
+                  <span className="text-sky-700 opacity-80" title={`공조 작동 ${Math.round(totalClimateMin)}분`}>
+                    <span aria-hidden="true">🌀</span>{totalClimatePct}%
+                  </span>
+                )}
+                {totalSentryPct != null && (
+                  <span className="text-fuchsia-400 opacity-80 ml-1" title={`센트리 의심 ${Math.round(totalSentryMin)}분`}>
+                    <span aria-hidden="true">🛡</span>{totalSentryPct}%
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
           <div className="text-sm font-extrabold tabular-nums text-amber-400">{avgDrainPerDay}%</div>
           <div className="text-[9px] text-zinc-600 mt-0.5">/일</div>
         </div>
