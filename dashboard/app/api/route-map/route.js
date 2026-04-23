@@ -26,7 +26,7 @@ export async function GET(request) {
     }
 
     const posResult = await pool.query(
-      `SELECT latitude, longitude, date, speed
+      `SELECT latitude, longitude, date, speed, elevation, outside_temp, inside_temp
        FROM positions
        WHERE drive_id = $1
        ORDER BY date ASC`,
@@ -54,6 +54,8 @@ export async function GET(request) {
         lng: parseFloat(p.longitude),
         date: p.date,
         speed: p.speed != null ? Math.round(parseFloat(p.speed)) : null,
+        elev: p.elevation != null ? parseFloat(p.elevation) : null,
+        temp: p.outside_temp != null ? parseFloat(p.outside_temp) : null,
       })),
       maxSpeedKmh,
       speedBands,

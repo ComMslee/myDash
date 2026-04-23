@@ -7,6 +7,7 @@ import { KWH_PER_KM } from '../../lib/constants';
 import { formatDuration, shortAddr } from '../../lib/format';
 import { formatTimeRange } from '../../lib/kst';
 import DriveMap from '../components/DriveMap';
+import RouteSparklines from '../components/RouteSparklines';
 import DriveListView from './DriveListView';
 import { useDriveData } from './useDriveData';
 
@@ -87,6 +88,37 @@ function DrivesInner() {
   const [mapEverShown, setMapEverShown] = useState(entryInMapView);
   const selectedIdx = selectedDrive ? drives.findIndex(d => d.id === selectedDrive.id) : -1;
   const eff = selectedDrive ? efficiency(selectedDrive) : null;
+
+  // 스파크라인 선택 포인트 (전체 flat 인덱스) — drive/dayMode 변경 시 리셋
+  const [selectedPosIdx, setSelectedPosIdx] = useState(null);
+  useEffect(() => { setSelectedPosIdx(null); }, [selectedDrive?.id, dayMode]);
+
+  // 스파크라인용 routes — 단일/일 모드 통합
+  const sparkRoutes = useMemo(() => {
+    if (dayMode && dayRoutes?.length) {
+      return dayRoutes
+        .filter(r => r.positions?.length >= 2)
+        .map(r => ({ positions: r.positions, startDate: r.startDate }));
+    }
+    if (selectedDrive && positions?.length >= 2) {
+      return [{ positions, startDate: selectedDrive.start_date }];
+    }
+    return [];
+  }, [dayMode, dayRoutes, selectedDrive, positions]);
+
+  // flat 인덱스 → 지도 하이라이트 좌표
+  const highlightLatLng = useMemo(() => {
+    if (selectedPosIdx == null) return null;
+    let idx = selectedPosIdx;
+    for (const r of sparkRoutes) {
+      if (idx < r.positions.length) {
+        const p = r.positions[idx];
+        return p ? { lat: p.lat, lng: p.lng } : null;
+      }
+      idx -= r.positions.length;
+    }
+    return null;
+  }, [selectedPosIdx, sparkRoutes]);
 
   const goToDrive = (d) => { setSelectedDrive(d); setSelectedPlace(null); setDayMode(null); setMapEverShown(true); setViewMode('map'); };
   const goToDay = (dateStr) => { setDayMode(dateStr); setSelectedPlace(null); setMapEverShown(true); setViewMode('map'); };
@@ -367,31 +399,21 @@ function DrivesInner() {
               </div>
             ) : null}
             <div className="flex-1 p-2">
-              <DriveMap positions={positions} routes={dayMode ? dayRoutes : undefined} loading={loadingRoute} placeMarker={selectedPlace} visible={viewMode === 'map'} />
+              <DriveMap
+                positions={positions}
+                routes={dayMode ? dayRoutes : undefined}
+                loading={loadingRoute}
+                placeMarker={selectedPlace}
+                visible={viewMode === 'map'}
+                highlightLatLng={highlightLatLng}
+              />
             </div>
-            {selectedDrive && routeData?.speedBands && (
-              <div className="px-4 py-2 border-t border-white/[0.04]">
-                <div className="flex items-center gap-2 flex-wrap justify-center">
-                  {[
-                    { key: 'jam',  label: '저속', color: '#ef4444' },
-                    { key: 'slow', label: '서행', color: '#f97316' },
-                    { key: 'flow', label: '원활', color: '#eab308' },
-                    { key: 'fast', label: '빠름', color: '#22c55e' },
-                  ].filter(b => routeData.speedBands[b.key] > 0).map(b => (
-                    <div key={b.key} className="flex items-center gap-1 text-[11px]">
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: b.color }} />
-                      <span className="text-zinc-600">{b.label}</span>
-                      <span className="font-bold tabular-nums" style={{ color: b.color }}>{routeData.speedBands[b.key]}%</span>
-                    </div>
-                  ))}
-                  {routeData.maxSpeedKmh != null && (
-                    <div className="flex items-center gap-1 text-[11px] ml-1 pl-2 border-l border-white/[0.06]">
-                      <span className="text-zinc-600">최고</span>
-                      <span className="font-bold tabular-nums text-zinc-300">{routeData.maxSpeedKmh}<span className="text-zinc-600 font-normal ml-0.5">km/h</span></span>
-                    </div>
-                  )}
-                </div>
-              </div>
+            {sparkRoutes.length > 0 && !selectedPlace && (
+              <RouteSparklines
+                routes={sparkRoutes}
+                selectedIdx={selectedPosIdx}
+                onSelect={setSelectedPosIdx}
+              />
             )}
           </div>
         </div>

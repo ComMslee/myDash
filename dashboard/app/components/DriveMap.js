@@ -28,13 +28,14 @@ export function loadLeaflet(cb) {
   document.head.appendChild(script);
 }
 
-export default function DriveMap({ positions, routes, loading, placeMarker, visible }) {
+export default function DriveMap({ positions, routes, loading, placeMarker, visible, highlightLatLng }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const polyRef = useRef(null);
   const markersRef = useRef([]);
   const placeMarkerRef = useRef(null);
+  const highlightRef = useRef(null);
 
   const initMap = useCallback(() => {
     if (!containerRef.current || mapInstanceRef.current || !window.L) return;
@@ -166,6 +167,18 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
       setTimeout(() => mapInstanceRef.current?.invalidateSize(), 150);
     }
   }, [visible]);
+
+  // 선택 포인트 하이라이트 마커 (스파크라인 ↔ 지도 동기)
+  useEffect(() => {
+    const map = mapRef.current;
+    const L = typeof window !== 'undefined' ? window.L : null;
+    if (!map || !L) return;
+    if (highlightRef.current) { map.removeLayer(highlightRef.current); highlightRef.current = null; }
+    if (!highlightLatLng || highlightLatLng.lat == null || highlightLatLng.lng == null) return;
+    highlightRef.current = L.circleMarker([highlightLatLng.lat, highlightLatLng.lng], {
+      radius: 7, color: '#e879f9', weight: 2, fillColor: '#e879f9', fillOpacity: 0.5, interactive: false,
+    }).addTo(map);
+  }, [highlightLatLng?.lat, highlightLatLng?.lng]);
 
   return (
     <div className="relative w-full h-full">

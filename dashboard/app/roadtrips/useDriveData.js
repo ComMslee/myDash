@@ -127,6 +127,7 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
             positions: data.positions || [],
             color: palette[idx % palette.length],
             id: d.id,
+            startDate: d.start_date,
           }))
           .catch(() => null)
       )
