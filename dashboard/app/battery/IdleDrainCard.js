@@ -4,6 +4,16 @@ import { formatHours } from '@/lib/format';
 import { toKstDate, formatHM } from '@/lib/kst';
 import { useIdleDrainDays } from './useIdleDrainDays';
 
+// 공조(HVAC) 오버레이 — sky-400 대각선 스트라이프 (기존 drain 배경 위에 얹힘)
+const CLIMATE_STRIPE = `repeating-linear-gradient(45deg, rgba(56,189,248,0.38) 0 3px, transparent 3px 7px)`;
+
+// "45분" / "1시간 20분" 포맷
+function formatMinutes(min) {
+  const m = Math.round(min);
+  if (m < 60) return `${m}분`;
+  return `${Math.floor(m / 60)}시간 ${m % 60}분`;
+}
+
 // 대기 손실 5단계 색상 (신호등형 그라데이션)
 // < 0.05%: 사실상 0 (에메랄드 밝음)  ·  0-1%: 에메랄드 어두움  ·  1-2%: 앰버  ·  2-3%: 오렌지  ·  3-4%: 레드  ·  4%+: 다크레드
 function dropTextClass(drop) {
@@ -72,11 +82,21 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
         const dayIdleH = items.reduce((s, r) => s + r.idle_hours, 0);
         const dayDropRaw = items.reduce((s, r) => s + r.soc_drop, 0);
         const dayDrop = Math.round(dayDropRaw * 10) / 10;
+        const dayClimateMin = items.reduce((s, r) => s + (r.climate_minutes || 0), 0);
         return (
           <div key={key} className="border-t border-white/[0.04]">
             <div className="px-4 py-1.5 bg-white/[0.02] flex items-center justify-between">
               <span className="text-[10px] font-semibold text-zinc-500 tabular-nums">{formatDateLabel(key)}</span>
               <div className="flex items-center gap-2 tabular-nums">
+                {dayClimateMin >= 1 && (
+                  <span
+                    className="text-[10px] text-sky-400 flex items-center gap-0.5"
+                    title={`공조 작동 추정 ${formatMinutes(dayClimateMin)}`}
+                  >
+                    <span aria-hidden="true">🌀</span>
+                    {formatMinutes(dayClimateMin)}
+                  </span>
+                )}
                 <span className="text-[10px] text-zinc-600">{formatHours(dayIdleH)}</span>
                 <span className={`text-[10px] font-bold ${dropTextClass(dayDrop)}`}>
                   {dayDrop < 0.05 ? '0%' : `-${fmtDrop(dayDrop)}%`}
@@ -98,13 +118,28 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                   const bg = isZero
                     ? (isPreCharge ? 'rgba(234,179,8,0.3)' : 'rgba(16,185,129,0.3)')
                     : (isPreCharge ? 'rgba(234,179,8,0.85)' : dropBarBg(r.soc_drop));
+                  const climateMin = r.climate_minutes || 0;
+                  const hasClimate = climateMin >= 1;
                   const showLabel = widthPct >= 10;
+                  const titleParts = [
+                    `${formatHM(r.idle_start)}~${r.idle_end ? formatHM(r.idle_end) : '현재'}`,
+                    formatHours(r.idle_hours),
+                    `${r.soc_start}→${r.soc_end}%`,
+                    isZero ? '0%' : `-${fmtDrop(r.soc_drop)}%`,
+                  ];
+                  if (isPreCharge) titleParts.push('⚡충전 전 대기');
+                  if (hasClimate) titleParts.push(`🌀 공조 ${formatMinutes(climateMin)}`);
                   return (
                     <div
                       key={i}
                       className="absolute top-0 bottom-0 flex items-center justify-center text-[10px] font-bold tabular-nums text-white"
-                      style={{ left: `${leftPct}%`, width: `${widthPct}%`, background: bg, textShadow: '0 0 2px rgba(0,0,0,0.6)' }}
-                      title={`${formatHM(r.idle_start)}~${r.idle_end ? formatHM(r.idle_end) : '현재'} · ${formatHours(r.idle_hours)} · ${r.soc_start}→${r.soc_end}% · ${isZero ? '0%' : `-${fmtDrop(r.soc_drop)}%`}${isPreCharge ? ' · ⚡충전 전 대기' : ''}`}
+                      style={{
+                        left: `${leftPct}%`,
+                        width: `${widthPct}%`,
+                        background: hasClimate ? `${CLIMATE_STRIPE}, ${bg}` : bg,
+                        textShadow: '0 0 2px rgba(0,0,0,0.6)',
+                      }}
+                      title={titleParts.join(' · ')}
                     >
                       {showLabel ? (isZero ? '0' : `-${fmtDrop(r.soc_drop)}%`) : ''}
                     </div>

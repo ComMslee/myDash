@@ -242,6 +242,7 @@ export async function GET() {
         soc_drop: parseInt(r.soc_drop),
         idle_hours: parseFloat(r.idle_hours),
         next_type: r.next_type,
+        climate_minutes: parseFloat(r.climate_minutes) || 0,
       })),
       charging_sessions: chargingSessionsResult.rows.map(r => ({
         start: r.start_date,

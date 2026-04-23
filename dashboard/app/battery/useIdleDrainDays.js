@@ -28,10 +28,12 @@ export function useIdleDrainDays(records, chargingSessions = []) {
       if (endMs <= startMs) return;
       const totalMs = endMs - startMs;
       const totalDrop = r.soc_drop || 0;
+      const totalClimate = r.climate_minutes || 0;
       for (const seg of splitByKstMidnight(startMs, endMs)) {
         const segMs = seg.endMs - seg.startMs;
         const segRatio = segMs / totalMs;
         const segDrop = Math.round(totalDrop * segRatio * 10) / 10;
+        const segClimate = Math.round(totalClimate * segRatio * 10) / 10;
         const socStart = r.soc_start != null ? r.soc_start - totalDrop * ((seg.startMs - startMs) / totalMs) : null;
         const socEnd = r.soc_start != null ? r.soc_start - totalDrop * ((seg.endMs - startMs) / totalMs) : null;
         expandedRecords.push({
@@ -39,6 +41,7 @@ export function useIdleDrainDays(records, chargingSessions = []) {
           idle_end: new Date(seg.endMs).toISOString(),
           idle_hours: segMs / 3600000,
           soc_drop: segDrop,
+          climate_minutes: segClimate,
           soc_start: socStart != null ? Math.round(socStart * 10) / 10 : null,
           soc_end: socEnd != null ? Math.round(socEnd * 10) / 10 : null,
           next_type: r.next_type,
