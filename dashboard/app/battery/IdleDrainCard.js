@@ -5,8 +5,8 @@ import { formatHours } from '@/lib/format';
 import { toKstDate, formatHM } from '@/lib/kst';
 import { useIdleDrainDays } from './useIdleDrainDays';
 
-// 공조(HVAC) 오버레이 — sky-400 대각선 스트라이프 (기존 drain 배경 위에 얹힘)
-const CLIMATE_STRIPE = `repeating-linear-gradient(45deg, rgba(56,189,248,0.38) 0 3px, transparent 3px 7px)`;
+// 공조(HVAC) 밴드 색 — sky-400 솔리드 (drain 바 아래에 별도 라인)
+const CLIMATE_BG = 'rgba(56,189,248,0.9)';
 
 // 공조 비중 (%) — idle 전체 대비 공조 작동 분 비율. 1% 미만이면 null
 function climatePct(climateMin, idleHours) {
@@ -107,8 +107,8 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
               </div>
             </div>
             <div className="px-4 py-2.5">
-              {/* 24h 타임라인 — 비대기 구간은 회색으로 */}
-              <div className="relative w-full h-6 rounded-md overflow-hidden bg-white/[0.05]">
+              {/* 24h 타임라인 — 상단: drain 바(24px) · 하단: 공조 밴드(8px) */}
+              <div className="relative w-full h-8 rounded-md overflow-hidden bg-white/[0.05]">
                 {items.map((r, i) => {
                   const kstStart = toKstDate(r.idle_start);
                   const hourOffset = kstStart.getUTCHours() + kstStart.getUTCMinutes() / 60 + kstStart.getUTCSeconds() / 3600;
@@ -135,9 +135,12 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                   if (itemClimatePct != null) titleParts.push(`🌀 공조 ${itemClimatePct}%`);
                   return (
                     <Fragment key={i}>
+                      {/* drain 바 — 상단 24px */}
                       <div
-                        className="absolute top-0 bottom-0 flex items-center justify-center text-[10px] font-bold tabular-nums text-white"
+                        className="absolute left-0 flex items-center justify-center text-[10px] font-bold tabular-nums text-white"
                         style={{
+                          top: 0,
+                          height: '24px',
                           left: `${leftPct}%`,
                           width: `${widthPct}%`,
                           background: bg,
@@ -147,7 +150,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                       >
                         {showLabel ? (isZero ? '0' : `-${fmtDrop(r.soc_drop)}%`) : ''}
                       </div>
-                      {/* 공조 구간 스트라이프 — drain 배경 위에 겹치되 라벨/툴팁은 베이스 div가 담당 */}
+                      {/* 공조 구간 밴드 — 하단 8px, 해당 좌표에만 솔리드 sky */}
                       {climateSpans.map((sp, spi) => {
                         const spKst = toKstDate(new Date(sp.s).toISOString());
                         const spHour = spKst.getUTCHours() + spKst.getUTCMinutes() / 60 + spKst.getUTCSeconds() / 3600;
@@ -157,15 +160,21 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                         return (
                           <div
                             key={`clm-${i}-${spi}`}
-                            className="absolute top-0 bottom-0 pointer-events-none"
-                            style={{ left: `${spLeft}%`, width: `${spWidth}%`, background: CLIMATE_STRIPE }}
+                            className="absolute pointer-events-none"
+                            style={{
+                              bottom: 0,
+                              height: '8px',
+                              left: `${spLeft}%`,
+                              width: `${spWidth}%`,
+                              background: CLIMATE_BG,
+                            }}
                           />
                         );
                       })}
                     </Fragment>
                   );
                 })}
-                {/* 충전 세션 (노랑) */}
+                {/* 충전 세션 (노랑) — 전체 높이 */}
                 {(chargingByDay[key] || []).map((c, ci) => {
                   const kstStart = toKstDate(c.start);
                   const hourOffset = kstStart.getUTCHours() + kstStart.getUTCMinutes() / 60 + kstStart.getUTCSeconds() / 3600;
