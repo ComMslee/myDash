@@ -85,6 +85,7 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
   const elevVals = flat.map(f => f.elev).filter(v => v != null);
   const minElev = elevVals.length ? Math.round(Math.min(...elevVals)) : null;
   const maxElev = elevVals.length ? Math.round(Math.max(...elevVals)) : null;
+  const avgElev = elevVals.length ? Math.round(elevVals.reduce((s, v) => s + v, 0) / elevVals.length) : null;
   let elevGain = null;
   if (elevVals.length >= 2) {
     elevGain = Math.round(elevVals[elevVals.length - 1] - elevVals[0]);
@@ -93,6 +94,7 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
   const tempVals = flat.map(f => f.temp).filter(v => v != null);
   const minTemp = tempVals.length ? Math.round(Math.min(...tempVals)) : null;
   const maxTemp = tempVals.length ? Math.round(Math.max(...tempVals)) : null;
+  const avgTemp = tempVals.length ? Math.round(tempVals.reduce((s, v) => s + v, 0) / tempVals.length) : null;
 
   const handlePointer = (e) => {
     if (!onSelect || !svgRef.current) return;
@@ -134,28 +136,49 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
     );
   };
 
-  // 기본 요약 (항상 표시) — 속도: 최고 / 고도: ±순증감 / 온도: 범위
-  const speedDefault = maxSpeed != null ? `최고 ${maxSpeed}` : null;
-  const elevDefault = elevGain != null ? `${elevGain >= 0 ? '+' : ''}${elevGain}` : null;
-  const tempDefault = (minTemp != null && maxTemp != null)
-    ? (minTemp === maxTemp ? `${minTemp}` : `${minTemp}~${maxTemp}`)
-    : null;
-
+  // 요약 포맷
+  // 선택X: 속도=평균(최고), 고도=±순증감(범위), 온도=평균(범위)
+  // 선택: 평균 > 선택값 (3행 모두 동일 패턴)
   const rowSummary = (key) => {
-    const def = key === 'speed' ? speedDefault : key === 'elev' ? elevDefault : tempDefault;
-    if (def == null) return null;
-    const unit = key === 'speed' ? 'km/h' : key === 'elev' ? 'm' : '°C';
-    const selVal = hasSel && sel[key] != null
-      ? (key === 'temp'
-          ? (Math.round(sel.temp * 10) / 10).toFixed(1)
-          : Math.round(sel[key]))
-      : null;
+    let defA = null, defRange = null, selCenter = null, selValTxt = null, unit = null;
+    if (key === 'speed') {
+      if (avgSpeed == null) return null;
+      defA = avgSpeed;
+      defRange = maxSpeed != null ? String(maxSpeed) : null;
+      selCenter = avgSpeed;
+      unit = 'km/h';
+      if (hasSel && sel.speed != null) selValTxt = Math.round(sel.speed);
+    } else if (key === 'elev') {
+      if (elevGain == null && avgElev == null) return null;
+      defA = elevGain != null ? `${elevGain >= 0 ? '+' : ''}${elevGain}` : String(avgElev);
+      defRange = (minElev != null && maxElev != null) ? `${minElev}~${maxElev}` : null;
+      selCenter = avgElev;
+      unit = 'm';
+      if (hasSel && sel.elev != null) selValTxt = Math.round(sel.elev);
+    } else { // temp
+      if (avgTemp == null) return null;
+      defA = avgTemp;
+      defRange = (minTemp != null && maxTemp != null)
+        ? (minTemp === maxTemp ? null : `${minTemp}~${maxTemp}`)
+        : null;
+      selCenter = avgTemp;
+      unit = '°C';
+      if (hasSel && sel.temp != null) selValTxt = (Math.round(sel.temp * 10) / 10).toFixed(1);
+    }
+
+    if (selValTxt != null) {
+      return (
+        <span className="text-zinc-500">
+          {selCenter}
+          <> <span className="text-zinc-700">{'>'}</span> <span className="text-fuchsia-400">{selValTxt}</span></>
+          <span className="text-zinc-600">{unit}</span>
+        </span>
+      );
+    }
     return (
       <span className="text-zinc-500">
-        {def}
-        {selVal != null && (
-          <> <span className="text-zinc-700">{'>'}</span> <span className="text-fuchsia-400">{selVal}</span></>
-        )}
+        {defA}
+        {defRange && <span className="text-zinc-600">({defRange})</span>}
         <span className="text-zinc-600">{unit}</span>
       </span>
     );
@@ -229,7 +252,7 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
       </div>
 
       {/* 우: 요약/선택값 */}
-      <div className="flex flex-col flex-shrink-0 text-[10px] tabular-nums text-right whitespace-nowrap" style={{ width: 116 }}>
+      <div className="flex flex-col flex-shrink-0 text-[10px] tabular-nums text-right whitespace-nowrap" style={{ width: 140 }}>
         <span className="flex items-center justify-end" style={{ height: ROW_H }}>{rowSummary('speed')}</span>
         <span className="flex items-center justify-end" style={{ height: ROW_H }}>{rowSummary('elev')}</span>
         <span className="flex items-center justify-end" style={{ height: ROW_H }}>{rowSummary('temp')}</span>
