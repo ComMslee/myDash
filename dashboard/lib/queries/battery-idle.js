@@ -44,23 +44,47 @@ export function queryIdleDrain(carId) {
     )
     SELECT f.idle_start, f.idle_end, f.soc_start, f.soc_end, f.next_type,
       f.soc_drop, f.idle_hours,
-      COALESCE(c.climate_minutes, 0)::float AS climate_minutes
+      COALESCE(c.climate_minutes, 0)::float AS climate_minutes,
+      COALESCE(c.spans, '[]'::jsonb) AS climate_spans
     FROM filtered f
     LEFT JOIN LATERAL (
-      SELECT ROUND(
-        SUM(
-          CASE WHEN p.is_climate_on
-               THEN LEAST(EXTRACT(EPOCH FROM (p.next_date - p.date)), 300)
-               ELSE 0 END
-        )::numeric / 60, 1
-      ) AS climate_minutes
-      FROM (
+      WITH p AS (
         SELECT date, is_climate_on,
                LEAD(date) OVER (ORDER BY date) AS next_date
         FROM positions
         WHERE car_id = $1 AND date BETWEEN f.idle_start AND f.idle_end
-      ) p
-      WHERE p.next_date IS NOT NULL
+      ),
+      -- is_climate_on=true 샘플만 걸러서 300초 초과 공백 기준으로 island 묶기
+      climate_rows AS (
+        SELECT date,
+          LEAST(COALESCE(next_date, date + INTERVAL '60 seconds'), date + INTERVAL '5 minutes') AS row_end,
+          SUM(
+            CASE
+              WHEN LAG(date) OVER (ORDER BY date) IS NULL THEN 1
+              WHEN EXTRACT(EPOCH FROM (date - LAG(date) OVER (ORDER BY date))) > 300 THEN 1
+              ELSE 0
+            END
+          ) OVER (ORDER BY date) AS island_id
+        FROM p
+        WHERE is_climate_on = true
+      ),
+      runs AS (
+        SELECT MIN(date) AS run_start, MAX(row_end) AS run_end
+        FROM climate_rows
+        GROUP BY island_id
+        -- 5분 미만 짧은 공조 토글(ON/OFF 노이즈)은 무시
+        HAVING EXTRACT(EPOCH FROM (MAX(row_end) - MIN(date))) >= 300
+      )
+      SELECT
+        COALESCE(
+          jsonb_agg(jsonb_build_object(
+            's', FLOOR(EXTRACT(EPOCH FROM run_start) * 1000)::bigint,
+            'e', FLOOR(EXTRACT(EPOCH FROM run_end) * 1000)::bigint
+          ) ORDER BY run_start),
+          '[]'::jsonb
+        ) AS spans,
+        ROUND(COALESCE(SUM(EXTRACT(EPOCH FROM (run_end - run_start))), 0)::numeric / 60, 1) AS climate_minutes
+      FROM runs
     ) c ON true
     ORDER BY f.idle_start DESC
   `, [carId]);

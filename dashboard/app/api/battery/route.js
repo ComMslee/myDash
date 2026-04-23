@@ -243,6 +243,9 @@ export async function GET() {
         idle_hours: parseFloat(r.idle_hours),
         next_type: r.next_type,
         climate_minutes: parseFloat(r.climate_minutes) || 0,
+        climate_spans: Array.isArray(r.climate_spans)
+          ? r.climate_spans.map(sp => ({ s: Number(sp.s), e: Number(sp.e) }))
+          : [],
       })),
       charging_sessions: chargingSessionsResult.rows.map(r => ({
         start: r.start_date,

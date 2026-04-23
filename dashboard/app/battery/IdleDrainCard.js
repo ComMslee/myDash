@@ -1,5 +1,6 @@
 'use client';
 
+import { Fragment } from 'react';
 import { formatHours } from '@/lib/format';
 import { toKstDate, formatHM } from '@/lib/kst';
 import { useIdleDrainDays } from './useIdleDrainDays';
@@ -119,7 +120,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                     ? (isPreCharge ? 'rgba(234,179,8,0.3)' : 'rgba(16,185,129,0.3)')
                     : (isPreCharge ? 'rgba(234,179,8,0.85)' : dropBarBg(r.soc_drop));
                   const climateMin = r.climate_minutes || 0;
-                  const hasClimate = climateMin >= 1;
+                  const climateSpans = r.climate_spans || [];
                   const showLabel = widthPct >= 10;
                   const titleParts = [
                     `${formatHM(r.idle_start)}~${r.idle_end ? formatHM(r.idle_end) : '현재'}`,
@@ -128,21 +129,37 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                     isZero ? '0%' : `-${fmtDrop(r.soc_drop)}%`,
                   ];
                   if (isPreCharge) titleParts.push('⚡충전 전 대기');
-                  if (hasClimate) titleParts.push(`🌀 공조 ${formatMinutes(climateMin)}`);
+                  if (climateMin >= 1) titleParts.push(`🌀 공조 ${formatMinutes(climateMin)}`);
                   return (
-                    <div
-                      key={i}
-                      className="absolute top-0 bottom-0 flex items-center justify-center text-[10px] font-bold tabular-nums text-white"
-                      style={{
-                        left: `${leftPct}%`,
-                        width: `${widthPct}%`,
-                        background: hasClimate ? `${CLIMATE_STRIPE}, ${bg}` : bg,
-                        textShadow: '0 0 2px rgba(0,0,0,0.6)',
-                      }}
-                      title={titleParts.join(' · ')}
-                    >
-                      {showLabel ? (isZero ? '0' : `-${fmtDrop(r.soc_drop)}%`) : ''}
-                    </div>
+                    <Fragment key={i}>
+                      <div
+                        className="absolute top-0 bottom-0 flex items-center justify-center text-[10px] font-bold tabular-nums text-white"
+                        style={{
+                          left: `${leftPct}%`,
+                          width: `${widthPct}%`,
+                          background: bg,
+                          textShadow: '0 0 2px rgba(0,0,0,0.6)',
+                        }}
+                        title={titleParts.join(' · ')}
+                      >
+                        {showLabel ? (isZero ? '0' : `-${fmtDrop(r.soc_drop)}%`) : ''}
+                      </div>
+                      {/* 공조 구간 스트라이프 — drain 배경 위에 겹치되 라벨/툴팁은 베이스 div가 담당 */}
+                      {climateSpans.map((sp, spi) => {
+                        const spKst = toKstDate(new Date(sp.s).toISOString());
+                        const spHour = spKst.getUTCHours() + spKst.getUTCMinutes() / 60 + spKst.getUTCSeconds() / 3600;
+                        const spLeft = (spHour / 24) * 100;
+                        const spWidth = ((sp.e - sp.s) / 3600000 / 24) * 100;
+                        if (spWidth <= 0) return null;
+                        return (
+                          <div
+                            key={`clm-${i}-${spi}`}
+                            className="absolute top-0 bottom-0 pointer-events-none"
+                            style={{ left: `${spLeft}%`, width: `${spWidth}%`, background: CLIMATE_STRIPE }}
+                          />
+                        );
+                      })}
+                    </Fragment>
                   );
                 })}
                 {/* 충전 세션 (노랑) */}
