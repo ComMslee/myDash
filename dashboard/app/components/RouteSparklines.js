@@ -106,10 +106,10 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
   const sel = hasSel ? flat[selectedIdx] : null;
   const totalH = ROW_H * 3;
 
-  // 시간 라벨 엣지 클램프 — 첫/끝 라벨은 가장자리에 붙도록 정렬
-  const labelAlign = (ratio) => {
-    if (ratio < 0.05) return { left: '0%', transform: 'translateX(0)' };
-    if (ratio > 0.95) return { left: '100%', transform: 'translateX(-100%)' };
+  // 시간 라벨 엣지 클램프 — 첫/끝 라벨은 인덱스 기반으로 무조건 가장자리 정렬
+  const labelAlign = (ratio, idx, total) => {
+    if (idx === 0) return { left: '0%', transform: 'translateX(0)' };
+    if (idx === total - 1) return { left: '100%', transform: 'translateX(-100%)' };
     return { left: `${ratio * 100}%`, transform: 'translateX(-50%)' };
   };
 
@@ -127,45 +127,29 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
     );
   };
 
-  // 기본 요약: 속도=최고, 고도=순증감 (온도는 기본 표시 없음 — 선택 시에만)
+  // 기본 요약 (항상 표시) — 속도: 최고 / 고도: ±순증감 / 온도: 범위
   const speedDefault = maxSpeed != null ? `최고 ${maxSpeed}` : null;
-  const elevDefault = elevGain != null
-    ? `${elevGain >= 0 ? '+' : ''}${elevGain}`
+  const elevDefault = elevGain != null ? `${elevGain >= 0 ? '+' : ''}${elevGain}` : null;
+  const tempDefault = (minTemp != null && maxTemp != null)
+    ? (minTemp === maxTemp ? `${minTemp}` : `${minTemp}~${maxTemp}`)
     : null;
 
-  // 선택 시: "기본 > 선택값" 형식 (온도는 선택값만)
   const rowSummary = (key) => {
-    if (key === 'temp') {
-      if (hasSel && sel.temp != null) {
-        return (
-          <span className="text-fuchsia-400">
-            {(Math.round(sel.temp * 10) / 10).toFixed(1)}°C
-          </span>
-        );
-      }
-      return null;
-    }
-    if (key === 'speed') {
-      if (speedDefault == null) return null;
-      return (
-        <span className="text-zinc-500">
-          {speedDefault}
-          {hasSel && sel.speed != null && (
-            <> <span className="text-zinc-700">{'>'}</span> <span className="text-fuchsia-400">{Math.round(sel.speed)}</span></>
-          )}
-          <span className="text-zinc-600">km/h</span>
-        </span>
-      );
-    }
-    // elev
-    if (elevDefault == null) return null;
+    const def = key === 'speed' ? speedDefault : key === 'elev' ? elevDefault : tempDefault;
+    if (def == null) return null;
+    const unit = key === 'speed' ? 'km/h' : key === 'elev' ? 'm' : '°C';
+    const selVal = hasSel && sel[key] != null
+      ? (key === 'temp'
+          ? (Math.round(sel.temp * 10) / 10).toFixed(1)
+          : Math.round(sel[key]))
+      : null;
     return (
       <span className="text-zinc-500">
-        {elevDefault}
-        {hasSel && sel.elev != null && (
-          <> <span className="text-zinc-700">{'>'}</span> <span className="text-fuchsia-400">{Math.round(sel.elev)}</span></>
+        {def}
+        {selVal != null && (
+          <> <span className="text-zinc-700">{'>'}</span> <span className="text-fuchsia-400">{selVal}</span></>
         )}
-        <span className="text-zinc-600">m</span>
+        <span className="text-zinc-600">{unit}</span>
       </span>
     );
   };
@@ -220,14 +204,14 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
         </svg>
 
         {labels.length > 1 && (
-          <div className="mt-1 relative h-3 text-[9px] text-zinc-600 tabular-nums overflow-hidden">
+          <div className="mt-1 relative h-3 text-[9px] text-zinc-600 tabular-nums">
             {labels.map((lbl, i) => {
               const ratio = lbl.atIdx / (n - 1);
               return (
                 <span
                   key={i}
                   className="absolute whitespace-nowrap"
-                  style={labelAlign(ratio)}
+                  style={labelAlign(ratio, i, labels.length)}
                 >
                   {lbl.time}
                 </span>
@@ -238,7 +222,7 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
       </div>
 
       {/* 우: 요약/선택값 */}
-      <div className="flex flex-col flex-shrink-0 text-[10px] tabular-nums text-right whitespace-nowrap" style={{ width: 108 }}>
+      <div className="flex flex-col flex-shrink-0 text-[10px] tabular-nums text-right whitespace-nowrap" style={{ width: 116 }}>
         <span className="flex items-center justify-end" style={{ height: ROW_H }}>{rowSummary('speed')}</span>
         <span className="flex items-center justify-end" style={{ height: ROW_H }}>{rowSummary('elev')}</span>
         <span className="flex items-center justify-end" style={{ height: ROW_H }}>{rowSummary('temp')}</span>
