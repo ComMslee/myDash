@@ -2,18 +2,18 @@
 
 ## 웹
 
-| 용도 | URL |
-|---|---|
-| **Dashboard** | **http://43.202.133.239/** |
-| **TeslaMate 설정** | **http://43.202.133.239:4000/** |
+| 용도 | URL | 인증 |
+|---|---|---|
+| **Dashboard** | **http://<LIGHTSAIL_IP>/** | 없음 (공개) |
+| **TeslaMate 설정** | **http://<LIGHTSAIL_IP>:4000/** | nginx basic-auth (`admin:<htpasswd>`) |
 
-둘 다 **공개 상태**. 인증 없이 URL만 알면 누구나 접근. 개인용이면 OK.
+TeslaMate 4000 포트는 `teslamate-auth`(nginx) 컨테이너가 `nginx-teslamate.htpasswd` 파일을 읽어 Basic 인증을 강제한다. 서버에 파일이 없으면 배포 스크립트가 임시 자격증명을 생성 후 Actions 로그에 출력한다 (`.github/workflows/deploy.yml` 참고).
 
 ## SSH
 
 ### Windows (PowerShell/CMD/Git Bash)
 ```bash
-ssh -i C:\Users\lmskn\Downloads\myDash\lightsail-seoul.pem ubuntu@43.202.133.239
+ssh -i C:\path\to\myDash\lightsail-seoul.pem ubuntu@<LIGHTSAIL_IP>
 ```
 
 ### 편의 스크립트
@@ -47,8 +47,8 @@ bash docs/scripts/aws-status.sh
 
 | 위치 | 경로 |
 |---|---|
-| 로컬 프로젝트 | `C:\Users\lmskn\Downloads\myDash` |
-| 로컬 SSH 키 | `C:\Users\lmskn\Downloads\myDash\lightsail-seoul.pem` |
+| 로컬 프로젝트 | `C:\path\to\myDash` |
+| 로컬 SSH 키 | `C:\path\to\myDash\lightsail-seoul.pem` |
 | 로컬 AWS 프로파일 | `~/.aws/credentials` (`[mydash]`) |
 | 서버 프로젝트 | `/home/ubuntu/myDash` |
 | 서버 .env | `/home/ubuntu/myDash/.env` |

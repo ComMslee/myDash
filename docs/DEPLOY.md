@@ -14,7 +14,7 @@ git push master
 GitHub-hosted Ubuntu runner (무료)
    │
    ├─ SSH 접속 (appleboy/ssh-action)
-   │  - LIGHTSAIL_HOST  : 43.202.133.239
+   │  - LIGHTSAIL_HOST  : <LIGHTSAIL_IP>
    │  - LIGHTSAIL_USER  : ubuntu
    │  - LIGHTSAIL_SSH_KEY : lightsail-seoul.pem 내용
    ▼
@@ -34,7 +34,7 @@ GitHub-hosted Ubuntu runner (무료)
 
 | Name | Value |
 |---|---|
-| `LIGHTSAIL_HOST` | `43.202.133.239` |
+| `LIGHTSAIL_HOST` | `<LIGHTSAIL_IP>` |
 | `LIGHTSAIL_USER` | `ubuntu` |
 | `LIGHTSAIL_SSH_KEY` | `lightsail-seoul.pem` **파일 전체 내용** |
 
@@ -42,12 +42,12 @@ GitHub-hosted Ubuntu runner (무료)
 
 PowerShell:
 ```powershell
-Get-Content C:\Users\lmskn\Downloads\myDash\lightsail-seoul.pem | Set-Clipboard
+Get-Content C:\path\to\myDash\lightsail-seoul.pem | Set-Clipboard
 ```
 
 Git Bash:
 ```bash
-cat C:\Users\lmskn\Downloads\myDash\lightsail-seoul.pem
+cat C:\path\to\myDash\lightsail-seoul.pem
 ```
 출력 전체 (`-----BEGIN RSA PRIVATE KEY-----` ~ `-----END RSA PRIVATE KEY-----`) 복사.
 
@@ -97,9 +97,9 @@ Remove-Item "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\GitHubAc
 
 ### 서버 Git 상태 꼬임
 ```bash
-ssh -i lightsail-seoul.pem ubuntu@43.202.133.239 'cd myDash && git status'
+ssh -i lightsail-seoul.pem ubuntu@<LIGHTSAIL_IP> 'cd myDash && git status'
 # 필요 시
-ssh -i lightsail-seoul.pem ubuntu@43.202.133.239 'cd myDash && git reset --hard origin/master'
+ssh -i lightsail-seoul.pem ubuntu@<LIGHTSAIL_IP> 'cd myDash && git reset --hard origin/master'
 ```
 
 ### 빌드 OOM

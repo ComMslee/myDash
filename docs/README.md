@@ -10,8 +10,8 @@ AWS Lightsail 기반 TeslaMate Dashboard 운영 문서.
 | 리전 | `ap-northeast-2` (Seoul) |
 | OS | Ubuntu 22.04 LTS |
 | 인스턴스 이름 | `mydash-prod` |
-| 정적 IP | `43.202.133.239` |
-| AWS 계정 | `183088117326` (`liam-lee`) |
+| 정적 IP | `<LIGHTSAIL_IP>` |
+| AWS 계정 | `<AWS_ACCOUNT_ID>` (`<AWS_PROFILE_NAME>`) |
 | IAM CLI 사용자 | `mydash-cli` (PowerUserAccess) |
 | 자동 스냅샷 | 매일 19:00 KST |
 | 예산 알림 | `mydash-monthly` $10/월 |
@@ -21,15 +21,18 @@ AWS Lightsail 기반 TeslaMate Dashboard 운영 문서.
 
 | 서비스 | 포트 | 역할 |
 |---|---|---|
-| dashboard | 5000 | Next.js 대시보드 |
-| teslamate | 4000 | 데이터 수집기 |
-| database | 5432 (내부) | PostgreSQL 16 |
+| dashboard | 80 | Next.js 대시보드 (`80:5000` 매핑, 부가 `5000:5000`도 열림) |
+| teslamate | (내부) | 데이터 수집기 — 외부 노출 없음 |
+| teslamate-auth | 4000 | nginx basic-auth 프록시 → teslamate |
+| database | (내부) | PostgreSQL 16 |
 | mosquitto | 1883 | MQTT 브로커 |
 
 ## 문서 목차
 
-- [ACCESS.md](./ACCESS.md) — SSH·CLI·웹 접속 방법
-- [OPERATIONS.md](./OPERATIONS.md) — 배포, 모니터링, 재부팅, 문제 해결
+- [ACCESS.md](./ACCESS.md) — SSH·CLI·웹 접속
+- [DEPLOY.md](./DEPLOY.md) — CI/CD (GitHub Actions → Lightsail SSH)
+- [OPERATIONS.md](./OPERATIONS.md) — 재부팅/서비스/모니터링/비용
+- [BACKUP.md](./BACKUP.md) — 스냅샷·DB 백업·인스턴스 정리
+- [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) — OOM/디스크/빌드/배포 장애 대응
 - [TAILSCALE.md](./TAILSCALE.md) — Tailscale 설정 (외부 접근)
-- [DEPLOY.md](./DEPLOY.md) — CI/CD (GitHub Actions)
 - [EV_CHARGER_API.md](./EV_CHARGER_API.md) — 한국환경공단 전기차 충전소 정보 API 사용 가이드
