@@ -1,8 +1,8 @@
 'use client';
 
-import { Fragment, useMemo } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { formatHours } from '@/lib/format';
-import { toKstDate, formatHM } from '@/lib/kst';
+import { toKstDate, formatHM, kstDateStr, kstMondayStr, kstDayOfWeek } from '@/lib/kst';
 import { useIdleDrainDays } from './useIdleDrainDays';
 
 // 하단 밴드 색 — 공조(sky-400) / 센트리 의심(fuchsia-400, 공조와 겹치지 않음)
@@ -76,10 +76,12 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
   const { avgDrainPerDay, avgIdleHours, avgDrop, withDrainCount, totalRecords } = stats;
   const fmtDrop = (n) => (Math.round(n * 10) / 10).toString();
 
-  // 전체 총계 + 일자별 파생치 — grouped 변경 시에만 재계산
-  const { totalClimatePct, totalSentryPct, totalClimateMin, totalSentryMin, dayCompute } = useMemo(() => {
+  // 전체 총계 + 일자별 파생치 + 주별 집계 — grouped 변경 시에만 재계산
+  const { totalClimatePct, totalSentryPct, totalClimateMin, totalSentryMin, dayCompute, weeks } = useMemo(() => {
     let totalIdleH = 0, totalClimateMin = 0, totalSentryMin = 0;
     const dayCompute = new Map();
+    const weekMap = new Map();
+    const weekOrder = [];
     for (const { key, items } of grouped) {
       let dayIdleH = 0, dayDropRaw = 0, dayClimateMin = 0, daySentryMin = 0;
       const sentrySpansList = [];
@@ -95,6 +97,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
       totalClimateMin += dayClimateMin;
       totalSentryMin += daySentryMin;
       dayCompute.set(key, {
+        items,
         dayIdleH,
         dayDrop: Math.round(dayDropRaw * 10) / 10,
         dayClimateMin,
@@ -103,15 +106,77 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
         daySentryPct: pctOf(daySentryMin, dayIdleH),
         sentrySpansList,
       });
+
+      // 주(월~일) 단위 집계
+      const weekKey = kstMondayStr(key + 'T00:00:00Z');
+      let w = weekMap.get(weekKey);
+      if (!w) {
+        w = { weekKey, dayKeys: [], weekIdleH: 0, weekDropRaw: 0, weekClimateMin: 0, weekSentryMin: 0 };
+        weekMap.set(weekKey, w);
+        weekOrder.push(weekKey);
+      }
+      w.dayKeys.push(key);
+      w.weekIdleH += dayIdleH;
+      w.weekDropRaw += dayDropRaw;
+      w.weekClimateMin += dayClimateMin;
+      w.weekSentryMin += daySentryMin;
     }
+    const weeks = weekOrder.map(wk => {
+      const w = weekMap.get(wk);
+      return {
+        weekKey: wk,
+        dayKeys: w.dayKeys,
+        avgIdleH: w.dayKeys.length > 0 ? w.weekIdleH / w.dayKeys.length : 0,
+        avgDrainPerDay: w.weekIdleH > 0 ? Math.round(w.weekDropRaw / w.weekIdleH * 24 * 10) / 10 : 0,
+        weekClimatePct: pctOf(w.weekClimateMin, w.weekIdleH),
+        weekSentryPct: pctOf(w.weekSentryMin, w.weekIdleH),
+        weekClimateMin: w.weekClimateMin,
+        weekSentryMin: w.weekSentryMin,
+      };
+    });
     return {
       totalClimatePct: pctOf(totalClimateMin, totalIdleH),
       totalSentryPct: pctOf(totalSentryMin, totalIdleH),
       totalClimateMin,
       totalSentryMin,
       dayCompute,
+      weeks,
     };
   }, [grouped]);
+
+  // 주 헤더 토글 — 이번 주 항상 펼침, 월/화엔 지난 주도 펼침
+  const [expandedWeeks, setExpandedWeeks] = useState(() => {
+    const today = kstDateStr(Date.now());
+    const thisWeek = kstMondayStr(today + 'T00:00:00Z');
+    const dow = kstDayOfWeek();
+    const set = new Set([thisWeek]);
+    if (dow === 1 || dow === 2) {
+      const lastWeek = kstMondayStr(new Date(thisWeek + 'T00:00:00Z').getTime() - 7 * 86400000);
+      set.add(lastWeek);
+    }
+    return set;
+  });
+  const toggleWeek = (wk) => setExpandedWeeks(prev => {
+    const next = new Set(prev);
+    if (next.has(wk)) next.delete(wk); else next.add(wk);
+    return next;
+  });
+
+  // 이번 주 기준점 — 상대 라벨 계산용
+  const todayWeekKey = useMemo(() => kstMondayStr(kstDateStr(Date.now()) + 'T00:00:00Z'), []);
+  const weekLabel = (weekKey) => {
+    const diff = Math.round(
+      (new Date(todayWeekKey + 'T00:00:00Z').getTime() - new Date(weekKey + 'T00:00:00Z').getTime()) / (7 * 86400000)
+    );
+    if (diff === 0) return '이번 주';
+    if (diff === 1) return '지난 주';
+    return `${diff}주 전`;
+  };
+  const weekRange = (weekKey) => {
+    const mon = new Date(weekKey + 'T00:00:00Z');
+    const sun = new Date(mon.getTime() + 6 * 86400000);
+    return `${mon.getUTCMonth() + 1}/${mon.getUTCDate()} ~ ${sun.getUTCMonth() + 1}/${sun.getUTCDate()}`;
+  };
 
   // 일자 라벨 포맷 (올해면 연도 생략, 요일 표시)
   const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -156,9 +221,44 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
         </div>
       </div>
 
-      {/* 날짜별 그룹 리스트 */}
-      {grouped.map(({ key, items }) => {
-        const { dayIdleH, dayDrop, dayClimateMin, daySentryMin, dayClimatePct, daySentryPct, sentrySpansList: daySentrySpansList } = dayCompute.get(key);
+      {/* 주간 그룹 리스트 — 월~일, 이번 주 펼침 + 월/화엔 지난 주도 펼침 */}
+      {weeks.map(week => {
+        const expanded = expandedWeeks.has(week.weekKey);
+        return (
+          <Fragment key={week.weekKey}>
+            {/* 주 헤더 — 탭하면 펼침/접힘 */}
+            <button
+              onClick={() => toggleWeek(week.weekKey)}
+              className="w-full px-4 py-2 border-t border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] flex items-center justify-between gap-2 text-left transition-colors"
+            >
+              <span className="flex items-center gap-2 min-w-0">
+                <svg className={`w-3 h-3 text-zinc-500 flex-shrink-0 transition-transform ${expanded ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                <span className="text-[10px] font-bold text-zinc-300">{weekLabel(week.weekKey)}</span>
+                <span className="text-[10px] text-zinc-600 tabular-nums">{weekRange(week.weekKey)}</span>
+              </span>
+              <span className="flex items-center gap-2 tabular-nums flex-shrink-0">
+                <span className="text-[10px] text-zinc-600">
+                  {formatHours(week.avgIdleH)}/일
+                  {week.weekClimatePct != null && (
+                    <span className="text-sky-700 ml-1 opacity-80" title={`공조 ${Math.round(week.weekClimateMin)}분`}>
+                      (<span aria-hidden="true">🌀</span>{week.weekClimatePct}%)
+                    </span>
+                  )}
+                  {week.weekSentryPct != null && (
+                    <span className="text-fuchsia-400 ml-1 opacity-80" title={`센트리 의심 ${Math.round(week.weekSentryMin)}분`}>
+                      (<span aria-hidden="true">🛡</span>{week.weekSentryPct}%)
+                    </span>
+                  )}
+                </span>
+                <span className={`text-[10px] font-bold ${dropTextClass(week.avgDrainPerDay)}`}>
+                  {week.avgDrainPerDay < 0.05 ? '0%' : `-${fmtDrop(week.avgDrainPerDay)}%`}
+                </span>
+              </span>
+            </button>
+            {expanded && week.dayKeys.map(key => {
+              const { items, dayIdleH, dayDrop, dayClimateMin, daySentryMin, dayClimatePct, daySentryPct, sentrySpansList: daySentrySpansList } = dayCompute.get(key);
         return (
           <div key={key} className="border-t border-white/[0.04]">
             <div className="px-4 py-1.5 bg-white/[0.02] flex items-center justify-between">
@@ -309,6 +409,9 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
               </div>
             </div>
           </div>
+        );
+      })}
+          </Fragment>
         );
       })}
     </div>

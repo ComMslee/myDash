@@ -23,6 +23,26 @@ export function kstDateStr(input, offsetDays = 0) {
   return `${y}-${m}-${d}`;
 }
 
+/** KST 기준 해당 주 월요일 'YYYY-MM-DD' 문자열 반환 (월~일 주 = ISO 8601). */
+export function kstMondayStr(input) {
+  const base = input instanceof Date ? input.getTime() : new Date(input).getTime();
+  const kst = new Date(base + KST_OFFSET_MS);
+  const dow = kst.getUTCDay(); // 0=Sun..6=Sat
+  const daysToMon = dow === 0 ? 6 : dow - 1;
+  const monMs = kst.getTime() - daysToMon * 24 * 60 * 60 * 1000;
+  const mon = new Date(monMs);
+  const y = mon.getUTCFullYear();
+  const m = String(mon.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(mon.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** KST 기준 오늘 요일 (0=일, 1=월, ..., 6=토) */
+export function kstDayOfWeek(input = Date.now()) {
+  const base = input instanceof Date ? input.getTime() : new Date(input).getTime();
+  return new Date(base + KST_OFFSET_MS).getUTCDay();
+}
+
 /** KST 기준 'HH:MM' 문자열 반환 */
 export function formatHM(input) {
   const kst = toKstDate(input);
