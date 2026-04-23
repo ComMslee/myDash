@@ -94,7 +94,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                   {formatHours(dayIdleH)}
                   {dayClimatePct != null && (
                     <span
-                      className="text-sky-400 ml-1"
+                      className="text-sky-700 ml-1 opacity-80"
                       title={`공조 작동 추정 ${Math.round(dayClimateMin)}분`}
                     >
                       (<span aria-hidden="true">🌀</span>{dayClimatePct}%)
@@ -199,13 +199,6 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                 {[6, 12, 18].map(h => (
                   <div key={h} className="absolute top-0 bottom-0 w-px bg-white/10 pointer-events-none" style={{ left: `${(h / 24) * 100}%` }} />
                 ))}
-              </div>
-              <div className="flex justify-between mt-1 text-[9px] tabular-nums text-zinc-600">
-                <span>0</span>
-                <span>6</span>
-                <span>12</span>
-                <span>18</span>
-                <span>24시</span>
               </div>
             </div>
           </div>

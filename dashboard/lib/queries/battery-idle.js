@@ -59,7 +59,7 @@ export function queryIdleDrain(carId) {
         ) AS spans,
         ROUND(COALESCE(SUM(EXTRACT(EPOCH FROM (run_end - run_start))), 0)::numeric / 60, 1) AS climate_minutes
       FROM (
-        -- island별 공조 구간 (5분 미만 토글은 HAVING으로 제외)
+        -- island별 공조 구간 (3분 미만 토글은 HAVING으로 제외)
         SELECT MIN(date) AS run_start, MAX(row_end) AS run_end
         FROM (
           -- 300초 초과 공백을 경계로 island_id 누적 증가
@@ -83,7 +83,8 @@ export function queryIdleDrain(carId) {
           ) flagged
         ) islanded
         GROUP BY island_id
-        HAVING EXTRACT(EPOCH FROM (MAX(row_end) - MIN(date))) >= 300
+        -- 3분 미만 짧은 공조 토글(ON/OFF 노이즈) 제외
+        HAVING EXTRACT(EPOCH FROM (MAX(row_end) - MIN(date))) >= 180
       ) runs
     ) c ON true
     ORDER BY f.idle_start DESC
