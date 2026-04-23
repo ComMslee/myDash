@@ -99,6 +99,9 @@ export default function FleetStatsPopup({ onClose }) {
                           count={e.count}
                           max={topMax}
                           isPeak={i === 0}
+                          delta={e.delta}
+                          isNew={e.isNew}
+                          prevRank={e.prevRank}
                         />
                       ))}
                     </div>

@@ -680,6 +680,58 @@ export async function fetchFleetStatsDb(statIds, months) {
     perCharger.sort((a, b) => b.count - a.count);
     const allTimeTotal = perCharger.reduce((s, e) => s + e.count, 0);
 
+    // 2-b) 전일까지 누적 랭킹 — 오늘(KST) 제외해서 어제 끝 시점 순위 산출
+    const prevRankRes = await pool.query(
+      `SELECT stat_id, chger_id, SUM(LEAST(count, 1))::bigint AS total
+         FROM charger_usage_daily
+        WHERE stat_id = ANY($1)
+          AND date < ((NOW() AT TIME ZONE 'Asia/Seoul')::date)
+        GROUP BY stat_id, chger_id`,
+      [statIds]
+    );
+    const prevCountMap = new Map();
+    for (const r of prevRankRes.rows) {
+      prevCountMap.set(`${r.stat_id}_${r.chger_id}`, Number(r.total));
+    }
+    const prevEntries = perCharger.map(e => ({ key: e.key, count: prevCountMap.get(e.key) || 0 }));
+    prevEntries.sort((a, b) => b.count - a.count);
+    // 경쟁 순위 (1, 2, 2, 4): 동점은 같은 등수
+    const prevRankMap = new Map();
+    {
+      let rank = 0;
+      let lastCount = null;
+      for (let i = 0; i < prevEntries.length; i++) {
+        const e = prevEntries[i];
+        if (e.count !== lastCount) {
+          rank = i + 1;
+          lastCount = e.count;
+        }
+        prevRankMap.set(e.key, { rank, count: e.count });
+      }
+    }
+    {
+      let rank = 0;
+      let lastCount = null;
+      for (let i = 0; i < perCharger.length; i++) {
+        const e = perCharger[i];
+        if (e.count !== lastCount) {
+          rank = i + 1;
+          lastCount = e.count;
+        }
+        e.rank = rank;
+        const prev = prevRankMap.get(e.key);
+        if (!prev || prev.count === 0) {
+          e.isNew = e.count > 0;
+          e.delta = null;
+          e.prevRank = null;
+        } else {
+          e.prevRank = prev.rank;
+          e.delta = prev.rank - rank; // +는 상승, -는 하락
+          e.isNew = false;
+        }
+      }
+    }
+
     // 3) 전체 누적 시간대 히스토그램 — 1시간당 최대 1포인트 정규화 (동일 규칙)
     const hourlyAllRes = await pool.query(
       `SELECT hour, SUM(LEAST(count, 1))::bigint AS total

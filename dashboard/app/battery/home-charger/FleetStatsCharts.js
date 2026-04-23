@@ -22,10 +22,25 @@ export function Bar({ value, max, className = '' }) {
   );
 }
 
+// 어제 순위 대비 변동 뱃지 — ▲상승(에메랄드)/▼하락(로즈)/–동일/NEW
+function DeltaBadge({ delta, isNew, prevRank }) {
+  if (isNew) {
+    return <span className="shrink-0 text-[9px] font-semibold text-amber-400" title="어제까지 미사용">NEW</span>;
+  }
+  if (delta == null) return null;
+  if (delta > 0) {
+    return <span className="shrink-0 text-[9px] tabular-nums text-emerald-400" title={`어제 ${prevRank}위 → ${delta}등 상승`}>▲{delta}</span>;
+  }
+  if (delta < 0) {
+    return <span className="shrink-0 text-[9px] tabular-nums text-rose-400" title={`어제 ${prevRank}위 → ${-delta}등 하락`}>▼{-delta}</span>;
+  }
+  return <span className="shrink-0 text-[9px] text-zinc-600" title="어제와 동일">–</span>;
+}
+
 // Top/Bottom 순위 행 — 2열 그리드 컴팩트 버전
-// [좌측 강도 스트립][아이콘][라벨][카운트]
+// [좌측 강도 스트립][아이콘][라벨][delta][카운트]
 // 강도는 4px 두께 세로 바의 오파시티로 표현 (시간/요일 차트와 동일 색상 규칙)
-export function RankRow({ icon, label, count, max, isPeak = false }) {
+export function RankRow({ icon, label, count, max, isPeak = false, delta = null, isNew = false, prevRank = null }) {
   const ratio = max > 0 ? count / max : 0;
   const color = isPeak ? '#f59e0b' : '#3b82f6';
   return (
@@ -37,6 +52,7 @@ export function RankRow({ icon, label, count, max, isPeak = false }) {
       />
       <span className="text-zinc-500 w-4 text-center shrink-0">{icon}</span>
       <span className="text-zinc-200 flex-1 truncate">{label}</span>
+      <DeltaBadge delta={delta} isNew={isNew} prevRank={prevRank} />
       <span
         className={`shrink-0 tabular-nums ${isPeak ? 'text-amber-400 font-semibold' : 'text-zinc-400'}`}
         title={`${count}회`}
