@@ -5,9 +5,9 @@ import { formatHours } from '@/lib/format';
 import { toKstDate, formatHM } from '@/lib/kst';
 import { useIdleDrainDays } from './useIdleDrainDays';
 
-// 하단 밴드 색 — 공조(sky-400) > 센트리 의심(violet-400) 순서로 레이어
+// 하단 밴드 색 — 공조(sky-400) / 센트리 의심(fuchsia-400, 공조와 겹치지 않음)
 const CLIMATE_BG = 'rgba(56,189,248,0.9)';
-const SENTRY_BG = 'rgba(167,139,250,0.85)';
+const SENTRY_BG = 'rgba(232,121,249,0.95)';
 
 // idle 전체 대비 퍼센트 — 1% 미만이면 null
 function pctOf(minutes, idleHours) {
@@ -136,7 +136,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                   )}
                   {daySentryPct != null && (
                     <span
-                      className="text-violet-700 ml-1 opacity-80"
+                      className="text-fuchsia-400 ml-1 opacity-80"
                       title={`센트리 의심(공조 제외 온라인) 추정 ${Math.round(daySentryMin)}분`}
                     >
                       (<span aria-hidden="true">🛡</span>{daySentryPct}%)
@@ -196,7 +196,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                       >
                         {showLabel ? (isZero ? '0' : `-${fmtDrop(r.soc_drop)}%`) : ''}
                       </div>
-                      {/* 센트리 의심 밴드 — 공조 제외 후 3분 이상 남은 온라인만 (violet) */}
+                      {/* 센트리 의심 밴드 — 공조 제외 후 3분 이상 남은 온라인만 (fuchsia) */}
                       {sentrySpans.map((sp, spi) => {
                         const spKst = toKstDate(new Date(sp.s).toISOString());
                         const spHour = spKst.getUTCHours() + spKst.getUTCMinutes() / 60 + spKst.getUTCSeconds() / 3600;
