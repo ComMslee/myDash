@@ -5,10 +5,17 @@ export const dynamic = 'force-dynamic';
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    let driveId = searchParams.get('driveId');
+    const raw = searchParams.get('driveId');
+    let driveId = null;
+    if (raw != null && raw !== '') {
+      const parsed = parseInt(raw, 10);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return Response.json({ error: '유효하지 않은 driveId' }, { status: 400 });
+      }
+      driveId = parsed;
+    }
 
-    if (!driveId) {
-      // Get the last drive
+    if (driveId == null) {
       const carResult = await pool.query(`SELECT id FROM cars LIMIT 1`);
       if (carResult.rows.length === 0) {
         return Response.json({ positions: [] });
@@ -33,22 +40,30 @@ export async function GET(request) {
       [driveId]
     );
 
-    const validSpeeds = posResult.rows.filter(p => p.speed != null);
-    const total = validSpeeds.length;
-    const maxSpeedKmh = total > 0
-      ? Math.round(Math.max(...validSpeeds.map(p => parseFloat(p.speed))))
-      : null;
-
-    // 4구간 퍼센트 (카카오/네이버 교통정보 기준)
+    // 속도 통계 단일 패스 (spread Math.max 스택오버플로 회피)
+    let total = 0, maxSpeed = -Infinity;
+    let jam = 0, slow = 0, flow = 0, fast = 0;
+    for (const p of posResult.rows) {
+      if (p.speed == null) continue;
+      const v = parseFloat(p.speed);
+      if (!Number.isFinite(v)) continue;
+      total++;
+      if (v > maxSpeed) maxSpeed = v;
+      if (v <= 30) jam++;
+      else if (v <= 60) slow++;
+      else if (v <= 80) flow++;
+      else fast++;
+    }
+    const maxSpeedKmh = total > 0 ? Math.round(maxSpeed) : null;
     const speedBands = total > 0 ? {
-      jam:   Math.round(validSpeeds.filter(p => parseFloat(p.speed) <= 30).length / total * 100),
-      slow:  Math.round(validSpeeds.filter(p => parseFloat(p.speed) > 30 && parseFloat(p.speed) <= 60).length / total * 100),
-      flow:  Math.round(validSpeeds.filter(p => parseFloat(p.speed) > 60 && parseFloat(p.speed) <= 80).length / total * 100),
-      fast:  Math.round(validSpeeds.filter(p => parseFloat(p.speed) > 80).length / total * 100),
+      jam:  Math.round(jam  / total * 100),
+      slow: Math.round(slow / total * 100),
+      flow: Math.round(flow / total * 100),
+      fast: Math.round(fast / total * 100),
     } : null;
 
     return Response.json({
-      driveId: parseInt(driveId),
+      driveId,
       positions: posResult.rows.map(p => ({
         lat: parseFloat(p.latitude),
         lng: parseFloat(p.longitude),
@@ -62,6 +77,6 @@ export async function GET(request) {
     });
   } catch (err) {
     console.error('/api/route-map error:', err);
-    return Response.json({ error: 'DB error', detail: err.message }, { status: 500 });
+    return Response.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }

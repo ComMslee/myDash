@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment } from 'react';
+import { Fragment, useMemo } from 'react';
 import { formatHours } from '@/lib/format';
 import { toKstDate, formatHM } from '@/lib/kst';
 import { useIdleDrainDays } from './useIdleDrainDays';
@@ -80,17 +80,42 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
   const { avgDrainPerDay, avgIdleHours, avgDrop, withDrainCount, totalRecords } = stats;
   const fmtDrop = (n) => (Math.round(n * 10) / 10).toString();
 
-  // 전체 평균 공조/센트리 비율 (idle 전체 대비)
-  let totalIdleH = 0, totalClimateMin = 0, totalSentryMin = 0;
-  for (const { items } of grouped) {
-    for (const r of items) {
-      totalIdleH += r.idle_hours;
-      totalClimateMin += r.climate_minutes || 0;
-      totalSentryMin += sumSpansMin(computeSentrySpans(r.online_spans, r.climate_spans));
+  // 전체 총계 + 일자별 파생치 — grouped 변경 시에만 재계산
+  const { totalClimatePct, totalSentryPct, totalClimateMin, totalSentryMin, dayCompute } = useMemo(() => {
+    let totalIdleH = 0, totalClimateMin = 0, totalSentryMin = 0;
+    const dayCompute = new Map();
+    for (const { key, items } of grouped) {
+      let dayIdleH = 0, dayDropRaw = 0, dayClimateMin = 0, daySentryMin = 0;
+      const sentrySpansList = [];
+      for (const r of items) {
+        dayIdleH += r.idle_hours;
+        dayDropRaw += r.soc_drop;
+        dayClimateMin += r.climate_minutes || 0;
+        const spans = computeSentrySpans(r.online_spans, r.climate_spans);
+        sentrySpansList.push(spans);
+        daySentryMin += sumSpansMin(spans);
+      }
+      totalIdleH += dayIdleH;
+      totalClimateMin += dayClimateMin;
+      totalSentryMin += daySentryMin;
+      dayCompute.set(key, {
+        dayIdleH,
+        dayDrop: Math.round(dayDropRaw * 10) / 10,
+        dayClimateMin,
+        daySentryMin,
+        dayClimatePct: pctOf(dayClimateMin, dayIdleH),
+        daySentryPct: pctOf(daySentryMin, dayIdleH),
+        sentrySpansList,
+      });
     }
-  }
-  const totalClimatePct = pctOf(totalClimateMin, totalIdleH);
-  const totalSentryPct = pctOf(totalSentryMin, totalIdleH);
+    return {
+      totalClimatePct: pctOf(totalClimateMin, totalIdleH),
+      totalSentryPct: pctOf(totalSentryMin, totalIdleH),
+      totalClimateMin,
+      totalSentryMin,
+      dayCompute,
+    };
+  }, [grouped]);
 
   // 일자 라벨 포맷 (올해면 연도 생략, 요일 표시)
   const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -137,14 +162,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
 
       {/* 날짜별 그룹 리스트 */}
       {grouped.map(({ key, items }) => {
-        const dayIdleH = items.reduce((s, r) => s + r.idle_hours, 0);
-        const dayDropRaw = items.reduce((s, r) => s + r.soc_drop, 0);
-        const dayDrop = Math.round(dayDropRaw * 10) / 10;
-        const dayClimateMin = items.reduce((s, r) => s + (r.climate_minutes || 0), 0);
-        const daySentrySpansList = items.map(r => computeSentrySpans(r.online_spans, r.climate_spans));
-        const daySentryMin = daySentrySpansList.reduce((s, spans) => s + sumSpansMin(spans), 0);
-        const dayClimatePct = pctOf(dayClimateMin, dayIdleH);
-        const daySentryPct = pctOf(daySentryMin, dayIdleH);
+        const { dayIdleH, dayDrop, dayClimateMin, daySentryMin, dayClimatePct, daySentryPct, sentrySpansList: daySentrySpansList } = dayCompute.get(key);
         return (
           <div key={key} className="border-t border-white/[0.04]">
             <div className="px-4 py-1.5 bg-white/[0.02] flex items-center justify-between">
@@ -224,7 +242,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                       </div>
                       {/* 센트리 의심 밴드 — 공조 제외 후 3분 이상 남은 온라인만 (fuchsia) */}
                       {sentrySpans.map((sp, spi) => {
-                        const spKst = toKstDate(new Date(sp.s).toISOString());
+                        const spKst = toKstDate(sp.s);
                         const spHour = spKst.getUTCHours() + spKst.getUTCMinutes() / 60 + spKst.getUTCSeconds() / 3600;
                         const spLeft = (spHour / 24) * 100;
                         const spWidth = ((sp.e - sp.s) / 3600000 / 24) * 100;
@@ -245,7 +263,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                       })}
                       {/* 공조 구간 밴드 — 센트리와 겹치지 않음(별도 구간) */}
                       {climateSpans.map((sp, spi) => {
-                        const spKst = toKstDate(new Date(sp.s).toISOString());
+                        const spKst = toKstDate(sp.s);
                         const spHour = spKst.getUTCHours() + spKst.getUTCMinutes() / 60 + spKst.getUTCSeconds() / 3600;
                         const spLeft = (spHour / 24) * 100;
                         const spWidth = ((sp.e - sp.s) / 3600000 / 24) * 100;

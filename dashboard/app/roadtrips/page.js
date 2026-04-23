@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useMock } from '../context/mock';
 import { KWH_PER_KM } from '../../lib/constants';
 import { formatDuration, shortAddr } from '../../lib/format';
-import { formatTimeRange } from '../../lib/kst';
+import { formatTimeRange, kstDateStr } from '../../lib/kst';
 import DriveMap from '../components/DriveMap';
 import RouteSparklines from '../components/RouteSparklines';
 import DriveListView from './DriveListView';
@@ -48,14 +48,8 @@ function DrivesInner() {
     };
   }, []);
 
-  // 주행의 KST 날짜 문자열 계산 (YYYY-MM-DD)
-  const driveDayStr = (d) => {
-    const dt = new Date(d.start_date);
-    const y = dt.getFullYear();
-    const m = String(dt.getMonth() + 1).padStart(2, '0');
-    const dd = String(dt.getDate()).padStart(2, '0');
-    return `${y}-${m}-${dd}`;
-  };
+  // 주행의 KST 날짜 문자열 — 브라우저 로컬 TZ가 아닌 KST 기준으로 통일 (해외/VPN 시 그룹 불일치 방지)
+  const driveDayStr = (d) => kstDateStr(d.start_date);
 
   const {
     drives, places,

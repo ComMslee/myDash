@@ -178,6 +178,12 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
     highlightRef.current = L.circleMarker([highlightLatLng.lat, highlightLatLng.lng], {
       radius: 7, color: '#e879f9', weight: 2, fillColor: '#e879f9', fillOpacity: 0.5, interactive: false,
     }).addTo(map);
+    return () => {
+      if (highlightRef.current && mapRef.current) {
+        mapRef.current.removeLayer(highlightRef.current);
+        highlightRef.current = null;
+      }
+    };
   }, [highlightLatLng?.lat, highlightLatLng?.lng]);
 
   return (

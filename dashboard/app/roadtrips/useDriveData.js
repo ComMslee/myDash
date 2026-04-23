@@ -104,6 +104,7 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
           setLoadingRoute(false);
         }
       });
+    return () => { abortRef.current?.abort(); };
   }, [selectedDrive?.id, isMock, refreshSignal, dayMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 일 모드 — 해당 일의 모든 주행 경로 병렬 로드
@@ -136,6 +137,7 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
       setDayRoutes(valid);
       setLoadingRoute(false);
     });
+    return () => { dayAbortRef.current?.abort(); };
   }, [dayMode, isMock, drives]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {

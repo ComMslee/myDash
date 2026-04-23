@@ -16,11 +16,14 @@ const METRICS = [
 
 function computeStats(vals) {
   if (!vals.length) return { min: null, max: null, avg: null };
-  return {
-    min: Math.round(Math.min(...vals)),
-    max: Math.round(Math.max(...vals)),
-    avg: Math.round(vals.reduce((s, v) => s + v, 0) / vals.length),
-  };
+  // 단일 패스 — Math.max(...arr) 는 긴 배열에서 스택오버플로 (V8 인자 상한 ~65k)
+  let min = vals[0], max = vals[0], sum = 0;
+  for (const v of vals) {
+    if (v < min) min = v;
+    if (v > max) max = v;
+    sum += v;
+  }
+  return { min: Math.round(min), max: Math.round(max), avg: Math.round(sum / vals.length) };
 }
 
 // routes: [{ positions: [{speed, elev, temp}], color?, startDate? }]
@@ -114,12 +117,8 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
     const rect = svgRef.current.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    const targetX = PAD_X + ratio * (W - 2 * PAD_X);
-    let best = 0, bestDist = Infinity;
-    for (let i = 0; i < n; i++) {
-      const d = Math.abs(xOf(i) - targetX);
-      if (d < bestDist) { bestDist = d; best = i; }
-    }
+    // xOf 가 선형이므로 역연산으로 O(1) 계산
+    const best = Math.max(0, Math.min(n - 1, Math.round(ratio * (n - 1))));
     onSelect(best);
   };
 
