@@ -16,9 +16,34 @@ function pctOf(minutes, idleHours) {
   return pct >= 1 ? pct : null;
 }
 
-// 센트리 의심 분 = 온라인 - 공조 (음수면 0)
-function sentryMin(onlineMin, climateMin) {
-  return Math.max(0, (onlineMin || 0) - (climateMin || 0));
+// 3분 미만 노이즈 제외 임계(ms)
+const SENTRY_MIN_SPAN_MS = 180000;
+
+// onlineSpans에서 climateSpans 겹침을 빼 센트리 의심 구간만 추출
+// (3분 미만 잔여 구간은 노이즈로 제외)
+function computeSentrySpans(onlineSpans, climateSpans) {
+  const out = [];
+  for (const on of onlineSpans || []) {
+    let pieces = [{ s: on.s, e: on.e }];
+    for (const cs of climateSpans || []) {
+      const next = [];
+      for (const p of pieces) {
+        if (cs.e <= p.s || cs.s >= p.e) { next.push(p); continue; }
+        if (cs.s <= p.s && cs.e >= p.e) continue;
+        if (cs.s > p.s) next.push({ s: p.s, e: Math.min(cs.s, p.e) });
+        if (cs.e < p.e) next.push({ s: Math.max(cs.e, p.s), e: p.e });
+      }
+      pieces = next;
+    }
+    for (const p of pieces) {
+      if (p.e - p.s >= SENTRY_MIN_SPAN_MS) out.push(p);
+    }
+  }
+  return out;
+}
+
+function sumSpansMin(spans) {
+  return (spans || []).reduce((t, sp) => t + (sp.e - sp.s), 0) / 60000;
 }
 
 // 대기 손실 5단계 색상 (신호등형 그라데이션)
@@ -90,8 +115,8 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
         const dayDropRaw = items.reduce((s, r) => s + r.soc_drop, 0);
         const dayDrop = Math.round(dayDropRaw * 10) / 10;
         const dayClimateMin = items.reduce((s, r) => s + (r.climate_minutes || 0), 0);
-        const dayOnlineMin = items.reduce((s, r) => s + (r.online_minutes || 0), 0);
-        const daySentryMin = sentryMin(dayOnlineMin, dayClimateMin);
+        const daySentrySpansList = items.map(r => computeSentrySpans(r.online_spans, r.climate_spans));
+        const daySentryMin = daySentrySpansList.reduce((s, spans) => s + sumSpansMin(spans), 0);
         const dayClimatePct = pctOf(dayClimateMin, dayIdleH);
         const daySentryPct = pctOf(daySentryMin, dayIdleH);
         return (
@@ -124,7 +149,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
               </div>
             </div>
             <div className="px-4 py-2.5">
-              {/* 24h 타임라인 — 상단 drain(32px) + 하단 공조/센트리 밴드(16px) */}
+              {/* 24h 타임라인 — 상단 drain(38px) + 하단 공조/센트리 밴드(10px) */}
               <div className="relative w-full h-12 rounded-md overflow-hidden bg-white/[0.05]">
                 {items.map((r, i) => {
                   const kstStart = toKstDate(r.idle_start);
@@ -139,10 +164,9 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                     ? (isPreCharge ? 'rgba(234,179,8,0.3)' : 'rgba(16,185,129,0.3)')
                     : (isPreCharge ? 'rgba(234,179,8,0.85)' : dropBarBg(r.soc_drop));
                   const climateMin = r.climate_minutes || 0;
-                  const onlineMin = r.online_minutes || 0;
-                  const itemSentryMin = sentryMin(onlineMin, climateMin);
                   const climateSpans = r.climate_spans || [];
-                  const onlineSpans = r.online_spans || [];
+                  const sentrySpans = daySentrySpansList[i];
+                  const itemSentryMin = sumSpansMin(sentrySpans);
                   const showLabel = widthPct >= 10;
                   const titleParts = [
                     `${formatHM(r.idle_start)}~${r.idle_end ? formatHM(r.idle_end) : '현재'}`,
@@ -157,12 +181,12 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                   if (itemSentryPct != null) titleParts.push(`🛡 센트리 의심 ${itemSentryPct}%`);
                   return (
                     <Fragment key={i}>
-                      {/* drain 바 — 상단 32px */}
+                      {/* drain 바 — 상단 38px */}
                       <div
                         className="absolute left-0 flex items-center justify-center text-[10px] font-bold tabular-nums text-white"
                         style={{
                           top: 0,
-                          height: '32px',
+                          height: '38px',
                           left: `${leftPct}%`,
                           width: `${widthPct}%`,
                           background: bg,
@@ -172,8 +196,8 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                       >
                         {showLabel ? (isZero ? '0' : `-${fmtDrop(r.soc_drop)}%`) : ''}
                       </div>
-                      {/* 센트리 의심 밴드 — 온라인 전체 구간 (violet). 공조 밴드가 위에서 덮음 */}
-                      {onlineSpans.map((sp, spi) => {
+                      {/* 센트리 의심 밴드 — 공조 제외 후 3분 이상 남은 온라인만 (violet) */}
+                      {sentrySpans.map((sp, spi) => {
                         const spKst = toKstDate(new Date(sp.s).toISOString());
                         const spHour = spKst.getUTCHours() + spKst.getUTCMinutes() / 60 + spKst.getUTCSeconds() / 3600;
                         const spLeft = (spHour / 24) * 100;
@@ -181,11 +205,11 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                         if (spWidth <= 0) return null;
                         return (
                           <div
-                            key={`on-${i}-${spi}`}
+                            key={`sn-${i}-${spi}`}
                             className="absolute pointer-events-none"
                             style={{
                               bottom: 0,
-                              height: '16px',
+                              height: '10px',
                               left: `${spLeft}%`,
                               width: `${spWidth}%`,
                               background: SENTRY_BG,
@@ -193,7 +217,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                           />
                         );
                       })}
-                      {/* 공조 구간 밴드 — 센트리 위에 덮음 (우선 표시) */}
+                      {/* 공조 구간 밴드 — 센트리와 겹치지 않음(별도 구간) */}
                       {climateSpans.map((sp, spi) => {
                         const spKst = toKstDate(new Date(sp.s).toISOString());
                         const spHour = spKst.getUTCHours() + spKst.getUTCMinutes() / 60 + spKst.getUTCSeconds() / 3600;
@@ -206,7 +230,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                             className="absolute pointer-events-none"
                             style={{
                               bottom: 0,
-                              height: '16px',
+                              height: '10px',
                               left: `${spLeft}%`,
                               width: `${spWidth}%`,
                               background: CLIMATE_BG,
