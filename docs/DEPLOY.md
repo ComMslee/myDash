@@ -95,12 +95,5 @@ Remove-Item "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\GitHubAc
 오류: `Error: Private key format is invalid` 등
 → 3개 secret 재확인, 특히 `LIGHTSAIL_SSH_KEY`는 `-----BEGIN` 줄부터 `-----END RSA PRIVATE KEY-----` 줄까지 **전체** 포함 필수.
 
-### 서버 Git 상태 꼬임
-```bash
-ssh -i lightsail-seoul.pem ubuntu@<LIGHTSAIL_IP> 'cd myDash && git status'
-# 필요 시
-ssh -i lightsail-seoul.pem ubuntu@<LIGHTSAIL_IP> 'cd myDash && git reset --hard origin/master'
-```
-
-### 빌드 OOM
-1GB RAM에서 Dashboard 빌드가 drop 되면 로그에 `Killed` 표시. [OPERATIONS.md](./OPERATIONS.md#컨테이너가-죽었다-oom) 참고.
+### 서버 Git 상태 꼬임 · 빌드 OOM
+[TROUBLESHOOTING.md](./TROUBLESHOOTING.md) 참고.
