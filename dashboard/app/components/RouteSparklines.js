@@ -106,11 +106,11 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
   const sel = hasSel ? flat[selectedIdx] : null;
   const totalH = ROW_H * 3;
 
-  // 시간 라벨 엣지 클램프 — 첫/끝 라벨은 인덱스 기반으로 무조건 가장자리 정렬
+  // 시간 라벨 엣지 클램프 — 첫/끝(인덱스) 또는 극단 ratio 라벨은 컨테이너 가장자리에 밀착
   const labelAlign = (ratio, idx, total) => {
-    if (idx === 0) return { left: '0%', transform: 'translateX(0)' };
-    if (idx === total - 1) return { left: '100%', transform: 'translateX(-100%)' };
-    return { left: `${ratio * 100}%`, transform: 'translateX(-50%)' };
+    if (idx === 0 || ratio < 0.05) return { left: 0, right: 'auto', transform: 'translateX(0)' };
+    if (idx === total - 1 || ratio > 0.95) return { left: 'auto', right: 0, transform: 'translateX(0)' };
+    return { left: `${ratio * 100}%`, right: 'auto', transform: 'translateX(-50%)' };
   };
 
   const renderRow = (row, color, rowIdx) => {
