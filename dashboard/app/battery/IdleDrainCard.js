@@ -6,8 +6,9 @@ import { toKstDate, formatHM } from '@/lib/kst';
 import { useIdleDrainDays } from './useIdleDrainDays';
 
 // 하단 밴드 색 — 공조(sky-400) / 센트리 의심(fuchsia-400, 공조와 겹치지 않음)
-const CLIMATE_BG = 'rgba(56,189,248,0.9)';
-const SENTRY_BG = 'rgba(232,121,249,0.95)';
+// 드레인 바와 겹치므로 알파 0.5로 톤다운
+const CLIMATE_BG = 'rgba(56,189,248,0.5)';
+const SENTRY_BG = 'rgba(232,121,249,0.5)';
 
 // idle 전체 대비 퍼센트 — 1% 미만이면 null
 function pctOf(minutes, idleHours) {
@@ -46,24 +47,19 @@ function sumSpansMin(spans) {
   return (spans || []).reduce((t, sp) => t + (sp.e - sp.s), 0) / 60000;
 }
 
-// 대기 손실 5단계 색상 (신호등형 그라데이션)
-// < 0.05%: 사실상 0 (에메랄드 밝음)  ·  0-1%: 에메랄드 어두움  ·  1-2%: 앰버  ·  2-3%: 오렌지  ·  3-4%: 레드  ·  4%+: 다크레드
+// 대기 손실 3단계 색상 — 신호등(에메랄드·앰버·레드), 0%는 에메랄드 밝음
 function dropTextClass(drop) {
   if (drop < 0.05) return 'text-emerald-400';
-  if (drop < 1) return 'text-emerald-700';
-  if (drop < 2) return 'text-amber-500';
-  if (drop < 3) return 'text-orange-500';
-  if (drop < 4) return 'text-red-500';
-  return 'text-red-700';
+  if (drop < 1.5) return 'text-emerald-700';
+  if (drop < 3)   return 'text-amber-500';
+  return 'text-red-500';
 }
 
-// 24h 타임라인 바 배경 (0.85 알파)
+// 24h 타임라인 바 배경 (0.85 알파) — 3단계
 function dropBarBg(drop) {
-  if (drop < 1) return 'rgba(4,120,87,0.85)';     // emerald-700
-  if (drop < 2) return 'rgba(245,158,11,0.85)';   // amber-500
-  if (drop < 3) return 'rgba(249,115,22,0.85)';   // orange-500
-  if (drop < 4) return 'rgba(239,68,68,0.85)';    // red-500
-  return 'rgba(185,28,28,0.85)';                   // red-700
+  if (drop < 1.5) return 'rgba(4,120,87,0.85)';    // emerald-700
+  if (drop < 3)   return 'rgba(245,158,11,0.85)';  // amber-500
+  return 'rgba(239,68,68,0.85)';                    // red-500
 }
 
 export default function IdleDrainCard({ records, chargingSessions = [] }) {
