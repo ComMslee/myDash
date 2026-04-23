@@ -127,93 +127,98 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
     );
   };
 
+  // 기본 요약 (미선택 시): 속도=최고, 고도=순증감, 온도=범위
+  const speedDefault = maxSpeed != null ? `최고 ${maxSpeed}km/h` : null;
+  const elevDefault = elevGain != null
+    ? `${elevGain >= 0 ? '+' : ''}${elevGain}m`
+    : (minElev != null ? `${minElev}~${maxElev}m` : null);
+  const tempDefault = minTemp != null ? `${minTemp}~${maxTemp}°C` : null;
+
+  const rowSummary = (key) => {
+    if (hasSel && sel[key] != null) {
+      const v = sel[key];
+      const txt = key === 'speed' ? `${Math.round(v)}km/h`
+        : key === 'elev' ? `${Math.round(v)}m`
+        : `${(Math.round(v * 10) / 10).toFixed(1)}°C`;
+      return <span className="text-fuchsia-400">{txt}</span>;
+    }
+    const def = key === 'speed' ? speedDefault : key === 'elev' ? elevDefault : tempDefault;
+    return def ? <span className="text-zinc-500">{def}</span> : null;
+  };
+
   return (
-    <div className="px-3 pt-2 pb-2 border-t border-white/[0.04]">
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${W} ${totalH}`}
-        preserveAspectRatio="none"
-        className="w-full block touch-none select-none cursor-crosshair"
-        style={{ height: `${totalH}px` }}
-        onPointerDown={(e) => { e.currentTarget.setPointerCapture?.(e.pointerId); handlePointer(e); }}
-        onPointerMove={(e) => { if (e.buttons) handlePointer(e); }}
-      >
-        {renderRow(speed, '#38bdf8', 0)}
-        {renderRow(elev,  '#a3e635', 1)}
-        {renderRow(temp,  '#fb923c', 2)}
-
-        {/* drive 경계 — 전 행 관통 */}
-        {boundaries.map((bi, k) => {
-          const x = xOf(bi);
-          return (
-            <line key={`b${k}`} x1={x} y1={0} x2={x} y2={totalH}
-              stroke="#71717a" strokeWidth={0.8} strokeDasharray="2 2" opacity={0.7} />
-          );
-        })}
-
-        {hasSel && (
-          <>
-            <line x1={selX} y1={0} x2={selX} y2={totalH}
-              stroke="#e879f9" strokeWidth={1} strokeDasharray="2 3" opacity={0.8} />
-            {sel.speed != null && speed.yOf && (
-              <circle cx={selX} cy={speed.yOf(sel.speed)} r={2.5} fill="#e879f9" />
-            )}
-            {sel.elev != null && elev.yOf && (
-              <circle cx={selX} cy={ROW_H + elev.yOf(sel.elev)} r={2.5} fill="#e879f9" />
-            )}
-            {sel.temp != null && temp.yOf && (
-              <circle cx={selX} cy={ROW_H * 2 + temp.yOf(sel.temp)} r={2.5} fill="#e879f9" />
-            )}
-          </>
-        )}
-      </svg>
-
-      <div className="mt-1 grid gap-0.5 text-[10px] tabular-nums leading-tight">
-        <div className="flex items-center justify-between">
-          <span className="text-sky-400">🚗</span>
-          <span className="text-zinc-500">
-            {hasSel && sel.speed != null && (
-              <span className="text-fuchsia-400 mr-2">{Math.round(sel.speed)}km/h</span>
-            )}
-            {maxSpeed != null && `최고 ${maxSpeed} · 평균 ${avgSpeed}km/h`}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-lime-400">⛰</span>
-          <span className="text-zinc-500">
-            {hasSel && sel.elev != null && (
-              <span className="text-fuchsia-400 mr-2">{Math.round(sel.elev)}m</span>
-            )}
-            {minElev != null && `${minElev}~${maxElev}m${elevGain != null ? ` (${elevGain >= 0 ? '+' : ''}${elevGain})` : ''}`}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-orange-400">🌡</span>
-          <span className="text-zinc-500">
-            {hasSel && sel.temp != null && (
-              <span className="text-fuchsia-400 mr-2">{(Math.round(sel.temp * 10) / 10).toFixed(1)}°C</span>
-            )}
-            {minTemp != null && `${minTemp}~${maxTemp}°C`}
-          </span>
-        </div>
+    <div className="px-3 pt-2 pb-2 border-t border-white/[0.04] flex items-start gap-2">
+      {/* 좌: 이모지 */}
+      <div className="flex flex-col flex-shrink-0 text-[11px] leading-none">
+        <span className="text-sky-400 flex items-center" style={{ height: ROW_H }}>🚗</span>
+        <span className="text-lime-400 flex items-center" style={{ height: ROW_H }}>⛰</span>
+        <span className="text-orange-400 flex items-center" style={{ height: ROW_H }}>🌡</span>
       </div>
 
-      {labels.length > 1 && (
-        <div className="mt-1 relative h-3 text-[9px] text-zinc-600 tabular-nums overflow-hidden">
-          {labels.map((lbl, i) => {
-            const ratio = lbl.atIdx / (n - 1);
+      {/* 중: 그래프 + 시간축 */}
+      <div className="flex-1 min-w-0">
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${W} ${totalH}`}
+          preserveAspectRatio="none"
+          className="w-full block touch-none select-none cursor-crosshair"
+          style={{ height: `${totalH}px` }}
+          onPointerDown={(e) => { e.currentTarget.setPointerCapture?.(e.pointerId); handlePointer(e); }}
+          onPointerMove={(e) => { if (e.buttons) handlePointer(e); }}
+        >
+          {renderRow(speed, '#38bdf8', 0)}
+          {renderRow(elev,  '#a3e635', 1)}
+          {renderRow(temp,  '#fb923c', 2)}
+
+          {boundaries.map((bi, k) => {
+            const x = xOf(bi);
             return (
-              <span
-                key={i}
-                className="absolute whitespace-nowrap"
-                style={labelAlign(ratio)}
-              >
-                {lbl.time}
-              </span>
+              <line key={`b${k}`} x1={x} y1={0} x2={x} y2={totalH}
+                stroke="#71717a" strokeWidth={0.8} strokeDasharray="2 2" opacity={0.7} />
             );
           })}
-        </div>
-      )}
+
+          {hasSel && (
+            <>
+              <line x1={selX} y1={0} x2={selX} y2={totalH}
+                stroke="#e879f9" strokeWidth={1} strokeDasharray="2 3" opacity={0.8} />
+              {sel.speed != null && speed.yOf && (
+                <circle cx={selX} cy={speed.yOf(sel.speed)} r={2.5} fill="#e879f9" />
+              )}
+              {sel.elev != null && elev.yOf && (
+                <circle cx={selX} cy={ROW_H + elev.yOf(sel.elev)} r={2.5} fill="#e879f9" />
+              )}
+              {sel.temp != null && temp.yOf && (
+                <circle cx={selX} cy={ROW_H * 2 + temp.yOf(sel.temp)} r={2.5} fill="#e879f9" />
+              )}
+            </>
+          )}
+        </svg>
+
+        {labels.length > 1 && (
+          <div className="mt-1 relative h-3 text-[9px] text-zinc-600 tabular-nums overflow-hidden">
+            {labels.map((lbl, i) => {
+              const ratio = lbl.atIdx / (n - 1);
+              return (
+                <span
+                  key={i}
+                  className="absolute whitespace-nowrap"
+                  style={labelAlign(ratio)}
+                >
+                  {lbl.time}
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 우: 요약/선택값 */}
+      <div className="flex flex-col flex-shrink-0 text-[10px] tabular-nums text-right" style={{ width: 84 }}>
+        <span className="flex items-center justify-end" style={{ height: ROW_H }}>{rowSummary('speed')}</span>
+        <span className="flex items-center justify-end" style={{ height: ROW_H }}>{rowSummary('elev')}</span>
+        <span className="flex items-center justify-end" style={{ height: ROW_H }}>{rowSummary('temp')}</span>
+      </div>
     </div>
   );
 }
