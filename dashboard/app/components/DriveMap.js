@@ -176,7 +176,7 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
     if (highlightRef.current) { map.removeLayer(highlightRef.current); highlightRef.current = null; }
     if (!highlightLatLng || highlightLatLng.lat == null || highlightLatLng.lng == null) return;
     highlightRef.current = L.circleMarker([highlightLatLng.lat, highlightLatLng.lng], {
-      radius: 7, color: '#e879f9', weight: 2, fillColor: '#e879f9', fillOpacity: 0.5, interactive: false,
+      radius: 7, color: '#ffffff', weight: 2, fillColor: '#ffffff', fillOpacity: 0.5, interactive: false,
     }).addTo(map);
     return () => {
       if (highlightRef.current && mapRef.current) {

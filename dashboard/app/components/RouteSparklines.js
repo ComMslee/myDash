@@ -142,7 +142,7 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
         <span className="text-zinc-500">
           {row.avg}
           <span className="text-zinc-600 mx-1">→</span>
-          <span className="text-fuchsia-400 font-semibold">{meta.fmtSel(selV)}</span>
+          <span className="text-white font-bold">{meta.fmtSel(selV)}</span>
           <span className="text-zinc-600">{meta.unit}</span>
         </span>
       );
@@ -206,14 +206,14 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
           {hasSel && (
             <>
               <line x1={selX} y1={0} x2={selX} y2={totalH}
-                stroke="#e879f9" strokeWidth={1} strokeDasharray="2 3" opacity={0.8} />
+                stroke="rgba(255,255,255,0.85)" strokeWidth={1} strokeDasharray="2 3" />
               {rows.map((row, rowIdx) => {
                 const v = selVals[row.key];
                 if (v == null || !row.yOf) return null;
                 return (
                   <circle key={row.key}
                     cx={selX} cy={ROW_H * rowIdx + row.yOf(v)}
-                    r={2.5} fill="#e879f9" />
+                    r={2.8} fill="white" stroke={METRICS[rowIdx].color} strokeWidth={1.5} />
                 );
               })}
             </>

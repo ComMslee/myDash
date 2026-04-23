@@ -73,8 +73,8 @@ export default function MonthlyChargeCard() {
 
         {/* 시간대별 / 요일별 */}
         <div className="pt-4 border-t border-white/[0.06] space-y-4">
-          <HourlyHeatmap data={data.charge_hourly} hexColor="#4ade80" />
-          <WeekdayBars data={data.charge_weekday} hexColor="#4ade80" />
+          <HourlyHeatmap data={data.charge_hourly} hexColor="#34d399" />
+          <WeekdayBars data={data.charge_weekday} hexColor="#34d399" />
         </div>
       </div>
     </div>
