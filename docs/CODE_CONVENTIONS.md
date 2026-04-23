@@ -5,17 +5,26 @@
 - **한국어 UI** — 모든 레이블, 에러 메시지, 단위 표시
 - **다크 테마** — 배경 `#0f0f0f`, 카드 `#161618`, 중첩 카드 `#1a1a1c`, 테두리 `border-white/[0.06]`
 - **모바일 우선** — `max-w-2xl mx-auto`, 하단 탭 네비게이션 (safe-area 대응)
-- **색상 팔레트**:
-  - 주행 = `blue-400`
-  - 충전 = `green-400` / `emerald-400`
-  - 효율 = `amber-400`
-  - 에러 = `red-400` / `rose-400`
-  - 랭크 강조 (자주 사용) = `amber-400` ring
+- **색상 팔레트** — 의미별 고정, 형광/채도 과한 색(`fuchsia`, `violet` 등) 지양
+  - 주행 = `blue-400` / `sky-400`
+  - 충전 = `emerald-400` (heatmap/바 등 그라디언트도 emerald 계열 통일. `green-400`은 점진 교체)
+  - 효율 · 외부충전 · 주의 = `amber-400`
+  - 급속 · 에러 = `rose-400` / `red-400`
+  - 고도 = `lime-400`, 온도 = `orange-400`
+  - 랭크 강조 ring = `amber-400`
+  - 선택 하이라이트(지도/스파크라인) = `white`
+- **농도 3-tier** — 강약 표현은 5단계 이상 세분화하지 말고 `emerald-400 → amber-400 → red-400` 3단계로 제한 (예: 대기 손실 타임라인)
+- **밴드/오버레이** — 배경 위 반투명 밴드는 `rgba(..., 0.5)` 이하 톤다운 (`sky` 공조, `fuchsia` 센트리 등)
 
 ## 데이터
 
-- **KST(UTC+9)** 기준 날짜/시간 처리 — SQL에서 `+ INTERVAL '9 hours'` 또는 JS에서 수동 변환
+- **KST(UTC+9)** 기준 날짜/시간 처리
+  - SQL: `+ INTERVAL '9 hours'`
+  - JS: **`dashboard/lib/kst.js`의 헬퍼를 사용** (`toKstDate`, `kstDateStr`, `kstMondayStr`, `kstDayOfWeek`, `formatHM`, `formatTimeRange`, `splitByKstMidnight`) — `+ 9*60*60*1000` 매직 넘버 직접 사용 금지
+  - `toKstDate()`로 얻은 Date는 **`getUTCHours()` 등 UTC-getter로 KST 값을 읽음**. `getHours()` 사용 금지
 - **API 라우트**: 모두 `export const dynamic = 'force-dynamic'` (SSR 캐시 비활성화)
+- **API 입력 검증**: URL 쿼리 파라미터 등 외부 입력은 `parseInt` + `Number.isFinite` + 범위 체크 후 사용 (예: `route-map/route.js`의 `driveId`)
+- **에러 응답**: `err.message`를 응답 본문에 그대로 노출하지 말 것 (DB 경로/스키마 정보 유출 위험). `console.error`로만 로깅하고 클라이언트에는 일반 메시지
 - **단일 차량**: `SELECT id FROM cars LIMIT 1` 패턴으로 항상 첫 번째 차량만 조회
 - **자동 갱신 주기**:
   - 홈/헤더: 30초 (setInterval)
@@ -34,6 +43,13 @@
   - 전역 공유 컴포넌트 → `dashboard/app/components/`
   - 페이지 전용 컴포넌트 → 해당 라우트 폴더
   - 복잡한 컴포넌트 내부 모듈 → 동명 서브폴더 (예: `HomeChargerCard.js` + `home-charger/`)
+- **fetch 정리**: `useEffect` 내 fetch는 `AbortController`로 언마운트/파라미터 변경 시 취소 (`setState`-after-unmount 경고 방지) — 예: `roadtrips/useDriveData.js`
+- **비싼 계산**: 배열 flat/stats/패스 생성 등은 `useMemo`로 메모이즈 (예: `RouteSparklines.js`)
+
+## 성능 · 안전성
+
+- **`Math.max(...arr)` / `Math.min(...arr)` 금지** — V8 인자 상한(~65k)으로 긴 배열에서 `RangeError` 발생. `for` 루프로 단일 패스 계산 (예: `RouteSparklines.js::computeStats`, `api/route-map/route.js`의 속도 통계)
+- **다중 통계 계산**: min/max/sum/count 등 여러 지표는 한 번의 루프로 함께 계산 (여러 `reduce`/`filter` 체이닝 대신)
 
 ## 집충전기 카드 상수화 기준
 

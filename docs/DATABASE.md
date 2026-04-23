@@ -68,3 +68,18 @@ TeslaMate가 관리하는 PostgreSQL 16 스키마. 직접 쿼리만 사용 (ORM 
 | `formatDate(iso)` | ISO → "M월 D일 HH:MM" |
 | `shortAddr(addr)` | 주소의 첫 번째 쉼표 이전 부분만 반환 |
 | `formatKorDate(iso)` | ISO → "YY/MM/DD" 또는 "MM/DD" (올해면 연도 생략) |
+
+## KST 헬퍼 (`dashboard/lib/kst.js`)
+
+`+ 9*60*60*1000` 매직 넘버 중복을 막기 위한 단일 소스. `toKstDate()`로 얻은 Date는 **UTC-getter (`getUTCHours` 등)로 KST 값을 반환** — `getHours()` 사용 금지.
+
+| 상수/함수 | 설명 |
+|-----------|------|
+| `KST_OFFSET_MS` | `9 * 60 * 60 * 1000` |
+| `toKstDate(input)` | UTC Date/ISO/ms → KST로 시프트된 Date |
+| `kstDateStr(input, offsetDays=0)` | KST 기준 `'YYYY-MM-DD'` (일 단위 오프셋 가능) |
+| `kstMondayStr(input)` | KST 기준 해당 주 월요일 `'YYYY-MM-DD'` (ISO 8601, 월~일) |
+| `kstDayOfWeek(input=Date.now())` | KST 기준 요일 (0=일 … 6=토) |
+| `formatHM(input)` | KST `'HH:MM'` |
+| `formatTimeRange(start, end)` | `'M/D HH:MM~HH:MM'` (end 없으면 `'M/D HH:MM'`) |
+| `splitByKstMidnight(startMs, endMs)` | UTC ms 범위를 KST 자정 기준으로 세그먼트 분할 (제너레이터) |

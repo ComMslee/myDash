@@ -45,7 +45,8 @@ myDash/
     │   │   ├── BottomNav.js      # 하단 탭 (주행/배터리/로드트립)
     │   │   ├── PageLayout.js     # Spinner 공유 컴포넌트
     │   │   ├── ChartWidgets.js   # HourlyHeatmap, WeekdayBars 차트
-    │   │   ├── DriveMap.js       # Leaflet 기반 주행 경로 지도
+    │   │   ├── DriveMap.js       # Leaflet 기반 주행 경로 지도 (highlightLatLng 포인트 하이라이트)
+    │   │   ├── RouteSparklines.js # 속도/고도/온도 3행 스파크라인 + 포인터 스크럽 선택
     │   │   └── YearHeatmap.js    # 연간 히트맵 (GitHub 스타일)
     │   ├── drives/
     │   │   └── page.js           # 주행 상세 — 통계 + 지도 + 이력
