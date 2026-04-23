@@ -106,6 +106,27 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
   const sel = hasSel ? flat[selectedIdx] : null;
   const totalH = ROW_H * 3;
 
+  // 시간 라벨 엣지 클램프 — 첫/끝 라벨은 가장자리에 붙도록 정렬
+  const labelAlign = (ratio) => {
+    if (ratio < 0.05) return { left: '0%', transform: 'translateX(0)' };
+    if (ratio > 0.95) return { left: '100%', transform: 'translateX(-100%)' };
+    return { left: `${ratio * 100}%`, transform: 'translateX(-50%)' };
+  };
+
+  const renderRow = (row, color, rowIdx) => {
+    const y0 = ROW_H * rowIdx;
+    return (
+      <g key={rowIdx} transform={`translate(0,${y0})`}>
+        {/* 행 배경 틴트 */}
+        <rect x={0} y={0} width={W} height={ROW_H} fill={color} opacity={0.05} />
+        {/* 행 상단 구분선 */}
+        {rowIdx > 0 && <line x1={0} y1={0} x2={W} y2={0} stroke="#27272a" strokeWidth={0.5} />}
+        {/* 라인 */}
+        <path d={row.d} stroke={color} strokeWidth={1.5} fill="none" vectorEffect="non-scaling-stroke" />
+      </g>
+    );
+  };
+
   return (
     <div className="px-3 pt-2 pb-2 border-t border-white/[0.04]">
       <svg
@@ -117,23 +138,18 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
         onPointerDown={(e) => { e.currentTarget.setPointerCapture?.(e.pointerId); handlePointer(e); }}
         onPointerMove={(e) => { if (e.buttons) handlePointer(e); }}
       >
+        {renderRow(speed, '#38bdf8', 0)}
+        {renderRow(elev,  '#a3e635', 1)}
+        {renderRow(temp,  '#fb923c', 2)}
+
+        {/* drive 경계 — 전 행 관통 */}
         {boundaries.map((bi, k) => {
           const x = xOf(bi);
           return (
             <line key={`b${k}`} x1={x} y1={0} x2={x} y2={totalH}
-              stroke="#52525b" strokeWidth={0.8} strokeDasharray="2 2" opacity={0.7} />
+              stroke="#71717a" strokeWidth={0.8} strokeDasharray="2 2" opacity={0.7} />
           );
         })}
-
-        <g transform="translate(0,0)">
-          <path d={speed.d} stroke="#38bdf8" strokeWidth={1.3} fill="none" vectorEffect="non-scaling-stroke" />
-        </g>
-        <g transform={`translate(0,${ROW_H})`}>
-          <path d={elev.d} stroke="#a3e635" strokeWidth={1.3} fill="none" vectorEffect="non-scaling-stroke" />
-        </g>
-        <g transform={`translate(0,${ROW_H * 2})`}>
-          <path d={temp.d} stroke="#fb923c" strokeWidth={1.3} fill="none" vectorEffect="non-scaling-stroke" />
-        </g>
 
         {hasSel && (
           <>
@@ -154,7 +170,7 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
 
       <div className="mt-1 grid gap-0.5 text-[10px] tabular-nums leading-tight">
         <div className="flex items-center justify-between">
-          <span className="text-sky-400">🚗 속도</span>
+          <span className="text-sky-400">🚗</span>
           <span className="text-zinc-500">
             {hasSel && sel.speed != null && (
               <span className="text-fuchsia-400 mr-2">{Math.round(sel.speed)}km/h</span>
@@ -163,7 +179,7 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
           </span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-lime-400">⛰ 고도</span>
+          <span className="text-lime-400">⛰</span>
           <span className="text-zinc-500">
             {hasSel && sel.elev != null && (
               <span className="text-fuchsia-400 mr-2">{Math.round(sel.elev)}m</span>
@@ -172,7 +188,7 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
           </span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-orange-400">🌡 외기온</span>
+          <span className="text-orange-400">🌡</span>
           <span className="text-zinc-500">
             {hasSel && sel.temp != null && (
               <span className="text-fuchsia-400 mr-2">{(Math.round(sel.temp * 10) / 10).toFixed(1)}°C</span>
@@ -183,16 +199,19 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
       </div>
 
       {labels.length > 1 && (
-        <div className="mt-1 relative h-3 text-[9px] text-zinc-600 tabular-nums">
-          {labels.map((lbl, i) => (
-            <span
-              key={i}
-              className="absolute whitespace-nowrap"
-              style={{ left: `${(lbl.atIdx / (n - 1)) * 100}%`, transform: 'translateX(-50%)' }}
-            >
-              {lbl.time}
-            </span>
-          ))}
+        <div className="mt-1 relative h-3 text-[9px] text-zinc-600 tabular-nums overflow-hidden">
+          {labels.map((lbl, i) => {
+            const ratio = lbl.atIdx / (n - 1);
+            return (
+              <span
+                key={i}
+                className="absolute whitespace-nowrap"
+                style={labelAlign(ratio)}
+              >
+                {lbl.time}
+              </span>
+            );
+          })}
         </div>
       )}
     </div>
