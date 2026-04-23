@@ -48,33 +48,7 @@ export function queryIdleDrain(carId) {
       COALESCE(c.spans, '[]'::jsonb) AS climate_spans
     FROM filtered f
     LEFT JOIN LATERAL (
-      WITH p AS (
-        SELECT date, is_climate_on,
-               LEAD(date) OVER (ORDER BY date) AS next_date
-        FROM positions
-        WHERE car_id = $1 AND date BETWEEN f.idle_start AND f.idle_end
-      ),
-      -- is_climate_on=true 샘플만 걸러서 300초 초과 공백 기준으로 island 묶기
-      climate_rows AS (
-        SELECT date,
-          LEAST(COALESCE(next_date, date + INTERVAL '60 seconds'), date + INTERVAL '5 minutes') AS row_end,
-          SUM(
-            CASE
-              WHEN LAG(date) OVER (ORDER BY date) IS NULL THEN 1
-              WHEN EXTRACT(EPOCH FROM (date - LAG(date) OVER (ORDER BY date))) > 300 THEN 1
-              ELSE 0
-            END
-          ) OVER (ORDER BY date) AS island_id
-        FROM p
-        WHERE is_climate_on = true
-      ),
-      runs AS (
-        SELECT MIN(date) AS run_start, MAX(row_end) AS run_end
-        FROM climate_rows
-        GROUP BY island_id
-        -- 5분 미만 짧은 공조 토글(ON/OFF 노이즈)은 무시
-        HAVING EXTRACT(EPOCH FROM (MAX(row_end) - MIN(date))) >= 300
-      )
+      -- LATERAL 안에는 CTE 대신 중첩 서브쿼리 사용 (Postgres planner 호환)
       SELECT
         COALESCE(
           jsonb_agg(jsonb_build_object(
@@ -84,7 +58,33 @@ export function queryIdleDrain(carId) {
           '[]'::jsonb
         ) AS spans,
         ROUND(COALESCE(SUM(EXTRACT(EPOCH FROM (run_end - run_start))), 0)::numeric / 60, 1) AS climate_minutes
-      FROM runs
+      FROM (
+        -- island별 공조 구간 (5분 미만 토글은 HAVING으로 제외)
+        SELECT MIN(date) AS run_start, MAX(row_end) AS run_end
+        FROM (
+          -- 300초 초과 공백을 경계로 island_id 누적 증가
+          SELECT date, row_end,
+                 SUM(new_island_flag) OVER (ORDER BY date) AS island_id
+          FROM (
+            SELECT date,
+              LEAST(COALESCE(next_date, date + INTERVAL '60 seconds'), date + INTERVAL '5 minutes') AS row_end,
+              CASE
+                WHEN LAG(date) OVER (ORDER BY date) IS NULL THEN 1
+                WHEN EXTRACT(EPOCH FROM (date - LAG(date) OVER (ORDER BY date))) > 300 THEN 1
+                ELSE 0
+              END AS new_island_flag
+            FROM (
+              SELECT date, is_climate_on,
+                     LEAD(date) OVER (ORDER BY date) AS next_date
+              FROM positions
+              WHERE car_id = $1 AND date BETWEEN f.idle_start AND f.idle_end
+            ) raw_pos
+            WHERE is_climate_on = true
+          ) flagged
+        ) islanded
+        GROUP BY island_id
+        HAVING EXTRACT(EPOCH FROM (MAX(row_end) - MIN(date))) >= 300
+      ) runs
     ) c ON true
     ORDER BY f.idle_start DESC
   `, [carId]);

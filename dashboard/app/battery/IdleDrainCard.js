@@ -8,11 +8,11 @@ import { useIdleDrainDays } from './useIdleDrainDays';
 // 공조(HVAC) 오버레이 — sky-400 대각선 스트라이프 (기존 drain 배경 위에 얹힘)
 const CLIMATE_STRIPE = `repeating-linear-gradient(45deg, rgba(56,189,248,0.38) 0 3px, transparent 3px 7px)`;
 
-// "45분" / "1시간 20분" 포맷
-function formatMinutes(min) {
-  const m = Math.round(min);
-  if (m < 60) return `${m}분`;
-  return `${Math.floor(m / 60)}시간 ${m % 60}분`;
+// 공조 비중 (%) — idle 전체 대비 공조 작동 분 비율. 1% 미만이면 null
+function climatePct(climateMin, idleHours) {
+  if (!idleHours || idleHours <= 0) return null;
+  const pct = Math.round((climateMin / (idleHours * 60)) * 100);
+  return pct >= 1 ? pct : null;
 }
 
 // 대기 손실 5단계 색상 (신호등형 그라데이션)
@@ -84,21 +84,23 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
         const dayDropRaw = items.reduce((s, r) => s + r.soc_drop, 0);
         const dayDrop = Math.round(dayDropRaw * 10) / 10;
         const dayClimateMin = items.reduce((s, r) => s + (r.climate_minutes || 0), 0);
+        const dayClimatePct = climatePct(dayClimateMin, dayIdleH);
         return (
           <div key={key} className="border-t border-white/[0.04]">
             <div className="px-4 py-1.5 bg-white/[0.02] flex items-center justify-between">
               <span className="text-[10px] font-semibold text-zinc-500 tabular-nums">{formatDateLabel(key)}</span>
               <div className="flex items-center gap-2 tabular-nums">
-                {dayClimateMin >= 1 && (
-                  <span
-                    className="text-[10px] text-sky-400 flex items-center gap-0.5"
-                    title={`공조 작동 추정 ${formatMinutes(dayClimateMin)}`}
-                  >
-                    <span aria-hidden="true">🌀</span>
-                    {formatMinutes(dayClimateMin)}
-                  </span>
-                )}
-                <span className="text-[10px] text-zinc-600">{formatHours(dayIdleH)}</span>
+                <span className="text-[10px] text-zinc-600">
+                  {formatHours(dayIdleH)}
+                  {dayClimatePct != null && (
+                    <span
+                      className="text-sky-400 ml-1"
+                      title={`공조 작동 추정 ${Math.round(dayClimateMin)}분`}
+                    >
+                      (<span aria-hidden="true">🌀</span>{dayClimatePct}%)
+                    </span>
+                  )}
+                </span>
                 <span className={`text-[10px] font-bold ${dropTextClass(dayDrop)}`}>
                   {dayDrop < 0.05 ? '0%' : `-${fmtDrop(dayDrop)}%`}
                 </span>
@@ -129,7 +131,8 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                     isZero ? '0%' : `-${fmtDrop(r.soc_drop)}%`,
                   ];
                   if (isPreCharge) titleParts.push('⚡충전 전 대기');
-                  if (climateMin >= 1) titleParts.push(`🌀 공조 ${formatMinutes(climateMin)}`);
+                  const itemClimatePct = climatePct(climateMin, r.idle_hours);
+                  if (itemClimatePct != null) titleParts.push(`🌀 공조 ${itemClimatePct}%`);
                   return (
                     <Fragment key={i}>
                       <div
