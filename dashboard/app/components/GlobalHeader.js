@@ -68,7 +68,7 @@ export default function GlobalHeader() {
 
   const isCharging = !!charging || car?.state === 'charging';
   const effectiveState = (isMock && isMockCharging) ? 'charging' : car?.state;
-  const lvl = isCharging ? (charging.battery_level ?? car?.battery_level ?? 0) : (car?.battery_level ?? 0);
+  const lvl = isCharging ? (charging?.battery_level ?? car?.battery_level ?? 0) : (car?.battery_level ?? 0);
   const limitLvl = charging?.charge_limit_soc ?? null;
   const estRange = car?.est_battery_range ?? null;
   // SOC 체류 분포와 토큰 통일: ideal/good=emerald, caution=amber, stress=red
@@ -196,7 +196,7 @@ export default function GlobalHeader() {
             <div className="flex items-center gap-1 flex-shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse flex-shrink-0" aria-hidden="true" />
               <span className="text-green-400 text-sm font-bold tabular-nums">
-                {charging.charger_power != null ? `${charging.charger_power}kW` : '충전 중'}
+                {charging?.charger_power != null ? `${charging.charger_power}kW` : '충전 중'}
               </span>
             </div>
             <PercentBadge level={lvl} color={color} charging />
