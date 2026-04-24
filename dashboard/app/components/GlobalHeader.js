@@ -32,6 +32,7 @@ export default function GlobalHeader() {
   const [car, setCar] = useState(null);
   const [charging, setCharging] = useState(null);
   const [carFetchedAt, setCarFetchedAt] = useState(null);
+  const [rawChargingStatus, setRawChargingStatus] = useState(null);
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -57,6 +58,7 @@ export default function GlobalHeader() {
       ]).then(([carData, chargingData]) => {
         if (carData) setCar(carData);
         setCharging(chargingData?.charging ? chargingData : null);
+        setRawChargingStatus(chargingData);
         setCarFetchedAt(new Date());
       });
     fetchData();
@@ -264,6 +266,25 @@ export default function GlobalHeader() {
           />
         </div>
       )}
+
+      {/* DEBUG: 충전 감지 진단 */}
+      <div className="bg-zinc-900/80 border-t border-white/5 px-3 py-1 text-[10px] tabular-nums text-zinc-400 flex flex-wrap gap-x-3 gap-y-0.5 font-mono">
+        <span>state=<span className="text-zinc-200">{car?.state ?? '—'}</span></span>
+        <span>charging={String(!!rawChargingStatus?.charging)}</span>
+        {rawChargingStatus?.fallback && (
+          <span className="text-amber-400">fb={rawChargingStatus.fallback_reason}</span>
+        )}
+        {rawChargingStatus?.debug && (
+          <>
+            <span>pwr=<span className="text-zinc-200">{rawChargingStatus.debug.latest_power ?? 'null'}</span></span>
+            <span>lvl=<span className="text-zinc-200">{rawChargingStatus.debug.recent_level ?? 'null'}→{rawChargingStatus.debug.older_level ?? 'null'}</span></span>
+            <span>pSig={String(rawChargingStatus.debug.power_signal)}</span>
+            <span>lSig={String(rawChargingStatus.debug.level_signal)}</span>
+          </>
+        )}
+        <span>isCharging={String(isCharging)}</span>
+        <span>display={displayState}</span>
+      </div>
     </header>
   );
 }

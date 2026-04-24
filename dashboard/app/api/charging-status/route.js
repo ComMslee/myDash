@@ -86,6 +86,15 @@ export async function GET() {
       && fb.older_level != null
       && fb.recent_level > fb.older_level;
 
+    const debug = {
+      latest_power: fb.latest_power != null ? parseFloat(fb.latest_power) : null,
+      recent_level: fb.recent_level ?? null,
+      older_level: fb.older_level ?? null,
+      latest_date: fb.latest_date ?? null,
+      power_signal: powerSignal,
+      level_signal: levelSignal,
+    };
+
     if (powerSignal || levelSignal) {
       const inferredPower = fb.latest_power != null && parseFloat(fb.latest_power) < 0
         ? Math.abs(parseFloat(fb.latest_power))
@@ -101,10 +110,11 @@ export async function GET() {
         time_to_full_charge: null,
         battery_level: fb.recent_level ?? null,
         charge_limit_soc: fb.last_limit ?? null,
+        debug,
       });
     }
 
-    return Response.json({ charging: false });
+    return Response.json({ charging: false, debug });
   } catch (err) {
     console.error('/api/charging-status error:', err);
     return Response.json({ error: 'DB error', detail: err.message }, { status: 500 });
