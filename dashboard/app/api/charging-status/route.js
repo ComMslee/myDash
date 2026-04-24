@@ -55,36 +55,51 @@ export async function GET() {
       });
     }
 
-    // 폴백 — TeslaMate가 테이퍼/일시 정지에서 charging_processes를 닫는 경우 대비:
-    // 최근 positions.power가 음수면 여전히 충전 중으로 간주
+    // 폴백 — TeslaMate가 charging_processes를 닫아버리거나 아예 안 여는 케이스 대비.
+    // 두 신호 OR로 판정: (a) 최근 positions.power < 0, (b) 최근 배터리 레벨 증가
     const fallback = await pool.query(
-      `SELECT p.power, p.battery_level, p.date,
-              (SELECT end_date FROM charging_processes
-                 WHERE car_id = $1 ORDER BY start_date DESC LIMIT 1) AS last_end,
-              (SELECT start_date FROM charging_processes
-                 WHERE car_id = $1 ORDER BY start_date DESC LIMIT 1) AS last_start,
-              (SELECT charge_limit_soc FROM charges c
-                 JOIN charging_processes cp ON cp.id = c.charging_process_id
-                 WHERE cp.car_id = $1
-                 ORDER BY c.date DESC LIMIT 1) AS last_limit
-       FROM positions p
-       WHERE p.car_id = $1
-         AND p.date >= NOW() - ($2 || ' seconds')::interval
-       ORDER BY p.date DESC
-       LIMIT 1`,
-      [carId, FALLBACK_WINDOW_SEC]
+      `SELECT
+         (SELECT power FROM positions
+            WHERE car_id = $1 ORDER BY date DESC LIMIT 1) AS latest_power,
+         (SELECT battery_level FROM positions
+            WHERE car_id = $1 AND date >= NOW() - ($2 || ' seconds')::interval
+            ORDER BY date DESC LIMIT 1) AS recent_level,
+         (SELECT battery_level FROM positions
+            WHERE car_id = $1 AND date <= NOW() - ($3 || ' seconds')::interval
+              AND date >= NOW() - ($4 || ' seconds')::interval
+            ORDER BY date DESC LIMIT 1) AS older_level,
+         (SELECT date FROM positions
+            WHERE car_id = $1 ORDER BY date DESC LIMIT 1) AS latest_date,
+         (SELECT start_date FROM charging_processes
+            WHERE car_id = $1 ORDER BY start_date DESC LIMIT 1) AS last_start,
+         (SELECT charge_limit_soc FROM charges c
+            JOIN charging_processes cp ON cp.id = c.charging_process_id
+            WHERE cp.car_id = $1
+            ORDER BY c.date DESC LIMIT 1) AS last_limit`,
+      [carId, FALLBACK_WINDOW_SEC, 300, 1200] // 최근 3분 / 5~20분 전
     );
 
-    const fb = fallback.rows[0];
-    if (fb && fb.power != null && parseFloat(fb.power) < FALLBACK_POWER_THRESHOLD) {
+    const fb = fallback.rows[0] || {};
+    const powerSignal = fb.latest_power != null
+      && parseFloat(fb.latest_power) < FALLBACK_POWER_THRESHOLD;
+    const levelSignal = fb.recent_level != null
+      && fb.older_level != null
+      && fb.recent_level > fb.older_level;
+
+    if (powerSignal || levelSignal) {
+      const inferredPower = fb.latest_power != null && parseFloat(fb.latest_power) < 0
+        ? Math.abs(parseFloat(fb.latest_power))
+        : null;
       return Response.json({
         charging: true,
         fallback: true,
+        fallback_reason: powerSignal && levelSignal ? 'power+level'
+          : powerSignal ? 'power' : 'level',
         start_date: fb.last_start ?? null,
         charge_energy_added: 0,
-        charger_power: Math.abs(parseFloat(fb.power)),
+        charger_power: inferredPower,
         time_to_full_charge: null,
-        battery_level: fb.battery_level ?? null,
+        battery_level: fb.recent_level ?? null,
         charge_limit_soc: fb.last_limit ?? null,
       });
     }
