@@ -35,10 +35,13 @@ export default function FleetStatsPopup({ onClose }) {
     return () => { alive = false; };
   }, []);
 
-  const topN = (data?.perCharger || []).slice(0, 15);
-  const restN = (data?.perCharger || []).slice(15);
+  const TOP_VISIBLE = 10;
+  const [expanded, setExpanded] = useState(false);
+  const perCharger = data?.perCharger || [];
+  const topN = perCharger.slice(0, TOP_VISIBLE);
+  const restN = perCharger.slice(TOP_VISIBLE);
   const topMax = topN[0]?.count || 1;
-  const rankIcons = ['🥇', '🥈', '🥉', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15'];
+  const rankIcons = ['🥇', '🥈', '🥉', '4', '5', '6', '7', '8', '9', '10'];
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -86,45 +89,47 @@ export default function FleetStatsPopup({ onClose }) {
               </div>
             ) : (
               <>
-                {/* Top / Bottom — 전체 기간 누적 */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <div className="text-[11px] text-zinc-400 mb-1.5">🏆 Top 15</div>
-                    <div className="space-y-0.5">
-                      {topN.map((e, i) => (
-                        <RankRow
-                          key={e.key}
-                          icon={rankIcons[i]}
-                          label={formatEntry(e.key)}
-                          count={e.count}
-                          max={topMax}
-                          isPeak={i === 0}
-                          delta={e.delta}
-                          isNew={e.isNew}
-                          prevRank={e.prevRank}
-                        />
-                      ))}
-                    </div>
+                {/* 전체 순위 — Top 10 고정 + 나머지 접기 */}
+                <div>
+                  <div className="text-[11px] text-zinc-400 mb-1.5">
+                    🏆 전체 순위 <span className="text-zinc-600">· 총 {perCharger.length}대</span>
                   </div>
-                  <div>
-                    <div className="text-[11px] text-zinc-400 mb-1.5">🐢 하위</div>
-                    {restN.length === 0 ? (
-                      <div className="text-[10px] text-zinc-600 py-1">없음</div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
-                        {restN.map((e, i) => (
-                          <div
-                            key={e.key}
-                            className="flex items-center gap-1 text-[10px] tabular-nums h-5 cursor-help"
-                            title={`${formatEntry(e.key)}: ${e.count}회`}
-                          >
-                            <span className="text-zinc-500 w-5 text-right shrink-0">{i + 16}</span>
-                            <span className="text-zinc-300 truncate">{formatEntry(e.key)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                  <div className="space-y-0.5">
+                    {topN.map((e, i) => (
+                      <RankRow
+                        key={e.key}
+                        icon={rankIcons[i]}
+                        label={formatEntry(e.key)}
+                        count={e.count}
+                        max={topMax}
+                        isPeak={i === 0}
+                        delta={e.delta}
+                        isNew={e.isNew}
+                        prevRank={e.prevRank}
+                      />
+                    ))}
+                    {expanded && restN.map((e, i) => (
+                      <RankRow
+                        key={e.key}
+                        icon={String(i + TOP_VISIBLE + 1)}
+                        label={formatEntry(e.key)}
+                        count={e.count}
+                        max={topMax}
+                        delta={e.delta}
+                        isNew={e.isNew}
+                        prevRank={e.prevRank}
+                      />
+                    ))}
                   </div>
+                  {restN.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setExpanded(v => !v)}
+                      className="mt-1.5 w-full py-1 text-[11px] bg-white/[0.04] hover:bg-white/[0.08] rounded text-zinc-400"
+                    >
+                      {expanded ? '▲ 접기' : `▼ 나머지 ${restN.length}대 보기`}
+                    </button>
+                  )}
                 </div>
 
                 {/* 시간대 — 전체 기간 */}
