@@ -414,7 +414,7 @@ export async function fetchPollLogDailyDb(days = 14) {
   try {
     await ensureTable();
     const clampDays = Math.max(1, Math.min(90, Math.floor(Number(days) || 14)));
-    const [dailyRes, hourRes] = await Promise.all([
+    const [dailyRes, byDateHourRes] = await Promise.all([
       pool.query(
         `SELECT to_char(date, 'YYYY-MM-DD') AS date_str,
                 SUM(attempts)::int         AS attempts,
@@ -431,15 +431,16 @@ export async function fetchPollLogDailyDb(days = 14) {
           ORDER BY date DESC`,
         [clampDays]
       ),
-      // 실패(재시도 실패 + 쿼터) 시간대별 집계 — 기간 전체 합산
+      // 일별 × 시간대 히트맵 원본 — (date, hour) PK라 행당 단일 행
       pool.query(
-        `SELECT hour,
-                SUM(retries)::int    AS retries,
-                SUM(quota_hits)::int AS quota_hits,
-                SUM(attempts)::int   AS attempts
+        `SELECT to_char(date, 'YYYY-MM-DD') AS date_str,
+                hour,
+                retries,
+                quota_hits,
+                attempts
            FROM home_charger_poll_log
           WHERE date >= (((NOW() AT TIME ZONE 'Asia/Seoul')::date) - ($1::int * INTERVAL '1 day'))::date
-          GROUP BY hour`,
+          ORDER BY date DESC, hour`,
         [clampDays]
       ),
     ]);
@@ -464,21 +465,30 @@ export async function fetchPollLogDailyDb(days = 14) {
       manualAttempts: a.manualAttempts + r.manualAttempts,
       warmCalls: a.warmCalls + r.warmCalls,
     }), { attempts: 0, successes: 0, partial: 0, retries: 0, retrySuccesses: 0, quotaHits: 0, manualAttempts: 0, warmCalls: 0 });
-    const failureByHour = new Array(24).fill(0).map(() => ({ retries: 0, quotaHits: 0, attempts: 0 }));
-    for (const r of hourRes.rows) {
+    // dailyByHour: 날짜별 24시간 실패(재시도실패+쿼터) 히트맵 원본
+    const emptyHour = () => ({ retries: 0, quotaHits: 0, attempts: 0 });
+    const dateToHours = new Map();
+    for (const r of byDateHourRes.rows) {
+      const date = r.date_str;
       const h = Number(r.hour);
-      if (h >= 0 && h < 24) {
-        failureByHour[h] = {
-          retries: Number(r.retries) || 0,
-          quotaHits: Number(r.quota_hits) || 0,
-          attempts: Number(r.attempts) || 0,
-        };
+      if (h < 0 || h >= 24) continue;
+      if (!dateToHours.has(date)) {
+        dateToHours.set(date, Array.from({ length: 24 }, emptyHour));
       }
+      dateToHours.get(date)[h] = {
+        retries: Number(r.retries) || 0,
+        quotaHits: Number(r.quota_hits) || 0,
+        attempts: Number(r.attempts) || 0,
+      };
     }
-    return { days: clampDays, daily, totals, failureByHour };
+    const dailyByHour = daily.map(d => ({
+      date: d.date,
+      hours: dateToHours.get(d.date) || Array.from({ length: 24 }, emptyHour),
+    }));
+    return { days: clampDays, daily, totals, dailyByHour };
   } catch (e) {
     console.warn('[home-charger] poll log daily fetch failed:', e.message);
-    return { days: 0, daily: [], totals: {}, failureByHour: [] };
+    return { days: 0, daily: [], totals: {}, dailyByHour: [] };
   }
 }
 

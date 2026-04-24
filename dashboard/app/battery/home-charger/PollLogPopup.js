@@ -201,36 +201,142 @@ function HourlyTable({ rows, schedule, nowHour, isToday }) {
   );
 }
 
-function WorstFailureHourCard({ failureByHour }) {
-  if (!Array.isArray(failureByHour) || failureByHour.length !== 24) return null;
-  let worstHour = -1;
-  let worstFail = 0;
-  let worstRow = null;
-  for (let h = 0; h < 24; h++) {
-    const r = failureByHour[h] || { retries: 0, quotaHits: 0, attempts: 0 };
-    const fail = (r.retries || 0) + (r.quotaHits || 0);
-    if (fail > worstFail) {
-      worstFail = fail;
-      worstHour = h;
-      worstRow = r;
-    }
+// 지표별 색상 팔레트 — 5지표 히트맵 + 실패(재시도)
+const METRIC_COLORS = {
+  attempts:  '#3b82f6', // 시도 — blue
+  successes: '#10b981', // 성공 — emerald
+  partial:   '#f59e0b', // 부분 — amber
+  retries:   '#f43f5e', // 재시도 실패 — rose
+  quotaHits: '#fb923c', // 쿼터 — orange
+};
+
+// 공통 히트맵 행: [라벨][24셀][합][보조]
+// - 피크 셀 amber 하이라이트 (행 내부 최댓값)
+// - opacity: v === 0 ? 0.08 : 0.18 + ratio * 0.82
+function HeatmapRow({ label, values, max, color, cellHeight = 'h-4', primary, secondary, cellTitle }) {
+  let peakIdx = -1;
+  let peakVal = 0;
+  for (let i = 0; i < values.length; i++) {
+    if (values[i] > peakVal) { peakVal = values[i]; peakIdx = i; }
   }
   return (
-    <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg px-3 py-2 flex items-center justify-between text-[12px] tabular-nums">
-      <div className="text-[10px] text-zinc-500 font-semibold">가장 많이 실패한 시간대</div>
-      {worstHour < 0 ? (
-        <div className="text-zinc-600 text-[11px]">실패 기록 없음</div>
-      ) : (
-        <div className="flex items-center gap-2">
-          <span className="text-amber-400 font-bold">{String(worstHour).padStart(2, '0')}시</span>
-          <span className="text-rose-400 font-semibold">{worstFail}회</span>
-          <span className="text-[10px] text-zinc-500">
-            (재시도 {worstRow.retries || 0}
-            {worstRow.quotaHits ? ` · 쿼터 ${worstRow.quotaHits}` : ''}
-            {worstRow.attempts ? ` / 시도 ${worstRow.attempts}` : ''})
-          </span>
-        </div>
+    <div className="flex items-center gap-1.5 text-[10px] tabular-nums">
+      <span className="w-10 shrink-0 text-[11px] text-zinc-400 truncate">{label}</span>
+      <div className={`flex-1 flex gap-0.5 ${cellHeight}`}>
+        {values.map((v, i) => {
+          const ratio = max > 0 ? v / max : 0;
+          const isPeak = i === peakIdx && v > 0;
+          return (
+            <div
+              key={i}
+              className="flex-1 rounded-[3px]"
+              style={{
+                background: isPeak ? '#f59e0b' : color,
+                opacity: v === 0 ? 0.08 : 0.18 + ratio * 0.82,
+              }}
+              title={cellTitle ? cellTitle(i, v) : `${String(i).padStart(2, '0')}시 · ${label} ${v}`}
+            />
+          );
+        })}
+      </div>
+      <span className="w-8 shrink-0 text-right text-zinc-300 font-semibold">{primary}</span>
+      <span className="w-10 shrink-0 text-right text-zinc-500">{secondary}</span>
+    </div>
+  );
+}
+
+function HeatmapXAxis({ primaryLabel = '합', secondaryLabel = '피크' }) {
+  return (
+    <div className="flex items-center gap-1.5 text-[9px] text-zinc-600 tabular-nums">
+      <span className="w-10 shrink-0" />
+      <div className="flex-1 flex justify-between px-px">
+        <span className="font-semibold">0시</span><span>6</span><span>12</span><span>18</span><span>23시</span>
+      </div>
+      <span className="w-8 shrink-0 text-right">{primaryLabel}</span>
+      <span className="w-10 shrink-0 text-right">{secondaryLabel}</span>
+    </div>
+  );
+}
+
+// 시간별 탭: 5지표 × 24시간 히트맵 (한 날짜 기준)
+function MetricHeatmap5Row({ hourly }) {
+  const metrics = [
+    { key: 'attempts',  label: '시도' },
+    { key: 'successes', label: '성공' },
+    { key: 'partial',   label: '부분' },
+    { key: 'retries',   label: '재실패' },
+    { key: 'quotaHits', label: '쿼터' },
+  ];
+  return (
+    <div className="space-y-1">
+      <HeatmapXAxis />
+      {metrics.map(m => {
+        const values = hourly.map(r => r[m.key] || 0);
+        const sum = values.reduce((a, b) => a + b, 0);
+        const rowMax = Math.max(1, ...values);
+        const peakIdx = sum > 0 ? values.indexOf(Math.max(...values)) : -1;
+        return (
+          <HeatmapRow
+            key={m.key}
+            label={m.label}
+            values={values}
+            max={rowMax}
+            color={METRIC_COLORS[m.key]}
+            primary={sum > 0 ? sum : '·'}
+            secondary={peakIdx >= 0 ? `${peakIdx}시` : '-'}
+            cellTitle={(h, v) => `${String(h).padStart(2, '0')}시 · ${m.label} ${v}`}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// 일별 탭: N일 × 24시간 실패(재시도실패+쿼터) 히트맵
+function DailyFailureHeatmap({ dailyByHour, daily, todayStr }) {
+  const dailyMap = new Map((daily || []).map(d => [d.date, d]));
+  // opacity 스케일: 전체 셀 중 최댓값
+  let globalMax = 0;
+  for (const d of dailyByHour) {
+    for (const h of d.hours) {
+      const fail = (h.retries || 0) + (h.quotaHits || 0);
+      if (fail > globalMax) globalMax = fail;
+    }
+  }
+  globalMax = Math.max(1, globalMax);
+  const cellHeight = dailyByHour.length > 20 ? 'h-3' : 'h-4';
+  return (
+    <div className="space-y-1">
+      <HeatmapXAxis secondaryLabel="성공률" />
+      {dailyByHour.length === 0 && (
+        <div className="text-center text-zinc-600 py-4 text-[11px]">기록된 일별 데이터 없음</div>
       )}
+      {dailyByHour.map(d => {
+        const values = d.hours.map(h => (h.retries || 0) + (h.quotaHits || 0));
+        const sum = values.reduce((a, b) => a + b, 0);
+        const rowForDate = dailyMap.get(d.date);
+        const rate = successRate(rowForDate);
+        const rateLabel = rate == null ? '-' : `${rate}%`;
+        const dateLabel = d.date.slice(5).replace('-', '/');
+        const isToday = d.date === todayStr;
+        return (
+          <HeatmapRow
+            key={d.date}
+            label={<span className={isToday ? 'text-amber-400 font-semibold' : undefined}>{dateLabel}</span>}
+            values={values}
+            max={globalMax}
+            color={METRIC_COLORS.retries}
+            cellHeight={cellHeight}
+            primary={sum > 0 ? sum : '·'}
+            secondary={rateLabel}
+            cellTitle={(h, v) => {
+              const row = d.hours[h];
+              return `${dateLabel} ${String(h).padStart(2, '0')}시 · 실패 ${v}` +
+                (row.attempts ? ` / 시도 ${row.attempts}` : '');
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -287,6 +393,7 @@ function DailyTable({ rows, todayStr }) {
 
 export default function PollLogPopup({ onClose }) {
   const [view, setView] = useState('hourly'); // 'hourly' | 'daily'
+  const [mode, setMode] = useState('heatmap'); // 'heatmap' | 'table'
   const [offset, setOffset] = useState(0); // 시간별 보기 — 0 = 오늘
   const [days, setDays] = useState(14);     // 일별 보기 — 최근 N일
   const [data, setData] = useState(null);
@@ -419,28 +526,64 @@ export default function PollLogPopup({ onClose }) {
             <>
               <SummaryCard totals={data.totals || {}} lastQuotaHitAt={data.lastQuotaHitAt || 0} />
               <WarmDiagCard diag={data.warmDiag} />
+
+              {/* 보기 모드 토글 (히트맵 / 표) */}
+              <div className="flex items-center justify-between gap-2">
+                {view === 'hourly' && mode === 'heatmap' && data.ttlInfo ? (
+                  <div className="text-[10px] text-zinc-500 tabular-nums">
+                    현재 TTL: <span className="text-zinc-300 font-semibold">{data.ttlInfo.currentMin}분</span>
+                    <span className="text-zinc-600 ml-1">({data.ttlInfo.currentHour}시)</span>
+                  </div>
+                ) : (<span />)}
+                <div className="flex gap-0.5 bg-[#1a1a1c] border border-white/[0.06] rounded p-0.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setMode('heatmap')}
+                    className={`px-2 py-0.5 text-[10px] rounded ${mode === 'heatmap' ? 'bg-white/[0.08] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >히트맵</button>
+                  <button
+                    type="button"
+                    onClick={() => setMode('table')}
+                    className={`px-2 py-0.5 text-[10px] rounded ${mode === 'table' ? 'bg-white/[0.08] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >표</button>
+                </div>
+              </div>
+
               <div className="overflow-x-auto">
                 {view === 'hourly' ? (
-                  <HourlyTable
-                    rows={data.hourly || []}
-                    schedule={data.ttlInfo?.schedule}
-                    nowHour={nowHour}
-                    isToday={isToday}
-                  />
+                  mode === 'heatmap' ? (
+                    <MetricHeatmap5Row hourly={data.hourly || []} />
+                  ) : (
+                    <HourlyTable
+                      rows={data.hourly || []}
+                      schedule={data.ttlInfo?.schedule}
+                      nowHour={nowHour}
+                      isToday={isToday}
+                    />
+                  )
                 ) : (
-                  <>
-                    <WorstFailureHourCard failureByHour={data.failureByHour} />
-                    <div className="h-2" />
+                  mode === 'heatmap' ? (
+                    <DailyFailureHeatmap
+                      dailyByHour={data.dailyByHour || []}
+                      daily={data.daily || []}
+                      todayStr={todayStr}
+                    />
+                  ) : (
                     <DailyTable rows={data.daily || []} todayStr={todayStr} />
-                  </>
+                  )
                 )}
               </div>
 
               <div className="text-[10px] text-zinc-600 leading-snug">
                 * 시도 = 성공 + 부분 + 재시도 + 쿼터  ·  성공률 = (성공 + 부분 + 재시도✓) / 시도
-                {view === 'hourly' && (
+                {view === 'hourly' && mode === 'table' && (
                   <>
                     <br />* 주기 = 해당 시간대의 현재 TTL (동적 학습 반영)
+                  </>
+                )}
+                {mode === 'heatmap' && view === 'daily' && (
+                  <>
+                    <br />* 실패 = 재시도실패 + 쿼터 (피크 셀 amber)
                   </>
                 )}
               </div>
