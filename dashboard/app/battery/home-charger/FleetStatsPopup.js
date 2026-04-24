@@ -94,7 +94,10 @@ export default function FleetStatsPopup({ onClose }) {
                   <div className="text-[11px] text-zinc-400 mb-1.5">
                     🏆 전체 순위 <span className="text-zinc-600">· 총 {perCharger.length}대</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                  <div
+                    className="grid grid-cols-2 grid-flow-col gap-x-2 gap-y-0.5"
+                    style={{ gridTemplateRows: `repeat(${Math.ceil(topN.length / 2)}, auto)` }}
+                  >
                     {topN.map((e, i) => (
                       <RankRow
                         key={e.key}
@@ -110,7 +113,10 @@ export default function FleetStatsPopup({ onClose }) {
                     ))}
                   </div>
                   {expanded && restN.length > 0 && (
-                    <div className="mt-1 grid grid-cols-4 gap-x-2 gap-y-0.5">
+                    <div
+                      className="mt-1 grid grid-cols-4 grid-flow-col gap-x-2 gap-y-0.5"
+                      style={{ gridTemplateRows: `repeat(${Math.ceil(restN.length / 4)}, auto)` }}
+                    >
                       {restN.map((e, i) => (
                         <RankRow
                           key={e.key}
