@@ -89,12 +89,12 @@ export default function FleetStatsPopup({ onClose }) {
               </div>
             ) : (
               <>
-                {/* 전체 순위 — Top 10 고정 + 나머지 접기 */}
+                {/* 전체 순위 — Top 10 2열 고정 + 나머지 4열 접기 */}
                 <div>
                   <div className="text-[11px] text-zinc-400 mb-1.5">
                     🏆 전체 순위 <span className="text-zinc-600">· 총 {perCharger.length}대</span>
                   </div>
-                  <div className="space-y-0.5">
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
                     {topN.map((e, i) => (
                       <RankRow
                         key={e.key}
@@ -108,19 +108,20 @@ export default function FleetStatsPopup({ onClose }) {
                         prevRank={e.prevRank}
                       />
                     ))}
-                    {expanded && restN.map((e, i) => (
-                      <RankRow
-                        key={e.key}
-                        icon={String(i + TOP_VISIBLE + 1)}
-                        label={formatEntry(e.key)}
-                        count={e.count}
-                        max={topMax}
-                        delta={e.delta}
-                        isNew={e.isNew}
-                        prevRank={e.prevRank}
-                      />
-                    ))}
                   </div>
+                  {expanded && restN.length > 0 && (
+                    <div className="mt-1 grid grid-cols-4 gap-x-2 gap-y-0.5">
+                      {restN.map((e, i) => (
+                        <RankRow
+                          key={e.key}
+                          icon={String(i + TOP_VISIBLE + 1)}
+                          label={formatEntry(e.key)}
+                          count={e.count}
+                          max={topMax}
+                        />
+                      ))}
+                    </div>
+                  )}
                   {restN.length > 0 && (
                     <button
                       type="button"
