@@ -433,6 +433,9 @@ export default function PollLogPopup({ onClose }) {
         </div>
 
         <div className="px-4 py-2.5 space-y-3">
+          {/* 서버 백그라운드 상태 — 뷰/로딩과 무관하게 최상단 고정 */}
+          {data?.warmDiag && <WarmDiagCard diag={data.warmDiag} />}
+
           {/* 탭 */}
           <div className="flex gap-1 bg-[#1a1a1c] border border-white/[0.06] rounded-md p-0.5">
             <TabButton active={view === 'hourly'} onClick={() => setView('hourly')}>시간별</TabButton>
@@ -491,7 +494,6 @@ export default function PollLogPopup({ onClose }) {
           {!loading && !error && data && (
             <>
               <SummaryCard totals={data.totals || {}} lastQuotaHitAt={data.lastQuotaHitAt || 0} />
-              <WarmDiagCard diag={data.warmDiag} />
 
               {/* 보기 모드 토글 (히트맵 / 표) */}
               <div className="flex items-center justify-between gap-2">
@@ -537,20 +539,6 @@ export default function PollLogPopup({ onClose }) {
                   ) : (
                     <DailyTable rows={data.daily || []} todayStr={todayStr} />
                   )
-                )}
-              </div>
-
-              <div className="text-[10px] text-zinc-600 leading-snug">
-                * 시도 = 성공 + 부분 + 재시도 + 쿼터  ·  성공률 = (성공 + 부분 + 재시도✓) / 시도
-                {view === 'hourly' && mode === 'table' && (
-                  <>
-                    <br />* 주기 = 해당 시간대의 현재 TTL (동적 학습 반영)
-                  </>
-                )}
-                {mode === 'heatmap' && view === 'daily' && (
-                  <>
-                    <br />* 실패 = 재시도실패 + 쿼터 (피크 셀 amber)
-                  </>
                 )}
               </div>
             </>
