@@ -201,6 +201,40 @@ function HourlyTable({ rows, schedule, nowHour, isToday }) {
   );
 }
 
+function WorstFailureHourCard({ failureByHour }) {
+  if (!Array.isArray(failureByHour) || failureByHour.length !== 24) return null;
+  let worstHour = -1;
+  let worstFail = 0;
+  let worstRow = null;
+  for (let h = 0; h < 24; h++) {
+    const r = failureByHour[h] || { retries: 0, quotaHits: 0, attempts: 0 };
+    const fail = (r.retries || 0) + (r.quotaHits || 0);
+    if (fail > worstFail) {
+      worstFail = fail;
+      worstHour = h;
+      worstRow = r;
+    }
+  }
+  return (
+    <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg px-3 py-2 flex items-center justify-between text-[12px] tabular-nums">
+      <div className="text-[10px] text-zinc-500 font-semibold">가장 많이 실패한 시간대</div>
+      {worstHour < 0 ? (
+        <div className="text-zinc-600 text-[11px]">실패 기록 없음</div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <span className="text-amber-400 font-bold">{String(worstHour).padStart(2, '0')}시</span>
+          <span className="text-rose-400 font-semibold">{worstFail}회</span>
+          <span className="text-[10px] text-zinc-500">
+            (재시도 {worstRow.retries || 0}
+            {worstRow.quotaHits ? ` · 쿼터 ${worstRow.quotaHits}` : ''}
+            {worstRow.attempts ? ` / 시도 ${worstRow.attempts}` : ''})
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DailyTable({ rows, todayStr }) {
   const sep = 'border-l border-white/[0.05]';
   return (
@@ -394,7 +428,11 @@ export default function PollLogPopup({ onClose }) {
                     isToday={isToday}
                   />
                 ) : (
-                  <DailyTable rows={data.daily || []} todayStr={todayStr} />
+                  <>
+                    <WorstFailureHourCard failureByHour={data.failureByHour} />
+                    <div className="h-2" />
+                    <DailyTable rows={data.daily || []} todayStr={todayStr} />
+                  </>
                 )}
               </div>
 

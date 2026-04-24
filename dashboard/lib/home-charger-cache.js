@@ -7,16 +7,16 @@ import { formatHM, kstDateStr, KST_OFFSET_MS } from '@/lib/kst';
 const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 
 // 공공 API 일일 쿼터 1,000회/일 고려하여 시간대별 TTL 설정 (fallback)
-// 범위: 4~15분
+// 범위: 5~12분
 const CACHE_TIERS = [
   { start:  0, end:  1, ttlMs: 10 * 60_000 }, // 자정 직후
-  { start:  1, end:  6, ttlMs: 12 * 60_000 }, // 새벽
-  { start:  6, end: 13, ttlMs: 12 * 60_000 }, // 아침~점심 전
-  { start: 13, end: 18, ttlMs: 15 * 60_000 }, // 오후
-  { start: 18, end: 22, ttlMs:  4 * 60_000 }, // 저녁 피크
-  { start: 22, end: 24, ttlMs:  6 * 60_000 }, // 저녁 마감~심야 전환
+  { start:  1, end:  6, ttlMs: 10 * 60_000 }, // 새벽
+  { start:  6, end: 13, ttlMs: 10 * 60_000 }, // 아침~점심 전
+  { start: 13, end: 18, ttlMs: 12 * 60_000 }, // 오후
+  { start: 18, end: 22, ttlMs:  5 * 60_000 }, // 저녁 피크
+  { start: 22, end: 24, ttlMs:  7 * 60_000 }, // 저녁 마감~심야 전환
 ];
-const FALLBACK_TTL_MS = 12 * 60_000;
+const FALLBACK_TTL_MS = 10 * 60_000;
 
 // 동적 TTL: 실제 충전 히스토리(최근 90일)에서 학습
 // false로 두면 항상 위의 CACHE_TIERS(static)만 사용 — 사용자가 지정한 스케줄 그대로 유지
@@ -414,23 +414,36 @@ export async function fetchPollLogDailyDb(days = 14) {
   try {
     await ensureTable();
     const clampDays = Math.max(1, Math.min(90, Math.floor(Number(days) || 14)));
-    const res = await pool.query(
-      `SELECT to_char(date, 'YYYY-MM-DD') AS date_str,
-              SUM(attempts)::int         AS attempts,
-              SUM(successes)::int        AS successes,
-              SUM(partial)::int          AS partial,
-              SUM(retries)::int          AS retries,
-              SUM(retry_successes)::int  AS retry_successes,
-              SUM(quota_hits)::int       AS quota_hits,
-              SUM(manual_attempts)::int  AS manual_attempts,
-              SUM(warm_calls)::int       AS warm_calls
-         FROM home_charger_poll_log
-        WHERE date >= (((NOW() AT TIME ZONE 'Asia/Seoul')::date) - ($1::int * INTERVAL '1 day'))::date
-        GROUP BY date
-        ORDER BY date DESC`,
-      [clampDays]
-    );
-    const daily = res.rows.map(r => ({
+    const [dailyRes, hourRes] = await Promise.all([
+      pool.query(
+        `SELECT to_char(date, 'YYYY-MM-DD') AS date_str,
+                SUM(attempts)::int         AS attempts,
+                SUM(successes)::int        AS successes,
+                SUM(partial)::int          AS partial,
+                SUM(retries)::int          AS retries,
+                SUM(retry_successes)::int  AS retry_successes,
+                SUM(quota_hits)::int       AS quota_hits,
+                SUM(manual_attempts)::int  AS manual_attempts,
+                SUM(warm_calls)::int       AS warm_calls
+           FROM home_charger_poll_log
+          WHERE date >= (((NOW() AT TIME ZONE 'Asia/Seoul')::date) - ($1::int * INTERVAL '1 day'))::date
+          GROUP BY date
+          ORDER BY date DESC`,
+        [clampDays]
+      ),
+      // 실패(재시도 실패 + 쿼터) 시간대별 집계 — 기간 전체 합산
+      pool.query(
+        `SELECT hour,
+                SUM(retries)::int    AS retries,
+                SUM(quota_hits)::int AS quota_hits,
+                SUM(attempts)::int   AS attempts
+           FROM home_charger_poll_log
+          WHERE date >= (((NOW() AT TIME ZONE 'Asia/Seoul')::date) - ($1::int * INTERVAL '1 day'))::date
+          GROUP BY hour`,
+        [clampDays]
+      ),
+    ]);
+    const daily = dailyRes.rows.map(r => ({
       date: r.date_str,
       attempts: Number(r.attempts),
       successes: Number(r.successes),
@@ -451,10 +464,21 @@ export async function fetchPollLogDailyDb(days = 14) {
       manualAttempts: a.manualAttempts + r.manualAttempts,
       warmCalls: a.warmCalls + r.warmCalls,
     }), { attempts: 0, successes: 0, partial: 0, retries: 0, retrySuccesses: 0, quotaHits: 0, manualAttempts: 0, warmCalls: 0 });
-    return { days: clampDays, daily, totals };
+    const failureByHour = new Array(24).fill(0).map(() => ({ retries: 0, quotaHits: 0, attempts: 0 }));
+    for (const r of hourRes.rows) {
+      const h = Number(r.hour);
+      if (h >= 0 && h < 24) {
+        failureByHour[h] = {
+          retries: Number(r.retries) || 0,
+          quotaHits: Number(r.quota_hits) || 0,
+          attempts: Number(r.attempts) || 0,
+        };
+      }
+    }
+    return { days: clampDays, daily, totals, failureByHour };
   } catch (e) {
     console.warn('[home-charger] poll log daily fetch failed:', e.message);
-    return { days: 0, daily: [], totals: {} };
+    return { days: 0, daily: [], totals: {}, failureByHour: [] };
   }
 }
 
