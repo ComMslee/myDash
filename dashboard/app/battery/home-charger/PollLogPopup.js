@@ -54,26 +54,20 @@ function WarmDiagCard({ diag }) {
     (sinceLastTick != null && sinceLastTick > TICK_INTERVAL_MS + 30_000) ||
     (expectedTicks - actualTicks >= 2);
   return (
-    <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg px-3 py-2 text-[11px] tabular-nums space-y-1">
-      <div className="text-[10px] text-zinc-500 font-semibold">서버 백그라운드 상태</div>
-      <div className="grid grid-cols-4 gap-1 text-center">
+    <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg px-3 py-1.5 text-[11px] tabular-nums">
+      <div className="grid grid-cols-3 gap-1 text-center">
         <div>
-          <div className="text-[10px] text-zinc-500">마지막 tick</div>
+          <div className="text-[9px] text-zinc-500">기동 후</div>
+          <div className="text-zinc-300 font-semibold">{sinceBoot != null ? formatDuration(sinceBoot) : '-'}</div>
+        </div>
+        <div>
+          <div className="text-[9px] text-zinc-500">마지막 tick</div>
           <div className={tickStale ? 'text-rose-400 font-semibold' : 'text-emerald-400 font-semibold'}>
             {sinceLastTick != null ? `${formatDuration(sinceLastTick)} 전` : '-'}
           </div>
         </div>
         <div>
-          <div className="text-[10px] text-zinc-500">tick 수</div>
-          <div className="text-zinc-200 font-semibold">
-            {actualTicks}
-            {expectedTicks > 0 && (
-              <span className="text-[9px] text-zinc-500 ml-0.5">/{expectedTicks}</span>
-            )}
-          </div>
-        </div>
-        <div>
-          <div className="text-[10px] text-zinc-500">warm 수</div>
+          <div className="text-[9px] text-zinc-500">warm 수</div>
           <div className="text-zinc-300 font-semibold">
             {diag.warmCallCount || 0}
             {sinceLastWarm != null && (
@@ -81,71 +75,44 @@ function WarmDiagCard({ diag }) {
             )}
           </div>
         </div>
-        <div>
-          <div className="text-[10px] text-zinc-500">기동 후</div>
-          <div className="text-zinc-300 font-semibold">{sinceBoot != null ? formatDuration(sinceBoot) : '-'}</div>
-        </div>
       </div>
       {tickStale && (
-        <div className="text-[10px] text-rose-400">
-          ⚠️ 2분 주기 tick이 정체. 인스트루멘테이션 루프가 죽었을 수 있음.
-        </div>
+        <div className="mt-1 text-[10px] text-rose-400">⚠️ 2분 tick 정체</div>
       )}
     </div>
   );
 }
 
+// 히트맵과 중복되는 폴링/성공/부분/재시도 카운트는 생략.
+// 히트맵에 없는 지표(수동·쿼터히트+시각·재시도성공·성공률)만 요약.
 function SummaryCard({ totals, lastQuotaHitAt }) {
   const rate = successRate(totals);
   const manual = totals.manualAttempts || 0;
-  const auto = Math.max(0, (totals.attempts || 0) - manual);
   const quotaHits = totals.quotaHits || 0;
-  const successes = totals.successes || 0;
-  const partial = totals.partial || 0;
-  const retries = totals.retries || 0;
   const retrySuccesses = totals.retrySuccesses || 0;
   const quotaTime = lastQuotaHitAt ? formatHM(lastQuotaHitAt) : null;
   return (
-    <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg px-3 py-2 space-y-1.5 text-[12px] tabular-nums">
-      {/* 호출 소스 · 쿼터 */}
-      <div className="grid grid-cols-3 gap-1 text-center">
+    <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg px-3 py-1.5 text-[12px] tabular-nums">
+      <div className="grid grid-cols-4 gap-1 text-center">
         <div>
-          <div className="text-[10px] text-sky-500">폴링</div>
-          <div className="text-sky-400 font-semibold">{auto}</div>
-        </div>
-        <div>
-          <div className="text-[10px] text-indigo-400">수동</div>
+          <div className="text-[9px] text-indigo-400">수동</div>
           <div className="text-indigo-300 font-semibold">{manual}</div>
         </div>
         <div>
-          <div className="text-[10px] text-orange-500">쿼터 히트</div>
+          <div className="text-[9px] text-orange-500">쿼터</div>
           <div className="text-orange-400 font-semibold">
             {quotaHits}
             {quotaHits > 0 && quotaTime && (
-              <span className="text-[9px] text-orange-300 ml-1">({quotaTime})</span>
+              <span className="text-[9px] text-orange-300 ml-0.5">({quotaTime})</span>
             )}
           </div>
         </div>
-      </div>
-      <div className="border-t border-white/[0.06]" />
-      {/* 결과(부분) · 재시도(성공) · 성공률 */}
-      <div className="grid grid-cols-3 gap-1 text-center">
         <div>
-          <div className="text-[10px] text-emerald-500">성공 (부분)</div>
-          <div>
-            <span className="text-emerald-400 font-semibold">{successes}</span>
-            <span className="text-amber-400 text-[10px] ml-0.5">({partial})</span>
-          </div>
+          <div className="text-[9px] text-emerald-500">재시도✓</div>
+          <div className="text-emerald-400 font-semibold">{retrySuccesses}</div>
         </div>
         <div>
-          <div className="text-[10px] text-rose-500">재시도 (성공)</div>
-          <div>
-            <span className="text-rose-400 font-semibold">{retries}</span>
-            <span className="text-emerald-400 text-[10px] ml-0.5">({retrySuccesses})</span>
-          </div>
-        </div>
-        <div>
-          <div className="text-[10px] text-zinc-500">성공률</div>
+          <div className="text-[9px] text-zinc-500">성공률</div>
           <div className="text-zinc-200 font-semibold">{rate != null ? `${rate}%` : '-'}</div>
         </div>
       </div>
@@ -221,7 +188,7 @@ function HeatmapRow({ label, values, max, color, cellHeight = 'h-4', primary, se
   }
   return (
     <div className="flex items-center gap-1.5 text-[10px] tabular-nums">
-      <span className="w-10 shrink-0 text-[11px] text-zinc-400 truncate">{label}</span>
+      <span className="w-12 shrink-0 text-[11px] text-zinc-400 whitespace-nowrap">{label}</span>
       <div className={`flex-1 flex gap-0.5 ${cellHeight}`}>
         {values.map((v, i) => {
           const ratio = max > 0 ? v / max : 0;
@@ -248,7 +215,7 @@ function HeatmapRow({ label, values, max, color, cellHeight = 'h-4', primary, se
 function HeatmapXAxis({ primaryLabel = '합', secondaryLabel = '피크' }) {
   return (
     <div className="flex items-center gap-1.5 text-[9px] text-zinc-600 tabular-nums">
-      <span className="w-10 shrink-0" />
+      <span className="w-12 shrink-0" />
       <div className="flex-1 flex justify-between px-px">
         <span className="font-semibold">0시</span><span>6</span><span>12</span><span>18</span><span>23시</span>
       </div>
@@ -258,14 +225,13 @@ function HeatmapXAxis({ primaryLabel = '합', secondaryLabel = '피크' }) {
   );
 }
 
-// 시간별 탭: 5지표 × 24시간 히트맵 (한 날짜 기준)
+// 시간별 탭: 4지표 × 24시간 히트맵 (쿼터는 위 SummaryCard에서 시각 포함 노출)
 function MetricHeatmap5Row({ hourly }) {
   const metrics = [
     { key: 'attempts',  label: '시도' },
     { key: 'successes', label: '성공' },
     { key: 'partial',   label: '부분' },
     { key: 'retries',   label: '재실패' },
-    { key: 'quotaHits', label: '쿼터' },
   ];
   return (
     <div className="space-y-1">
