@@ -63,7 +63,7 @@ export async function GET() {
     // 12개월 각 월 통계 + 패턴 쿼리 동시 실행 (패턴은 전체 기간)
     const [
       twelveMonthBreakdown, driveHourDowQ, chargeHourDowQ,
-      allTimeDrive, allTimeCharge, dayMaxResult,
+      allTimeDrive, allTimeCharge, dayMaxResult, driveMinEffResult,
     ] = await Promise.all([
       Promise.all(
         Array.from({ length: 12 }, (_, i) => {
@@ -133,11 +133,12 @@ export async function GET() {
          ) sub`,
         [carId]
       ),
-      // 전체 기간 일별 최대 거리/시간
+      // 전체 기간 일별 최대 거리/시간 + 최저 효율(=가장 좋은 효율)
       pool.query(
         `SELECT MAX(day_distance)::float AS max_day_distance,
                 MAX(day_duration)::int AS max_day_duration,
-                MAX(day_avg_speed)::float AS max_day_avg_speed
+                MAX(day_avg_speed)::float AS max_day_avg_speed,
+                MIN(day_eff)::float AS min_day_eff_wh_km
          FROM (
            SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
                   SUM(distance)::float AS day_distance,
@@ -145,11 +146,32 @@ export async function GET() {
                   CASE WHEN SUM(distance) >= 10 AND SUM(duration_min) > 0
                        THEN SUM(distance) / SUM(duration_min) * 60
                        ELSE NULL
-                  END AS day_avg_speed
+                  END AS day_avg_speed,
+                  CASE WHEN SUM(distance) >= 10
+                            AND SUM(CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
+                                         THEN (start_rated_range_km - end_rated_range_km) ELSE 0 END) > 0
+                       THEN SUM(CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
+                                     THEN (start_rated_range_km - end_rated_range_km) ELSE 0 END)
+                            * ${KWH_PER_KM} / SUM(distance) * 1000
+                       ELSE NULL
+                  END AS day_eff
            FROM drives
            WHERE car_id = $1
            GROUP BY day
          ) sub`,
+        [carId]
+      ),
+      // 단일 주행 최저 효율(=가장 좋은 효율) — 노이즈 제거를 위해 distance >= 10km
+      pool.query(
+        `SELECT MIN(
+           (start_rated_range_km - end_rated_range_km) * ${KWH_PER_KM} / NULLIF(distance, 0) * 1000
+         )::float AS min_eff_wh_km
+         FROM drives
+         WHERE car_id = $1
+           AND distance >= 10
+           AND start_rated_range_km IS NOT NULL
+           AND end_rated_range_km IS NOT NULL
+           AND (start_rated_range_km - end_rated_range_km) > 0`,
         [carId]
       ),
     ]);
@@ -225,6 +247,12 @@ export async function GET() {
       max_day_distance: dayMax.max_day_distance != null ? parseFloat(parseFloat(dayMax.max_day_distance).toFixed(1)) : 0,
       max_day_duration: dayMax.max_day_duration != null ? parseInt(dayMax.max_day_duration) : 0,
       max_day_avg_speed: dayMax.max_day_avg_speed != null ? parseFloat(parseFloat(dayMax.max_day_avg_speed).toFixed(1)) : null,
+      min_eff_wh_km: driveMinEffResult.rows[0]?.min_eff_wh_km != null
+        ? Math.round(parseFloat(driveMinEffResult.rows[0].min_eff_wh_km))
+        : null,
+      min_day_eff_wh_km: dayMax.min_day_eff_wh_km != null
+        ? Math.round(parseFloat(dayMax.min_day_eff_wh_km))
+        : null,
     };
 
     return Response.json({

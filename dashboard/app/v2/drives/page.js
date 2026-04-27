@@ -158,6 +158,7 @@ function RecordsCardV2({ allTime }) {
 
   const km  = (v) => <>{v}<span className="text-zinc-600 text-[11px] ml-0.5 font-normal">km</span></>;
   const kmh = (v) => <>{v}<span className="text-zinc-600 text-[11px] ml-0.5 font-normal">km/h</span></>;
+  const wh  = (v) => <>{v}<span className="text-zinc-600 text-[11px] ml-0.5 font-normal">Wh/km</span></>;
 
   const rows = [
     {
@@ -202,8 +203,8 @@ function RecordsCardV2({ allTime }) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
         </svg>
       ),
-      drive: { value: '준비 중', metric: 'eff', base: 'drive' },
-      day:   { value: '준비 중', metric: 'eff', base: 'day'   },
+      drive: { value: allTime.min_eff_wh_km != null ? wh(allTime.min_eff_wh_km) : '—', metric: 'eff', base: 'drive' },
+      day:   { value: allTime.min_day_eff_wh_km != null ? wh(allTime.min_day_eff_wh_km) : '—', metric: 'eff', base: 'day'   },
     },
   ];
 

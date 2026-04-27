@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatDuration, shortAddr, formatKorDateTime, formatKorDay } from '@/lib/format';
+import { effColor } from '@/lib/effColor';
 
 // ── Context ────────────────────────────────────────────────────
 const RankingsSheetContext = createContext(null);
@@ -23,9 +24,8 @@ const BASE_TABS = [
   { base: 'day',   label: '일 합계' },
 ];
 
-// metric × base → API type 매핑 (eff는 미지원)
+// metric × base → API type 매핑
 function toApiType(metric, base) {
-  if (metric === 'eff') return null;
   return `${base}_${metric}`;
 }
 
@@ -130,13 +130,7 @@ function SheetContent({ metric, base, onClose }) {
 
       {/* 콘텐츠 */}
       <div className="overflow-y-auto flex-1 px-4 pb-6">
-        {isEff ? (
-          <div className="py-16 text-center text-zinc-500 text-sm">
-            <p className="text-2xl mb-3">🔜</p>
-            <p>효율 랭킹은 준비 중입니다</p>
-            <p className="text-xs text-zinc-600 mt-1">실제 소비 kWh 데이터 연동 후 제공 예정</p>
-          </div>
-        ) : loading ? (
+        {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="w-6 h-6 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
           </div>
@@ -213,11 +207,31 @@ function SheetContent({ metric, base, onClose }) {
                         )}
                       </>
                     )}
+                    {isEff && (
+                      <>
+                        <p className="text-base font-bold tabular-nums" style={{ color: effColor(it.eff_wh_km) }}>
+                          {it.eff_wh_km ?? '—'}<span className="text-xs font-medium text-zinc-600 ml-0.5">Wh/km</span>
+                        </p>
+                        {isDrive && it.distance > 0 && (
+                          <p className="text-xs text-blue-400/80">
+                            {it.distance}<span className="text-zinc-600 ml-0.5">km</span>
+                          </p>
+                        )}
+                        {!isDrive && it.total_distance > 0 && (
+                          <p className="text-xs text-blue-400/80">
+                            {it.total_distance}<span className="text-zinc-600 ml-0.5">km</span>
+                          </p>
+                        )}
+                      </>
+                    )}
                   </div>
                 </button>
               );
             })}
           </div>
+        )}
+        {isEff && !loading && items && items.length > 0 && (
+          <p className="text-[10px] text-zinc-600 text-center mt-2">* rated_range 기반 추정값 · 10km 이상 주행만</p>
         )}
       </div>
     </>
