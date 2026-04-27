@@ -40,7 +40,7 @@
 - **무효화**: 서버 재시작 (Postgres에서 positions를 사후 변경하지 않는다는 가정)
 
 ### 3. 집충전기 (환경공단 EvCharger) 캐시
-- **위치**: `dashboard/lib/home-charger-cache.js`
+- **위치**: `dashboard/lib/home-charger-cache.js` (코어) + `dashboard/lib/home-charger/{schema,poll-log,usage,fleet-stats}.js` (분리 모듈)
 - **메모리 캐시**: 모듈 변수 `cache = { ts, data }`, `inflight` (동시 요청 dedup)
 - **TTL (정적)**: KST 시간대별 5~12분 (`CACHE_TIERS`). 저녁 피크(18~22시) 5분, 오후 12분 등
 - **TTL (동적, 옵션)**: `USE_DYNAMIC_TTL=true` 시 최근 90일 충전 패턴으로 24시간마다 학습 (현재 `false` 유지)

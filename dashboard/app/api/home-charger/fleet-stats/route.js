@@ -1,4 +1,5 @@
-import { fetchFleetStatsDb, getStatIds } from '@/lib/home-charger-cache';
+import { fetchFleetStatsDb } from '@/lib/home-charger/fleet-stats';
+import { getStatIds } from '@/lib/home-charger-cache';
 
 export const dynamic = 'force-dynamic';
 
