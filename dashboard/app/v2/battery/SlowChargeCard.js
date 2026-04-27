@@ -18,6 +18,20 @@ export default function SlowChargeCard() {
 
   const records = data?.records || [];
 
+  // 상단 요약 — 총 kWh / 평균 kW
+  const summary = useMemo(() => {
+    if (!records.length) return null;
+    const totalKwh = records.reduce((s, r) => s + (Number(r.energy_kwh) || 0), 0);
+    const withPower = records.filter(r => r.avg_power);
+    const avgKw = withPower.length
+      ? withPower.reduce((s, r) => s + Number(r.avg_power), 0) / withPower.length
+      : null;
+    return {
+      totalKwh: Math.round(totalKwh * 10) / 10,
+      avgKw: avgKw != null ? Math.round(avgKw * 10) / 10 : null,
+    };
+  }, [records]);
+
   // 주(월~일) 단위 집계 — IdleDrainCard와 동일 규칙
   const weeks = useMemo(() => {
     const weekMap = new Map();
@@ -83,9 +97,23 @@ export default function SlowChargeCard() {
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
-        <span className="text-xs font-bold text-zinc-200">완속 충전 기록</span>
-        <span className="text-xs text-zinc-600">{records.length}건</span>
+      <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between gap-2 tabular-nums">
+        <span className="flex items-baseline gap-1.5 min-w-0">
+          <span className="text-xs font-bold text-zinc-200 shrink-0">완속 충전 기록</span>
+          <span className="text-[11px] text-zinc-600 shrink-0">{records.length}건</span>
+        </span>
+        {summary && (
+          <span className="flex items-baseline gap-2 text-[11px] shrink-0">
+            <span className="text-emerald-400 font-bold">
+              {summary.totalKwh}<span className="text-zinc-600 ml-0.5">kWh</span>
+            </span>
+            {summary.avgKw != null && (
+              <span className="text-emerald-400">
+                {summary.avgKw}<span className="text-zinc-600 ml-0.5">kW</span><span className="text-zinc-700 ml-0.5">평균</span>
+              </span>
+            )}
+          </span>
+        )}
       </div>
       <div className="overflow-y-auto" style={{ maxHeight: '360px' }}>
         {weeks.map(week => {
