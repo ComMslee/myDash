@@ -22,7 +22,7 @@ function countByStat(chargers) {
   }, {});
 }
 
-export default function HomeChargerCard() {
+export default function HomeChargerCard({ showFavLabel = false } = {}) {
   const [data, setData] = useState(moduleCache);
   const [loading, setLoading] = useState(!moduleCache);
   const [refreshing, setRefreshing] = useState(false);
@@ -204,9 +204,17 @@ export default function HomeChargerCard() {
 
       <div className="px-4 py-3 space-y-3">
         {/* P1: 108 · 107 — 1줄 2열, 셀 넘치면 자동 개행 */}
-        <div className="grid grid-cols-2 gap-1.5">
-          <TileBox title="108" chargers={cells108} {...tileProps} />
-          <TileBox title="107" chargers={cells107} {...tileProps} />
+        <div className="space-y-1.5">
+          {showFavLabel && (
+            <div className="text-[11px] text-zinc-400 flex items-center gap-1.5">
+              <span>⭐ 즐겨찾기</span>
+              <span className="text-zinc-600">· 108·107동</span>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-1.5">
+            <TileBox title="108" chargers={cells108} {...tileProps} />
+            <TileBox title="107" chargers={cells107} {...tileProps} />
+          </div>
         </div>
 
         {/* 더보기 (접힘) — 102 · 104 → 105 · 115 → 111 · 117 → 119 (전폭) */}
@@ -218,7 +226,7 @@ export default function HomeChargerCard() {
               className="w-full flex items-center justify-between py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300"
             >
               <span className="flex items-center gap-2">
-                <span>더보기 {p3AllChargers.length}대</span>
+                <span>{showFavLabel ? '그 외' : '더보기'} {p3AllChargers.length}대</span>
                 <span className="text-zinc-600">·</span>
                 <StatusBadges counts={p3Counts} size="sm" />
               </span>

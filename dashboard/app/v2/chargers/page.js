@@ -150,7 +150,7 @@ export default function V2ChargersPage() {
     <main className="min-h-screen bg-[#0f0f0f] text-white">
       <div className="max-w-2xl mx-auto px-4 py-5 pb-24 flex flex-col gap-5">
         {/* 집충전기 실시간 현황 (P1/그 외 + 상태 배지) */}
-        <HomeChargerCard />
+        <HomeChargerCard showFavLabel />
 
         {/* 집충전기 누적 사용 — Top 10 + 시간×요일 히트맵 (구 팝업 → 패널) */}
         <FleetStatsPanel />
