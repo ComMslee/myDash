@@ -5,7 +5,7 @@ import { useMock, MOCK_DATA } from '@/app/context/mock';
 import { formatDuration } from '@/lib/format';
 import { effColor } from '@/lib/effColor';
 import { Spinner } from '@/app/components/PageLayout';
-import { HourlyHeatmap, WeekdayBars } from '@/app/components/ChartWidgets';
+import { HourDowHeatmap } from '@/app/components/ChartWidgets';
 import YearHeatmap from '@/app/components/YearHeatmap';
 import { useRankingsSheet } from '../components/RankingsSheet';
 
@@ -350,15 +350,14 @@ export default function V2DrivesPage() {
           latestLeft
         />
 
-        {/* 5. 주행 패턴 */}
-        {insights?.hourly && insights?.weekday && (
+        {/* 5. 주행 패턴 — 시간×요일 히트맵 */}
+        {insights?.hour_dow && (
           <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
             <div className="px-3 py-2 border-b border-white/[0.06]">
               <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">주행 패턴</span>
             </div>
-            <div className="px-4 pt-4 pb-4 space-y-4">
-              <HourlyHeatmap data={insights.hourly} hexColor="#3b82f6" />
-              <WeekdayBars data={insights.weekday} hexColor="#3b82f6" />
+            <div className="px-4 pt-4 pb-4">
+              <HourDowHeatmap data={insights.hour_dow} hexColor="#3b82f6" />
             </div>
           </div>
         )}

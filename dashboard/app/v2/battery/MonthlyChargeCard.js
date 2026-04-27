@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { HourlyHeatmap, WeekdayBars } from '@/app/components/ChartWidgets';
+import { HourDowHeatmap } from '@/app/components/ChartWidgets';
 
 export default function MonthlyChargeCard() {
   const [data, setData] = useState(null);
@@ -71,10 +71,9 @@ export default function MonthlyChargeCard() {
           </div>
         </div>
 
-        {/* 시간대별 / 요일별 */}
-        <div className="pt-4 border-t border-white/[0.06] space-y-4">
-          <HourlyHeatmap data={data.charge_hourly} hexColor="#34d399" />
-          <WeekdayBars data={data.charge_weekday} hexColor="#34d399" />
+        {/* 시간×요일 히트맵 */}
+        <div className="pt-4 border-t border-white/[0.06]">
+          <HourDowHeatmap data={data.charge_hour_dow} hexColor="#34d399" />
         </div>
       </div>
     </div>
