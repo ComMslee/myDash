@@ -170,7 +170,7 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
     monthAbortRef.current = new AbortController();
     const palette = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7', '#84cc16', '#f43f5e'];
     fetchInChunks(monthDrives, (d, idx) =>
-      fetch(`/api/route-map?driveId=${d.id}`, { signal: monthAbortRef.current.signal })
+      fetch(`/api/route-map?driveId=${d.id}&detail=light`, { signal: monthAbortRef.current.signal })
         .then(r => r.json())
         .then(data => ({
           positions: data.positions || [],
