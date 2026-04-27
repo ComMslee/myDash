@@ -165,8 +165,13 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Redraw when positions / placeMarker change
+  // drawContent 직전에 invalidateSize 호출 — 데이터(positions/routes) 도착 시점에 컨테이너 layout
+  // 이 settled 되지 않은 상태이면 fitBounds 가 0-size 기준으로 잘못 계산되어 polyline 이 보이지
+  // 않고 default(서울) view 에 고정되던 회귀 보강. mount 시점의 setTimeout(150ms) 만으로는
+  // 데이터가 그 이후 도착하는 cold-cache 첫 진입을 못 잡음.
   useEffect(() => {
     if (!mapRef.current || !window.L) return;
+    mapRef.current.invalidateSize();
     drawContent();
   }, [drawContent]);
 
