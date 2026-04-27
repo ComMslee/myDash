@@ -6,6 +6,9 @@ import { usePathname } from 'next/navigation';
 export default function BottomNav() {
   const pathname = usePathname();
 
+  // V2 경로는 자체 네비를 사용
+  if (pathname?.startsWith('/v2')) return null;
+
   const tabs = [
     {
       href: '/drives',
