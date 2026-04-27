@@ -39,12 +39,13 @@ function FleetStatsPanel() {
     return () => { alive = false; };
   }, []);
 
-  const TOP_VISIBLE = 10;
+  const TOP_VISIBLE = 15;
   const perCharger = data?.perCharger || [];
-  const topN = perCharger.slice(0, TOP_VISIBLE);
+  const top3 = perCharger.slice(0, 3);
+  const mid12 = perCharger.slice(3, TOP_VISIBLE);
   const restN = perCharger.slice(TOP_VISIBLE);
-  const topMax = topN[0]?.count || 1;
-  const rankIcons = ['🥇', '🥈', '🥉', '4', '5', '6', '7', '8', '9', '10'];
+  const topMax = top3[0]?.count || 1;
+  const top3Icons = ['🥇', '🥈', '🥉'];
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
@@ -73,24 +74,44 @@ function FleetStatsPanel() {
                 <div className="text-[11px] text-zinc-400 mb-1.5">
                   🏆 전체 순위 <span className="text-zinc-600">· 총 {perCharger.length}대</span>
                 </div>
-                <div
-                  className="grid grid-cols-2 grid-flow-col gap-x-2 gap-y-0.5"
-                  style={{ gridTemplateRows: `repeat(${Math.ceil(topN.length / 2)}, auto)` }}
-                >
-                  {topN.map((e, i) => (
-                    <RankRow
-                      key={e.key}
-                      icon={rankIcons[i]}
-                      label={formatEntry(e.key)}
-                      count={e.count}
-                      max={topMax}
-                      isPeak={i === 0}
-                      delta={e.delta}
-                      isNew={e.isNew}
-                      prevRank={e.prevRank}
-                    />
-                  ))}
-                </div>
+                {/* Top 1~3 — 한 줄 3칸 */}
+                {top3.length > 0 && (
+                  <div className="grid grid-cols-3 gap-x-2 gap-y-0.5 mb-1">
+                    {top3.map((e, i) => (
+                      <RankRow
+                        key={e.key}
+                        icon={top3Icons[i]}
+                        label={formatEntry(e.key)}
+                        count={e.count}
+                        max={topMax}
+                        isPeak={i === 0}
+                        delta={e.delta}
+                        isNew={e.isNew}
+                        prevRank={e.prevRank}
+                      />
+                    ))}
+                  </div>
+                )}
+                {/* 4~15위 — 2칸 그리드 */}
+                {mid12.length > 0 && (
+                  <div
+                    className="grid grid-cols-2 grid-flow-col gap-x-2 gap-y-0.5"
+                    style={{ gridTemplateRows: `repeat(${Math.ceil(mid12.length / 2)}, auto)` }}
+                  >
+                    {mid12.map((e, i) => (
+                      <RankRow
+                        key={e.key}
+                        icon={String(i + 4)}
+                        label={formatEntry(e.key)}
+                        count={e.count}
+                        max={topMax}
+                        delta={e.delta}
+                        isNew={e.isNew}
+                        prevRank={e.prevRank}
+                      />
+                    ))}
+                  </div>
+                )}
                 {expanded && restN.length > 0 && (
                   <div
                     className="mt-1 grid grid-cols-4 grid-flow-col gap-x-2 gap-y-0.5"
