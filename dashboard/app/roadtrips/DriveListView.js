@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, Fragment } from 'react';
 import { KWH_PER_KM } from '../../lib/constants';
 import { formatDuration, shortAddr } from '../../lib/format';
 
@@ -15,7 +16,28 @@ function efficiency(d) {
 
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
-export default function DriveListView({ drives, loadingDrives, error, onDriveClick, onDayClick, driveDayStr }) {
+// KST 기준 현재 'YYYY-MM' — 이번 달 펼침 기본값 계산용
+function currentMonthKey() {
+  const kst = new Date(Date.now() + 9 * 3600000);
+  return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+// 'YYYY-MM' → '24/03 (3월)' 라벨 (현재 연도면 연도 생략)
+function formatMonthLabel(mk) {
+  const [y, m] = mk.split('-');
+  const currentYear = new Date().getFullYear();
+  const yLabel = parseInt(y) === currentYear ? '' : `${y.slice(2)}년 `;
+  return `${yLabel}${parseInt(m)}월`;
+}
+
+export default function DriveListView({ drives, loadingDrives, error, onDriveClick, onDayClick, onMonthClick, driveDayStr }) {
+  const [expandedMonths, setExpandedMonths] = useState(() => new Set([currentMonthKey()]));
+  const toggleMonth = (mk) => setExpandedMonths(prev => {
+    const next = new Set(prev);
+    if (next.has(mk)) next.delete(mk); else next.add(mk);
+    return next;
+  });
+
   if (loadingDrives) {
     return (
       <div className="flex items-center justify-center h-24">
@@ -26,7 +48,7 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
   if (error) return <p className="text-red-400 text-sm text-center py-4">{error}</p>;
   if (!drives.length) return <p className="text-zinc-500 text-sm text-center py-4">주행 기록이 없습니다</p>;
 
-  // 날짜별 그룹핑 (순서 보존)
+  // 일별 그룹핑 (순서 보존)
   const groups = [];
   let currentKey = null;
   drives.forEach(d => {
@@ -48,16 +70,34 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
     }
   });
 
-  return groups.flatMap((g, gi) => {
+  // 월별 묶음 (순서 보존)
+  const monthOrder = [];
+  const monthMap = new Map();
+  groups.forEach((g, gi) => {
+    const mk = g.dateStr.slice(0, 7);
+    let m = monthMap.get(mk);
+    if (!m) {
+      m = { mk, days: [], dayIdx: [], distance: 0, kwh: 0, usedPct: 0, driveCount: 0 };
+      monthMap.set(mk, m);
+      monthOrder.push(mk);
+    }
+    m.days.push(g);
+    m.dayIdx.push(gi);
+    m.distance += g.distance;
+    m.kwh += g.kwh;
+    m.usedPct += g.usedPct;
+    m.driveCount += g.items.length;
+  });
+
+  // 일별 그룹 노드 렌더링 (기존 로직 — gi는 전체 groups 인덱스, crossGap은 같은 달 내에서만)
+  const renderDay = (g, gi, sameMonthNext) => {
     const weekday = WEEKDAY_KO[g.firstDate.getDay()];
     const multi = g.items.length > 1;
 
-    // 그룹 사이 대기 시간 (이전 날 첫 주행 end → 이번 날 마지막 주행 start)
-    const nextG = groups[gi + 1];
     let crossGap = null;
-    if (nextG) {
+    if (sameMonthNext) {
       const curOldest = g.items[g.items.length - 1];
-      const nextNewest = nextG.items[0];
+      const nextNewest = sameMonthNext.items[0];
       if (curOldest?.start_date && nextNewest?.end_date) {
         const ms = new Date(curOldest.start_date) - new Date(nextNewest.end_date);
         if (ms > 0) crossGap = formatDuration(Math.round(ms / 60000));
@@ -102,7 +142,6 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
             const endPct = d.end_battery_level ?? null;
             const usedPct = (startPct != null && endPct != null) ? Math.max(0, startPct - endPct) : 0;
 
-            // 같은 날 내에서만 대기 시간 표시
             const next = g.items[iidx + 1];
             let gapLabel = null;
             if (next && d.start_date && next.end_date) {
@@ -163,5 +202,48 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
       );
     }
     return nodes;
-  });
+  };
+
+  return (
+    <>
+      {monthOrder.map(mk => {
+        const m = monthMap.get(mk);
+        const expanded = expandedMonths.has(mk);
+        return (
+          <Fragment key={mk}>
+            {/* 월 헤더 — chevron 토글(좌) + 상세보기 버튼(우) */}
+            <div className="flex items-stretch border-t border-white/[0.10] bg-white/[0.04]">
+              <button
+                onClick={() => toggleMonth(mk)}
+                className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-white/[0.05] active:bg-white/[0.08] transition-colors text-left min-w-0"
+              >
+                <svg className={`w-3 h-3 text-zinc-500 flex-shrink-0 transition-transform ${expanded ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                <span className="text-xs font-bold text-zinc-300 flex-shrink-0">{formatMonthLabel(mk)}</span>
+                <span className="text-[10px] text-zinc-600 tabular-nums truncate">
+                  {m.driveCount}회 · {m.distance.toFixed(0)}km
+                  {m.usedPct > 0 && <span className="text-zinc-700"> · {m.usedPct}%</span>}
+                </span>
+              </button>
+              {onMonthClick && (
+                <button
+                  onClick={() => onMonthClick(mk)}
+                  className="px-3 flex items-center text-[11px] text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 border-l border-white/[0.06] transition-colors"
+                  title="이 달 전체 지도/순위 보기"
+                >
+                  상세보기
+                </button>
+              )}
+            </div>
+            {expanded && m.days.flatMap((g, idx) => {
+              const gi = m.dayIdx[idx];
+              const sameMonthNext = idx + 1 < m.days.length ? m.days[idx + 1] : null;
+              return renderDay(g, gi, sameMonthNext);
+            })}
+          </Fragment>
+        );
+      })}
+    </>
+  );
 }

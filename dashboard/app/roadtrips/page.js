@@ -58,6 +58,8 @@ function DrivesInner() {
     routeData,
     dayMode, setDayMode,
     dayRoutes,
+    monthMode, setMonthMode,
+    monthRoutes,
     loadingDrives, loadingRoute,
     error,
   } = useDriveData({ isMock, refreshSignal, initialId, initialDate, driveDayStr });
@@ -83,12 +85,17 @@ function DrivesInner() {
   const selectedIdx = selectedDrive ? drives.findIndex(d => d.id === selectedDrive.id) : -1;
   const eff = selectedDrive ? efficiency(selectedDrive) : null;
 
-  // 스파크라인 선택 포인트 (전체 flat 인덱스) — drive/dayMode 변경 시 리셋
+  // 스파크라인 선택 포인트 (전체 flat 인덱스) — drive/dayMode/monthMode 변경 시 리셋
   const [selectedPosIdx, setSelectedPosIdx] = useState(null);
-  useEffect(() => { setSelectedPosIdx(null); }, [selectedDrive?.id, dayMode]);
+  useEffect(() => { setSelectedPosIdx(null); }, [selectedDrive?.id, dayMode, monthMode]);
 
-  // 스파크라인용 routes — 단일/일 모드 통합
+  // 스파크라인용 routes — 단일/일/월 모드 통합
   const sparkRoutes = useMemo(() => {
+    if (monthMode && monthRoutes?.length) {
+      return monthRoutes
+        .filter(r => r.positions?.length >= 2)
+        .map(r => ({ positions: r.positions, startDate: r.startDate, color: r.color }));
+    }
     if (dayMode && dayRoutes?.length) {
       return dayRoutes
         .filter(r => r.positions?.length >= 2)
@@ -98,7 +105,7 @@ function DrivesInner() {
       return [{ positions, startDate: selectedDrive.start_date, color: '#3b82f6' }];
     }
     return [];
-  }, [dayMode, dayRoutes, selectedDrive, positions]);
+  }, [monthMode, monthRoutes, dayMode, dayRoutes, selectedDrive, positions]);
 
   // flat 인덱스 → 지도 하이라이트 좌표
   const highlightLatLng = useMemo(() => {
@@ -114,8 +121,9 @@ function DrivesInner() {
     return null;
   }, [selectedPosIdx, sparkRoutes]);
 
-  const goToDrive = (d) => { setSelectedDrive(d); setSelectedPlace(null); setDayMode(null); setMapEverShown(true); setViewMode('map'); };
-  const goToDay = (dateStr) => { setDayMode(dateStr); setSelectedPlace(null); setMapEverShown(true); setViewMode('map'); };
+  const goToDrive = (d) => { setSelectedDrive(d); setSelectedPlace(null); setDayMode(null); setMonthMode(null); setMapEverShown(true); setViewMode('map'); };
+  const goToDay = (dateStr) => { setDayMode(dateStr); setMonthMode(null); setSelectedPlace(null); setMapEverShown(true); setViewMode('map'); };
+  const goToMonth = (monthStr) => { setMonthMode(monthStr); setDayMode(null); setSelectedDrive(null); setSelectedPlace(null); setPositions([]); setMapEverShown(true); setViewMode('map'); };
 
   // 일 모드 날짜 네비 — drives에서 유니크 날짜를 내림차순 정렬 후 dayMode 인덱스 계산
   const uniqueDays = useMemo(() => {
@@ -126,6 +134,17 @@ function DrivesInner() {
   const dayIdx = dayMode ? uniqueDays.indexOf(dayMode) : -1;
   const goPrevDay = () => { if (dayIdx > 0) setDayMode(uniqueDays[dayIdx - 1]); };
   const goNextDay = () => { if (dayIdx >= 0 && dayIdx < uniqueDays.length - 1) setDayMode(uniqueDays[dayIdx + 1]); };
+
+  // 월 모드 네비 — 'YYYY-MM' 내림차순
+  const uniqueMonths = useMemo(() => {
+    if (!drives.length) return [];
+    const set = new Set(drives.map(d => driveDayStr(d).slice(0, 7)));
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [drives]);
+  const monthIdx = monthMode ? uniqueMonths.indexOf(monthMode) : -1;
+  const goPrevMonth = () => { if (monthIdx > 0) setMonthMode(uniqueMonths[monthIdx - 1]); };
+  const goNextMonth = () => { if (monthIdx >= 0 && monthIdx < uniqueMonths.length - 1) setMonthMode(uniqueMonths[monthIdx + 1]); };
+
   const goPrev = () => { if (selectedIdx > 0) { setSelectedDrive(drives[selectedIdx - 1]); setSelectedPlace(null); } };
   const goNext = () => { if (selectedIdx < drives.length - 1) { setSelectedDrive(drives[selectedIdx + 1]); setSelectedPlace(null); } };
 
@@ -159,7 +178,7 @@ function DrivesInner() {
                 {places.slice(0, 5).map((p, i) => (
                   <button
                     key={p.id}
-                    onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMapEverShown(true); setViewMode('map'); }}
+                    onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMonthMode(null); setMapEverShown(true); setViewMode('map'); }}
                     className={`flex-shrink-0 flex flex-col gap-1.5 border rounded-xl px-3 py-3 w-[130px] text-left transition-colors ${
                       selectedPlace?.id === p.id
                         ? 'bg-amber-500/10 border-amber-500/30'
@@ -197,6 +216,7 @@ function DrivesInner() {
                         key={p.id}
                         onClick={() => {
                           setSelectedPlace(p); setSelectedDrive(null); setPositions([]);
+                          setMonthMode(null);
                           setPlacesExpanded(false); setMapEverShown(true); setViewMode('map');
                         }}
                         className="w-full flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.03] transition-colors text-left"
@@ -226,7 +246,19 @@ function DrivesInner() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               목록
             </button>
-            {dayMode ? (
+            {monthMode ? (
+              <div className="flex items-center gap-3">
+                <button onClick={goPrevMonth} disabled={monthIdx <= 0}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <span className="text-xs text-zinc-400 tabular-nums">{monthMode}<span className="text-zinc-600 ml-1">({monthRoutes.length}회)</span></span>
+                <button onClick={goNextMonth} disabled={monthIdx < 0 || monthIdx >= uniqueMonths.length - 1}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                </button>
+              </div>
+            ) : dayMode ? (
               <div className="flex items-center gap-3">
                 <button onClick={goPrevDay} disabled={dayIdx <= 0}
                   className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
@@ -255,7 +287,69 @@ function DrivesInner() {
 
           {/* 주행 정보 + 지도 */}
           <div className="flex-1 min-h-0 flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden mb-20">
-            {dayMode ? (() => {
+            {monthMode ? (() => {
+              const mDrives = drives
+                .filter(d => driveDayStr(d).slice(0, 7) === monthMode)
+                .slice()
+                .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+              if (mDrives.length === 0) return null;
+              const totalKm = mDrives.reduce((s, d) => s + (parseFloat(d.distance) || 0), 0);
+              const totalMin = mDrives.reduce((s, d) => s + (parseFloat(d.duration_min) || 0), 0);
+              const totalKwh = mDrives.reduce((s, d) => {
+                if (d.start_rated_range_km && d.end_rated_range_km) {
+                  const usedKm = parseFloat(d.start_rated_range_km) - parseFloat(d.end_rated_range_km);
+                  if (usedKm > 0) return s + usedKm * KWH_PER_KM;
+                }
+                return s;
+              }, 0);
+              const usedPct = mDrives.reduce((s, d) =>
+                (d.start_battery_level != null && d.end_battery_level != null)
+                  ? s + Math.max(0, d.start_battery_level - d.end_battery_level)
+                  : s, 0);
+              const perKm = totalKm > 0 && totalKwh > 0 ? Math.round((totalKwh * 1000) / totalKm) : null;
+              const dayCount = new Set(mDrives.map(d => driveDayStr(d))).size;
+              const destMap = new Map();
+              for (const d of mDrives) {
+                const key = shortAddr(d.end_address) || '?';
+                destMap.set(key, (destMap.get(key) || 0) + 1);
+              }
+              const topDests = Array.from(destMap.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5);
+              return (
+                <div className="px-4 py-2 border-b border-white/[0.06] flex flex-col gap-1.5 flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-zinc-500 tabular-nums">
+                        {monthMode}
+                        <span className="text-zinc-600"> · {mDrives.length}회 ({dayCount}일, {formatDuration(Math.round(totalMin))})</span>
+                      </p>
+                    </div>
+                    <div className="flex-shrink-0 text-right tabular-nums">
+                      <p className="text-sm font-bold text-blue-400">{totalKm.toFixed(0)}<span className="text-xs text-zinc-600 ml-0.5">km</span></p>
+                      {totalKwh > 0 && (
+                        <p className="text-sm font-semibold text-green-400">
+                          {totalKwh.toFixed(1)}<span className="text-xs text-zinc-600 ml-0.5">kWh</span>
+                          {usedPct > 0 && <span className="text-zinc-500 text-xs ml-1">({usedPct}%)</span>}
+                        </p>
+                      )}
+                      {perKm != null && <p className="text-xs text-amber-400">{perKm}<span className="text-zinc-600 ml-0.5">Wh/km</span></p>}
+                    </div>
+                  </div>
+                  {topDests.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                      <span className="text-zinc-600 flex-shrink-0">자주 간 곳</span>
+                      {topDests.map(([addr, n], i) => (
+                        <span key={addr} className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 truncate max-w-[140px]">
+                          <span className="text-zinc-600 mr-1">{i + 1}</span>{addr}
+                          <span className="text-zinc-500 ml-1 tabular-nums">{n}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })() : dayMode ? (() => {
               const dayDrives = drives
                 .filter(d => driveDayStr(d) === dayMode)
                 .slice()
@@ -394,8 +488,8 @@ function DrivesInner() {
             ) : null}
             <div className="flex-1 p-2">
               <DriveMap
-                positions={positions}
-                routes={dayMode ? dayRoutes : undefined}
+                positions={monthMode ? [] : positions}
+                routes={monthMode ? monthRoutes : dayMode ? dayRoutes : undefined}
                 loading={loadingRoute}
                 placeMarker={selectedPlace}
                 visible={viewMode === 'map'}
@@ -423,6 +517,7 @@ function DrivesInner() {
                 error={error}
                 onDriveClick={goToDrive}
                 onDayClick={goToDay}
+                onMonthClick={goToMonth}
                 driveDayStr={driveDayStr}
               />
             </div>
