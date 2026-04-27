@@ -1,7 +1,6 @@
 import './globals.css';
 import { MockProvider } from './context/mock';
 import GlobalHeader from './components/GlobalHeader';
-import BottomNav from './components/BottomNav';
 
 export const metadata = {
   title: 'TeslaMate Dashboard',
@@ -21,7 +20,6 @@ export default function RootLayout({ children }) {
         <MockProvider>
           <GlobalHeader />
           {children}
-          <BottomNav />
         </MockProvider>
       </body>
     </html>
