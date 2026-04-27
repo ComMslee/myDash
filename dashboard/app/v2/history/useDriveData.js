@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { MOCK_DATA } from '../context/mock';
+import { MOCK_DATA } from '@/app/context/mock';
 
 // 동시 요청 상한 헬퍼 — N개 워커가 cursor를 공유하며 items 소비
 async function fetchInChunks(items, fn, concurrency = 6) {

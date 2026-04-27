@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, Fragment } from 'react';
-import { KWH_PER_KM } from '../../lib/constants';
-import { formatDuration, shortAddr } from '../../lib/format';
+import { KWH_PER_KM } from '@/lib/constants';
+import { formatDuration, shortAddr } from '@/lib/format';
 
 function efficiency(d) {
   if (!d.start_rated_range_km || !d.end_rated_range_km || !d.distance) return null;
