@@ -144,13 +144,13 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
     };
   }, [grouped]);
 
-  // 주 헤더 토글 — 이번 주 항상 펼침, 월/화엔 지난 주도 펼침
+  // 주 헤더 토글 — 이번 주 항상 펼침, 월요일엔 지난 주도 펼침(화요일부턴 접힘)
   const [expandedWeeks, setExpandedWeeks] = useState(() => {
     const today = kstDateStr(Date.now());
     const thisWeek = kstMondayStr(today + 'T00:00:00Z');
     const dow = kstDayOfWeek();
     const set = new Set([thisWeek]);
-    if (dow === 1 || dow === 2) {
+    if (dow === 1) {
       const lastWeek = kstMondayStr(new Date(thisWeek + 'T00:00:00Z').getTime() - 7 * 86400000);
       set.add(lastWeek);
     }
@@ -289,8 +289,8 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
               </div>
             </div>
             <div className="px-4 py-2.5">
-              {/* 24h 타임라인 — 상단 drain(38px) + 하단 공조/센트리 밴드(10px) */}
-              <div className="relative w-full h-12 rounded-md overflow-hidden bg-white/[0.05]">
+              {/* 24h 타임라인 — 상단 drain(28px) + 하단 공조/센트리 밴드(8px) */}
+              <div className="relative w-full h-9 rounded-md overflow-hidden bg-white/[0.05]">
                 {items.map((r, i) => {
                   const kstStart = toKstDate(r.idle_start);
                   const hourOffset = kstStart.getUTCHours() + kstStart.getUTCMinutes() / 60 + kstStart.getUTCSeconds() / 3600;
@@ -321,12 +321,12 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                   if (itemSentryPct != null) titleParts.push(`🛡 센트리 의심 ${itemSentryPct}%`);
                   return (
                     <Fragment key={i}>
-                      {/* drain 바 — 상단 38px */}
+                      {/* drain 바 — 상단 28px */}
                       <div
                         className="absolute left-0 flex items-center justify-center text-[10px] font-bold tabular-nums text-white"
                         style={{
                           top: 0,
-                          height: '38px',
+                          height: '28px',
                           left: `${leftPct}%`,
                           width: `${widthPct}%`,
                           background: bg,
@@ -349,7 +349,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                             className="absolute pointer-events-none"
                             style={{
                               bottom: 0,
-                              height: '10px',
+                              height: '8px',
                               left: `${spLeft}%`,
                               width: `${spWidth}%`,
                               background: SENTRY_BG,
@@ -370,7 +370,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                             className="absolute pointer-events-none"
                             style={{
                               bottom: 0,
-                              height: '10px',
+                              height: '8px',
                               left: `${spLeft}%`,
                               width: `${spWidth}%`,
                               background: CLIMATE_BG,
