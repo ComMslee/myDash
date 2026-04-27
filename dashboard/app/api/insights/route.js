@@ -14,6 +14,8 @@ export async function GET() {
     const now = new Date();
     const nextStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const twelveMonthStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = nextStart;
 
     const iso = (d) => d.toISOString();
 
@@ -64,6 +66,7 @@ export async function GET() {
     const [
       twelveMonthBreakdown, driveHourDowQ, chargeHourDowQ,
       allTimeDrive, allTimeCharge, dayMaxResult, driveMinEffResult,
+      monthBestLongResult, monthBestEffResult,
     ] = await Promise.all([
       Promise.all(
         Array.from({ length: 12 }, (_, i) => {
@@ -174,6 +177,30 @@ export async function GET() {
            AND (start_rated_range_km - end_rated_range_km) > 0`,
         [carId]
       ),
+      // 이번달 최장 주행 (단일 row)
+      pool.query(
+        `SELECT id, start_date, distance::float AS distance
+         FROM drives
+         WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
+           AND distance IS NOT NULL
+         ORDER BY distance DESC NULLS LAST
+         LIMIT 1`,
+        [carId, iso(monthStart), iso(monthEnd)]
+      ),
+      // 이번달 최고 효율 주행 (단일 row, 노이즈 제거 distance >= 10km)
+      pool.query(
+        `SELECT id, start_date, distance::float AS distance,
+                ((start_rated_range_km - end_rated_range_km) * ${KWH_PER_KM} / NULLIF(distance, 0) * 1000)::float AS eff_wh_km
+         FROM drives
+         WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
+           AND distance >= 10
+           AND start_rated_range_km IS NOT NULL
+           AND end_rated_range_km IS NOT NULL
+           AND (start_rated_range_km - end_rated_range_km) > 0
+         ORDER BY ((start_rated_range_km - end_rated_range_km) * ${KWH_PER_KM} / NULLIF(distance, 0) * 1000) ASC
+         LIMIT 1`,
+        [carId, iso(monthStart), iso(monthEnd)]
+      ),
     ]);
 
     // 이번달 / 지난달
@@ -255,6 +282,9 @@ export async function GET() {
         : null,
     };
 
+    const bestLongRow = monthBestLongResult.rows[0];
+    const bestEffRow = monthBestEffResult.rows[0];
+
     return Response.json({
       current: {
         distance: parseFloat(current.distance.toFixed(1)),
@@ -269,6 +299,17 @@ export async function GET() {
         max_duration: current.max_duration,
         max_speed: current.max_speed,
         efficiency_wh_km: parseFloat(effCur.toFixed(0)),
+        best_drive_long: bestLongRow ? {
+          id: bestLongRow.id,
+          start_date: bestLongRow.start_date,
+          distance: parseFloat(parseFloat(bestLongRow.distance).toFixed(1)),
+        } : null,
+        best_drive_eff: bestEffRow ? {
+          id: bestEffRow.id,
+          start_date: bestEffRow.start_date,
+          distance: parseFloat(parseFloat(bestEffRow.distance).toFixed(1)),
+          eff_wh_km: Math.round(parseFloat(bestEffRow.eff_wh_km)),
+        } : null,
       },
       previous: {
         distance: parseFloat(previous.distance.toFixed(1)),
