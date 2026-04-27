@@ -74,22 +74,45 @@ function FleetStatsPanel() {
                 <div className="text-[11px] text-zinc-400 mb-1.5">
                   🏆 전체 순위 <span className="text-zinc-600">· 총 {perCharger.length}대</span>
                 </div>
-                {/* Top 1~3 — 한 줄 3칸 */}
+                {/* Top 1~3 — 강조 카드 (한 줄 3칸, 크게) */}
                 {top3.length > 0 && (
-                  <div className="grid grid-cols-3 gap-x-2 gap-y-0.5 mb-1">
-                    {top3.map((e, i) => (
-                      <RankRow
-                        key={e.key}
-                        icon={top3Icons[i]}
-                        label={formatEntry(e.key)}
-                        count={e.count}
-                        max={topMax}
-                        isPeak={i === 0}
-                        delta={e.delta}
-                        isNew={e.isNew}
-                        prevRank={e.prevRank}
-                      />
-                    ))}
+                  <div className="grid grid-cols-3 gap-2 mb-2">
+                    {top3.map((e, i) => {
+                      const isPeak = i === 0;
+                      const ratio = topMax > 0 ? e.count / topMax : 0;
+                      const accent = isPeak ? '#f59e0b' : '#3b82f6';
+                      return (
+                        <div
+                          key={e.key}
+                          className="relative bg-white/[0.04] border border-white/[0.08] rounded-lg p-2 pl-3 flex flex-col items-center justify-center gap-1 overflow-hidden"
+                          title={`${formatEntry(e.key)}: ${e.count}회`}
+                        >
+                          <div
+                            className="absolute left-0 top-0 bottom-0 w-1"
+                            style={{ background: accent, opacity: 0.4 + ratio * 0.6 }}
+                          />
+                          <div className="text-2xl leading-none">{top3Icons[i]}</div>
+                          <div className="text-[11px] text-zinc-200 truncate w-full text-center font-medium">
+                            {formatEntry(e.key)}
+                          </div>
+                          <div className="flex items-baseline gap-1">
+                            <span className={`text-base font-bold tabular-nums ${isPeak ? 'text-amber-400' : 'text-zinc-200'}`}>
+                              {e.count}
+                            </span>
+                            <span className="text-[9px] text-zinc-500">회</span>
+                            {e.isNew && (
+                              <span className="text-[9px] font-semibold text-amber-400 ml-0.5" title="어제까지 미사용">NEW</span>
+                            )}
+                            {!e.isNew && e.delta != null && e.delta > 0 && (
+                              <span className="text-[9px] tabular-nums text-emerald-400 ml-0.5" title={`어제 ${e.prevRank}위 → ${e.delta}등 상승`}>▲{e.delta}</span>
+                            )}
+                            {!e.isNew && e.delta != null && e.delta < 0 && (
+                              <span className="text-[9px] tabular-nums text-rose-400 ml-0.5" title={`어제 ${e.prevRank}위 → ${-e.delta}등 하락`}>▼{-e.delta}</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
                 {/* 4~15위 — 2칸 그리드 */}
