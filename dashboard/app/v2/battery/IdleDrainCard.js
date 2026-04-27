@@ -129,7 +129,9 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
     }
     const weeks = weekOrder.map(wk => {
       const w = weekMap.get(wk);
-      const avgDrainPerDay = w.weekIdleH > 0 ? Math.round(w.weekDropRaw / w.weekIdleH * 24 * 10) / 10 : 0;
+      // 일자 단위와 동일한 척도로 표시 — 데이터가 있는 날의 평균 일일 소실
+      // (기존: weekDrop/weekIdleH*24 = 24h 정규화 비율 → 짧은 idle만 있는 주에서 실제값보다 크게 보이는 버그)
+      const avgDrainPerDay = w.dayKeys.length > 0 ? Math.round(w.weekDropRaw / w.dayKeys.length * 10) / 10 : 0;
       return {
         weekKey: wk,
         dayKeys: w.dayKeys,
@@ -237,21 +239,21 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                 <span className="text-[10px] text-zinc-600 tabular-nums">{weekRange(week.weekKey)}</span>
               </span>
               <span className="flex items-center gap-2 tabular-nums flex-shrink-0">
+                <span className={`text-[10px] font-bold ${dropTextClass(week.avgDrainPerDay)}`}>
+                  {week.avgDrainPerDay < 0.05 ? '0%' : `-${fmtDrop(week.avgDrainPerDay)}%`}
+                </span>
                 <span className="text-[10px] text-zinc-600">
-                  {formatHours(week.avgIdleH)}/일
                   {week.weekClimatePct != null && (
-                    <span className="text-sky-700 ml-1 opacity-80" title={`공조 ${Math.round(week.weekClimateMin)}분`}>
-                      (<span aria-hidden="true">🌀</span>{week.weekClimatePct}%)
+                    <span className="text-sky-700 mr-1 opacity-80" title={`공조 ${Math.round(week.weekClimateMin)}분`}>
+                      <span aria-hidden="true">🌀</span>{week.weekClimatePct}%
                     </span>
                   )}
                   {week.weekSentryPct != null && (
-                    <span className="text-fuchsia-400 ml-1 opacity-80" title={`센트리 의심 ${Math.round(week.weekSentryMin)}분`}>
-                      (<span aria-hidden="true">🛡</span>{week.weekSentryPct}%)
+                    <span className="text-fuchsia-400 mr-1 opacity-80" title={`센트리 의심 ${Math.round(week.weekSentryMin)}분`}>
+                      <span aria-hidden="true">🛡</span>{week.weekSentryPct}%
                     </span>
                   )}
-                </span>
-                <span className={`text-[10px] font-bold ${dropTextClass(week.avgDrainPerDay)}`}>
-                  {week.avgDrainPerDay < 0.05 ? '0%' : `-${fmtDrop(week.avgDrainPerDay)}%`}
+                  {formatHours(week.avgIdleH)}/일
                 </span>
               </span>
             </button>
@@ -262,27 +264,27 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
             <div className="px-4 py-1.5 bg-white/[0.02] flex items-center justify-between">
               <span className="text-[10px] font-semibold text-zinc-500 tabular-nums">{formatDateLabel(key)}</span>
               <div className="flex items-center gap-2 tabular-nums">
+                <span className={`text-[10px] font-bold ${dropTextClass(dayDrop)}`}>
+                  {dayDrop < 0.05 ? '0%' : `-${fmtDrop(dayDrop)}%`}
+                </span>
                 <span className="text-[10px] text-zinc-600">
-                  {formatHours(dayIdleH)}
                   {dayClimatePct != null && (
                     <span
-                      className="text-sky-700 ml-1 opacity-80"
+                      className="text-sky-700 mr-1 opacity-80"
                       title={`공조 작동 추정 ${Math.round(dayClimateMin)}분`}
                     >
-                      (<span aria-hidden="true">🌀</span>{dayClimatePct}%)
+                      <span aria-hidden="true">🌀</span>{dayClimatePct}%
                     </span>
                   )}
                   {daySentryPct != null && (
                     <span
-                      className="text-fuchsia-400 ml-1 opacity-80"
+                      className="text-fuchsia-400 mr-1 opacity-80"
                       title={`센트리 의심(공조 제외 온라인) 추정 ${Math.round(daySentryMin)}분`}
                     >
-                      (<span aria-hidden="true">🛡</span>{daySentryPct}%)
+                      <span aria-hidden="true">🛡</span>{daySentryPct}%
                     </span>
                   )}
-                </span>
-                <span className={`text-[10px] font-bold ${dropTextClass(dayDrop)}`}>
-                  {dayDrop < 0.05 ? '0%' : `-${fmtDrop(dayDrop)}%`}
+                  {formatHours(dayIdleH)}
                 </span>
               </div>
             </div>
