@@ -108,11 +108,18 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
     setPositions([]);
     setRouteData(null);
     if (abortRef.current) abortRef.current.abort();
-    abortRef.current = new AbortController();
-    fetch(`/api/route-map?driveId=${selectedDrive.id}`, { signal: abortRef.current.signal })
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const driveId = selectedDrive.id;
+    fetch(`/api/route-map?driveId=${driveId}`, { signal: controller.signal })
       .then(r => r.json())
       .then(data => {
-        setPositions(data.positions || []);
+        if (controller.signal.aborted) return;
+        const pos = data.positions || [];
+        if (pos.length < 2) {
+          console.warn(`[route-map] driveId=${driveId} positions=${pos.length} — no route data`);
+        }
+        setPositions(pos);
         setRouteData(data);
         setLoadingRoute(false);
       })
@@ -123,7 +130,7 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
           setLoadingRoute(false);
         }
       });
-    return () => { abortRef.current?.abort(); };
+    return () => { controller.abort(); };
   }, [selectedDrive?.id, isMock, refreshSignal, dayMode, monthMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 일 모드 — 해당 일의 모든 주행 경로 병렬 로드
