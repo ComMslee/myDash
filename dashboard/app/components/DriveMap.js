@@ -161,10 +161,14 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
     drawContent();
   }, [drawContent]);
 
-  // Resize when tab becomes visible
+  // Resize when tab becomes visible — invalidateSize 로 사이즈 재측정 후
+  // drawContent 재호출하여 첫 visibility 전환 시 polyline 이 보이지 않던 케이스 보강.
   useEffect(() => {
     if (visible && mapInstanceRef.current) {
-      setTimeout(() => mapInstanceRef.current?.invalidateSize(), 150);
+      setTimeout(() => {
+        mapInstanceRef.current?.invalidateSize();
+        drawContentRef.current?.();
+      }, 150);
     }
   }, [visible]);
 
