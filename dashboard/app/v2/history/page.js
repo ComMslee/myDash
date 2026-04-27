@@ -44,8 +44,9 @@ function HistoryInner() {
     };
   }, []);
 
-  // Leaflet CDN 사전 로드 — 첫 항목 클릭 시 1~2초 다운로드 지연 제거
+  // Leaflet CDN 사전 로드 — 페이지 진입 즉시 받아두어 첫 클릭 지연 제거
   useEffect(() => { loadLeaflet(() => {}); }, []);
+  // (지도 컨테이너는 항상 마운트 — display:none 으로만 토글하여 첫 클릭 즉시 렌더)
 
   const driveDayStr = (d) => kstDateStr(d.start_date);
 
@@ -78,7 +79,6 @@ function HistoryInner() {
     }
   }, [viewMode]);
 
-  const [mapEverShown, setMapEverShown] = useState(entryInMapView);
   const selectedIdx = selectedDrive ? drives.findIndex(d => d.id === selectedDrive.id) : -1;
   const eff = selectedDrive ? efficiency(selectedDrive) : null;
 
@@ -111,9 +111,9 @@ function HistoryInner() {
     return null;
   }, [selectedPosIdx, sparkRoutes]);
 
-  const goToDrive = (d) => { setSelectedDrive(d); setSelectedPlace(null); setDayMode(null); setMonthMode(null); setMapEverShown(true); setViewMode('map'); };
-  const goToDay = (dateStr) => { setDayMode(dateStr); setMonthMode(null); setSelectedPlace(null); setMapEverShown(true); setViewMode('map'); };
-  const goToMonth = (monthStr) => { setMonthMode(monthStr); setDayMode(null); setSelectedDrive(null); setSelectedPlace(null); setPositions([]); setMapEverShown(true); setViewMode('map'); };
+  const goToDrive = (d) => { setSelectedDrive(d); setSelectedPlace(null); setDayMode(null); setMonthMode(null); setViewMode('map'); };
+  const goToDay = (dateStr) => { setDayMode(dateStr); setMonthMode(null); setSelectedPlace(null); setViewMode('map'); };
+  const goToMonth = (monthStr) => { setMonthMode(monthStr); setDayMode(null); setSelectedDrive(null); setSelectedPlace(null); setPositions([]); setViewMode('map'); };
 
   const uniqueDays = useMemo(() => {
     if (!drives.length) return [];
@@ -165,7 +165,7 @@ function HistoryInner() {
                 {places.slice(0, 5).map((p, i) => (
                   <button
                     key={p.id}
-                    onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMonthMode(null); setMapEverShown(true); setViewMode('map'); }}
+                    onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMonthMode(null); setViewMode('map'); }}
                     className={`flex-shrink-0 flex flex-col gap-1.5 border rounded-xl px-3 py-3 w-[130px] text-left transition-colors ${
                       selectedPlace?.id === p.id
                         ? 'bg-amber-500/10 border-amber-500/30'
@@ -199,7 +199,7 @@ function HistoryInner() {
                     {places.slice(5).map((p, i) => (
                       <button
                         key={p.id}
-                        onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMonthMode(null); setPlacesExpanded(false); setMapEverShown(true); setViewMode('map'); }}
+                        onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMonthMode(null); setPlacesExpanded(false); setViewMode('map'); }}
                         className="w-full flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.03] transition-colors text-left"
                       >
                         <span className="text-sm font-black w-7 text-center flex-shrink-0 text-zinc-600">{i + 6}</span>
@@ -218,8 +218,7 @@ function HistoryInner() {
         </div>
       )}
 
-      {/* 지도 모드 */}
-      {mapEverShown && (
+      {/* 지도 모드 — 항상 마운트하여 첫 클릭 즉시 렌더 (display 만 토글) */}
       <div className="flex-1 flex flex-col px-4 pb-4" style={{ display: viewMode === 'map' ? 'flex' : 'none' }}>
           <div className="flex items-center justify-between py-2 mb-2">
             <button onClick={() => setViewMode('list')} className="flex items-center gap-1 text-sm text-zinc-400 hover:text-white transition-colors">
@@ -395,7 +394,6 @@ function HistoryInner() {
             )}
           </div>
         </div>
-      )}
 
       {/* 목록 모드 */}
       <div className="flex-1 min-h-0 flex flex-col px-4 pb-4 pt-3" style={{ display: viewMode === 'list' ? 'flex' : 'none' }}>
