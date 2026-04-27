@@ -8,8 +8,8 @@ import { formatDuration, shortAddr } from '@/lib/format';
 import { formatTimeRange, kstDateStr } from '@/lib/kst';
 import DriveMap from '@/app/components/DriveMap';
 import RouteSparklines from '@/app/components/RouteSparklines';
-import DriveListView from '@/app/roadtrips/DriveListView';
-import { useDriveData } from '@/app/roadtrips/useDriveData';
+import DriveListView from '@/app/v1/roadtrips/DriveListView';
+import { useDriveData } from '@/app/v1/roadtrips/useDriveData';
 
 function efficiency(d) {
   if (!d.start_rated_range_km || !d.end_rated_range_km || !d.distance) return null;

@@ -136,14 +136,14 @@ function RecordsCard({ allTime }) {
             </div>,
             <Link
               key={`d-${i}`}
-              href={`/rankings?type=${r.drive.rankType}`}
+              href={`/v1/rankings?type=${r.drive.rankType}`}
               className={`${cellBase} ${r.color} hover:bg-white/[0.04] active:bg-blue-500/10`}
             >
               {r.drive.value}
             </Link>,
             <Link
               key={`y-${i}`}
-              href={`/rankings?type=${r.day.rankType}`}
+              href={`/v1/rankings?type=${r.day.rankType}`}
               className={`${cellBase} ${r.color} hover:bg-white/[0.04] active:bg-blue-500/10`}
             >
               {r.day.value}

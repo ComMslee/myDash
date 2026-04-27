@@ -60,7 +60,7 @@ function RankingsInner() {
       <div className="max-w-2xl mx-auto px-4 py-4 pb-20">
         {/* 헤더 */}
         <div className="flex items-center gap-2 mb-4">
-          <Link href="/drives" className="w-9 h-9 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors">
+          <Link href="/v1/drives" className="w-9 h-9 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
             </svg>
@@ -73,7 +73,7 @@ function RankingsInner() {
           {metricTabs.map(t => (
             <Link
               key={t.key}
-              href={`/rankings?type=${t.key}`}
+              href={`/v1/rankings?type=${t.key}`}
               className={`py-2 text-center rounded-lg text-sm font-semibold transition-colors ${
                 currentMetric === t.metric
                   ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
@@ -88,7 +88,7 @@ function RankingsInner() {
         {/* 기준 탭 */}
         <div className="grid grid-cols-2 gap-1.5 mb-5">
           <Link
-            href={`/rankings?type=${baseSingleKey}`}
+            href={`/v1/rankings?type=${baseSingleKey}`}
             className={`py-1.5 text-center rounded-lg text-xs font-semibold transition-colors ${
               isDrive ? 'bg-zinc-700/70 text-zinc-100' : 'bg-zinc-800/50 text-zinc-500 hover:text-zinc-300'
             }`}
@@ -96,7 +96,7 @@ function RankingsInner() {
             단일 주행
           </Link>
           <Link
-            href={`/rankings?type=${baseDayKey}`}
+            href={`/v1/rankings?type=${baseDayKey}`}
             className={`py-1.5 text-center rounded-lg text-xs font-semibold transition-colors ${
               isDay ? 'bg-zinc-700/70 text-zinc-100' : 'bg-zinc-800/50 text-zinc-500 hover:text-zinc-300'
             }`}
@@ -123,7 +123,7 @@ function RankingsInner() {
                 return (
                   <Link
                     key={it.id}
-                    href={`/roadtrips?id=${it.id}`}
+                    href={`/v1/roadtrips?id=${it.id}`}
                     className="grid grid-cols-[28px_1fr_auto] items-center gap-2 px-4 py-3 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.03] transition-colors"
                   >
                     <span className={`text-sm font-black tabular-nums text-center ${rankColor}`}>{idx + 1}</span>
@@ -178,7 +178,7 @@ function RankingsInner() {
               return (
                 <Link
                   key={it.day}
-                  href={`/roadtrips?date=${it.day}`}
+                  href={`/v1/roadtrips?date=${it.day}`}
                   className="grid grid-cols-[28px_1fr_auto] items-center gap-2 px-4 py-3 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.03] transition-colors"
                 >
                   <span className={`text-sm font-black tabular-nums text-center ${rankColor}`}>{idx + 1}</span>

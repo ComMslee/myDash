@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import HomeChargerCard from '@/app/battery/HomeChargerCard';
+import HomeChargerCard from '@/app/v1/battery/HomeChargerCard';
 import { Spinner } from '@/app/components/PageLayout';
 
 // ── NEW 배지 ──────────────────────────────────────────────────

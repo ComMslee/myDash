@@ -6,12 +6,12 @@ import { usePathname } from 'next/navigation';
 export default function BottomNav() {
   const pathname = usePathname();
 
-  // V2 경로는 자체 네비를 사용
-  if (pathname?.startsWith('/v2')) return null;
+  // V1 경로에서만 V1 네비 표시 (V2는 자체 네비 사용)
+  if (!pathname?.startsWith('/v1')) return null;
 
   const tabs = [
     {
-      href: '/drives',
+      href: '/v1/drives',
       label: '주행',
       // 통계/차트 아이콘
       icon: (
@@ -21,7 +21,7 @@ export default function BottomNav() {
       ),
     },
     {
-      href: '/battery',
+      href: '/v1/battery',
       label: '배터리',
       // 배터리 + 번개
       icon: (
@@ -33,7 +33,7 @@ export default function BottomNav() {
       ),
     },
     {
-      href: '/roadtrips',
+      href: '/v1/roadtrips',
       label: '로드트립',
       // 지도 핀 아이콘
       icon: (
