@@ -120,38 +120,38 @@ export default function SlowChargeCard() {
                   : null;
                 const socDelta = (r.soc_start != null && r.soc_end != null)
                   ? r.soc_end - r.soc_start : null;
+                const tipParts = [
+                  shortAddr(r.location),
+                  endTime ? `${startTime}~${endTime}` : startTime,
+                  r.duration_min ? formatDuration(r.duration_min) : null,
+                  (r.soc_start != null && r.soc_end != null) ? `${r.soc_start}→${r.soc_end}%` : null,
+                  `${r.energy_kwh}kWh`,
+                  r.avg_power ? `평균 ${r.avg_power}kW` : null,
+                  r.max_power ? `최대 ${r.max_power}` : null,
+                  r.min_power ? `최소 ${r.min_power}` : null,
+                ].filter(Boolean);
 
                 return (
-                  <div key={r.id} className="px-4 py-3 border-t border-white/[0.04] space-y-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm text-zinc-300 font-bold tabular-nums flex-shrink-0">{dateLabel}</span>
-                      <span className="text-xs text-zinc-400 truncate text-right">{shortAddr(r.location)}</span>
-                    </div>
-                    <div className="text-xs text-zinc-400 tabular-nums">
-                      <span>{startTime}</span>
-                      {endTime && <><span className="text-zinc-600 mx-1">-</span><span>{endTime}</span></>}
-                      {r.duration_min && <span className="text-zinc-600 ml-1.5">({formatDuration(r.duration_min)})</span>}
-                    </div>
-                    {r.soc_start != null && r.soc_end != null && (
-                      <div className="text-xs text-zinc-400 tabular-nums">
-                        <span>{r.soc_start}%</span>
-                        <span className="text-zinc-600 mx-1">-</span>
-                        <span>{r.soc_end}%</span>
-                        {socDelta != null && <span className="text-zinc-600 ml-1.5">({socDelta >= 0 ? '+' : ''}{socDelta}%)</span>}
-                      </div>
+                  <div
+                    key={r.id}
+                    className="px-4 py-2 border-t border-white/[0.04] flex items-center gap-1.5 text-[11px] tabular-nums"
+                    title={tipParts.join(' · ')}
+                  >
+                    <span className="font-bold text-zinc-300 shrink-0">{dateLabel}</span>
+                    <span className="text-zinc-500 truncate min-w-0 flex-1">{shortAddr(r.location)}</span>
+                    <span className="text-zinc-400 shrink-0">{startTime}{endTime && `~${endTime}`}</span>
+                    {r.duration_min && <span className="text-zinc-600 shrink-0">{formatDuration(r.duration_min)}</span>}
+                    {socDelta != null && (
+                      <span className="text-sky-400 shrink-0">{socDelta >= 0 ? '+' : ''}{socDelta}%</span>
                     )}
-                    <div className="flex items-center gap-3 text-xs tabular-nums flex-wrap pt-0.5">
-                      <span className="text-emerald-400 font-bold">{r.energy_kwh}<span className="text-zinc-600 ml-0.5">kWh</span></span>
-                      {r.avg_power && (
-                        <span className="text-emerald-400 font-bold">{r.avg_power}<span className="text-zinc-600 ml-0.5">kW</span><span className="text-zinc-700 ml-0.5">평균</span></span>
-                      )}
-                      {r.max_power && (
-                        <span className="text-zinc-500">{r.max_power}<span className="text-zinc-700 ml-0.5">최대</span></span>
-                      )}
-                      {r.min_power && (
-                        <span className="text-zinc-500">{r.min_power}<span className="text-zinc-700 ml-0.5">최소</span></span>
-                      )}
-                    </div>
+                    <span className="text-emerald-400 font-bold shrink-0">
+                      {r.energy_kwh}<span className="text-zinc-600 ml-0.5">kWh</span>
+                    </span>
+                    {r.avg_power && (
+                      <span className="text-emerald-400 shrink-0">
+                        {r.avg_power}<span className="text-zinc-600 ml-0.5">kW</span>
+                      </span>
+                    )}
                   </div>
                 );
               })}
