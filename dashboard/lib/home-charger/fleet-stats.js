@@ -157,6 +157,21 @@ export async function fetchFleetStatsDb(statIds, months) {
       dowAllTime[Number(r.dow)] = Number(r.total);
     }
 
+    // 5) 마지막 피크 — 동시 사용 충전기 가짓수 최댓값, 동률이면 가장 최근
+    //    PK가 (stat_id, chger_id, date, hour)라 row 1개 = 충전기 1대가 그 시간에 사용됨
+    const peakRes = await pool.query(
+      `SELECT to_char(date, 'YYYY-MM-DD') AS date_str, hour, COUNT(*)::int AS active
+         FROM charger_usage_daily
+        WHERE stat_id = ANY($1)
+        GROUP BY date, hour
+        ORDER BY active DESC, date DESC, hour DESC
+        LIMIT 1`,
+      [statIds]
+    );
+    const lastPeak = peakRes.rows[0]
+      ? { date: peakRes.rows[0].date_str, hour: Number(peakRes.rows[0].hour), count: Number(peakRes.rows[0].active) }
+      : null;
+
     return {
       hourly,
       hourlyAllTime,
@@ -167,6 +182,7 @@ export async function fetchFleetStatsDb(statIds, months) {
       daysCovered: dateSet.size,
       allTimeTotal,
       months: clampMonths,
+      lastPeak,
     };
   } catch (e) {
     console.warn('[home-charger] fleet stats failed:', e.message);

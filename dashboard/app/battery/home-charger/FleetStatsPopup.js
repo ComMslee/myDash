@@ -3,6 +3,17 @@ import { useEffect, useState } from 'react';
 import { formatEntry } from './fleet-stats-utils';
 import { RankRow, HourlyChart, DowChart } from './FleetStatsCharts';
 
+const DOW_KO = ['일', '월', '화', '수', '목', '금', '토'];
+
+// "2026-04-27" + 19 → "4/27 (월) 19시" (다른 해면 "25/12/30 (화) 19시")
+function formatPeak({ date, hour }) {
+  const [y, m, d] = date.split('-').map(Number);
+  const dow = DOW_KO[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  const sameYear = y === new Date().getFullYear();
+  const head = sameYear ? `${m}/${d}` : `${String(y).slice(2)}/${m}/${d}`;
+  return `${head} (${dow}) ${hour}시`;
+}
+
 // 단지 전체 충전기 현황 상세 팝업 — 모든 섹션 전체 기간 누적
 export default function FleetStatsPopup({ onClose }) {
   const [data, setData] = useState(null);
@@ -141,8 +152,13 @@ export default function FleetStatsPopup({ onClose }) {
 
                 {/* 시간대 — 전체 기간 */}
                 <div>
-                  <div className="text-[11px] text-zinc-400 mb-1.5">
-                    📈 시간대별 (24시간) <span className="text-zinc-600">· 전체 기간</span>
+                  <div className="text-[11px] text-zinc-400 mb-1.5 flex items-center justify-between gap-2">
+                    <span>📈 시간대별 (24시간) <span className="text-zinc-600">· 전체 기간</span></span>
+                    {data.lastPeak && data.lastPeak.count > 0 && (
+                      <span className="text-zinc-500">
+                        🔥 {formatPeak(data.lastPeak)} · {data.lastPeak.count}대
+                      </span>
+                    )}
                   </div>
                   <HourlyChart hourly={data.hourlyAllTime} />
                 </div>
