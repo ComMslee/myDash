@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 
 // ── Leaflet Map (CDN) ─────────────────────────────────────────
 
@@ -36,6 +36,9 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
   const markersRef = useRef([]);
   const placeMarkerRef = useRef(null);
   const highlightRef = useRef(null);
+  // Leaflet 부팅 + 첫 invalidateSize/drawContent 완료 전까지 spinner 노출 게이트.
+  // 첫 클릭 시 회색 빈 컨테이너가 보이던 공백을 로딩 오버레이로 덮는다.
+  const [mapReady, setMapReady] = useState(false);
 
   const initMap = useCallback(() => {
     if (!containerRef.current || mapInstanceRef.current || !window.L) return;
@@ -151,6 +154,7 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
       setTimeout(() => {
         mapInstanceRef.current?.invalidateSize();
         drawContentRef.current?.();
+        setMapReady(true);
       }, 150);
     });
     return () => {
@@ -203,12 +207,12 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
         .leaflet-control-zoom a:hover { background: #2a2a2a !important; }
       `}</style>
       <div ref={containerRef} className="w-full h-full" />
-      {loading && (
+      {(loading || !mapReady) && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
           <div className="w-6 h-6 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
         </div>
       )}
-      {!loading && !placeMarker && (!routes || routes.length === 0) && (!positions || positions.length < 2) && (
+      {!loading && mapReady && !placeMarker && (!routes || routes.length === 0) && (!positions || positions.length < 2) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-300 pointer-events-none bg-black/60 rounded-xl">
           <svg className="w-12 h-12 mb-2 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
