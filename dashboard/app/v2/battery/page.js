@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import HealthScoreCard from '@/app/v1/battery/HealthScoreCard';
-import IdleDrainCard from '@/app/v1/battery/IdleDrainCard';
-import { LevelHabitCard } from '@/app/v1/battery/RecordsHabit';
-import MonthlyChargeCard from '@/app/v1/battery/MonthlyChargeCard';
-import FastChargeCard from '@/app/v1/battery/FastChargeCard';
-import SlowChargeCard from '@/app/v1/battery/SlowChargeCard';
-import ChargeHeatmap from '@/app/v1/battery/ChargeHeatmap';
+import HealthScoreCard from '@/app/v2/battery/HealthScoreCard';
+import IdleDrainCard from '@/app/v2/battery/IdleDrainCard';
+import { LevelHabitCard } from '@/app/v2/battery/RecordsHabit';
+import MonthlyChargeCard from '@/app/v2/battery/MonthlyChargeCard';
+import FastChargeCard from '@/app/v2/battery/FastChargeCard';
+import SlowChargeCard from '@/app/v2/battery/SlowChargeCard';
+import ChargeHeatmap from '@/app/v2/battery/ChargeHeatmap';
 import { Spinner } from '@/app/components/PageLayout';
 
 // ── 누적 충전 통계 — 내 차의 충전 행위 ────────────────────────
