@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { formatEntry } from './fleet-stats-utils';
-import { RankRow, HourlyChart, DowChart } from './FleetStatsCharts';
+import { RankRow, HeatmapChart } from './FleetStatsCharts';
 
 const DOW_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -150,30 +150,22 @@ export default function FleetStatsPopup({ onClose }) {
                   )}
                 </div>
 
-                {/* 시간대 — 전체 기간 */}
+                {/* 시간×요일 히트맵 — 전체 기간 */}
                 <div>
                   <div className="text-[11px] text-zinc-400 mb-1.5 flex items-center justify-between gap-2">
-                    <span>📈 시간대별 (24시간) <span className="text-zinc-600">· 전체 기간</span></span>
+                    <span>📊 시간×요일 히트맵 <span className="text-zinc-600">· 전체 기간</span></span>
                     {data.lastPeak && data.lastPeak.count > 0 && (
                       <span className="text-zinc-500">
                         🔥 {formatPeak(data.lastPeak)} · {data.lastPeak.count}대
                       </span>
                     )}
                   </div>
-                  <HourlyChart hourly={data.hourlyAllTime} />
-                </div>
-
-                {/* 요일 — 전체 기간 */}
-                <div>
-                  <div className="text-[11px] text-zinc-400 mb-1.5">
-                    📅 요일별 활성도 <span className="text-zinc-600">· 전체 기간</span>
-                  </div>
-                  {(data.dowAllTime || []).every(v => v === 0) ? (
+                  {(data.heatmap || []).flat().every(v => v === 0) ? (
                     <div className="text-[11px] text-zinc-600 py-2">
-                      요일별 집계는 일별 수집 시작일부터 가능 — 며칠 뒤 확인
+                      집계는 일별 수집 시작일부터 가능 — 며칠 뒤 확인
                     </div>
                   ) : (
-                    <DowChart dow={data.dowAllTime} />
+                    <HeatmapChart heatmap={data.heatmap} />
                   )}
                 </div>
               </>

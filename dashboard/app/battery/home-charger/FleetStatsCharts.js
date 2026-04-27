@@ -63,6 +63,55 @@ export function RankRow({ icon, label, count, max, isPeak = false, delta = null,
   );
 }
 
+// 7×24 시간×요일 히트맵 — 한 셀 = (DOW, hour) 누적 활성 카운트
+// 색 구간: 0=회색(미사용), 약/중=파랑 농도, 강(>0.75)=주황(피크 강조)
+function heatColor(v, max) {
+  if (v === 0) return 'rgba(63,63,70,0.3)';
+  const r = v / max;
+  if (r > 0.75) return `rgba(245,158,11,${(0.6 + r * 0.35).toFixed(2)})`;
+  if (r > 0.4)  return `rgba(59,130,246,${(0.5 + r * 0.4).toFixed(2)})`;
+  return `rgba(59,130,246,${(0.3 + r * 0.25).toFixed(2)})`;
+}
+
+export function HeatmapChart({ heatmap }) {
+  const flat = heatmap.flat();
+  const max = Math.max(1, ...flat);
+  const total = flat.reduce((s, v) => s + v, 0);
+  const nonZero = flat.filter(v => v > 0).length;
+  const deadCells = 7 * 24 - nonZero;
+  return (
+    <div>
+      {DOW_LABELS.map((lab, d) => (
+        <div
+          key={d}
+          className="grid items-center"
+          style={{ gridTemplateColumns: '18px repeat(24, 1fr)', gap: '1px', marginBottom: '1px' }}
+        >
+          <div className="text-[9px] text-zinc-500 text-center">{lab}</div>
+          {heatmap[d].map((v, h) => (
+            <div
+              key={h}
+              className="h-3 rounded-[1px]"
+              style={{ background: heatColor(v, max) }}
+              title={`${lab} ${h}시: ${v}회`}
+            />
+          ))}
+        </div>
+      ))}
+      <div className="flex justify-between text-[9px] text-zinc-500 tabular-nums mt-1" style={{ paddingLeft: '18px' }}>
+        <span className="font-semibold">0시</span><span>6</span><span>12</span><span>18</span><span>23시</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1.5 text-[10px] text-zinc-500">
+        <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(63,63,70,0.3)' }}/>미사용</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(59,130,246,0.4)' }}/>약</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(59,130,246,0.75)' }}/>중</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(245,158,11,0.95)' }}/>강</span>
+        <span className="ml-auto tabular-nums" title={`${total}회`}>총 {compact(total)}회 · 데드 {deadCells}/168</span>
+      </div>
+    </div>
+  );
+}
+
 // 24시간 오파시티 바 (주행 탭 패턴 스타일) + 시간별 카운트 표시
 export function HourlyChart({ hourly }) {
   const max = Math.max(1, ...hourly);

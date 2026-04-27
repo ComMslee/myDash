@@ -20,6 +20,8 @@ export async function fetchFleetStatsDb(statIds, months) {
     daysCovered: 0,
     allTimeTotal: 0,
     months: clampMonths,
+    lastPeak: null,
+    heatmap: Array.from({ length: 7 }, () => new Array(24).fill(0)),
   };
   try {
     await ensureTable();
@@ -157,7 +159,25 @@ export async function fetchFleetStatsDb(statIds, months) {
       dowAllTime[Number(r.dow)] = Number(r.total);
     }
 
-    // 5) 마지막 피크 — 동시 사용 충전기 가짓수 최댓값, 동률이면 가장 최근
+    // 5) 7×24 히트맵 — (요일×시간) 셀별 활성 행 수 (1시간당 충전기당 최대 1)
+    //    cell value = 그 (DOW, hour)에 활동한 (charger × date) 짝의 누적 수
+    const heatRes = await pool.query(
+      `SELECT EXTRACT(DOW FROM date)::int AS dow, hour, SUM(LEAST(count, 1))::int AS active
+         FROM charger_usage_daily
+        WHERE stat_id = ANY($1)
+        GROUP BY dow, hour`,
+      [statIds]
+    );
+    const heatmap = Array.from({ length: 7 }, () => new Array(24).fill(0));
+    for (const r of heatRes.rows) {
+      const d = Number(r.dow);
+      const h = Number(r.hour);
+      if (d >= 0 && d < 7 && h >= 0 && h < 24) {
+        heatmap[d][h] = Number(r.active);
+      }
+    }
+
+    // 6) 마지막 피크 — 동시 사용 충전기 가짓수 최댓값, 동률이면 가장 최근
     //    PK가 (stat_id, chger_id, date, hour)라 row 1개 = 충전기 1대가 그 시간에 사용됨
     const peakRes = await pool.query(
       `SELECT to_char(date, 'YYYY-MM-DD') AS date_str, hour, COUNT(*)::int AS active
@@ -183,6 +203,7 @@ export async function fetchFleetStatsDb(statIds, months) {
       allTimeTotal,
       months: clampMonths,
       lastPeak,
+      heatmap,
     };
   } catch (e) {
     console.warn('[home-charger] fleet stats failed:', e.message);
