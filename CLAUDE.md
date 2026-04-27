@@ -28,6 +28,7 @@ docker compose build dashboard && docker compose up -d dashboard
 |------|------|
 | [`docs/PROJECT_STRUCTURE.md`](./docs/PROJECT_STRUCTURE.md) | 전체 파일 트리 + 페이지(4탭) 구성 |
 | [`docs/DATABASE.md`](./docs/DATABASE.md) | PostgreSQL 테이블 · 환경 변수 · 공용 상수/유틸 |
+| [`docs/CACHING.md`](./docs/CACHING.md) | DB·캐시 흐름도 · 서버/클라 캐시 정책 · API↔테이블↔캐시 매핑 |
 | [`docs/CODE_CONVENTIONS.md`](./docs/CODE_CONVENTIONS.md) | UI/데이터/컴포넌트 규칙 · 파일 분할 기준 · 커밋 스타일 |
 | [`docs/EV_CHARGER_API.md`](./docs/EV_CHARGER_API.md) | 환경공단 전기차 충전소 API 사용법 |
 | [`docs/DEPLOY.md`](./docs/DEPLOY.md) | CI/CD (GitHub Actions → Lightsail SSH) |
