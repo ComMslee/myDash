@@ -6,7 +6,7 @@ import { useMock } from '@/app/context/mock';
 import { KWH_PER_KM } from '@/lib/constants';
 import { formatDuration, shortAddr } from '@/lib/format';
 import { formatTimeRange, kstDateStr } from '@/lib/kst';
-import DriveMap from '@/app/components/DriveMap';
+import DriveMap, { loadLeaflet } from '@/app/components/DriveMap';
 import RouteSparklines from '@/app/components/RouteSparklines';
 import DriveListView from '@/app/v2/history/DriveListView';
 import { useDriveData } from '@/app/v2/history/useDriveData';
@@ -43,6 +43,9 @@ function HistoryInner() {
       document.body.style.overflow = bodyPrev;
     };
   }, []);
+
+  // Leaflet CDN 사전 로드 — 첫 항목 클릭 시 1~2초 다운로드 지연 제거
+  useEffect(() => { loadLeaflet(() => {}); }, []);
 
   const driveDayStr = (d) => kstDateStr(d.start_date);
 
