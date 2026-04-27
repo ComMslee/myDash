@@ -44,6 +44,9 @@ export async function GET() {
            (SELECT rated_battery_range_km FROM positions
               WHERE car_id = $1 AND rated_battery_range_km IS NOT NULL
               ORDER BY date DESC LIMIT 1) AS rated_battery_range_km,
+           (SELECT odometer FROM positions
+              WHERE car_id = $1 AND odometer IS NOT NULL
+              ORDER BY date DESC LIMIT 1) AS odometer,
            (SELECT date FROM positions WHERE car_id = $1 ORDER BY date DESC LIMIT 1) AS date`,
         [carId]
       ),
@@ -165,6 +168,7 @@ export async function GET() {
       battery_level: currentBattery,
       est_battery_range: pos?.est_battery_range_km ? parseFloat(pos.est_battery_range_km).toFixed(0) : null,
       rated_battery_range: pos?.rated_battery_range_km ? parseFloat(pos.rated_battery_range_km).toFixed(0) : null,
+      odometer: pos?.odometer != null ? parseFloat(pos.odometer) : null,
       state: currentState,
       state_since: stateSince,
       current_drive_start: lastDriveResult.rows[0]?.end_date == null ? lastDriveResult.rows[0]?.start_date ?? null : null,

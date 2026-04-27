@@ -19,8 +19,8 @@ function NewBadge() {
 // ── 차량 KPI 헤더 ─────────────────────────────────────────────
 function VehicleKpiCard({ car, insights }) {
   const odometer = car?.odometer;
-  const recentEff = insights?.sixMonth?.avg_wh_km ?? null;
-  const allTimeEff = insights?.allTime?.avg_wh_km ?? null;
+  const recentEff = insights?.sixMonth?.efficiency_wh_km ?? null;
+  const allTimeEff = insights?.allTime?.efficiency_wh_km ?? null;
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3 flex items-center gap-4">
