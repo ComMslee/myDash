@@ -49,3 +49,8 @@ docker compose build dashboard && docker compose up -d dashboard
 - 커밋: `<type>: <설명>` (`feat`, `fix`, `refactor`, `tune`, `ci`, `docs`, `chore`)
 
 세부 규칙은 [`docs/CODE_CONVENTIONS.md`](./docs/CODE_CONVENTIONS.md) 참고.
+
+## 알려진 함정
+
+- **DriveMap 첫 렌더 폴리라인**: `dashboard/app/components/DriveMap.js`의 mount/visibility 두 useEffect 모두 `setTimeout(150ms) → invalidateSize() + drawContentRef.current?.()` 패턴이 살아 있어야 함. 단순 `invalidateSize()`만 호출하면 fitBounds가 재실행 안 돼 첫 클릭 시 폴리라인이 안 보이는 회귀 발생 (커밋 `7b56817`/`830910a`로 해결).
+- **배포 후 캐시**: GitHub Actions 배포가 완료돼도 브라우저/CDN 캐시 때문에 즉시 반영 안 될 수 있음. 사용자가 "안 됨" 보고 시 하드 리프레시(Ctrl+Shift+R) 확인을 먼저 안내.
