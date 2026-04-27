@@ -161,14 +161,10 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
     drawContent();
   }, [drawContent]);
 
-  // Resize when tab becomes visible — display:none 동안 0×0 으로 초기화된
-  // 맵의 사이즈를 재측정하고, fitBounds 가 무효화됐을 수 있으므로 drawContent 재호출.
+  // Resize when tab becomes visible
   useEffect(() => {
     if (visible && mapInstanceRef.current) {
-      setTimeout(() => {
-        mapInstanceRef.current?.invalidateSize();
-        drawContentRef.current?.();
-      }, 150);
+      setTimeout(() => mapInstanceRef.current?.invalidateSize(), 150);
     }
   }, [visible]);
 
