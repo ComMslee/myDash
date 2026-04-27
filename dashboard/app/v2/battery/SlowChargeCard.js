@@ -36,18 +36,8 @@ export default function SlowChargeCard() {
     return weekOrder.map(wk => weekMap.get(wk));
   }, [records]);
 
-  // 이번 주 항상 펼침; 월요일엔 지난 주도 펼침
-  const [expandedWeeks, setExpandedWeeks] = useState(() => {
-    const today = kstDateStr(Date.now());
-    const thisWeek = kstMondayStr(today + 'T00:00:00Z');
-    const dow = kstDayOfWeek();
-    const set = new Set([thisWeek]);
-    if (dow === 1) {
-      const lastWeek = kstMondayStr(new Date(thisWeek + 'T00:00:00Z').getTime() - 7 * 86400000);
-      set.add(lastWeek);
-    }
-    return set;
-  });
+  // 기본 모두 접힘 — 사용자가 원하는 주만 펼침
+  const [expandedWeeks, setExpandedWeeks] = useState(() => new Set());
   const toggleWeek = (wk) => setExpandedWeeks(prev => {
     const next = new Set(prev);
     if (next.has(wk)) next.delete(wk); else next.add(wk);

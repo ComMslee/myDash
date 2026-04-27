@@ -36,7 +36,7 @@ const tabs = [
   },
   {
     href: '/v2/chargers',
-    label: '충전소',
+    label: '집 충전소',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
