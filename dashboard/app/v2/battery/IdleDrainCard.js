@@ -10,11 +10,15 @@ import { useIdleDrainDays } from './useIdleDrainDays';
 const CLIMATE_BG = 'rgba(56,189,248,0.5)';
 const SENTRY_BG = 'rgba(232,121,249,0.5)';
 
-// idle 전체 대비 퍼센트 — 1% 미만이면 null
-function pctOf(minutes, idleHours) {
+// 드레인 용량 중 공조/센트리가 차지한 추정 기여 % — 시간 점유율 × 드레인%
+// (시간 가중 단순 모델: 그 구간이 다른 구간과 동일 속도로 빠진다는 근사)
+// 0.05% 미만은 null, 1자리 소수.
+function dropSharePct(minutes, idleHours, drop) {
   if (!idleHours || idleHours <= 0) return null;
-  const pct = Math.round((minutes / (idleHours * 60)) * 100);
-  return pct >= 1 ? pct : null;
+  if (drop == null || drop <= 0) return null;
+  const share = (minutes / (idleHours * 60)) * drop;
+  if (share < 0.05) return null;
+  return Math.round(share * 10) / 10;
 }
 
 // 3분 미만 노이즈 제외 임계(ms)
@@ -78,7 +82,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
 
   // 전체 총계 + 일자별 파생치 + 주별 집계 — grouped 변경 시에만 재계산
   const { totalClimatePct, totalSentryPct, totalClimateMin, totalSentryMin, dayCompute, weeks } = useMemo(() => {
-    let totalIdleH = 0, totalClimateMin = 0, totalSentryMin = 0;
+    let totalIdleH = 0, totalDropRaw = 0, totalClimateMin = 0, totalSentryMin = 0;
     const dayCompute = new Map();
     const weekMap = new Map();
     const weekOrder = [];
@@ -94,16 +98,18 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
         daySentryMin += sumSpansMin(spans);
       }
       totalIdleH += dayIdleH;
+      totalDropRaw += dayDropRaw;
       totalClimateMin += dayClimateMin;
       totalSentryMin += daySentryMin;
+      const dayDrop = Math.round(dayDropRaw * 10) / 10;
       dayCompute.set(key, {
         items,
         dayIdleH,
-        dayDrop: Math.round(dayDropRaw * 10) / 10,
+        dayDrop,
         dayClimateMin,
         daySentryMin,
-        dayClimatePct: pctOf(dayClimateMin, dayIdleH),
-        daySentryPct: pctOf(daySentryMin, dayIdleH),
+        dayClimatePct: dropSharePct(dayClimateMin, dayIdleH, dayDrop),
+        daySentryPct: dropSharePct(daySentryMin, dayIdleH, dayDrop),
         sentrySpansList,
       });
 
@@ -123,20 +129,22 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
     }
     const weeks = weekOrder.map(wk => {
       const w = weekMap.get(wk);
+      const avgDrainPerDay = w.weekIdleH > 0 ? Math.round(w.weekDropRaw / w.weekIdleH * 24 * 10) / 10 : 0;
       return {
         weekKey: wk,
         dayKeys: w.dayKeys,
         avgIdleH: w.dayKeys.length > 0 ? w.weekIdleH / w.dayKeys.length : 0,
-        avgDrainPerDay: w.weekIdleH > 0 ? Math.round(w.weekDropRaw / w.weekIdleH * 24 * 10) / 10 : 0,
-        weekClimatePct: pctOf(w.weekClimateMin, w.weekIdleH),
-        weekSentryPct: pctOf(w.weekSentryMin, w.weekIdleH),
+        avgDrainPerDay,
+        weekClimatePct: dropSharePct(w.weekClimateMin, w.weekIdleH, avgDrainPerDay),
+        weekSentryPct: dropSharePct(w.weekSentryMin, w.weekIdleH, avgDrainPerDay),
         weekClimateMin: w.weekClimateMin,
         weekSentryMin: w.weekSentryMin,
       };
     });
+    const totalAvgDrainPerDay = totalIdleH > 0 ? Math.round(totalDropRaw / totalIdleH * 24 * 10) / 10 : 0;
     return {
-      totalClimatePct: pctOf(totalClimateMin, totalIdleH),
-      totalSentryPct: pctOf(totalSentryMin, totalIdleH),
+      totalClimatePct: dropSharePct(totalClimateMin, totalIdleH, totalAvgDrainPerDay),
+      totalSentryPct: dropSharePct(totalSentryMin, totalIdleH, totalAvgDrainPerDay),
       totalClimateMin,
       totalSentryMin,
       dayCompute,
@@ -305,8 +313,8 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                     isZero ? '0%' : `-${fmtDrop(r.soc_drop)}%`,
                   ];
                   if (isPreCharge) titleParts.push('⚡충전 전 대기');
-                  const itemClimatePct = pctOf(climateMin, r.idle_hours);
-                  const itemSentryPct = pctOf(itemSentryMin, r.idle_hours);
+                  const itemClimatePct = dropSharePct(climateMin, r.idle_hours, r.soc_drop);
+                  const itemSentryPct = dropSharePct(itemSentryMin, r.idle_hours, r.soc_drop);
                   if (itemClimatePct != null) titleParts.push(`🌀 공조 ${itemClimatePct}%`);
                   if (itemSentryPct != null) titleParts.push(`🛡 센트리 의심 ${itemSentryPct}%`);
                   return (
