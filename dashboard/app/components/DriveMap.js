@@ -140,13 +140,18 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
   const drawContentRef = useRef(drawContent);
   useEffect(() => { drawContentRef.current = drawContent; }, [drawContent]);
 
-  // Init map once on mount
+  // Init map once on mount — invalidateSize 후 drawContent 를 한 번 더 실행해
+  // 첫 마운트(컨테이너 layout 미정착 / Leaflet 내부 size 캐시 어긋남) 시
+  // polyline 이 화면에 그려지지 않던 케이스 보강.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     loadLeaflet(() => {
       initMap();
       drawContentRef.current();
-      setTimeout(() => mapInstanceRef.current?.invalidateSize(), 150);
+      setTimeout(() => {
+        mapInstanceRef.current?.invalidateSize();
+        drawContentRef.current?.();
+      }, 150);
     });
     return () => {
       mapInstanceRef.current?.remove();
