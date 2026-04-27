@@ -19,6 +19,7 @@ tesla_auth/
 .omc/
 .claude/*
 !.claude/skills/
+!.claude/settings.json
 dashboard/.omc/
 
 # ─── Windows PowerShell 스크립트 (개인용) ─────────────────
