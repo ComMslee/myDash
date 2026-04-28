@@ -69,11 +69,14 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
   const elapsed = elapsedLabel(c, now);
   const peak = peakHourOf(hourly);
 
-  const ringClass =
-    highlight?.tier === 'top1'  ? 'ring-2 ring-yellow-200 shadow-[0_0_8px_rgba(254,240,138,0.35)]' :
-    highlight?.tier === 'top3'  ? 'ring-[1.5px] ring-amber-300' :
-    highlight?.tier === 'top10' ? 'ring-1 ring-amber-400/40' :
-    '';
+  const ringClass = highlight?.rank === 1
+    ? 'ring-2 ring-yellow-200 shadow-[0_0_8px_rgba(254,240,138,0.35)]'
+    : '';
+
+  const medal =
+    highlight?.rank === 1 ? '🥇' :
+    highlight?.rank === 2 ? '🥈' :
+    highlight?.rank === 3 ? '🥉' : null;
 
   // 하단 info 텍스트
   const bottomText = isCharging ? elapsed
@@ -90,14 +93,28 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
 
   return (
     <div
-      className={`relative w-14 h-[60px] rounded-[12px] overflow-hidden ${meta.body} border-2 ${meta.border} ${ringClass} cursor-help`}
+      className={`relative w-14 h-[60px] rounded-[12px] ${meta.body} border-2 ${meta.border} ${ringClass} cursor-help`}
       title={titleParts.join(' · ')}
     >
       {isCharging && fillPct > 0 && (
-        <div
-          className={`absolute bottom-0 left-0 right-0 ${meta.fill} transition-[height] duration-500 ease-out`}
-          style={{ height: `${fillPct}%` }}
-        />
+        <div className="absolute inset-0 rounded-[10px] overflow-hidden pointer-events-none">
+          <div
+            className={`absolute bottom-0 left-0 right-0 ${meta.fill} transition-[height] duration-500 ease-out`}
+            style={{ height: `${fillPct}%` }}
+          />
+        </div>
+      )}
+      {medal && (
+        <div className="absolute -top-1.5 -right-1.5 z-20 text-[14px] leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
+          {medal}
+        </div>
+      )}
+      {!medal && highlight && (
+        <div className="absolute -top-1 -right-1 z-20">
+          <span className="bg-amber-400 text-amber-950 rounded-full min-w-[14px] h-[14px] px-1 text-[9px] font-bold leading-none tabular-nums shadow-sm flex items-center justify-center">
+            {highlight.rank}
+          </span>
+        </div>
       )}
       <div className={`relative z-10 pt-1 text-center text-base font-bold tabular-nums ${meta.num}`}>
         {numberPrefix}{label}
