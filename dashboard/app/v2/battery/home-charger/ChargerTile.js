@@ -90,7 +90,7 @@ export function UnifiedCell({ c, highlight, count, hourly, now }) {
 
   return (
     <div
-      className={`relative w-11 h-[60px] rounded-[12px] overflow-hidden bg-white/[0.04] border-2 ${meta.border} ${ringClass} cursor-help`}
+      className={`relative w-14 h-[60px] rounded-[12px] overflow-hidden ${meta.body} border-2 ${meta.border} ${ringClass} cursor-help`}
       title={titleParts.join(' · ')}
     >
       {isCharging && fillPct > 0 && (
@@ -99,10 +99,10 @@ export function UnifiedCell({ c, highlight, count, hourly, now }) {
           style={{ height: `${fillPct}%` }}
         />
       )}
-      <div className="relative z-10 pt-1 text-center text-sm font-bold tabular-nums text-zinc-100">
+      <div className={`relative z-10 pt-1 text-center text-base font-bold tabular-nums ${meta.num}`}>
         {label}
       </div>
-      <div className="absolute bottom-0.5 left-0 right-0 z-10 text-[9px] text-center tabular-nums text-zinc-400">
+      <div className="absolute bottom-0.5 left-0 right-0 z-10 text-[10px] text-center tabular-nums text-zinc-400">
         {bottomText}
       </div>
     </div>
