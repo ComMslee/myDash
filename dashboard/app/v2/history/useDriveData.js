@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { MOCK_DATA } from '@/app/context/mock';
+import { dbgLog } from '@/lib/dbg';
 
 // 동시 요청 상한 헬퍼 — N개 워커가 cursor를 공유하며 items 소비
 async function fetchInChunks(items, fn, concurrency = 6) {
@@ -68,8 +69,10 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
 
   // drives + places 초기 로드
   useEffect(() => {
+    dbgLog(`[drives effect] initId=${initialId ?? 'null'} initDate=${initialDate ?? 'null'} isMock=${isMock} refresh=${refreshSignal}`);
     if (isMock) {
       const list = MOCK_DATA.drives.recent_drives;
+      dbgLog(`[drives effect] mock branch list=${list.length}`);
       setDrives(list);
       setPlaces(MOCK_DATA.frequentPlaces);
       setLoadingDrives(false);
@@ -86,53 +89,51 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
       const placesData = placesResult.status === 'fulfilled' ? placesResult.value : { places: [] };
       if (drivesResult.status === 'rejected') setError('데이터를 불러오지 못했습니다.');
       const list = drivesData.recent_drives || [];
+      const pre = list.length > 0 ? pickPreselect(list) : null;
+      dbgLog(`[drives fetch] OK list=${list.length} preselect=${pre?.id ?? 'null'}`);
       setDrives(list);
       setPlaces(placesData.places || []);
       setLoadingDrives(false);
-      if (list.length > 0) {
-        setSelectedDrive(pickPreselect(list));
-      }
+      if (pre) setSelectedDrive(pre);
     });
   }, [isMock, refreshSignal, initialId, initialDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 단일 주행 경로 로드
   useEffect(() => {
-    if (dayMode || monthMode) return; // 일/월 모드에서는 단일 경로 미로딩
-    if (!selectedDrive) return;
+    dbgLog(`[route effect] selDrive=${selectedDrive?.id ?? 'null'} dayMode=${dayMode ?? 'null'} monthMode=${monthMode ?? 'null'} isMock=${isMock}`);
+    if (dayMode || monthMode) { dbgLog(`[route effect] EXIT dayMode/monthMode`); return; }
+    if (!selectedDrive) { dbgLog(`[route effect] EXIT no selectedDrive`); return; }
     if (isMock) {
+      dbgLog(`[route effect] mock branch`);
       setPositions(MOCK_DATA.routePositions);
       setRouteData({ positions: MOCK_DATA.routePositions, maxSpeedKmh: 127, speedBands: { jam: 12, slow: 35, flow: 28, fast: 25 } });
       return;
     }
+    dbgLog(`[route effect] setLoadingRoute(true) → fetch driveId=${selectedDrive.id}`);
     setLoadingRoute(true);
-    // setPositions([]) / setRouteData(null) 의도적으로 제거 — 새 fetch 도착 전까지 기존
-    // polyline 유지. 첫 진입 시 router cache 로 직전 drive 의 positions 가 이미 props 에
-    // 들어와있는 상태에서 빈 배열로 reset 하면 fitBounds animate(default true) 가 cancel
-    // 되며 view 가 default(서울) 에 고정되던 회귀.
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
     abortRef.current = controller;
     const driveId = selectedDrive.id;
     fetch(`/api/route-map?driveId=${driveId}`, { signal: controller.signal })
-      .then(r => r.json())
+      .then(r => { dbgLog(`[route fetch] HTTP ${r.status} driveId=${driveId}`); return r.json(); })
       .then(data => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) { dbgLog(`[route fetch] ABORTED post-json driveId=${driveId}`); return; }
         const pos = data.positions || [];
-        if (pos.length < 2) {
-          console.warn(`[route-map] driveId=${driveId} positions=${pos.length} — no route data`);
-        }
+        dbgLog(`[route fetch] OK driveId=${driveId} positions=${pos.length}`);
         setPositions(pos);
         setRouteData(data);
         setLoadingRoute(false);
       })
       .catch(e => {
+        dbgLog(`[route fetch] CATCH ${e.name}: ${e.message?.slice(0, 40)}`);
         if (e.name !== 'AbortError') {
           setPositions([]);
           setRouteData(null);
           setLoadingRoute(false);
         }
       });
-    return () => { controller.abort(); };
+    return () => { dbgLog(`[route effect] CLEANUP abort driveId=${driveId}`); controller.abort(); };
   }, [selectedDrive?.id, isMock, refreshSignal, dayMode, monthMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 일 모드 — 해당 일의 모든 주행 경로 병렬 로드

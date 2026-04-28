@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useCallback, useState } from 'react';
+import { dbgRead, dbgSubscribe } from '@/lib/dbg';
 
 // ── Leaflet Map (CDN) ─────────────────────────────────────────
 
@@ -43,6 +44,8 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
   // ── DEBUG (임시) ───────────────────────────────────────────
   // 첫 진입 polyline 미표시 회귀 진단용. 우상단 오버레이에 lifecycle 이벤트 로그.
   const [dbg, setDbg] = useState([]);
+  const [globalDbg, setGlobalDbg] = useState(() => dbgRead());
+  useEffect(() => dbgSubscribe(() => setGlobalDbg(dbgRead())), []);
   const t0Ref = useRef(typeof performance !== 'undefined' ? performance.now() : 0);
   const log = useCallback((msg) => {
     const t = Math.round((typeof performance !== 'undefined' ? performance.now() : 0) - t0Ref.current);
@@ -271,7 +274,7 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
       <div
         style={{
           position: 'absolute', top: 4, right: 4, zIndex: 1000,
-          maxWidth: 'min(92%, 380px)', maxHeight: '60%', overflowY: 'auto',
+          maxWidth: 'min(92%, 420px)', maxHeight: '85%', overflowY: 'auto',
           background: 'rgba(0,0,0,0.78)', color: '#9fffa3',
           fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 9, lineHeight: '1.25',
           padding: '4px 6px', borderRadius: 6, whiteSpace: 'pre', pointerEvents: 'auto',
@@ -279,7 +282,8 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
       >
         {(_debugInfo ? `[hook] drives=${_debugInfo.drivesLen} loadingDrives=${_debugInfo.loadingDrives} selectedId=${_debugInfo.selectedId} loadingRoute=${_debugInfo.loadingRoute} posLen=${_debugInfo.posLen}\n[url] initId=${_debugInfo.initialId} initDate=${_debugInfo.initialDate} dayMode=${_debugInfo.dayMode} monthMode=${_debugInfo.monthMode}\n` : '')
           + `pos=${positions?.length ?? 0} routes=${routes?.length ?? '∅'} place=${!!placeMarker} loading=${!!loading} mapReady=${mapReady}\n`
-          + dbg.join('\n')}
+          + '─── hook events ───\n' + globalDbg.slice(-20).join('\n')
+          + '\n─── map events ───\n' + dbg.join('\n')}
       </div>
     </div>
   );
