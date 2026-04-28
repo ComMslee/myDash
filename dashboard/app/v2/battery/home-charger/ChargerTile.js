@@ -69,9 +69,11 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
   const elapsed = elapsedLabel(c, now);
   const peak = peakHourOf(hourly);
 
-  const ringClass = highlight?.rank === 1
-    ? 'ring-2 ring-yellow-200 shadow-[0_0_8px_rgba(254,240,138,0.35)]'
-    : '';
+  const ringClass =
+    highlight?.tier === 'top1'  ? 'ring-2 ring-yellow-200 shadow-[0_0_8px_rgba(254,240,138,0.35)]' :
+    highlight?.tier === 'top3'  ? 'ring-2 ring-amber-300' :
+    highlight?.tier === 'top10' ? 'ring-2 ring-amber-400/60' :
+    '';
 
   const medal =
     highlight?.rank === 1 ? '🥇' :
@@ -105,15 +107,8 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
         </div>
       )}
       {medal && (
-        <div className="absolute -top-1.5 -right-1.5 z-20 text-[14px] leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
+        <div className="absolute -top-2 -right-2 z-20 text-[18px] leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
           {medal}
-        </div>
-      )}
-      {!medal && highlight && (
-        <div className="absolute -top-1 -right-1 z-20">
-          <span className="bg-amber-400 text-amber-950 rounded-full min-w-[14px] h-[14px] px-1 text-[9px] font-bold leading-none tabular-nums shadow-sm flex items-center justify-center">
-            {highlight.rank}
-          </span>
         </div>
       )}
       <div className={`relative z-10 pt-1 text-center text-base font-bold tabular-nums ${meta.num}`}>
