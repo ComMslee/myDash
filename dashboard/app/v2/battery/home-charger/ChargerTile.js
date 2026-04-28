@@ -107,7 +107,7 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
         </div>
       )}
       {medal && (
-        <div className="absolute -top-2.5 -right-2.5 z-20 text-[22px] leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+        <div className="absolute -top-3 -right-3 z-20 text-[26px] leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
           {medal}
         </div>
       )}
@@ -117,7 +117,7 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
       <div className={`absolute bottom-0.5 left-0 right-0 z-10 text-center tabular-nums ${
         isCharging ? 'text-[10px] font-semibold text-zinc-100'
         : (c.stat === '9' || c.stat === '1') ? 'text-[10px] text-zinc-500'
-        : 'text-[8px] text-zinc-500'
+        : 'text-[7px] text-zinc-500'
       }`}>
         {bottomText}
       </div>
