@@ -20,7 +20,7 @@ export async function GET() {
 
     // Find active charging process (no end_date)
     const activeResult = await pool.query(
-      `SELECT id, start_date, charge_energy_added
+      `SELECT id, start_date, charge_energy_added, start_battery_level
        FROM charging_processes
        WHERE car_id = $1 AND end_date IS NULL
        ORDER BY start_date DESC
@@ -54,6 +54,7 @@ export async function GET() {
         charger_power: detail.charger_power ? parseFloat(detail.charger_power) : null,
         time_to_full_charge: null,
         battery_level: detail.battery_level ?? null,
+        start_battery_level: activeProcess.start_battery_level ?? null,
         charge_limit_soc: null,
       });
     }
