@@ -50,7 +50,7 @@ export function RankRow({ icon, label, count, max, isPeak = false, delta = null,
         style={{ background: color, opacity: count === 0 ? 0.1 : 0.2 + ratio * 0.8 }}
         title={`${label}: ${count}회`}
       />
-      <span className="text-zinc-500 w-4 text-center shrink-0">{icon}</span>
+      <span className="text-xs font-semibold text-zinc-400 w-5 text-center shrink-0 tabular-nums">{icon}</span>
       <span className="text-zinc-200 flex-1 truncate">{label}</span>
       <DeltaBadge delta={delta} isNew={isNew} prevRank={prevRank} />
       <span

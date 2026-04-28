@@ -137,8 +137,8 @@ function FleetStatsPanel() {
                 )}
                 {expanded && restN.length > 0 && (
                   <div
-                    className="mt-1 grid grid-cols-4 grid-flow-col gap-x-2 gap-y-0.5"
-                    style={{ gridTemplateRows: `repeat(${Math.ceil(restN.length / 4)}, auto)` }}
+                    className="mt-1 grid grid-cols-3 grid-flow-col gap-x-2 gap-y-0.5"
+                    style={{ gridTemplateRows: `repeat(${Math.ceil(restN.length / 3)}, auto)` }}
                   >
                     {restN.map((e, i) => (
                       <RankRow
