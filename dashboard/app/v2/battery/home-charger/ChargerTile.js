@@ -1,7 +1,7 @@
 // 집충전기 셀/타일 프리미티브 — UnifiedCell, TileBox, StatusBadges, MiniGrid
 
-import { ID_OFFSET, STAT_META, STATUS_ORDER } from './constants';
-import { elapsedLabel, chargingFillPct } from './utils';
+import { ID_OFFSET, OVERDUE_THRESHOLD_H, STAT_META, STATUS_ORDER } from './constants';
+import { chargingFillPct, chargingHours, elapsedLabel } from './utils';
 
 // 상태별 카운트 배지 — 헤더/요약에서 공용
 // size: 'md'(헤더) | 'sm'(P3 요약)
@@ -60,6 +60,7 @@ export function MiniGrid({ chargers, statId, ranks, usage, now, className = '' }
 //   ring:     순위 (top1=골드 2px+glow / top3=앰버 1.5px / top10=앰버 1px 옅음)
 //   inner fill: 충전중에만 (지수 점근 곡선 — utils.chargingFillPct, 아래→위)
 //   상단: 번호 / 하단: 충전시간(충전중) | 누적회수(가용) | – (장애)
+//   14h+: 비정상 점유 경고 — fill/외곽선/하단시간 amber 톤 전환
 export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '' }) {
   const meta = STAT_META[c.stat] || STAT_META['9'];
   const localId = ID_OFFSET + Number(c.chgerId);
@@ -68,6 +69,13 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
   const fillPct = chargingFillPct(c, now);
   const elapsed = elapsedLabel(c, now);
   const peak = peakHourOf(hourly);
+  const overdue = isCharging && chargingHours(c, now) >= OVERDUE_THRESHOLD_H;
+  const fillCls = overdue ? 'bg-amber-400/45' : meta.fill;
+  const borderCls = overdue ? 'border-amber-300' : meta.border;
+  const bottomCls = isCharging
+    ? overdue ? 'text-[10px] font-bold text-amber-300' : 'text-[10px] font-semibold text-zinc-100'
+    : (c.stat === '9' || c.stat === '1') ? 'text-[10px] text-zinc-500'
+    : 'text-[6px] text-zinc-500';
 
   const ringClass =
     highlight?.tier === 'top1'  ? 'ring-4 ring-yellow-200 shadow-[0_0_8px_rgba(254,240,138,0.35)]' :
@@ -89,19 +97,20 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
   // 호버 툴팁 — 정보 손실 방지용 풀버전 유지
   const titleParts = [`${localId} · ${meta.label}`];
   if (elapsed) titleParts.push(`${elapsed} 경과`);
+  if (overdue) titleParts.push(`⚠ ${OVERDUE_THRESHOLD_H}h 초과 점유`);
   titleParts.push(count > 0 ? `누적 ${count}회 사용` : '미사용');
   if (peak) titleParts.push(`피크 ${peak.hour}시 (${peak.count}회)`);
   if (highlight) titleParts.push(`${highlight.rank}위${highlight.tier !== 'top10' ? ' · 자주 사용' : ''}`);
 
   return (
     <div
-      className={`relative w-[52px] h-[60px] rounded-[12px] ${meta.body} border-2 ${meta.border} ${ringClass} cursor-help`}
+      className={`relative w-[52px] h-[60px] rounded-[12px] ${meta.body} border-2 ${borderCls} ${ringClass} cursor-help`}
       title={titleParts.join(' · ')}
     >
       {isCharging && fillPct > 0 && (
         <div className="absolute inset-0 rounded-[10px] overflow-hidden pointer-events-none">
           <div
-            className={`absolute bottom-0 left-0 right-0 ${meta.fill} transition-[height] duration-500 ease-out`}
+            className={`absolute bottom-0 left-0 right-0 ${fillCls} transition-[height] duration-500 ease-out`}
             style={{ height: `${fillPct}%` }}
           />
         </div>
@@ -114,11 +123,7 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
       <div className={`relative z-10 pt-1 text-center text-lg font-bold tabular-nums ${meta.num}`}>
         {numberPrefix}{label}
       </div>
-      <div className={`absolute bottom-0.5 left-0 right-0 z-10 text-center tabular-nums ${
-        isCharging ? 'text-[10px] font-semibold text-zinc-100'
-        : (c.stat === '9' || c.stat === '1') ? 'text-[10px] text-zinc-500'
-        : 'text-[6px] text-zinc-500'
-      }`}>
+      <div className={`absolute bottom-0.5 left-0 right-0 z-10 text-center tabular-nums ${bottomCls}`}>
         {bottomText}
       </div>
     </div>
