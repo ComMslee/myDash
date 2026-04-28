@@ -137,6 +137,24 @@ export default function GlobalHeader() {
         }}
         aria-hidden="true"
       />
+      {/* 충전 시작 SOC 세로선 — 게이지 위에 시작점 표시 (delta 가시화) */}
+      {isCharging && charging?.start_battery_level != null && charging.start_battery_level < lvl && (
+        <div
+          className="absolute inset-y-0 w-px bg-emerald-300/70 pointer-events-none"
+          style={{ left: `${charging.start_battery_level}%` }}
+          aria-hidden="true"
+        />
+      )}
+      {/* 충전 진행 화살표 — 현재 SOC 위치에 진행 방향 시각화 */}
+      {isCharging && charging?.start_battery_level != null && charging.start_battery_level < lvl && (
+        <span
+          className="absolute top-1/2 -translate-y-1/2 text-emerald-300 text-[10px] font-bold pointer-events-none -translate-x-full pr-0.5"
+          style={{ left: `${lvl}%` }}
+          aria-hidden="true"
+        >
+          ▶
+        </span>
+      )}
       {/* 충전 목표 지점 세로선 */}
       {isCharging && limitLvl && limitLvl > lvl && (
         <div
