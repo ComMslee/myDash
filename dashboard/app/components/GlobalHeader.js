@@ -139,11 +139,20 @@ export default function GlobalHeader() {
       />
       {/* 충전 시작 SOC 세로선 — 게이지 위에 시작점 표시 (delta 가시화) */}
       {isCharging && charging?.start_battery_level != null && charging.start_battery_level < lvl && (
-        <div
-          className="absolute inset-y-0 w-px bg-emerald-300/70 pointer-events-none"
-          style={{ left: `${charging.start_battery_level}%` }}
-          aria-hidden="true"
-        />
+        <>
+          <div
+            className="absolute inset-y-0 w-0.5 bg-emerald-300 shadow-[0_0_4px_rgba(110,231,183,0.6)] pointer-events-none z-10"
+            style={{ left: `${charging.start_battery_level}%` }}
+            aria-hidden="true"
+          />
+          <span
+            className="absolute top-0.5 text-[9px] font-semibold tabular-nums text-emerald-200 pointer-events-none -translate-x-1/2 z-10"
+            style={{ left: `${charging.start_battery_level}%` }}
+            aria-hidden="true"
+          >
+            {charging.start_battery_level}
+          </span>
+        </>
       )}
       {/* 충전 진행 화살표 — 현재 SOC 위치에 진행 방향 시각화 */}
       {isCharging && charging?.start_battery_level != null && charging.start_battery_level < lvl && (
