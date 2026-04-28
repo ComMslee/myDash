@@ -70,9 +70,9 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
   const peak = peakHourOf(hourly);
 
   const ringClass =
-    highlight?.tier === 'top1'  ? 'ring-2 ring-yellow-200 shadow-[0_0_8px_rgba(254,240,138,0.35)]' :
-    highlight?.tier === 'top3'  ? 'ring-2 ring-amber-300' :
-    highlight?.tier === 'top10' ? 'ring-2 ring-amber-400/60' :
+    highlight?.tier === 'top1'  ? 'ring-4 ring-yellow-200 shadow-[0_0_8px_rgba(254,240,138,0.35)]' :
+    highlight?.tier === 'top3'  ? 'ring-4 ring-amber-300' :
+    highlight?.tier === 'top10' ? 'ring-4 ring-amber-400/60' :
     '';
 
   const medal =
