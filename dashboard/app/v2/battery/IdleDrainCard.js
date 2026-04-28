@@ -195,7 +195,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
         <div className="text-center py-3 border-r border-white/[0.06]">
           <div className="text-[10px] text-zinc-600 mb-1">일평균 손실</div>
           <div className="text-sm font-extrabold tabular-nums text-amber-400">
-            {avgDrainPerDay}%
+            {avgDrainPerDay}%<span className="text-[9px] font-normal text-zinc-600 ml-0.5">/일</span>
             {totalClimatePct != null && (
               <span className="text-[10px] font-normal text-sky-700 opacity-80 ml-1" title={`공조 작동 ${Math.round(totalClimateMin)}분`}>
                 <span aria-hidden="true">🌀</span>{totalClimatePct}%
@@ -207,7 +207,6 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
               </span>
             )}
           </div>
-          <div className="text-[9px] text-zinc-600 mt-0.5">/일</div>
         </div>
         <div className="text-center py-3">
           <div className="text-[10px] text-zinc-600 mb-1">평균 대기</div>
