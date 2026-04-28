@@ -70,9 +70,9 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
   const peak = peakHourOf(hourly);
 
   const ringClass =
-    highlight?.tier === 'top1'  ? 'ring ring-yellow-200 shadow-[0_0_8px_rgba(254,240,138,0.35)]' :
-    highlight?.tier === 'top3'  ? 'ring ring-amber-300' :
-    highlight?.tier === 'top10' ? 'ring ring-amber-400/60' :
+    highlight?.tier === 'top1'  ? 'ring-4 ring-yellow-200 shadow-[0_0_8px_rgba(254,240,138,0.35)]' :
+    highlight?.tier === 'top3'  ? 'ring-4 ring-amber-300' :
+    highlight?.tier === 'top10' ? 'ring-4 ring-amber-400/60' :
     '';
 
   const medal =
@@ -95,7 +95,7 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
 
   return (
     <div
-      className={`relative w-14 h-[60px] rounded-[12px] ${meta.body} border-2 ${meta.border} ${ringClass} cursor-help`}
+      className={`relative w-[53px] h-[60px] rounded-[12px] ${meta.body} border-2 ${meta.border} ${ringClass} cursor-help`}
       title={titleParts.join(' · ')}
     >
       {isCharging && fillPct > 0 && (
