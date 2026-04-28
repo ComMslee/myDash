@@ -137,12 +137,12 @@ function MonthInsightsCard({ insights }) {
   const Row = ({ iconSvg, iconColor, label, valueNode, dateStr, driveId }) => (
     <button
       onClick={() => router.push(`/v2/history?id=${driveId}`)}
-      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] active:bg-blue-500/10 transition-colors text-left border-b border-white/[0.04] last:border-0"
+      className="w-full flex items-center gap-2 px-3 py-3 hover:bg-white/[0.03] active:bg-blue-500/10 transition-colors text-left border-b border-white/[0.04] last:border-0"
     >
       <span className={`flex-shrink-0 ${iconColor}`}>{iconSvg}</span>
-      <span className="text-xs text-zinc-400 font-semibold flex-shrink-0 w-16">{label}</span>
-      <span className="flex-1 text-right tabular-nums">{valueNode}</span>
-      <span className="text-[11px] text-zinc-500 tabular-nums flex-shrink-0 w-12 text-right">{dateStr}</span>
+      <span className="text-xs text-zinc-400 font-semibold flex-shrink-0 whitespace-nowrap">{label}</span>
+      <span className="flex-1 min-w-0 text-right tabular-nums whitespace-nowrap">{valueNode}</span>
+      <span className="text-[11px] text-zinc-500 tabular-nums flex-shrink-0 text-right whitespace-nowrap">{dateStr}</span>
       <svg className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
       </svg>
