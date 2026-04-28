@@ -40,6 +40,27 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
   // 첫 클릭 시 회색 빈 컨테이너가 보이던 공백을 로딩 오버레이로 덮는다.
   const [mapReady, setMapReady] = useState(false);
 
+  // ── DEBUG (임시) ───────────────────────────────────────────
+  // 첫 진입 polyline 미표시 회귀 진단용. 우상단 오버레이에 lifecycle 이벤트 로그.
+  const [dbg, setDbg] = useState([]);
+  const t0Ref = useRef(typeof performance !== 'undefined' ? performance.now() : 0);
+  const log = useCallback((msg) => {
+    const t = Math.round((typeof performance !== 'undefined' ? performance.now() : 0) - t0Ref.current);
+    setDbg(d => [...d.slice(-29), `${String(t).padStart(5)}ms ${msg}`]);
+  }, []);
+  const containerSize = () => {
+    const el = containerRef.current;
+    if (!el) return 'no-el';
+    return `${el.offsetWidth}x${el.offsetHeight}`;
+  };
+  const mapSize = () => {
+    const m = mapInstanceRef.current;
+    if (!m) return 'no-map';
+    const s = m.getSize?.();
+    return s ? `${s.x}x${s.y}` : '?';
+  };
+  // ───────────────────────────────────────────────────────────
+
   const initMap = useCallback(() => {
     if (!containerRef.current || mapInstanceRef.current || !window.L) return;
     const L = window.L;
@@ -48,12 +69,17 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
     }).setView([37.5665, 126.9780], 11);
     mapRef.current = mapInstanceRef.current;
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapInstanceRef.current);
-  }, []);
+    log(`initMap done c=${containerSize()} m=${mapSize()}`);
+  }, [log]);
 
   const drawContent = useCallback(() => {
     const map = mapRef.current;
     const L = window.L;
-    if (!map || !L) return;
+    if (!map || !L) {
+      log(`drawContent SKIP map=${!!map} L=${!!L}`);
+      return;
+    }
+    log(`drawContent pos=${positions?.length ?? 0} routes=${routes?.length ?? '∅'} place=${!!placeMarker} c=${containerSize()} m=${mapSize()}`);
     if (polyRef.current) { map.removeLayer(polyRef.current); polyRef.current = null; }
     markersRef.current.forEach(m => map.removeLayer(m));
     markersRef.current = [];
@@ -99,12 +125,13 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
       });
       polyRef.current = group;
       if (allLatLngs.length >= 2) {
+        log(`fitBounds(routes) m=${mapSize()} pts=${allLatLngs.length}`);
         map.fitBounds(L.latLngBounds(allLatLngs), { padding: [50, 50] });
       }
       return;
     }
 
-    if (!positions || positions.length < 2) return;
+    if (!positions || positions.length < 2) { log(`drawContent EARLY pos<2`); return; }
     const latlngs = positions.map(p => [p.lat, p.lng]);
     const hasSpeed = positions.some(p => p.speed != null);
 
@@ -136,8 +163,10 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
     const mkStart = L.circleMarker(latlngs[0], { radius: 7, fillColor: '#22c55e', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
     const mkEnd = L.circleMarker(latlngs[latlngs.length - 1], { radius: 7, fillColor: '#ef4444', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
     markersRef.current = [mkStart, mkEnd];
+    log(`fitBounds(single) m=${mapSize()} pts=${latlngs.length}`);
     map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50] });
-  }, [positions, routes, placeMarker]);
+    log(`after fitBounds center=${map.getCenter()?.lat?.toFixed(3)},${map.getCenter()?.lng?.toFixed(3)} z=${map.getZoom()}`);
+  }, [positions, routes, placeMarker, log]);
 
   // Keep a ref to the latest drawContent so init callback always calls current version
   const drawContentRef = useRef(drawContent);
@@ -148,16 +177,22 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
   // polyline 이 화면에 그려지지 않던 케이스 보강.
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    log(`MOUNT visible=${visible} c=${containerSize()}`);
     loadLeaflet(() => {
+      log(`leaflet onload c=${containerSize()}`);
       initMap();
       drawContentRef.current();
       setTimeout(() => {
+        log(`mount T+150 invalidateSize c=${containerSize()} m=${mapSize()}`);
         mapInstanceRef.current?.invalidateSize();
+        log(`after invalidateSize m=${mapSize()}`);
         drawContentRef.current?.();
         setMapReady(true);
+        log(`mapReady=true`);
       }, 150);
     });
     return () => {
+      log(`UNMOUNT`);
       mapInstanceRef.current?.remove();
       mapInstanceRef.current = null;
       mapRef.current = null;
@@ -170,10 +205,11 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
   // 않고 default(서울) view 에 고정되던 회귀 보강. mount 시점의 setTimeout(150ms) 만으로는
   // 데이터가 그 이후 도착하는 cold-cache 첫 진입을 못 잡음.
   useEffect(() => {
+    log(`[drawContent] effect map=${!!mapRef.current} L=${typeof window !== 'undefined' && !!window.L} pos=${positions?.length ?? 0}`);
     if (!mapRef.current || !window.L) return;
     mapRef.current.invalidateSize();
     drawContent();
-  }, [drawContent]);
+  }, [drawContent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resize when tab becomes visible — invalidateSize 로 사이즈 재측정 후
   // drawContent 재호출하여 첫 visibility 전환 시 polyline 이 보이지 않던 케이스 보강.
@@ -227,6 +263,18 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
           <p className="text-xs text-zinc-500 mt-1">이 주행은 GPS 포인트가 기록되지 않았습니다</p>
         </div>
       )}
+      {/* DEBUG (임시) — 첫 진입 polyline 미표시 진단용. 우상단 오버레이 */}
+      <div
+        style={{
+          position: 'absolute', top: 4, right: 4, zIndex: 1000,
+          maxWidth: 'min(92%, 380px)', maxHeight: '60%', overflowY: 'auto',
+          background: 'rgba(0,0,0,0.78)', color: '#9fffa3',
+          fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 9, lineHeight: '1.25',
+          padding: '4px 6px', borderRadius: 6, whiteSpace: 'pre', pointerEvents: 'auto',
+        }}
+      >
+        {`pos=${positions?.length ?? 0} routes=${routes?.length ?? '∅'} place=${!!placeMarker} loading=${!!loading} mapReady=${mapReady}\n` + dbg.join('\n')}
+      </div>
     </div>
   );
 }
