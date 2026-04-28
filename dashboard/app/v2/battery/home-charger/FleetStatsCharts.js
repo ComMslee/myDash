@@ -91,7 +91,7 @@ export function HeatmapChart({ heatmap }) {
           {heatmap[d].map((v, h) => (
             <div
               key={h}
-              className="h-3 rounded-[1px]"
+              className="h-5 rounded-[1px]"
               style={{ background: heatColor(v, max) }}
               title={`${lab} ${h}시: ${v}회`}
             />
