@@ -147,7 +147,7 @@ function FlowChart({ start, end }) {
       {/* 시작 IQR (빨강 음영) */}
       <div
         className="absolute top-1/2 -translate-y-1/2 h-4 rounded"
-        style={{ left: `${start.q1}%`, width: `${Math.max(0.5, start.q3 - start.q1)}%`, background: '#f87171', opacity: 0.2 }}
+        style={{ left: `${start.q1}%`, width: `${Math.max(0.5, start.q3 - start.q1)}%`, background: '#fbbf24', opacity: 0.2 }}
         title={`시작 25~75%: ${Math.round(start.q1)}~${Math.round(start.q3)}%`}
       />
       {/* 종료 IQR (초록 음영) */}
@@ -164,15 +164,15 @@ function FlowChart({ start, end }) {
             left: `${lineLeft}%`,
             width: `${lineWidth}%`,
             background: fwd
-              ? 'linear-gradient(to right, #f87171, #34d399)'
-              : 'linear-gradient(to left, #f87171, #34d399)',
+              ? 'linear-gradient(to right, #fbbf24, #34d399)'
+              : 'linear-gradient(to left, #fbbf24, #34d399)',
             opacity: 0.85,
           }}
         />
       )}
       {/* 시작 median 점 */}
       <div
-        className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-red-400 border border-white/50 z-10"
+        className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-amber-400 border border-white/50 z-10"
         style={{ left: `calc(${sm}% - 5px)` }}
         title={`시작 중앙값 ${Math.round(sm)}%`}
       />
@@ -215,10 +215,11 @@ export function LevelHabitCard({ histogram }) {
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3.5">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-1">
         <span className="text-[11px] font-semibold text-zinc-300">충전 시작 → 종료 분포</span>
         {startTotal > 0 && <span className="text-[10px] text-zinc-600">{startTotal}회</span>}
       </div>
+      <p className="text-[10px] text-zinc-500 mb-3">보통 어느 SOC 에서 시작해 어디까지 채우는지</p>
 
       {startTotal === 0 ? (
         <p className="text-[10px] text-zinc-600 py-8 text-center">충전 기록이 없습니다</p>
@@ -233,7 +234,7 @@ export function LevelHabitCard({ histogram }) {
           {/* 범례 */}
           <div className="flex items-center justify-center gap-3 mt-2 text-[9px] text-zinc-600">
             <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-red-400" /> 시작
+              <span className="w-2 h-2 rounded-full bg-amber-400" /> 시작
             </span>
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-400" /> 종료
@@ -244,7 +245,7 @@ export function LevelHabitCard({ histogram }) {
           </div>
           {/* 요약 */}
           <div className="mt-2.5 pt-2 border-t border-white/[0.04] text-[10px] text-zinc-500 flex items-center justify-center gap-1.5 tabular-nums">
-            주로 <span className="text-red-400 font-semibold">{start_modal_range}</span>
+            주로 <span className="text-amber-400 font-semibold">{start_modal_range}</span>
             <span className="text-zinc-700">→</span>
             <span className="text-emerald-400 font-semibold">{end_modal_range}</span>
             <span className="text-zinc-700 ml-1">({Math.round(endStats.median - startStats.median)}%p)</span>
