@@ -44,6 +44,9 @@ export const P3_GROUPED_IDS = new Set([
 // 115동 지하 스테이션 ID (지상과 묶어 한 타일로 표시)
 export const STATION_115_UNDERGROUND = 'PI313299';
 
+// 119동 앞 — 충전기 수가 많아 grid에서 2칸을 차지하도록 처리
+export const STATION_119F = 'PIH01089';
+
 export const COMPLEX_NAME = '망포늘푸른벽산아파트';
 
 export const STATION_CONFIG = {

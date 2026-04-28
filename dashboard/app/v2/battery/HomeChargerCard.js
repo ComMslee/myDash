@@ -4,7 +4,7 @@ import {
   MAIN_STATION_ID, POLL_INTERVAL_MS, CLOCK_INTERVAL_MS,
   P1_108_IDS, P1_107_IDS, P2_102_IDS, P2_104_IDS,
   PRIORITY_IDS, P3_GROUPS, P3_GROUPED_IDS, P3_115_IDS,
-  STATION_115_UNDERGROUND, STATION_CONFIG,
+  STATION_115_UNDERGROUND, STATION_119F, STATION_CONFIG,
 } from './home-charger/constants';
 import { computeRanks, buildTtlTooltip, timeAgoKo } from './home-charger/utils';
 import { TileBox, StatusBadges, UnifiedCell } from './home-charger/ChargerTile';
@@ -262,6 +262,7 @@ export default function HomeChargerCard({ showFavLabel = false } = {}) {
                 })()}
                 {refStations.map(s => {
                   const stationTitle = (STATION_CONFIG[s.station.statId]?.label || s.station.statId).replace(/\s*앞$/, '');
+                  const wide = s.station.statId === STATION_119F;
                   return (
                     <TileBox
                       key={s.station.statId}
@@ -272,6 +273,7 @@ export default function HomeChargerCard({ showFavLabel = false } = {}) {
                       statId={s.station.statId}
                       now={now}
                       variant="nearby"
+                      className={wide ? 'col-span-2' : ''}
                     />
                   );
                 })}
