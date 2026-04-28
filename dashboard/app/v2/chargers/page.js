@@ -47,6 +47,14 @@ function FleetStatsPanel() {
   const topMax = top3[0]?.count || 1;
   const top3Icons = ['🥇', '🥈', '🥉'];
 
+  // 사용률 — 우리 단지 충전기 활용도. (활동 시간 슬롯) / (전체 가능 슬롯).
+  // 분자: 기간 내 (charger × 시간) 활동 카운트 합 (시간당 0/1 clip)
+  // 분모: 관측일수 × 24 × 충전기수
+  const totalSlots = (data?.daysCovered || 0) * 24 * perCharger.length;
+  const usagePct = totalSlots > 0 && data?.total != null
+    ? Math.round((data.total / totalSlots) * 100)
+    : null;
+
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center justify-between">
@@ -73,6 +81,9 @@ function FleetStatsPanel() {
               <div>
                 <div className="text-[11px] text-zinc-400 mb-1.5">
                   🏆 전체 순위 <span className="text-zinc-600">· 총 {perCharger.length}대</span>
+                  {usagePct != null && (
+                    <span className="text-zinc-600"> · 사용률 <span className="text-zinc-300 tabular-nums">{usagePct}%</span></span>
+                  )}
                 </div>
                 {/* Top 1~3 — 강조 카드 (한 줄 3칸, 크게) */}
                 {top3.length > 0 && (
