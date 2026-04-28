@@ -7,7 +7,7 @@ import {
   STATION_115_UNDERGROUND, STATION_CONFIG,
 } from './home-charger/constants';
 import { computeRanks, buildTtlTooltip, timeAgoKo } from './home-charger/utils';
-import { TileBox, StatusBadges, MiniGrid } from './home-charger/ChargerTile';
+import { TileBox, StatusBadges, UnifiedCell } from './home-charger/ChargerTile';
 import PollLogPopup from './home-charger/PollLogPopup';
 
 // 브라우저 세션 동안 유지 — 탭 재진입 시 스피너 없이 즉시 이전 데이터 노출
@@ -209,7 +209,7 @@ export default function HomeChargerCard({ showFavLabel = false } = {}) {
               <span>{showP3 ? '접기 ▲' : '펼치기 ▼'}</span>
             </button>
             {showP3 && (
-              <div className="space-y-1.5 pt-2">
+              <div className="grid grid-cols-2 gap-1.5 pt-2">
                 {(() => {
                   const g105 = p3GroupCells.find(g => g.title === '105');
                   return g105 ? <TileBox title="105" chargers={g105.chargers} {...tileProps} /> : null;
@@ -219,19 +219,36 @@ export default function HomeChargerCard({ showFavLabel = false } = {}) {
                     <div className="text-[11px] text-zinc-400 font-semibold mb-2 px-0.5 tabular-nums">
                       115
                     </div>
-                    <div className="space-y-1.5">
-                      {cells115Ground.length > 0 && (
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-[9px] text-zinc-500 w-6 shrink-0 pt-2">지상</span>
-                          <MiniGrid chargers={cells115Ground} statId={MAIN_STATION_ID} ranks={ranks} usage={usage} now={now} className="flex-1" />
-                        </div>
-                      )}
-                      {cells115Under.length > 0 && (
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-[9px] text-zinc-500 w-6 shrink-0 pt-2">지하</span>
-                          <MiniGrid chargers={cells115Under} statId={STATION_115_UNDERGROUND} ranks={ranks} usage={usage} now={now} className="flex-1" />
-                        </div>
-                      )}
+                    <div className="flex flex-wrap gap-1.5">
+                      {cells115Ground.map(c => {
+                        const k = `${MAIN_STATION_ID}_${c.chgerId}`;
+                        const u = usage[k];
+                        return (
+                          <UnifiedCell
+                            key={`g-${c.chgerId}`}
+                            c={c}
+                            highlight={ranks.get(k) ?? null}
+                            count={u?.t ?? 0}
+                            hourly={u?.h ?? null}
+                            now={now}
+                          />
+                        );
+                      })}
+                      {cells115Under.map(c => {
+                        const k = `${STATION_115_UNDERGROUND}_${c.chgerId}`;
+                        const u = usage[k];
+                        return (
+                          <UnifiedCell
+                            key={`u-${c.chgerId}`}
+                            c={c}
+                            highlight={ranks.get(k) ?? null}
+                            count={u?.t ?? 0}
+                            hourly={u?.h ?? null}
+                            now={now}
+                            numberPrefix="B-"
+                          />
+                        );
+                      })}
                     </div>
                   </div>
                 )}
