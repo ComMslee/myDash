@@ -1,4 +1,5 @@
 import pool from '@/lib/db';
+import { getDefaultCar } from '@/lib/queries/car';
 
 export const dynamic = 'force-dynamic';
 
@@ -6,9 +7,9 @@ export const dynamic = 'force-dynamic';
 // /api/charging-status 가 false 인데 실제로는 플러그 꽂혀 있을 때 어디서 끊겼는지 본다.
 export async function GET() {
   try {
-    const car = await pool.query(`SELECT id, name FROM cars LIMIT 1`);
-    if (!car.rows.length) return Response.json({ error: 'no car' });
-    const carId = car.rows[0].id;
+    const car = await getDefaultCar();
+    if (!car) return Response.json({ error: 'no car' });
+    const carId = car.id;
 
     const [
       latestState,

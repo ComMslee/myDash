@@ -1,15 +1,16 @@
 import pool from '@/lib/db';
+import { getDefaultCar } from '@/lib/queries/car';
 import { KST_OFFSET_MS } from '@/lib/kst';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const carResult = await pool.query(`SELECT id FROM cars LIMIT 1`);
-    if (carResult.rows.length === 0) {
+    const car = await getDefaultCar();
+    if (!car) {
       return Response.json({ error: 'No car found' }, { status: 404 });
     }
-    const carId = carResult.rows[0].id;
+    const carId = car.id;
 
     const chargesResult = await pool.query(
       `SELECT id, start_date, end_date, charge_energy_added, duration_min, cost

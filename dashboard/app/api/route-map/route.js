@@ -1,4 +1,6 @@
 import pool from '@/lib/db';
+import { getDefaultCar } from '@/lib/queries/car';
+import { haversineMeters } from '@/lib/geo';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,22 +32,13 @@ function cacheSet(key, value) {
 
 // ── 거리 기반 thinning (light 모드) ──────────────────────
 // 직전 보존 점에서 minMeters 이상 떨어진 점만 유지. 시작/끝점 보장.
-function haversineMeters(lat1, lng1, lat2, lng2) {
-  const R = 6371000;
-  const toRad = (d) => d * Math.PI / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
 function thinPositions(positions, minMeters = 5) {
   if (positions.length < 3) return positions;
   const out = [positions[0]];
   let lastLat = positions[0].lat, lastLng = positions[0].lng;
   for (let i = 1; i < positions.length - 1; i++) {
     const p = positions[i];
-    if (haversineMeters(lastLat, lastLng, p.lat, p.lng) >= minMeters) {
+    if (haversineMeters({ lat: lastLat, lng: lastLng }, { lat: p.lat, lng: p.lng }) >= minMeters) {
       out.push(p);
       lastLat = p.lat;
       lastLng = p.lng;
@@ -70,11 +63,11 @@ export async function GET(request) {
     }
 
     if (driveId == null) {
-      const carResult = await pool.query(`SELECT id FROM cars LIMIT 1`);
-      if (carResult.rows.length === 0) {
+      const carResult = await getDefaultCar();
+      if (!carResult) {
         return Response.json({ positions: [] });
       }
-      const carId = carResult.rows[0].id;
+      const carId = carResult.id;
 
       const lastDrive = await pool.query(
         `SELECT id FROM drives WHERE car_id = $1 ORDER BY start_date DESC LIMIT 1`,

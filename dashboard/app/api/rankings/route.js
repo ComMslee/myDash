@@ -1,4 +1,5 @@
 import pool from '@/lib/db';
+import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
 import { batchReverseGeocode } from '@/lib/kakao-geo';
 
@@ -11,11 +12,11 @@ export async function GET(request) {
     const type = searchParams.get('type') || 'drive_distance';
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '30', 10)));
 
-    const carResult = await pool.query(`SELECT id FROM cars LIMIT 1`);
-    if (carResult.rows.length === 0) {
+    const car = await getDefaultCar();
+    if (!car) {
       return Response.json({ error: 'No car found' }, { status: 404 });
     }
-    const carId = carResult.rows[0].id;
+    const carId = car.id;
 
     if (type === 'drive_distance' || type === 'drive_duration' || type === 'drive_avg_speed' || type === 'drive_eff') {
       // 단일 주행 기준 정렬 컬럼

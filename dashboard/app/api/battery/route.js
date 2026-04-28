@@ -16,6 +16,7 @@ import {
 } from '@/lib/queries/battery-health';
 import { queryAllDailyRecords } from '@/lib/queries/battery-records';
 import { queryIdleDrain, queryChargingSessions } from '@/lib/queries/battery-idle';
+import { getDefaultCar } from '@/lib/queries/car';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,9 +32,9 @@ function getISOWeekNumber(mondayUTC) {
 
 export async function GET() {
   try {
-    const carResult = await pool.query(`SELECT id FROM cars LIMIT 1`);
-    if (carResult.rows.length === 0) return Response.json({ error: 'No car found' }, { status: 404 });
-    const carId = carResult.rows[0].id;
+    const car = await getDefaultCar();
+    if (!car) return Response.json({ error: 'No car found' }, { status: 404 });
+    const carId = car.id;
 
     const KST = KST_OFFSET_MS;
     const now = new Date();

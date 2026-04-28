@@ -1,15 +1,16 @@
 import pool from '@/lib/db';
+import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const car = await pool.query(`SELECT id FROM cars LIMIT 1`);
-    if (car.rows.length === 0) {
+    const car = await getDefaultCar();
+    if (!car) {
       return Response.json({ error: 'No car found' }, { status: 404 });
     }
-    const carId = car.rows[0].id;
+    const carId = car.id;
 
     const now = new Date();
     const nextStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);

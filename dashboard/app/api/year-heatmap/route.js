@@ -1,4 +1,5 @@
 import pool from '@/lib/db';
+import { getDefaultCar } from '@/lib/queries/car';
 
 export const dynamic = 'force-dynamic';
 
@@ -6,11 +7,11 @@ export const dynamic = 'force-dynamic';
 // 응답: { days: { 'YYYY-MM-DD': { km, kwh, drives, charges } }, max_km, max_kwh }
 export async function GET() {
   try {
-    const carResult = await pool.query(`SELECT id FROM cars LIMIT 1`);
-    if (carResult.rows.length === 0) {
+    const car = await getDefaultCar();
+    if (!car) {
       return Response.json({ error: 'No car found' }, { status: 404 });
     }
-    const carId = carResult.rows[0].id;
+    const carId = car.id;
 
     const [drivesResult, chargesResult] = await Promise.all([
       // 주행: KST(UTC+9) 기준 일별 합계

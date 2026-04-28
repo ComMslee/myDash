@@ -1,4 +1,5 @@
 import pool from '@/lib/db';
+import { getDefaultCar } from '@/lib/queries/car';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,11 +13,11 @@ const FALLBACK_POWER_THRESHOLD = -0.1; // kW (충전=음수)
 
 export async function GET() {
   try {
-    const carResult = await pool.query(`SELECT id FROM cars LIMIT 1`);
-    if (carResult.rows.length === 0) {
+    const car = await getDefaultCar();
+    if (!car) {
       return Response.json({ charging: false });
     }
-    const carId = carResult.rows[0].id;
+    const carId = car.id;
 
     // Find active charging process (no end_date)
     const activeResult = await pool.query(
