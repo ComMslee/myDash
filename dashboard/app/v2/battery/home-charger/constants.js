@@ -7,6 +7,10 @@ export const MAIN_STATION_ID = 'PI795111';
 export const POLL_INTERVAL_MS = 60_000;   // 클라이언트 API 폴링
 export const CLOCK_INTERVAL_MS = 1_000;   // 경과시간 갱신용 tick
 
+// 충전 점유 경고 임계 — 14h 넘으면 비정상 점유(잊고 안 뽑음 / 세션 종료 미반영) 가능성.
+// 셀 fill/외곽선/하단시간 모두 amber 톤으로 전환.
+export const OVERDUE_THRESHOLD_H = 14;
+
 // 상태 배지 표시 순서 (대기 > 충전중 > 점검중 > 통신이상 > 운영중지 > 확인불가)
 export const STATUS_ORDER = ['2', '3', '5', '1', '4', '9'];
 
