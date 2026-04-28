@@ -53,11 +53,14 @@ export const STATION_CONFIG = {
 };
 
 // 환경공단 API 상태 코드별 UI 메타
+// dot/text: 헤더 상태 배지용 (saturated)
+// border: 셀 외곽선 (파스텔 톤, 다크 배경에 살아있도록 raw hex 채도 낮춤)
+// fill:   셀 inner fill (충전중에만 사용, 14h max scale)
 export const STAT_META = {
-  '2': { label: '대기',     dot: 'bg-emerald-500', text: 'text-emerald-400', cellBg: 'bg-emerald-500/80', cellText: 'text-white' },
-  '3': { label: '충전중',   dot: 'bg-blue-500',    text: 'text-blue-400',    cellBg: 'bg-blue-500/80',    cellText: 'text-white' },
-  '4': { label: '운영중지', dot: 'bg-zinc-600',    text: 'text-zinc-400',    cellBg: 'bg-zinc-700/70',    cellText: 'text-zinc-300' },
-  '5': { label: '점검중',   dot: 'bg-amber-500',   text: 'text-amber-400',   cellBg: 'bg-amber-500/80',   cellText: 'text-white' },
-  '1': { label: '통신이상', dot: 'bg-rose-500',    text: 'text-rose-400',    cellBg: 'bg-rose-500/80',    cellText: 'text-white' },
-  '9': { label: '확인불가', dot: 'bg-zinc-700',    text: 'text-zinc-500',    cellBg: 'bg-zinc-800',       cellText: 'text-zinc-500' },
+  '2': { label: '대기',     dot: 'bg-emerald-500', text: 'text-emerald-400', border: 'border-emerald-300' },
+  '3': { label: '충전중',   dot: 'bg-blue-500',    text: 'text-blue-400',    border: 'border-sky-300', fill: 'bg-sky-300/40' },
+  '4': { label: '운영중지', dot: 'bg-zinc-600',    text: 'text-zinc-400',    border: 'border-slate-400/40' },
+  '5': { label: '점검중',   dot: 'bg-amber-500',   text: 'text-amber-400',   border: 'border-yellow-200' },
+  '1': { label: '통신이상', dot: 'bg-rose-500',    text: 'text-rose-400',    border: 'border-rose-300' },
+  '9': { label: '확인불가', dot: 'bg-zinc-700',    text: 'text-zinc-500',    border: 'border-slate-400/30' },
 };

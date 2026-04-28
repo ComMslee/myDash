@@ -1,8 +1,8 @@
 // 집충전기 카드 순수 함수 — 랭크 계산, 시각 포맷, 툴팁 빌더
 
-// 순위 기반 링크 등급: 1~3위 → 'top3' (뱃지+글로우), 4~10위 → 'top10' (얇은 링)
+// 순위 기반 링크 등급: 1위 → 'top1', 2~3위 → 'top3', 4~10위 → 'top10'
 // 11위 이후 → null. 동점은 같은 rank 번호를 공유.
-// 반환: Map<id, { tier: 'top3'|'top10', rank: number }>
+// 반환: Map<id, { tier: 'top1'|'top3'|'top10', rank: number }>
 export function computeRanks(usage) {
   const entries = Object.entries(usage)
     .map(([id, d]) => ({ id, t: d.t }))
@@ -18,7 +18,7 @@ export function computeRanks(usage) {
     if (prevT === null || e.t !== prevT) displayRank = i + 1;
     prevT = e.t;
     if (displayRank > 10) break;
-    const tier = displayRank <= 3 ? 'top3' : 'top10';
+    const tier = displayRank === 1 ? 'top1' : displayRank <= 3 ? 'top3' : 'top10';
     ranks.set(e.id, { tier, rank: displayRank });
   }
   return ranks;
@@ -75,4 +75,13 @@ export function elapsedLabel(c, now) {
   const m = Math.max(0, Math.floor((now - startMs) / 60000));
   if (m < 60) return `${m}m`;
   return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`;
+}
+
+// 충전중 셀의 fill 비율 (0~100). 14시간을 max(100%)로 정규화.
+export function chargingFillPct(c, now) {
+  if (c.stat !== '3') return 0;
+  const startMs = parseKstDt(c.lastTsdt || c.statUpdDt);
+  if (!startMs) return 0;
+  const h = Math.max(0, (now - startMs) / 3_600_000);
+  return Math.min(h / 14, 1) * 100;
 }

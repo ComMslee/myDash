@@ -188,8 +188,8 @@ export default function HomeChargerCard({ showFavLabel = false } = {}) {
             </div>
           )}
           <div className="grid grid-cols-2 gap-1.5">
-            <TileBox title="108" chargers={cells108} {...tileProps} />
-            <TileBox title="107" chargers={cells107} {...tileProps} />
+            <TileBox title="108" chargers={cells108} variant="favorite" {...tileProps} />
+            <TileBox title="107" chargers={cells107} variant="favorite" {...tileProps} />
           </div>
         </div>
 
@@ -218,21 +218,21 @@ export default function HomeChargerCard({ showFavLabel = false } = {}) {
                     return g105 ? <TileBox title="105" chargers={g105.chargers} {...tileProps} /> : null;
                   })()}
                   {show115 && (
-                    <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg p-2 flex items-center gap-2">
-                      <div className="text-[11px] text-zinc-300 font-medium shrink-0 flex flex-col items-center leading-none tabular-nums">
-                        {Array.from('115').map((d, i) => <span key={i}>{d}</span>)}
+                    <div className="bg-[#1c1d20] border border-white/[0.06] rounded-2xl p-3">
+                      <div className="text-[11px] text-zinc-400 font-semibold mb-2 px-0.5 tabular-nums">
+                        115
                       </div>
-                      <div className="flex-1 min-w-0 space-y-1">
+                      <div className="space-y-1.5">
                         {cells115Ground.length > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] text-zinc-500 w-6 shrink-0">지상</span>
-                            <MiniGrid chargers={cells115Ground} statId={MAIN_STATION_ID} ranks={ranks} usage={usage} now={now} className="flex-1 justify-center" />
+                          <div className="flex items-start gap-1.5">
+                            <span className="text-[9px] text-zinc-500 w-6 shrink-0 pt-2">지상</span>
+                            <MiniGrid chargers={cells115Ground} statId={MAIN_STATION_ID} ranks={ranks} usage={usage} now={now} className="flex-1" />
                           </div>
                         )}
                         {cells115Under.length > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] text-zinc-500 w-6 shrink-0">지하</span>
-                            <MiniGrid chargers={cells115Under} statId={STATION_115_UNDERGROUND} ranks={ranks} usage={usage} now={now} className="flex-1 justify-center" />
+                          <div className="flex items-start gap-1.5">
+                            <span className="text-[9px] text-zinc-500 w-6 shrink-0 pt-2">지하</span>
+                            <MiniGrid chargers={cells115Under} statId={STATION_115_UNDERGROUND} ranks={ranks} usage={usage} now={now} className="flex-1" />
                           </div>
                         )}
                       </div>
@@ -258,6 +258,7 @@ export default function HomeChargerCard({ showFavLabel = false } = {}) {
                       usage={usage}
                       statId={s.station.statId}
                       now={now}
+                      variant="nearby"
                     />
                   );
                 })}

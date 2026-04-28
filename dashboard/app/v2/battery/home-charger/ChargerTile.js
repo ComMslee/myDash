@@ -1,7 +1,7 @@
 // 집충전기 셀/타일 프리미티브 — UnifiedCell, TileBox, StatusBadges, MiniGrid
 
 import { ID_OFFSET, STAT_META, STATUS_ORDER } from './constants';
-import { elapsedLabel } from './utils';
+import { elapsedLabel, chargingFillPct } from './utils';
 
 // 상태별 카운트 배지 — 헤더/요약에서 공용
 // size: 'md'(헤더) | 'sm'(P3 요약)
@@ -34,7 +34,7 @@ function peakHourOf(hourly) {
   return max > 0 ? { hour: idx, count: max } : null;
 }
 
-// P3 참고 섹션 — 셀 포맷은 P1/P2와 완전 동일, flex-wrap으로 자연 줄바꿈
+// 동일 카드 내 셀 wrap (115동 합성 카드 등에서 재사용)
 export function MiniGrid({ chargers, statId, ranks, usage, now, className = '' }) {
   return (
     <div className={`flex flex-wrap gap-1.5 ${className}`}>
@@ -55,69 +55,81 @@ export function MiniGrid({ chargers, statId, ranks, usage, now, className = '' }
   );
 }
 
-// 통일 셀 — 색 배경 + 번호, 하단에 경과시간(충전중) 또는 사용횟수(비사용), 랭크 링
-// 모든 셀 크기/폰트 통일 (P1/P2/P3 동일 포맷)
-// highlight: { tier: 'top3'|'top10', rank: number } | null
+// 통일 셀 — 44×60 세로 카드
+//   border-2: 상태 색 (파스텔)
+//   ring:     순위 (top1=골드 2px+glow / top3=앰버 1.5px / top10=앰버 1px 옅음)
+//   inner fill: 충전중에만 (14h max scale, 아래→위)
+//   상단: 번호 / 하단: 충전시간(충전중) | 누적회수(가용) | – (장애)
 export function UnifiedCell({ c, highlight, count, hourly, now }) {
   const meta = STAT_META[c.stat] || STAT_META['9'];
   const localId = ID_OFFSET + Number(c.chgerId);
   const label = localId - 95100;
-  const sizeClass = 'w-10 h-10 text-sm';
-  // top3은 트로피 이모지로 표시(링 없음), top10은 기존 얇은 앰버 링
-  const ringClass = highlight?.tier === 'top10'
-    ? 'ring-2 ring-amber-400'
-    : '';
-  const trophy = highlight?.tier === 'top3' ? ['🥇', '🥈', '🥉'][highlight.rank - 1] : null;
-  const elapsed = elapsedLabel(c, now);
   const isCharging = c.stat === '3';
+  const fillPct = chargingFillPct(c, now);
+  const elapsed = elapsedLabel(c, now);
   const peak = peakHourOf(hourly);
 
-  // 툴팁 — 항상 사용 횟수 표시 (0이면 "미사용")
+  const ringClass =
+    highlight?.tier === 'top1'  ? 'ring-2 ring-yellow-200 shadow-[0_0_8px_rgba(254,240,138,0.35)]' :
+    highlight?.tier === 'top3'  ? 'ring-[1.5px] ring-amber-300' :
+    highlight?.tier === 'top10' ? 'ring-1 ring-amber-400/40' :
+    '';
+
+  // 하단 info 텍스트
+  const bottomText = isCharging ? elapsed
+    : (c.stat === '9' || c.stat === '1') ? '–'
+    : count > 0 ? String(count)
+    : '';
+
+  // 호버 툴팁 — 정보 손실 방지용 풀버전 유지
   const titleParts = [`${localId} · ${meta.label}`];
   if (elapsed) titleParts.push(`${elapsed} 경과`);
   titleParts.push(count > 0 ? `누적 ${count}회 사용` : '미사용');
   if (peak) titleParts.push(`피크 ${peak.hour}시 (${peak.count}회)`);
-  if (highlight) titleParts.push(`${highlight.rank}위${highlight.tier === 'top3' ? ' · 자주 사용' : ''}`);
-
-  // 셀 하단 텍스트 — 충전중일 때만 경과시간 (누적 횟수는 호버에서 확인)
-  const bottomText = isCharging ? elapsed : '';
-  const bottomClass = meta.text;
+  if (highlight) titleParts.push(`${highlight.rank}위${highlight.tier !== 'top10' ? ' · 자주 사용' : ''}`);
 
   return (
-    <div className="flex flex-col items-center gap-0.5 min-w-0">
-      <div className="relative">
+    <div
+      className={`relative w-11 h-[60px] rounded-[12px] overflow-hidden bg-white/[0.04] border-2 ${meta.border} ${ringClass} cursor-help`}
+      title={titleParts.join(' · ')}
+    >
+      {isCharging && fillPct > 0 && (
         <div
-          className={`${sizeClass} rounded-md flex items-center justify-center font-bold tabular-nums cursor-help ${meta.cellBg} ${meta.cellText} ${ringClass}`}
-          title={titleParts.join(' · ')}
-        >
-          {label}
-        </div>
-        {trophy && (
-          <span
-            className="absolute -top-2 -right-2 text-[16px] leading-none drop-shadow-[0_0_3px_rgba(0,0,0,0.8)] pointer-events-none"
-            aria-label={`${highlight.rank}위`}
-          >
-            {trophy}
-          </span>
-        )}
+          className={`absolute bottom-0 left-0 right-0 ${meta.fill} transition-[height] duration-500 ease-out`}
+          style={{ height: `${fillPct}%` }}
+        />
+      )}
+      <div className="relative z-10 pt-1 text-center text-sm font-bold tabular-nums text-zinc-100">
+        {label}
       </div>
-      <div className={`text-[9px] tabular-nums leading-none min-h-[10px] ${bottomClass}`}>
+      <div className="absolute bottom-0.5 left-0 right-0 z-10 text-[9px] text-center tabular-nums text-zinc-400">
         {bottomText}
       </div>
     </div>
   );
 }
 
-// 동별 타일 박스 — 왼쪽에 동 이름, 오른쪽에 셀 나열
-export function TileBox({ title, chargers, ranks, usage, statId, now }) {
+// 카드 variant — 그룹 hierarchy 시각화
+//   favorite: 즐겨찾기(108·107) — bg lift + sky 외곽
+//   default:  단지 내 그 외 동
+//   nearby:   refStations(단지 외) — dashed border
+const VARIANT_CLS = {
+  favorite: 'bg-white/[0.05] border border-sky-300/15',
+  default:  'bg-[#1c1d20] border border-white/[0.06]',
+  nearby:   'bg-[#161618] border border-dashed border-white/[0.06]',
+};
+
+// 동별 타일 박스 — 헤더(동번호) + 셀 wrap
+export function TileBox({ title, chargers, ranks, usage, statId, now, variant = 'default' }) {
   if (!chargers.length) return null;
   const keyOf = (c) => `${statId}_${c.chgerId}`;
+  const variantCls = VARIANT_CLS[variant] || VARIANT_CLS.default;
   return (
-    <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg p-2 flex items-center gap-2">
-      <div className="text-[11px] text-zinc-300 font-medium shrink-0 flex flex-col items-center leading-none tabular-nums">
-        {Array.from(String(title)).map((d, i) => <span key={i}>{d}</span>)}
+    <div className={`rounded-2xl p-3 ${variantCls}`}>
+      <div className="text-[11px] text-zinc-400 font-semibold mb-2 px-0.5 tabular-nums">
+        {title}
       </div>
-      <div className="flex items-start flex-wrap gap-1.5 flex-1 min-w-0 justify-center">
+      <div className="flex flex-wrap gap-1.5">
         {chargers.map(c => {
           const u = usage[keyOf(c)];
           return (
