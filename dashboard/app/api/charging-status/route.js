@@ -31,18 +31,24 @@ export async function GET() {
     if (activeResult.rows.length > 0) {
       const activeProcess = activeResult.rows[0];
 
-      // Get latest charge detail — TeslaMate charges 테이블에 charge_limit_soc,
-      // time_to_full_charge 컬럼이 없는 스키마가 있어 SELECT 에서 제외. 응답에서는 null.
+      // Get latest + first charge detail.
+      // - TeslaMate charges 테이블에 charge_limit_soc, time_to_full_charge 컬럼이
+      //   없는 스키마가 있어 SELECT 에서 제외. 응답에서는 null.
+      // - charging_processes.start_battery_level 은 세션 종료 시점에 업데이트되는
+      //   패턴이 있어 진행 중엔 null. charges 첫 row(date ASC) 로 폴백.
       const chargeDetail = await pool.query(
-        `SELECT charger_power, battery_level
-         FROM charges
-         WHERE charging_process_id = $1
-         ORDER BY date DESC
-         LIMIT 1`,
+        `SELECT
+           (SELECT charger_power FROM charges
+              WHERE charging_process_id = $1 ORDER BY date DESC LIMIT 1) AS charger_power,
+           (SELECT battery_level FROM charges
+              WHERE charging_process_id = $1 ORDER BY date DESC LIMIT 1) AS battery_level,
+           (SELECT battery_level FROM charges
+              WHERE charging_process_id = $1 ORDER BY date ASC LIMIT 1) AS first_battery_level`,
         [activeProcess.id]
       );
 
       const detail = chargeDetail.rows[0] || {};
+      const startSoc = activeProcess.start_battery_level ?? detail.first_battery_level ?? null;
 
       return Response.json({
         charging: true,
@@ -54,7 +60,7 @@ export async function GET() {
         charger_power: detail.charger_power ? parseFloat(detail.charger_power) : null,
         time_to_full_charge: null,
         battery_level: detail.battery_level ?? null,
-        start_battery_level: activeProcess.start_battery_level ?? null,
+        start_battery_level: startSoc,
         charge_limit_soc: null,
       });
     }
