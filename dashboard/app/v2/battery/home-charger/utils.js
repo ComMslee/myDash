@@ -76,13 +76,13 @@ export function elapsedLabel(c, now) {
   return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
 }
 
-// 충전중 셀의 fill 비율 (0~100). 지수 점근 곡선 — (1 - e^(-h/7.8)) * 100.
-// 4h = 40% 앵커로 튜닝. 짧은 세션도 보이되 4h 미만은 절반 이하, 그 이상은 점진 saturate.
-// 참고값: 1h=12%, 2h=23%, 4h=40%, 6h=54%, 8h=64%, 12h=78%, 14h=83%.
+// 충전중 셀의 fill 비율 (0~100). 거듭제곱 곡선 — (h/14)^0.73 * 100.
+// 두 앵커 동시 만족: 4h=40%, 14h=100%. 4h 미만 절반 이하, 이상부터 가속해 14h 만수.
+// 참고값: 1h=13%, 2h=22%, 4h=40%, 6h=54%, 8h=67%, 10h=80%, 12h=90%, 14h=100%.
 export function chargingFillPct(c, now) {
   if (c.stat !== '3') return 0;
   const startMs = parseKstDt(c.lastTsdt || c.statUpdDt);
   if (!startMs) return 0;
   const h = Math.max(0, (now - startMs) / 3_600_000);
-  return (1 - Math.exp(-h / 7.8)) * 100;
+  return Math.min(Math.pow(h / 14, 0.73), 1) * 100;
 }
