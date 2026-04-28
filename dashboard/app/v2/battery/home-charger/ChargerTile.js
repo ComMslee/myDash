@@ -58,7 +58,7 @@ export function MiniGrid({ chargers, statId, ranks, usage, now, className = '' }
 // 통일 셀 — 44×60 세로 카드
 //   border-2: 상태 색 (파스텔)
 //   ring:     순위 (top1=골드 2px+glow / top3=앰버 1.5px / top10=앰버 1px 옅음)
-//   inner fill: 충전중에만 (14h max scale, 아래→위)
+//   inner fill: 충전중에만 (지수 점근 곡선 — utils.chargingFillPct, 아래→위)
 //   상단: 번호 / 하단: 충전시간(충전중) | 누적회수(가용) | – (장애)
 export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '' }) {
   const meta = STAT_META[c.stat] || STAT_META['9'];

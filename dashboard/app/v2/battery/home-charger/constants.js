@@ -60,7 +60,7 @@ export const STATION_CONFIG = {
 // border:   셀 외곽선 (파스텔)
 // body:     셀 본체 bg (상태 색 옅게 — 비충전 셀 시각 강도 보강)
 // num:      셀 번호 색 (상태 색 — 충전중만 zinc-100, fill 위 가독성)
-// fill:     셀 inner fill (충전중에만, 14h max scale)
+// fill:     셀 inner fill (충전중에만, 지수 점근 곡선 — utils.chargingFillPct)
 export const STAT_META = {
   '2': { label: '대기',     dot: 'bg-emerald-500', text: 'text-emerald-400', border: 'border-emerald-300',     body: 'bg-emerald-300/15', num: 'text-emerald-300' },
   '3': { label: '충전중',   dot: 'bg-blue-500',    text: 'text-blue-400',    border: 'border-sky-300',         body: 'bg-sky-300/[0.04]', num: 'text-zinc-100', fill: 'bg-sky-300/40' },

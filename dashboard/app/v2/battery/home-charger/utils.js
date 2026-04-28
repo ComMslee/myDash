@@ -76,11 +76,13 @@ export function elapsedLabel(c, now) {
   return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
 }
 
-// 충전중 셀의 fill 비율 (0~100). 14시간을 max(100%)로 정규화.
+// 충전중 셀의 fill 비율 (0~100). 지수 점근 곡선 — (1 - e^(-h/2.5)) * 100.
+// 짧은 세션(30min~2h) 도 즉시 시각화되고, 긴 세션(8h~)도 부드럽게 saturate.
+// 참고값: 30min=18%, 1h=33%, 2h=55%, 4h=80%, 8h=96%, 14h=99%.
 export function chargingFillPct(c, now) {
   if (c.stat !== '3') return 0;
   const startMs = parseKstDt(c.lastTsdt || c.statUpdDt);
   if (!startMs) return 0;
   const h = Math.max(0, (now - startMs) / 3_600_000);
-  return Math.min(h / 14, 1) * 100;
+  return (1 - Math.exp(-h / 2.5)) * 100;
 }
