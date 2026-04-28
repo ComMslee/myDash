@@ -59,10 +59,10 @@ export const STATION_CONFIG = {
 // num:      셀 번호 색 (상태 색 — 충전중만 zinc-100, fill 위 가독성)
 // fill:     셀 inner fill (충전중에만, 14h max scale)
 export const STAT_META = {
-  '2': { label: '대기',     dot: 'bg-emerald-500', text: 'text-emerald-400', border: 'border-emerald-300',     body: 'bg-emerald-300/10', num: 'text-emerald-200' },
+  '2': { label: '대기',     dot: 'bg-emerald-500', text: 'text-emerald-400', border: 'border-emerald-300',     body: 'bg-emerald-300/15', num: 'text-emerald-300' },
   '3': { label: '충전중',   dot: 'bg-blue-500',    text: 'text-blue-400',    border: 'border-sky-300',         body: 'bg-sky-300/[0.04]', num: 'text-zinc-100', fill: 'bg-sky-300/40' },
-  '4': { label: '운영중지', dot: 'bg-zinc-600',    text: 'text-zinc-400',    border: 'border-slate-400/40',    body: 'bg-slate-400/[0.06]', num: 'text-slate-300' },
-  '5': { label: '점검중',   dot: 'bg-amber-500',   text: 'text-amber-400',   border: 'border-yellow-200',      body: 'bg-yellow-200/10',  num: 'text-yellow-200' },
-  '1': { label: '통신이상', dot: 'bg-rose-500',    text: 'text-rose-400',    border: 'border-rose-300',        body: 'bg-rose-300/10',    num: 'text-rose-200' },
-  '9': { label: '확인불가', dot: 'bg-zinc-700',    text: 'text-zinc-500',    border: 'border-slate-400/30',    body: 'bg-slate-400/[0.04]', num: 'text-slate-400' },
+  '4': { label: '운영중지', dot: 'bg-zinc-600',    text: 'text-zinc-400',    border: 'border-slate-400/40',    body: 'bg-slate-400/10',   num: 'text-slate-200' },
+  '5': { label: '점검중',   dot: 'bg-amber-500',   text: 'text-amber-400',   border: 'border-yellow-200',      body: 'bg-yellow-200/15',  num: 'text-yellow-200' },
+  '1': { label: '통신이상', dot: 'bg-rose-500',    text: 'text-rose-400',    border: 'border-rose-300',        body: 'bg-rose-300/15',    num: 'text-rose-300' },
+  '9': { label: '확인불가', dot: 'bg-zinc-700',    text: 'text-zinc-500',    border: 'border-slate-400/30',    body: 'bg-slate-400/[0.06]', num: 'text-slate-300' },
 };
