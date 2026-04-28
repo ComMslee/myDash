@@ -26,6 +26,7 @@ export default function HealthScoreCard({ data, trend }) {
   }
 
   // SOH — 출고 용량 대비 최근 추정치 (lib/constants NOMINAL_BATTERY_KWH 기준)
+  // 임계: 95%↑ 정상(녹), 90%↑ 경계(앰버), 90%↓ 점검권장(적) — 절대 SOH 기준
   const recentCap = (trend?.capacity_trend || []).slice(-12);
   const lastCap = recentCap[recentCap.length - 1]?.est_capacity_kwh;
   const sohPct = lastCap != null ? (lastCap / NOMINAL_BATTERY_KWH) * 100 : null;
