@@ -2,6 +2,10 @@ import pool from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
+// ⚠️  수정 전 필독: /CLAUDE.md "알려진 함정 — TeslaMate charges 테이블 스키마 변동" 섹션.
+//     일부 TeslaMate 버전엔 `charges.charge_limit_soc` 컬럼이 없음. SELECT 추가시
+//     해당 컬럼 존재 여부 확인 필요.
+
 // 최근 이 시간(초) 안의 positions.power < 0 이면 충전 중으로 간주 (폴백)
 const FALLBACK_WINDOW_SEC = 180;
 const FALLBACK_POWER_THRESHOLD = -0.1; // kW (충전=음수)

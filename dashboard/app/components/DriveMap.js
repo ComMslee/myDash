@@ -1,5 +1,9 @@
 'use client';
 
+// ⚠️  수정 전 필독: /CLAUDE.md "알려진 함정 — DriveMap 첫 렌더 폴리라인" 섹션.
+//     setTimeout(150ms) → invalidateSize + drawContentRef, [drawContent] useEffect
+//     의 invalidateSize 선행, fitBounds animate:false 패턴은 회귀 방지를 위해 유지.
+
 import { useRef, useEffect, useCallback, useState } from 'react';
 
 // ── Leaflet Map (CDN) ─────────────────────────────────────────

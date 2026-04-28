@@ -2,6 +2,10 @@ import pool from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
+// ⚠️  수정 전 필독: /CLAUDE.md "알려진 함정 — /api/route-map LRU 캐시 변수명" 섹션.
+//     cacheSet 의 eviction 조건은 반드시 `cache.size > CACHE_CAPACITY` (변수명 오타시
+//     eviction 미작동 → unbounded → 5xx).
+
 // ── 모듈 스코프 LRU 캐시 ───────────────────────────────────
 // drive는 종료 후 positions가 불변이므로 영구 캐시 가능. 메모리 보호용 LRU만 적용.
 const CACHE_CAPACITY = 200;

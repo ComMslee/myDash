@@ -47,10 +47,18 @@ docker compose build dashboard && docker compose up -d dashboard
 - API 라우트: `export const dynamic = 'force-dynamic'`
 - 단일 차량 가정: `SELECT id FROM cars LIMIT 1`
 - 커밋: `<type>: <설명>` (`feat`, `fix`, `refactor`, `tune`, `ci`, `docs`, `chore`)
+- **함정 표시 파일 수정 전**: 파일 상단에 `⚠️  수정 전 필독: /CLAUDE.md "알려진 함정 …"` 주석이 있으면 아래 [알려진 함정](#알려진-함정) 섹션의 해당 항목을 먼저 읽고 작업.
 
 세부 규칙은 [`docs/CODE_CONVENTIONS.md`](./docs/CODE_CONVENTIONS.md) 참고.
 
 ## 알려진 함정
 
-- **DriveMap 첫 렌더 폴리라인**: `dashboard/app/components/DriveMap.js`의 mount/visibility 두 useEffect 모두 `setTimeout(150ms) → invalidateSize() + drawContentRef.current?.()` 패턴이 살아 있어야 함. 단순 `invalidateSize()`만 호출하면 fitBounds가 재실행 안 돼 첫 클릭 시 폴리라인이 안 보이는 회귀 발생 (커밋 `7b56817`/`830910a`로 해결).
+- **DriveMap 첫 렌더 폴리라인** (`dashboard/app/components/DriveMap.js` + `dashboard/app/v2/history/useDriveData.js`): 이력 탭 첫 클릭 시 폴리라인이 안 그려지고 default(서울) view 에 고정되던 회귀. 다음 5가지 fix 가 **모두** 살아 있어야 재현 안 됨 — 하나라도 빠지면 회귀.
+  1. mount/visibility 두 useEffect 모두 `setTimeout(150ms) → invalidateSize() + drawContentRef.current?.()` 패턴 유지 (`7b56817`/`830910a`).
+  2. `[drawContent]` deps useEffect 도 `invalidateSize()` 선행 후 `drawContent()` 호출 — 데이터 도착 시점에 컨테이너 layout 미정착이면 fitBounds 가 0-size 기준으로 잘못 계산됨 (`3e23655`).
+  3. `fitBounds(bounds, { animate: false })` — animate(default true) 진행 중 setState 로 인해 cancel 되어 view 가 default 에 고정되던 race condition (`3e23655`). 단일 경로 / routes 다중 경로 두 분기 모두 적용.
+  4. `useDriveData`의 단일 경로 fetch useEffect 에서 시작 시점에 `setPositions([])` / `setRouteData(null)` 호출 금지 — 새 데이터 도착 전 빈 배열 set 이 fitBounds 애니메이션과 race 를 만들어 view 가 어긋남 (`3e23655`).
+  5. `/api/route-map` 5xx 회복용 1회 retry — `fetch().then(r => r.json())` 만으로는 HTTP 5xx 가 reject 되지 않아 `data.positions || []` 가 빈 배열로 그대로 흘러감. `r.ok` 체크 후 throw → catch 에서 1회 재시도 (`9ea3ebb`).
+- **`/api/route-map` LRU 캐시 변수명**: `cacheSet` 의 eviction 루프 조건은 반드시 `cache.size > CACHE_CAPACITY` — 변수명 오타시 `Map.size > undefined === false` 라 eviction 미작동, unbounded 캐시 → 메모리 압박 → 5xx 유발 (`9ea3ebb`).
+- **TeslaMate `charges` 테이블 스키마 변동**: 일부 TeslaMate 버전엔 `charge_limit_soc` 컬럼이 없음. `/api/charging-status` 의 SELECT 에서 제외하고 응답에서는 `charge_limit_soc: null` 로 반환 (`bb46127`). 다른 라우트에서도 `charges` 테이블 신규 컬럼 추가 시 동일하게 존재 여부 확인 필요.
 - **배포 후 캐시**: GitHub Actions 배포가 완료돼도 브라우저/CDN 캐시 때문에 즉시 반영 안 될 수 있음. 사용자가 "안 됨" 보고 시 하드 리프레시(Ctrl+Shift+R) 확인을 먼저 안내.

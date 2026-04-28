@@ -1,5 +1,9 @@
 'use client';
 
+// ⚠️  수정 전 필독: /CLAUDE.md "알려진 함정 — DriveMap 첫 렌더 폴리라인" 섹션.
+//     단일 경로 fetch useEffect 에서 setPositions([]) 금지, /api/route-map 5xx
+//     1회 retry + r.ok 체크 패턴은 회귀 방지를 위해 유지.
+
 import { useState, useEffect, useRef } from 'react';
 import { MOCK_DATA } from '@/app/context/mock';
 
