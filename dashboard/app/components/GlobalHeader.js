@@ -137,32 +137,17 @@ export default function GlobalHeader() {
         }}
         aria-hidden="true"
       />
-      {/* 충전 시작 SOC 세로선 — 게이지 위에 시작점 표시 (delta 가시화) */}
+      {/* 투톤 게이지 — 시작 SOC → 현재 SOC 구간을 밝은 emerald 로 덧칠 (delta 가시화) */}
       {isCharging && charging?.start_battery_level != null && charging.start_battery_level < lvl && (
-        <>
-          <div
-            className="absolute inset-y-0 w-0.5 bg-emerald-300 shadow-[0_0_4px_rgba(110,231,183,0.6)] pointer-events-none z-10"
-            style={{ left: `${charging.start_battery_level}%` }}
-            aria-hidden="true"
-          />
-          <span
-            className="absolute top-0.5 text-[9px] font-semibold tabular-nums text-emerald-200 pointer-events-none -translate-x-1/2 z-10"
-            style={{ left: `${charging.start_battery_level}%` }}
-            aria-hidden="true"
-          >
-            {charging.start_battery_level}
-          </span>
-        </>
-      )}
-      {/* 충전 진행 화살표 — 현재 SOC 위치에 진행 방향 시각화 */}
-      {isCharging && charging?.start_battery_level != null && charging.start_battery_level < lvl && (
-        <span
-          className="absolute top-1/2 -translate-y-1/2 text-emerald-300 text-[10px] font-bold pointer-events-none -translate-x-full pr-0.5"
-          style={{ left: `${lvl}%` }}
+        <div
+          className="absolute inset-y-0 transition-all duration-700 pointer-events-none"
+          style={{
+            left: `${charging.start_battery_level}%`,
+            width: `${lvl - charging.start_battery_level}%`,
+            background: 'linear-gradient(90deg, rgba(110,231,183,0.30) 0%, rgba(110,231,183,0.55) 100%)',
+          }}
           aria-hidden="true"
-        >
-          ▶
-        </span>
+        />
       )}
       {/* 충전 목표 지점 세로선 */}
       {isCharging && limitLvl && limitLvl > lvl && (
