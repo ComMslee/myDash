@@ -219,7 +219,7 @@ export default function HomeChargerCard({ showFavLabel = false } = {}) {
                     <div className="text-[11px] text-zinc-400 font-semibold mb-2 px-0.5 tabular-nums">
                       115
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {cells115Ground.map(c => {
                         const k = `${MAIN_STATION_ID}_${c.chgerId}`;
                         const u = usage[k];

@@ -37,7 +37,7 @@ function peakHourOf(hourly) {
 // 동일 카드 내 셀 wrap (115동 합성 카드 등에서 재사용)
 export function MiniGrid({ chargers, statId, ranks, usage, now, className = '' }) {
   return (
-    <div className={`flex flex-wrap gap-1.5 ${className}`}>
+    <div className={`flex flex-wrap gap-2 ${className}`}>
       {chargers.map(c => {
         const u = usage[`${statId}_${c.chgerId}`];
         return (
@@ -95,7 +95,7 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
 
   return (
     <div
-      className={`relative w-[53px] h-[60px] rounded-[12px] ${meta.body} border-2 ${meta.border} ${ringClass} cursor-help`}
+      className={`relative w-[52px] h-[60px] rounded-[12px] ${meta.body} border-2 ${meta.border} ${ringClass} cursor-help`}
       title={titleParts.join(' · ')}
     >
       {isCharging && fillPct > 0 && (
@@ -111,13 +111,13 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
           {medal}
         </div>
       )}
-      <div className={`relative z-10 pt-1 text-center text-base font-bold tabular-nums ${meta.num}`}>
+      <div className={`relative z-10 pt-1 text-center text-lg font-bold tabular-nums ${meta.num}`}>
         {numberPrefix}{label}
       </div>
       <div className={`absolute bottom-0.5 left-0 right-0 z-10 text-center tabular-nums ${
         isCharging ? 'text-[10px] font-semibold text-zinc-100'
         : (c.stat === '9' || c.stat === '1') ? 'text-[10px] text-zinc-500'
-        : 'text-[7px] text-zinc-500'
+        : 'text-[6px] text-zinc-500'
       }`}>
         {bottomText}
       </div>
@@ -145,7 +145,7 @@ export function TileBox({ title, chargers, ranks, usage, statId, now, variant = 
       <div className="text-[11px] text-zinc-400 font-semibold mb-2 px-0.5 tabular-nums">
         {title}
       </div>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-2">
         {chargers.map(c => {
           const u = usage[keyOf(c)];
           return (
