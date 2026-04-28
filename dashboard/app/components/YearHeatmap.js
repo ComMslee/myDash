@@ -81,6 +81,18 @@ export default function YearHeatmap({
 
   const unitSuffix = metric === 'kwh' ? 'kWh' : 'km';
 
+  // 월별 합계 — 각 주 컬럼을 해당 월 강도로 칠해 시즌성 밴드 생성
+  const monthlyTotals = useMemo(() => {
+    const totals = {};
+    for (const [key, d] of Object.entries(daysMap)) {
+      const ym = key.slice(0, 7);
+      const v = metric === 'kwh' ? (d.kwh || 0) : (d.km || 0);
+      totals[ym] = (totals[ym] || 0) + v;
+    }
+    return totals;
+  }, [daysMap, metric]);
+  const monthMax = Math.max(0, ...Object.values(monthlyTotals));
+
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-3">
       {loading ? (
@@ -137,6 +149,24 @@ export default function YearHeatmap({
                   })}
                 </div>
               ))}
+            </div>
+            {/* 시즌성 밴드 — 각 주 컬럼을 해당 월의 합계 강도로 채색 */}
+            <div className="flex gap-[3px] pl-[36px] mt-1.5">
+              {weeks.map((week, wi) => {
+                const first = week[0].date;
+                const ym = `${first.getFullYear()}-${String(first.getMonth()+1).padStart(2,'0')}`;
+                const total = monthlyTotals[ym] || 0;
+                const op = heatmapIntensity(total, monthMax);
+                const cellStyle = op > 0 ? { background: color, opacity: op } : {};
+                return (
+                  <div
+                    key={wi}
+                    title={`${ym} 합계 ${Math.round(total).toLocaleString()}${unitSuffix}`}
+                    className="w-[15px] h-[5px] rounded-[1px] bg-zinc-800/40"
+                    style={cellStyle}
+                  />
+                );
+              })}
             </div>
           </div>
         </div>
