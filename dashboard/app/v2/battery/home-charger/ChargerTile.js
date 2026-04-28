@@ -114,7 +114,11 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
       <div className={`relative z-10 pt-1 text-center text-base font-bold tabular-nums ${meta.num}`}>
         {numberPrefix}{label}
       </div>
-      <div className="absolute bottom-0.5 left-0 right-0 z-10 text-[10px] text-center tabular-nums text-zinc-400">
+      <div className={`absolute bottom-0.5 left-0 right-0 z-10 text-center tabular-nums ${
+        isCharging ? 'text-[10px] font-semibold text-zinc-100'
+        : (c.stat === '9' || c.stat === '1') ? 'text-[10px] text-zinc-500'
+        : 'text-[9px] text-zinc-500'
+      }`}>
         {bottomText}
       </div>
     </div>

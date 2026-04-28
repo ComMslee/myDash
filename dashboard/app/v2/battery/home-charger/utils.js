@@ -67,14 +67,13 @@ export function parseKstDt(s) {
   return Date.UTC(y, mo, d, h - 9, mi, se);
 }
 
-// 충전중 셀의 경과 시간 라벨 ("32m" / "1h23")
+// 충전중 셀의 경과 시간 라벨 (hh:mm — "0:32" / "1:23" / "12:05")
 export function elapsedLabel(c, now) {
   if (c.stat !== '3') return '';
   const startMs = parseKstDt(c.lastTsdt || c.statUpdDt);
   if (!startMs) return '';
   const m = Math.max(0, Math.floor((now - startMs) / 60000));
-  if (m < 60) return `${m}m`;
-  return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`;
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
 }
 
 // 충전중 셀의 fill 비율 (0~100). 14시간을 max(100%)로 정규화.
