@@ -388,6 +388,17 @@ function HistoryInner() {
                 placeMarker={selectedPlace}
                 visible={viewMode === 'map'}
                 highlightLatLng={highlightLatLng}
+                _debugInfo={{
+                  drivesLen: drives.length,
+                  loadingDrives,
+                  selectedId: selectedDrive?.id ?? null,
+                  loadingRoute,
+                  posLen: positions.length,
+                  initialId: initialId ?? '∅',
+                  initialDate: initialDate ?? '∅',
+                  dayMode: dayMode ?? '∅',
+                  monthMode: monthMode ?? '∅',
+                }}
               />
             </div>
             {sparkRoutes.length > 0 && !selectedPlace && (

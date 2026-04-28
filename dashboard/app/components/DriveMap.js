@@ -28,7 +28,7 @@ export function loadLeaflet(cb) {
   document.head.appendChild(script);
 }
 
-export default function DriveMap({ positions, routes, loading, placeMarker, visible, highlightLatLng }) {
+export default function DriveMap({ positions, routes, loading, placeMarker, visible, highlightLatLng, _debugInfo }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -277,7 +277,9 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
           padding: '4px 6px', borderRadius: 6, whiteSpace: 'pre', pointerEvents: 'auto',
         }}
       >
-        {`pos=${positions?.length ?? 0} routes=${routes?.length ?? '∅'} place=${!!placeMarker} loading=${!!loading} mapReady=${mapReady}\n` + dbg.join('\n')}
+        {(_debugInfo ? `[hook] drives=${_debugInfo.drivesLen} loadingDrives=${_debugInfo.loadingDrives} selectedId=${_debugInfo.selectedId} loadingRoute=${_debugInfo.loadingRoute} posLen=${_debugInfo.posLen}\n[url] initId=${_debugInfo.initialId} initDate=${_debugInfo.initialDate} dayMode=${_debugInfo.dayMode} monthMode=${_debugInfo.monthMode}\n` : '')
+          + `pos=${positions?.length ?? 0} routes=${routes?.length ?? '∅'} place=${!!placeMarker} loading=${!!loading} mapReady=${mapReady}\n`
+          + dbg.join('\n')}
       </div>
     </div>
   );
