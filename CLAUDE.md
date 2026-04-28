@@ -60,5 +60,5 @@ docker compose build dashboard && docker compose up -d dashboard
   4. `useDriveData`의 단일 경로 fetch useEffect 에서 시작 시점에 `setPositions([])` / `setRouteData(null)` 호출 금지 — 새 데이터 도착 전 빈 배열 set 이 fitBounds 애니메이션과 race 를 만들어 view 가 어긋남 (`3e23655`).
   5. `/api/route-map` 5xx 회복용 1회 retry — `fetch().then(r => r.json())` 만으로는 HTTP 5xx 가 reject 되지 않아 `data.positions || []` 가 빈 배열로 그대로 흘러감. `r.ok` 체크 후 throw → catch 에서 1회 재시도 (`9ea3ebb`).
 - **`/api/route-map` LRU 캐시 변수명**: `cacheSet` 의 eviction 루프 조건은 반드시 `cache.size > CACHE_CAPACITY` — 변수명 오타시 `Map.size > undefined === false` 라 eviction 미작동, unbounded 캐시 → 메모리 압박 → 5xx 유발 (`9ea3ebb`).
-- **TeslaMate `charges` 테이블 스키마 변동**: 일부 TeslaMate 버전엔 `charge_limit_soc` 컬럼이 없음. `/api/charging-status` 의 SELECT 에서 제외하고 응답에서는 `charge_limit_soc: null` 로 반환 (`bb46127`). 다른 라우트에서도 `charges` 테이블 신규 컬럼 추가 시 동일하게 존재 여부 확인 필요.
+- **TeslaMate `charges` 테이블 스키마 변동**: 일부 TeslaMate 버전엔 `charge_limit_soc`, `time_to_full_charge` 컬럼이 없음. `/api/charging-status` SELECT 에서 제외하고 응답에서는 `null` 로 반환 (`bb46127` + 후속). 증상이 까다로운 이유 — 충전 미진행 시엔 폴백 분기만 타서 안 터지다가, `charging_processes` 가 열리는 순간 active 분기가 500 으로 떨어지고 프런트 `.catch(() => null)` 이 삼켜 `charging=false` 로 보임 ("처음엔 됐는데 안 됨" 패턴). 다른 라우트에서도 `charges` 테이블 신규 컬럼 추가 시 존재 여부 확인 필수.
 - **배포 후 캐시**: GitHub Actions 배포가 완료돼도 브라우저/CDN 캐시 때문에 즉시 반영 안 될 수 있음. 사용자가 "안 됨" 보고 시 하드 리프레시(Ctrl+Shift+R) 확인을 먼저 안내.

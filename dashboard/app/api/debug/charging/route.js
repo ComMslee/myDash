@@ -52,8 +52,7 @@ export async function GET() {
         [carId]
       ),
       pool.query(
-        `SELECT c.date, c.battery_level, c.charger_power, c.time_to_full_charge,
-                c.charging_process_id
+        `SELECT c.date, c.battery_level, c.charger_power, c.charging_process_id
          FROM charges c
          JOIN charging_processes cp ON cp.id = c.charging_process_id
          WHERE cp.car_id = $1

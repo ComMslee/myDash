@@ -3,8 +3,8 @@ import pool from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 // ⚠️  수정 전 필독: /CLAUDE.md "알려진 함정 — TeslaMate charges 테이블 스키마 변동" 섹션.
-//     일부 TeslaMate 버전엔 `charges.charge_limit_soc` 컬럼이 없음. SELECT 추가시
-//     해당 컬럼 존재 여부 확인 필요.
+//     일부 TeslaMate 버전엔 `charges.charge_limit_soc`, `charges.time_to_full_charge`
+//     컬럼이 없음. SELECT 추가시 해당 컬럼 존재 여부 확인 필요.
 
 // 최근 이 시간(초) 안의 positions.power < 0 이면 충전 중으로 간주 (폴백)
 const FALLBACK_WINDOW_SEC = 180;
@@ -31,10 +31,10 @@ export async function GET() {
     if (activeResult.rows.length > 0) {
       const activeProcess = activeResult.rows[0];
 
-      // Get latest charge detail — TeslaMate charges 테이블에 charge_limit_soc 컬럼이
-      // 없는 스키마가 있어 SELECT 에서 제외. 응답에서는 null 로 반환.
+      // Get latest charge detail — TeslaMate charges 테이블에 charge_limit_soc,
+      // time_to_full_charge 컬럼이 없는 스키마가 있어 SELECT 에서 제외. 응답에서는 null.
       const chargeDetail = await pool.query(
-        `SELECT charger_power, time_to_full_charge, battery_level
+        `SELECT charger_power, battery_level
          FROM charges
          WHERE charging_process_id = $1
          ORDER BY date DESC
@@ -52,9 +52,7 @@ export async function GET() {
           ? parseFloat(parseFloat(activeProcess.charge_energy_added).toFixed(2))
           : 0,
         charger_power: detail.charger_power ? parseFloat(detail.charger_power) : null,
-        time_to_full_charge: detail.time_to_full_charge
-          ? parseFloat(detail.time_to_full_charge)
-          : null,
+        time_to_full_charge: null,
         battery_level: detail.battery_level ?? null,
         charge_limit_soc: null,
       });
