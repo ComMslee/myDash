@@ -105,8 +105,10 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
       return;
     }
     setLoadingRoute(true);
-    setPositions([]);
-    setRouteData(null);
+    // setPositions([]) / setRouteData(null) 의도적으로 제거 — 새 fetch 도착 전까지 기존
+    // polyline 유지. 첫 진입 시 router cache 로 직전 drive 의 positions 가 이미 props 에
+    // 들어와있는 상태에서 빈 배열로 reset 하면 fitBounds animate(default true) 가 cancel
+    // 되며 view 가 default(서울) 에 고정되던 회귀.
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
     abortRef.current = controller;

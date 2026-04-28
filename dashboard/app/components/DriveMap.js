@@ -126,7 +126,9 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
       polyRef.current = group;
       if (allLatLngs.length >= 2) {
         log(`fitBounds(routes) m=${mapSize()} pts=${allLatLngs.length}`);
-        map.fitBounds(L.latLngBounds(allLatLngs), { padding: [50, 50] });
+        // animate:false — animate(default true) 진행 중 setPositions([]) 등에 의해
+        // cancel 되어 view 가 default(서울) 에 고정되던 race condition 제거
+        map.fitBounds(L.latLngBounds(allLatLngs), { padding: [50, 50], animate: false });
       }
       return;
     }
@@ -164,7 +166,9 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
     const mkEnd = L.circleMarker(latlngs[latlngs.length - 1], { radius: 7, fillColor: '#ef4444', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
     markersRef.current = [mkStart, mkEnd];
     log(`fitBounds(single) m=${mapSize()} pts=${latlngs.length}`);
-    map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50] });
+    // animate:false — animate(default true) 진행 중 setPositions([]) 등에 의해
+    // cancel 되어 view 가 default(서울) 에 고정되던 race condition 제거
+    map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50], animate: false });
     log(`after fitBounds center=${map.getCenter()?.lat?.toFixed(3)},${map.getCenter()?.lng?.toFixed(3)} z=${map.getZoom()}`);
   }, [positions, routes, placeMarker, log]);
 
