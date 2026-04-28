@@ -70,12 +70,16 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
   const elapsed = elapsedLabel(c, now);
   const peak = peakHourOf(hourly);
   const overdue = isCharging && chargingHours(c, now) >= OVERDUE_THRESHOLD_H;
-  const fillCls = overdue ? 'bg-amber-400/45' : meta.fill;
-  const borderCls = overdue ? 'border-amber-300' : meta.border;
+  const fillCls = overdue ? 'bg-orange-400/45' : meta.fill;
+  const borderCls = overdue ? 'border-orange-300' : meta.border;
   const bottomCls = isCharging
-    ? overdue ? 'text-[10px] font-bold text-amber-300' : 'text-[10px] font-semibold text-zinc-100'
+    ? overdue ? 'text-[10px] font-bold text-orange-300' : 'text-[10px] font-semibold text-zinc-100'
     : (c.stat === '9' || c.stat === '1') ? 'text-[10px] text-zinc-500'
     : 'text-[6px] text-zinc-500';
+  // 비정상 점유 — orange fill 위에 사선 stripe 패턴으로 시각 분리
+  const fillStyle = overdue
+    ? { backgroundImage: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.18) 0 4px, transparent 4px 9px)' }
+    : undefined;
 
   const ringClass =
     highlight?.tier === 'top1'  ? 'ring-4 ring-yellow-200 shadow-[0_0_8px_rgba(254,240,138,0.35)]' :
@@ -111,7 +115,7 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
         <div className="absolute inset-0 rounded-[10px] overflow-hidden pointer-events-none">
           <div
             className={`absolute bottom-0 left-0 right-0 ${fillCls} transition-[height] duration-500 ease-out`}
-            style={{ height: `${fillPct}%` }}
+            style={{ height: `${fillPct}%`, ...fillStyle }}
           />
         </div>
       )}
