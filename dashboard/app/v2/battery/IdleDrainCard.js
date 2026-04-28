@@ -77,7 +77,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
     );
   }
 
-  const { avgDrainPerDay, avgIdleHours, avgDrop, withDrainCount, totalRecords } = stats;
+  const { avgDrainPerDay, avgIdleHours, totalRecords } = stats;
   const fmtDrop = (n) => (Math.round(n * 10) / 10).toString();
 
   // 전체 총계 + 일자별 파생치 + 주별 집계 — grouped 변경 시에만 재계산
@@ -191,7 +191,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       {/* 요약 */}
-      <div className="grid grid-cols-3 border-b border-white/[0.06]">
+      <div className="grid grid-cols-2 border-b border-white/[0.06]">
         <div className="text-center py-3 border-r border-white/[0.06]">
           <div className="text-[10px] text-zinc-600 mb-1">일평균 손실</div>
           <div className="text-sm font-extrabold tabular-nums text-amber-400">
@@ -209,15 +209,10 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
           </div>
           <div className="text-[9px] text-zinc-600 mt-0.5">/일</div>
         </div>
-        <div className="text-center py-3 border-r border-white/[0.06]">
+        <div className="text-center py-3">
           <div className="text-[10px] text-zinc-600 mb-1">평균 대기</div>
           <div className="text-sm font-extrabold tabular-nums text-zinc-300">{formatHours(avgIdleHours)}</div>
           <div className="text-[9px] text-zinc-600 mt-0.5">{totalRecords}회 기준</div>
-        </div>
-        <div className="text-center py-3">
-          <div className="text-[10px] text-zinc-600 mb-1">평균 손실</div>
-          <div className={`text-sm font-extrabold tabular-nums ${dropTextClass(avgDrop)}`}>{avgDrop}%</div>
-          <div className="text-[9px] text-zinc-600 mt-0.5">드레인 {withDrainCount}회</div>
         </div>
       </div>
 
