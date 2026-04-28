@@ -1,5 +1,7 @@
 'use client';
 
+import { NOMINAL_BATTERY_KWH } from '@/lib/constants';
+
 export default function HealthScoreCard({ data, trend }) {
   const {
     score,
@@ -23,14 +25,13 @@ export default function HealthScoreCard({ data, trend }) {
     );
   }
 
-  // 배터리 용량 추이 (12개월 중 가장 오래된 달 대비 최근 달의 용량 비율)
+  // SOH — 출고 용량 대비 최근 추정치 (lib/constants NOMINAL_BATTERY_KWH 기준)
   const recentCap = (trend?.capacity_trend || []).slice(-12);
-  const firstCap = recentCap[0]?.est_capacity_kwh;
   const lastCap = recentCap[recentCap.length - 1]?.est_capacity_kwh;
-  const trendPct = firstCap && lastCap ? (lastCap / firstCap) * 100 : null;
-  const trendColor = trendPct == null ? '#71717a'
-    : trendPct >= 95 ? '#10b981'
-    : trendPct >= 90 ? '#f59e0b'
+  const sohPct = lastCap != null ? (lastCap / NOMINAL_BATTERY_KWH) * 100 : null;
+  const trendColor = sohPct == null ? '#71717a'
+    : sohPct >= 95 ? '#10b981'
+    : sohPct >= 90 ? '#f59e0b'
     : '#ef4444';
 
   // 2% 단위가 있으면 50칸, 없으면 10칸 fallback
@@ -62,11 +63,11 @@ export default function HealthScoreCard({ data, trend }) {
         </div>
         <div className="w-px h-8 bg-white/[0.06]" />
         <div className="text-center">
-          <p className="text-[10px] text-zinc-600 mb-0.5">예상/원래</p>
+          <p className="text-[10px] text-zinc-600 mb-0.5">용량/출고</p>
           <p className="text-xl font-black leading-none tabular-nums" style={{ color: trendColor }}>
-            {lastCap != null && firstCap != null ? (
+            {lastCap != null ? (
               <>
-                {lastCap.toFixed(1)}<span className="text-xs text-zinc-600 font-normal mx-0.5">/</span>{firstCap.toFixed(1)}
+                {lastCap.toFixed(1)}<span className="text-xs text-zinc-600 font-normal mx-0.5">/</span>{NOMINAL_BATTERY_KWH}
                 <span className="text-[10px] text-zinc-600 font-normal ml-0.5">kWh</span>
               </>
             ) : (
