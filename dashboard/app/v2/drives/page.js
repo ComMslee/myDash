@@ -13,7 +13,7 @@ import { useRankingsSheet } from '../components/RankingsSheet';
 // ── NEW 배지 ──────────────────────────────────────────────────
 function NewBadge() {
   return (
-    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gradient-to-br from-blue-500 to-violet-500 text-white leading-none">NEW</span>
+    <span className="text-[8px] font-bold px-1 py-px rounded bg-gradient-to-br from-blue-500 to-violet-500 text-white leading-none">NEW</span>
   );
 }
 
