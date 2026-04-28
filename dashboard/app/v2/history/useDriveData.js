@@ -115,24 +115,42 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
     const controller = new AbortController();
     abortRef.current = controller;
     const driveId = selectedDrive.id;
-    fetch(`/api/route-map?driveId=${driveId}`, { signal: controller.signal })
-      .then(r => { dbgLog(`[route fetch] HTTP ${r.status} driveId=${driveId}`); return r.json(); })
-      .then(data => {
-        if (controller.signal.aborted) { dbgLog(`[route fetch] ABORTED post-json driveId=${driveId}`); return; }
-        const pos = data.positions || [];
-        dbgLog(`[route fetch] OK driveId=${driveId} positions=${pos.length}`);
-        setPositions(pos);
-        setRouteData(data);
-        setLoadingRoute(false);
-      })
-      .catch(e => {
-        dbgLog(`[route fetch] CATCH ${e.name}: ${e.message?.slice(0, 40)}`);
-        if (e.name !== 'AbortError') {
+
+    // 5xx transient 에러 회복용 1회 retry. r.ok 체크해서 HTTP 에러를 throw 로 명시 처리.
+    const fetchOnce = async () => {
+      const r = await fetch(`/api/route-map?driveId=${driveId}`, { signal: controller.signal });
+      dbgLog(`[route fetch] HTTP ${r.status} driveId=${driveId}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    };
+    (async () => {
+      let data;
+      try {
+        data = await fetchOnce();
+      } catch (e1) {
+        if (e1.name === 'AbortError' || controller.signal.aborted) {
+          dbgLog(`[route fetch] ABORT driveId=${driveId}`);
+          return;
+        }
+        dbgLog(`[route fetch] retry after ${e1.message}`);
+        try {
+          data = await fetchOnce();
+        } catch (e2) {
+          if (e2.name === 'AbortError' || controller.signal.aborted) return;
+          dbgLog(`[route fetch] FAIL ${e2.message}`);
           setPositions([]);
           setRouteData(null);
           setLoadingRoute(false);
+          return;
         }
-      });
+      }
+      if (controller.signal.aborted) { dbgLog(`[route fetch] ABORTED post-json driveId=${driveId}`); return; }
+      const pos = data.positions || [];
+      dbgLog(`[route fetch] OK driveId=${driveId} positions=${pos.length}`);
+      setPositions(pos);
+      setRouteData(data);
+      setLoadingRoute(false);
+    })();
     return () => { dbgLog(`[route effect] CLEANUP abort driveId=${driveId}`); controller.abort(); };
   }, [selectedDrive?.id, isMock, refreshSignal, dayMode, monthMode]); // eslint-disable-line react-hooks/exhaustive-deps
 

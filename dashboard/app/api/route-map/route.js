@@ -18,7 +18,7 @@ function cacheGet(key) {
 function cacheSet(key, value) {
   if (cache.has(key)) cache.delete(key);
   cache.set(key, value);
-  while (cache.size > CAPACITY) {
+  while (cache.size > CACHE_CAPACITY) {
     const oldest = cache.keys().next().value;
     cache.delete(oldest);
   }
