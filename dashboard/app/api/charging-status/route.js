@@ -27,9 +27,10 @@ export async function GET() {
     if (activeResult.rows.length > 0) {
       const activeProcess = activeResult.rows[0];
 
-      // Get latest charge detail
+      // Get latest charge detail — TeslaMate charges 테이블에 charge_limit_soc 컬럼이
+      // 없는 스키마가 있어 SELECT 에서 제외. 응답에서는 null 로 반환.
       const chargeDetail = await pool.query(
-        `SELECT charger_power, time_to_full_charge, battery_level, charge_limit_soc
+        `SELECT charger_power, time_to_full_charge, battery_level
          FROM charges
          WHERE charging_process_id = $1
          ORDER BY date DESC
@@ -51,7 +52,7 @@ export async function GET() {
           ? parseFloat(detail.time_to_full_charge)
           : null,
         battery_level: detail.battery_level ?? null,
-        charge_limit_soc: detail.charge_limit_soc ?? null,
+        charge_limit_soc: null,
       });
     }
 
@@ -71,11 +72,7 @@ export async function GET() {
          (SELECT date FROM positions
             WHERE car_id = $1 ORDER BY date DESC LIMIT 1) AS latest_date,
          (SELECT start_date FROM charging_processes
-            WHERE car_id = $1 ORDER BY start_date DESC LIMIT 1) AS last_start,
-         (SELECT charge_limit_soc FROM charges c
-            JOIN charging_processes cp ON cp.id = c.charging_process_id
-            WHERE cp.car_id = $1
-            ORDER BY c.date DESC LIMIT 1) AS last_limit`,
+            WHERE car_id = $1 ORDER BY start_date DESC LIMIT 1) AS last_start`,
       [carId, FALLBACK_WINDOW_SEC, 300, 1200] // 최근 3분 / 5~20분 전
     );
 
@@ -109,7 +106,7 @@ export async function GET() {
         charger_power: inferredPower,
         time_to_full_charge: null,
         battery_level: fb.recent_level ?? null,
-        charge_limit_soc: fb.last_limit ?? null,
+        charge_limit_soc: null,
         debug,
       });
     }
