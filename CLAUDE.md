@@ -51,6 +51,27 @@ docker compose build dashboard && docker compose up -d dashboard
 
 세부 규칙은 [`docs/CODE_CONVENTIONS.md`](./docs/CODE_CONVENTIONS.md) 참고.
 
+## 디버깅 — `/v2/dev/api-status` 적극 활용
+
+이슈 트리아지·회귀 검증·서버 헬스 확인은 **항상 이 페이지부터** 펴서 1차 판단하고 코드를 보러 들어간다. 코드만 읽으면 라이브 상태(폴링 루프 살아있는지, DB freshness, 충전 감지 신호 등)가 안 보여 헛수고 되기 쉬움.
+
+- URL: `http://<host>/v2/dev/api-status` (하단 탭에선 미노출, URL 직접 입력)
+- 코드: `dashboard/app/v2/dev/api-status/page.js` + `/api/server-status`
+- 카테고리 5개(시스템 / 차량 / 주행 / 배터리 / 집충전기)에 라우트 22개. "전체 재실행" 으로 동시 호출, 각 행 ▾ 펼침 시 raw peek + (해당되면) 대시보드 뷰.
+
+**라우트별 1차 진단 매핑** — 사용자가 "X 안 됨" 보고할 때 이 행부터 확인:
+- 페이지 전체 느림/안 뜸 → `/api/server-status` (DB latency, pool, host load) 펼쳐 health 확인
+- 충전 감지 회귀 ("처음엔 되다가 안 됨" 등 `charges` 스키마 함정 의심) → `/api/charging-status` ▾ 의 `charging` / `pwr` / `lvl` / `pSig` / `lSig` (헤더 10연타 디버그 바와 동일 데이터)
+- 폴링 루프 멎음 의심 (집충전기 데이터 stale) → `/api/home-charger/poll-log` ▾ 의 `WarmDiagCard` — `마지막 tick` 이 2분+ 면 ⚠️
+- 이력 탭 5xx 회귀 (`/api/route-map` LRU 함정) → 시스템 카테고리 행에서 ▶ 단독 실행 반복, status·ms·KB 추이로 캐시 eviction 작동 확인
+- TeslaMate 데이터 끊김 → `/api/server-status` ▾ 의 `latest position / drive / charge` 색상 (5분 emerald → 30분 amber → 그 이상 rose)
+
+**기존 라이브 진단과의 관계**:
+- 헤더 10연타 디버그 바(`GlobalHeader.js`) — 라이브 모니터링용. 충전 감지 신호를 **바로 위에** 띄워 보고 싶을 때 사용. 그대로 살려둠.
+- 폴링 로그 팝업 안 `WarmDiagCard` — 집충전기 카드에서 진입. 이 페이지가 같은 데이터를 통합 보여줌.
+
+새 라우트를 추가했으면 `dashboard/app/v2/dev/api-status/page.js` 의 `ROUTES` 배열에도 등록해 디버깅 동선이 끊기지 않게 유지.
+
 ## 알려진 함정
 
 - **DriveMap 첫 렌더 폴리라인** (`dashboard/app/components/DriveMap.js` + `dashboard/app/v2/history/useDriveData.js`): 이력 탭 첫 클릭 시 폴리라인이 안 그려지고 default(서울) view 에 고정되던 회귀. 다음 5가지 fix 가 **모두** 살아 있어야 재현 안 됨 — 하나라도 빠지면 회귀.
