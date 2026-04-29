@@ -8,55 +8,55 @@ import { WarmDiagCard } from '@/app/v2/battery/home-charger/poll-log/diag';
 // params[].sample 의 'auto:firstDriveId' 는 마운트 시 /api/drives 응답에서 자동 픽
 const ROUTES = [
   // 시스템
-  { path: '/api/server-status',    label: '서버 상태',       category: '시스템', dashboard: 'server' },
+  { path: '/api/server-status',    label: '서버 상태',       desc: '호스트/메모리/CPU/uptime + DB pool·latency·time skew', category: '시스템', dashboard: 'server' },
 
   // 차량
-  { path: '/api/car',              label: '차량',           category: '차량' },
-  { path: '/api/drives',           label: '주행 요약',      category: '차량',
+  { path: '/api/car',              label: '차량',           desc: '현재 상태(주차/주행/충전) + SOC·범위·위치 + 추천 충전일', category: '차량' },
+  { path: '/api/drives',           label: '주행 요약',      desc: '최근 주행 목록 + 거리/시간/효율 (from·to 로 기간 필터)', category: '차량',
     params: [
       { key: 'from', sample: '' },
       { key: 'to',   sample: '' },
     ] },
-  { path: '/api/insights',         label: '인사이트',       category: '차량' },
+  { path: '/api/insights',         label: '인사이트',       desc: '누적 거리·kWh·평균효율·요약 통계', category: '차량' },
 
   // 주행
-  { path: '/api/route-map',        label: '경로 지도',      category: '주행',
+  { path: '/api/route-map',        label: '경로 지도',      desc: '단일 주행의 polyline + start/end + 통계 (driveId 필수)', category: '주행',
     params: [
       { key: 'driveId', required: true, sample: 'auto:firstDriveId' },
       { key: 'detail',  sample: '' },
     ] },
-  { path: '/api/heatmap',          label: '히트맵',         category: '주행' },
-  { path: '/api/year-heatmap',     label: '연간 히트맵',    category: '주행' },
-  { path: '/api/monthly-history',  label: '월간 이력',      category: '주행' },
-  { path: '/api/frequent-places',  label: '자주 가는 곳',   category: '주행' },
-  { path: '/api/rankings',         label: '랭킹',           category: '주행',
+  { path: '/api/heatmap',          label: '히트맵',         desc: '전체 위치 좌표 다운샘플링 → 빈도 히트맵 입력', category: '주행' },
+  { path: '/api/year-heatmap',     label: '연간 히트맵',    desc: '최근 1년 일별 주행/충전 집계 (캘린더 셀)', category: '주행' },
+  { path: '/api/monthly-history',  label: '월간 이력',      desc: '월별 주행거리/충전량/효율 집계', category: '주행' },
+  { path: '/api/frequent-places',  label: '자주 가는 곳',   desc: '지오펜스 도착 빈도 + 카카오 reverse geocode (집/회사 우선 핀)', category: '주행' },
+  { path: '/api/rankings',         label: '랭킹',           desc: '주행/일자별 TOP N (type=거리·시간·평속·효율)', category: '주행',
     params: [
       { key: 'type',  sample: 'drive_distance' },
       { key: 'limit', sample: '30' },
     ] },
 
   // 배터리
-  { path: '/api/battery',          label: '배터리',         category: '배터리' },
-  { path: '/api/battery-trend',    label: '배터리 추이',    category: '배터리' },
-  { path: '/api/charges',          label: '충전 기록',      category: '배터리' },
-  { path: '/api/charge-all-time',  label: '충전 전기간',    category: '배터리' },
-  { path: '/api/charging-status',  label: '충전 상태',      category: '배터리', dashboard: 'charging' },
-  { path: '/api/fast-charges',     label: '급속 기록',      category: '배터리' },
-  { path: '/api/slow-charges',     label: '완속 기록',      category: '배터리' },
-  { path: '/api/debug/charging',   label: '디버그 · 충전',  category: '배터리' },
+  { path: '/api/battery',          label: '배터리',         desc: 'SOC 종합 — 용량·체류 분포·주간/월간 충방전·추정 잔여', category: '배터리' },
+  { path: '/api/battery-trend',    label: '배터리 추이',    desc: 'SOC 시계열 (라인 차트용 다운샘플링)', category: '배터리' },
+  { path: '/api/charges',          label: '충전 기록',      desc: '최근 충전 세션 목록 (시작 SOC → 종료 SOC, kWh, 위치)', category: '배터리' },
+  { path: '/api/charge-all-time',  label: '충전 전기간',    desc: '전기간 누적 충전 통계 (총 kWh, 횟수, 평균)', category: '배터리' },
+  { path: '/api/charging-status',  label: '충전 상태',      desc: '현재 충전 중 여부 + power/level 신호 + 폴백 진단', category: '배터리', dashboard: 'charging' },
+  { path: '/api/fast-charges',     label: '급속 기록',      desc: 'DC 급속(>50kW) 충전 세션 필터', category: '배터리' },
+  { path: '/api/slow-charges',     label: '완속 기록',      desc: 'AC 완속 충전 세션 필터', category: '배터리' },
+  { path: '/api/debug/charging',   label: '디버그 · 충전',  desc: '충전 감지 raw 신호 (positions.power, charges 행, states)', category: '배터리' },
 
   // 집충전기
-  { path: '/api/home-charger',                  label: '집충전기',         category: '집충전기',
+  { path: '/api/home-charger',                  label: '집충전기',         desc: '환경공단 API 사용량 (캐시 우선, refresh=1로 강제 갱신)', category: '집충전기',
     params: [{ key: 'refresh', sample: '' }] },
-  { path: '/api/home-charger/fleet-stats',      label: '집충전기 누적',    category: '집충전기',
+  { path: '/api/home-charger/fleet-stats',      label: '집충전기 누적',    desc: '등록된 모든 집충전기 월별 누적 (months 로 기간)', category: '집충전기',
     params: [{ key: 'months', sample: '' }] },
-  { path: '/api/home-charger/poll-log',         label: '집충전기 로그',    category: '집충전기', dashboard: 'poll',
+  { path: '/api/home-charger/poll-log',         label: '집충전기 로그',    desc: '폴링 루프 로그 + warm 진단 (view=hourly/daily/raw)', category: '집충전기', dashboard: 'poll',
     params: [
       { key: 'view', sample: 'hourly' },
       { key: 'days', sample: '' },
       { key: 'date', sample: '' },
     ] },
-  { path: '/api/find-nearby-chargers',          label: '주변 충전소',      category: '집충전기',
+  { path: '/api/find-nearby-chargers',          label: '주변 충전소',      desc: '좌표/주소 기반 주변 충전소 탐색 (1회성 조사)', category: '집충전기',
     params: [
       { key: 'radius', sample: '' },
       { key: 'count',  sample: '' },
@@ -155,7 +155,37 @@ export default function ApiStatusPage() {
   const [autoDriveId, setAutoDriveId] = useState(null);
   const [autoErr, setAutoErr] = useState(null);
   const [lastRun, setLastRun] = useState(null);
+  const [serverData, setServerData] = useState(null);
+  const [serverLatency, setServerLatency] = useState(null);
+  const [serverErr, setServerErr] = useState(null);
   const runIdRef = useRef(0);
+
+  // 서버 상태 — 페이지 진입 시 즉시 + 30초 주기 자동 갱신
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      const t0 = performance.now();
+      try {
+        const res = await fetch('/api/server-status', { cache: 'no-store' });
+        const text = await res.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch {}
+        if (!alive) return;
+        if (!res.ok) {
+          setServerErr(data?.error || `HTTP ${res.status}`);
+        } else {
+          setServerData(data);
+          setServerLatency(performance.now() - t0);
+          setServerErr(null);
+        }
+      } catch (e) {
+        if (alive) setServerErr(e?.message || 'fetch 실패');
+      }
+    };
+    tick();
+    const id = setInterval(tick, 30_000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
 
   // 마운트 시 driveId 자동 픽
   useEffect(() => {
@@ -288,6 +318,23 @@ export default function ApiStatusPage() {
           </div>
         </div>
 
+        {/* 서버 상태 — 항상 상단 노출, 30초 자동 갱신 */}
+        <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">서버 상태</span>
+            <span className="text-[10px] text-zinc-600 tabular-nums">
+              {serverData ? '30초 자동' : serverErr ? '오류' : '로딩…'}
+            </span>
+          </div>
+          {serverData ? (
+            <ServerStatusCard data={serverData} latencyMs={serverLatency} />
+          ) : serverErr ? (
+            <div className="text-[11px] text-rose-300">로딩 실패: {serverErr}</div>
+          ) : (
+            <div className="text-[11px] text-zinc-500">로딩 중…</div>
+          )}
+        </div>
+
         {/* 카테고리별 */}
         {CATEGORIES.map(cat => {
           const list = ROUTES.filter(r => r.category === cat);
@@ -335,14 +382,25 @@ function RouteRow({ route, result, values, setValue, expanded, onToggleExpand, e
         </span>
 
         <button
-          onClick={onToggleExpand}
-          className="flex-1 min-w-0 text-left flex items-center gap-1.5"
+          onClick={() => {
+            const willExpand = !expanded;
+            onToggleExpand();
+            if (willExpand && (state === 'idle' || state === 'fail') && !missingRequired) {
+              onRun();
+            }
+          }}
+          className="flex-1 min-w-0 text-left flex flex-col gap-0.5"
         >
-          <span className="font-mono text-zinc-300 truncate">{route.path}</span>
-          {route.dashboard && (
-            <span className="text-[9px] px-1 rounded bg-blue-500/15 text-blue-300 shrink-0" title="대시보드 뷰 제공">📊</span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-zinc-300 truncate">{route.path}</span>
+            {route.dashboard && (
+              <span className="text-[9px] px-1 rounded bg-blue-500/15 text-blue-300 shrink-0" title="대시보드 뷰 제공">📊</span>
+            )}
+            <span className={`text-[9px] text-zinc-600 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}>▾</span>
+          </div>
+          {route.desc && (
+            <span className="text-[10px] text-zinc-500 truncate leading-tight">{route.desc}</span>
           )}
-          <span className={`text-[9px] text-zinc-600 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}>▾</span>
         </button>
 
         <span className="flex items-center gap-1.5 tabular-nums shrink-0">
