@@ -115,38 +115,6 @@ function summarizePayload(text) {
   return { kind: 'json', hint, peek, parsed };
 }
 
-const ACCENT = {
-  emerald: { text: 'text-emerald-400', dim: 'text-emerald-300/60', bg: 'bg-emerald-500/[0.06]', border: 'border-emerald-500/30' },
-  amber:   { text: 'text-amber-400',   dim: 'text-amber-300/60',   bg: 'bg-amber-500/[0.06]',   border: 'border-amber-500/30' },
-  rose:    { text: 'text-rose-400',    dim: 'text-rose-300/60',    bg: 'bg-rose-500/[0.07]',    border: 'border-rose-500/30' },
-  zinc:    { text: 'text-zinc-400',    dim: 'text-zinc-600',       bg: 'bg-white/[0.02]',       border: 'border-white/[0.06]' },
-};
-
-function CountBox({ mark, label, value, accent, total }) {
-  const a = ACCENT[accent];
-  const active = value > 0;
-  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
-  return (
-    <div className={`relative rounded-lg border ${a.border} ${active ? a.bg : 'bg-transparent'} px-2 py-1.5 flex flex-col items-center justify-center overflow-hidden`}>
-      <div className="flex items-baseline gap-1">
-        <span className={`text-base ${active ? a.text : 'text-zinc-700'}`}>{mark}</span>
-        <span className={`text-xl font-black leading-none tabular-nums ${active ? a.text : 'text-zinc-700'}`}>{value}</span>
-      </div>
-      <span className={`text-[9px] mt-0.5 ${active ? a.dim : 'text-zinc-700'}`}>
-        {label}{active && <span className="ml-1 tabular-nums">{pct}%</span>}
-      </span>
-    </div>
-  );
-}
-
-function stateInfo(s) {
-  if (s === 'ok')      return { mark: '✓', text: 'text-emerald-400', border: 'border-l-emerald-500/70', bg: 'bg-emerald-500/[0.04]', pill: 'bg-emerald-500/15 text-emerald-300' };
-  if (s === 'slow')    return { mark: '⚠', text: 'text-amber-400',   border: 'border-l-amber-500/80',   bg: 'bg-amber-500/[0.05]',   pill: 'bg-amber-500/15 text-amber-300' };
-  if (s === 'fail')    return { mark: '✕', text: 'text-rose-400',    border: 'border-l-rose-500/90',    bg: 'bg-rose-500/[0.06]',    pill: 'bg-rose-500/20 text-rose-300' };
-  if (s === 'running') return { mark: '…', text: 'text-blue-400',    border: 'border-l-blue-500/70',    bg: 'bg-blue-500/[0.04]',    pill: 'bg-blue-500/15 text-blue-300' };
-  return { mark: '○', text: 'text-zinc-600', border: 'border-l-transparent', bg: '', pill: 'text-zinc-700' };
-}
-
 export default function ApiStatusPage() {
   const [results, setResults] = useState({});
   const [paramValues, setParamValues] = useState({});
@@ -288,48 +256,79 @@ export default function ApiStatusPage() {
     <main className="min-h-screen bg-[#0f0f0f] text-white">
       <div className="max-w-2xl mx-auto px-4 py-5 pb-8 flex flex-col gap-4">
 
-        {/* 헤더 + 요약 */}
-        <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">API 상태</span>
-            <button
-              onClick={runAll}
-              className="px-3 py-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 text-xs font-semibold"
-            >
-              전체 재실행
-            </button>
-          </div>
-          <div className="grid grid-cols-4 gap-1.5 tabular-nums">
-            <CountBox mark="✓" label="OK"   value={counts.ok}   accent="emerald" total={ROUTES.length} />
-            <CountBox mark="⚠" label="느림" value={counts.slow} accent="amber"   total={ROUTES.length} />
-            <CountBox mark="✕" label="실패" value={counts.fail} accent="rose"    total={ROUTES.length} />
-            <CountBox mark="○" label="대기" value={counts.idle} accent="zinc"    total={ROUTES.length} />
-          </div>
-          <div className="flex items-center justify-between mt-1.5">
-            {counts.running > 0 ? (
-              <span className="text-[10px] text-blue-400">… 실행중 {counts.running}</span>
-            ) : <span />}
-            <span className="text-[10px] text-zinc-600 tabular-nums">
-              {lastRun ? new Date(lastRun).toLocaleTimeString('ko-KR') : '미실행'}
-            </span>
-          </div>
-          <div className="mt-2 text-[10px] text-zinc-600">
-            driveId 자동: <span className={autoDriveId ? 'text-zinc-400' : 'text-rose-400'}>{autoDriveId || autoErr || '로딩…'}</span>
-          </div>
-        </div>
+        {/* Hero — 전체 상태 한 줄 + 진행 바 */}
+        {(() => {
+          const overall =
+            counts.fail > 0 ? 'fail'
+            : counts.slow > 0 ? 'slow'
+            : counts.running > 0 ? 'running'
+            : counts.idle === ROUTES.length ? 'idle'
+            : counts.idle > 0 ? 'partial'
+            : 'ok';
+          const cfg = {
+            ok:      { label: '정상',   dot: 'bg-emerald-400', halo: 'bg-emerald-500/15', pulse: true },
+            slow:    { label: '느림',   dot: 'bg-amber-400',   halo: 'bg-amber-500/15',   pulse: false },
+            fail:    { label: '오류',   dot: 'bg-rose-400',    halo: 'bg-rose-500/15',    pulse: false },
+            running: { label: '실행 중', dot: 'bg-blue-400',    halo: 'bg-blue-500/15',    pulse: true },
+            partial: { label: '부분',   dot: 'bg-zinc-400',    halo: 'bg-zinc-500/15',    pulse: false },
+            idle:    { label: '대기',   dot: 'bg-zinc-600',    halo: 'bg-zinc-700/30',    pulse: false },
+          }[overall];
+          return (
+            <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
+                    <span className={`absolute inset-0 rounded-full ${cfg.halo} ${cfg.pulse ? 'animate-pulse' : ''}`} />
+                    <span className={`relative w-3 h-3 rounded-full ${cfg.dot}`} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-2xl font-light tracking-tight">{cfg.label}</div>
+                    <div className="text-[11px] text-zinc-500 tabular-nums mt-0.5">
+                      <span className="text-zinc-300">{counts.ok}</span>
+                      <span className="text-zinc-600"> / {ROUTES.length} OK</span>
+                      {counts.slow > 0 && <span className="ml-2.5 text-amber-400">⚠ {counts.slow}</span>}
+                      {counts.fail > 0 && <span className="ml-2.5 text-rose-400">✕ {counts.fail}</span>}
+                      {counts.idle > 0 && counts.idle < ROUTES.length && <span className="ml-2.5 text-zinc-600">○ {counts.idle}</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <button
+                    onClick={runAll}
+                    className="px-3 py-1.5 rounded-full bg-white/[0.05] hover:bg-white/[0.08] active:bg-white/[0.10] text-zinc-300 text-[11px] font-medium flex items-center gap-1.5"
+                  >
+                    <span className="text-[13px]">↻</span>
+                    <span>재실행</span>
+                  </button>
+                  <span className="text-[10px] text-zinc-600 tabular-nums">
+                    {lastRun ? new Date(lastRun).toLocaleTimeString('ko-KR', { hour12: false }) : '미실행'}
+                  </span>
+                </div>
+              </div>
+
+              {/* 진행 바 — OK / slow / fail / idle 비율 */}
+              <div className="mt-4 h-1 rounded-full bg-white/[0.04] overflow-hidden flex">
+                {counts.ok   > 0 && <div className="h-full bg-emerald-500/70" style={{ width: `${(counts.ok   / ROUTES.length) * 100}%` }} />}
+                {counts.slow > 0 && <div className="h-full bg-amber-500/70"   style={{ width: `${(counts.slow / ROUTES.length) * 100}%` }} />}
+                {counts.fail > 0 && <div className="h-full bg-rose-500/70"    style={{ width: `${(counts.fail / ROUTES.length) * 100}%` }} />}
+              </div>
+
+              {autoErr && (
+                <div className="mt-3 text-[10px] text-zinc-600">
+                  driveId: <span className="text-rose-400">{autoErr}</span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* 서버 상태 — 항상 상단 노출, 30초 자동 갱신 */}
         <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">서버 상태</span>
-            <span className="text-[10px] text-zinc-600 tabular-nums">
-              {serverData ? '30초 자동' : serverErr ? '오류' : '로딩…'}
-            </span>
-          </div>
+          <div className="text-[11px] font-bold tracking-widest uppercase text-zinc-500 mb-2">서버</div>
           {serverData ? (
             <ServerStatusCard data={serverData} latencyMs={serverLatency} />
           ) : serverErr ? (
-            <div className="text-[11px] text-rose-300">로딩 실패: {serverErr}</div>
+            <div className="text-[11px] text-rose-300">로딩 실패 — {serverErr}</div>
           ) : (
             <div className="text-[11px] text-zinc-500">로딩 중…</div>
           )}
@@ -370,17 +369,25 @@ export default function ApiStatusPage() {
 
 function RouteRow({ route, result, values, setValue, expanded, onToggleExpand, editing, onToggleEdit, onRun }) {
   const state = result?.state || 'idle';
-  const s = stateInfo(state);
   const hasParams = !!route.params?.length;
   const missingRequired = route.params?.some(p => p.required && !values[p.key]);
 
-  return (
-    <div className={`border-b border-white/[0.04] last:border-0 border-l-4 ${s.border} ${s.bg} transition-colors`}>
-      <div className="px-3 py-2 flex items-center gap-2 text-[11px]">
-        <span className={`${s.text} ${state === 'running' ? 'animate-pulse' : ''} text-base font-bold leading-none w-4 text-center shrink-0`}>
-          {s.mark}
-        </span>
+  const dotCls = {
+    ok:      'bg-emerald-400',
+    slow:    'bg-amber-400',
+    fail:    'bg-rose-400',
+    running: 'bg-blue-400 animate-pulse',
+    idle:    'bg-zinc-700',
+  }[state];
 
+  const msCls =
+    state === 'fail' ? 'text-rose-400'
+    : state === 'slow' ? 'text-amber-400'
+    : 'text-zinc-500';
+
+  return (
+    <div className="border-b border-white/[0.04] last:border-0">
+      <div className="flex items-stretch">
         <button
           onClick={() => {
             const willExpand = !expanded;
@@ -389,53 +396,39 @@ function RouteRow({ route, result, values, setValue, expanded, onToggleExpand, e
               onRun();
             }
           }}
-          className="flex-1 min-w-0 text-left flex flex-col gap-0.5"
+          className="flex-1 min-w-0 px-4 py-3 flex items-center gap-3 text-left active:bg-white/[0.02]"
         >
-          <div className="flex items-center gap-1.5">
-            <span className="font-mono text-zinc-300 truncate">{route.path}</span>
-            {route.dashboard && (
-              <span className="text-[9px] px-1 rounded bg-blue-500/15 text-blue-300 shrink-0" title="대시보드 뷰 제공">📊</span>
+          <span className={`w-2 h-2 rounded-full shrink-0 ${dotCls}`} aria-label={state} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[13px] font-medium text-zinc-100 truncate">{route.label}</span>
+              <span className="text-[10px] font-mono text-zinc-600 truncate">{route.path}</span>
+            </div>
+            {route.desc && (
+              <div className="text-[11px] text-zinc-500 mt-0.5 truncate">{route.desc}</div>
             )}
-            <span className={`text-[9px] text-zinc-600 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}>▾</span>
           </div>
-          {route.desc && (
-            <span className="text-[10px] text-zinc-500 truncate leading-tight">{route.desc}</span>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {state === 'running' ? (
+              <span className="text-[11px] text-blue-400 tabular-nums">…</span>
+            ) : state !== 'idle' ? (
+              <span className={`text-[11px] tabular-nums ${msCls}`}>{fmtMs(result.ms)}</span>
+            ) : missingRequired ? (
+              <span className="text-[10px] text-amber-500/70">파라미터 필요</span>
+            ) : null}
+            <span className={`text-zinc-600 text-base shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}>›</span>
+          </div>
         </button>
-
-        <span className="flex items-center gap-1.5 tabular-nums shrink-0">
-          {state === 'idle' ? (
-            <span className="text-[10px] text-zinc-700 px-1.5">대기</span>
-          ) : state === 'running' ? (
-            <span className="text-[10px] text-blue-400 px-1.5">…</span>
-          ) : (
-            <>
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${s.pill}`}>
-                {result.status ?? 'ERR'}
-              </span>
-              <span className={`text-[10px] ${result.ms >= SLOW_MS ? 'text-amber-400' : 'text-zinc-500'}`}>
-                {fmtMs(result.ms)}
-              </span>
-            </>
-          )}
+        {hasParams && (
           <button
-            onClick={onRun}
-            disabled={missingRequired || state === 'running'}
-            className="w-6 h-6 rounded hover:bg-white/[0.06] flex items-center justify-center text-zinc-500 hover:text-zinc-200 disabled:opacity-30"
-            title={missingRequired ? '필수 파라미터 없음' : '실행'}
+            onClick={onToggleEdit}
+            className={`px-3 flex items-center justify-center text-base active:bg-white/[0.05] ${editing ? 'text-blue-300' : 'text-zinc-600 hover:text-zinc-300'}`}
+            title="파라미터 편집"
+            aria-label="파라미터 편집"
           >
-            ▶
+            ✎
           </button>
-          {hasParams && (
-            <button
-              onClick={onToggleEdit}
-              className={`w-6 h-6 rounded hover:bg-white/[0.06] flex items-center justify-center ${editing ? 'text-blue-300' : 'text-zinc-500'}`}
-              title="파라미터 편집"
-            >
-              ✏︎
-            </button>
-          )}
-        </span>
+        )}
       </div>
 
       {/* 파라미터 칩 / 편집 */}
@@ -474,28 +467,65 @@ function RouteRow({ route, result, values, setValue, expanded, onToggleExpand, e
       )}
 
       {/* 펼침 */}
-      {expanded && result && state !== 'idle' && state !== 'running' && (
+      {expanded && (
         <div className="px-4 pb-3 space-y-2">
-          {/* 대시보드 뷰 (시스템/충전 진단/폴링 진단 라우트만) */}
-          {route.dashboard === 'server' && result.parsed && (
-            <ServerStatusCard data={result.parsed} latencyMs={result.ms} />
-          )}
-          {route.dashboard === 'charging' && result.parsed && (
-            <ChargingDiagPanel data={result.parsed} />
-          )}
-          {route.dashboard === 'poll' && result.parsed?.warmDiag && (
-            <WarmDiagCard diag={result.parsed.warmDiag} />
+          {state === 'running' && (
+            <div className="text-[11px] text-blue-400 flex items-center gap-2 py-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+              실행 중...
+            </div>
           )}
 
-          {/* raw peek */}
-          <div>
-            <div className="text-[10px] text-zinc-600 mb-1 tabular-nums">
-              {result.url} · {result.hint}
+          {state === 'idle' && (
+            <div className="flex items-center justify-between text-[11px] text-zinc-500 py-1">
+              <span>대기 중</span>
+              <button
+                onClick={onRun}
+                disabled={missingRequired}
+                className="text-blue-400 hover:text-blue-300 disabled:opacity-40"
+              >
+                {missingRequired ? '필수 파라미터 없음' : '실행 →'}
+              </button>
             </div>
-            <pre className="bg-zinc-900/60 border border-white/[0.04] rounded-lg p-2 text-[10px] text-zinc-300 overflow-auto max-h-60 font-mono whitespace-pre-wrap break-all">
+          )}
+
+          {result && state !== 'idle' && state !== 'running' && (
+            <>
+              {/* 대시보드 뷰 (시스템/충전 진단/폴링 진단 라우트만) */}
+              {route.dashboard === 'server' && result.parsed && (
+                <ServerStatusCard data={result.parsed} latencyMs={result.ms} />
+              )}
+              {route.dashboard === 'charging' && result.parsed && (
+                <ChargingDiagPanel data={result.parsed} />
+              )}
+              {route.dashboard === 'poll' && result.parsed?.warmDiag && (
+                <WarmDiagCard diag={result.parsed.warmDiag} />
+              )}
+
+              {/* raw peek */}
+              <div>
+                <div className="flex items-center justify-between text-[10px] text-zinc-600 mb-1 tabular-nums">
+                  <span className="truncate">
+                    <span className={result.status >= 400 ? 'text-rose-400' : result.status >= 300 ? 'text-amber-400' : 'text-zinc-500'}>
+                      {result.status ?? 'ERR'}
+                    </span>
+                    <span className="ml-2">{result.url}</span>
+                    <span className="ml-2">· {result.hint}</span>
+                  </span>
+                  <button
+                    onClick={onRun}
+                    disabled={state === 'running' || missingRequired}
+                    className="ml-2 shrink-0 px-2 py-0.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 disabled:opacity-40"
+                  >
+                    ↻ 재실행
+                  </button>
+                </div>
+                <pre className="bg-zinc-900/60 border border-white/[0.04] rounded-lg p-2 text-[10px] text-zinc-300 overflow-auto max-h-60 font-mono whitespace-pre-wrap break-all">
 {result.peek || '(empty)'}
-            </pre>
-          </div>
+                </pre>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
