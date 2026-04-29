@@ -5,8 +5,8 @@ import { usePathname } from 'next/navigation';
 import { useMock, MOCK_DATA } from '../context/mock';
 import { formatDuration } from '../../lib/format';
 
-// GlobalHeader를 숨길 경로 (서브/상세 페이지)
-const HIDDEN_ROUTES = ['/rankings', '/v1/rankings'];
+// GlobalHeader를 숨길 경로 (서브/상세 페이지 + dev 도구)
+const HIDDEN_ROUTES = ['/rankings', '/v1/rankings', '/v2/dev'];
 
 function PercentBadge({ level, color, charging }) {
   return (

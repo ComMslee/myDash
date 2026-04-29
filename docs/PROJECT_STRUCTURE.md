@@ -84,8 +84,11 @@ myDash/
     │   │   │   ├── page.js           # 주행 이력 목록
     │   │   │   ├── DriveListView.js  # 리스트 뷰
     │   │   │   └── useDriveData.js   # 주행 데이터 훅
-    │   │   └── chargers/
-    │   │       └── page.js           # 주변 충전소 지도 검색
+    │   │   ├── chargers/
+    │   │   │   └── page.js           # 주변 충전소 지도 검색
+    │   │   └── dev/                  # 개발/진단 도구 (하단 탭·헤더 미노출, URL 직접)
+    │   │       └── api-status/
+    │   │           └── page.js       # 22개 라우트 가용성 체크 + 서버/충전/폴링 진단 통합
     │   └── api/                  # 서버사이드 API 라우트 (모두 GET, force-dynamic)
     │       ├── car/route.js              # 차량 기본 정보 + 배터리 + 상태
     │       ├── charging-status/route.js  # 현재 충전 상태
@@ -107,7 +110,8 @@ myDash/
     │       ├── home-charger/fleet-stats/route.js  # 집충전기 단지 통계
     │       ├── home-charger/poll-log/route.js     # 폴링 로그 조회
     │       ├── find-nearby-chargers/route.js  # 좌표 기반 주변 충전소 검색
-    │       └── debug/charging/route.js        # 충전 디버그 정보
+    │       ├── debug/charging/route.js        # 충전 디버그 정보
+    │       └── server-status/route.js         # 호스트/프로세스/DB 풀·freshness — /v2/dev/api-status 대시보드용
 ```
 
 ## 라우트
@@ -119,3 +123,4 @@ myDash/
 | `/v2/battery` | 건강 점수 + 대기 소모 + 집충전기 + 충전 습관 + 급속/완속 기록 | 배터리 |
 | `/v2/history` | 주행 이력 목록 + 경로 지도 | 이력 |
 | `/v2/chargers` | 주변 충전소 지도 검색 | 충전소 |
+| `/v2/dev/api-status` | API 가용성 + 서버/진단 (개발자용, URL 직접) | — (헤더·탭 미노출) |
