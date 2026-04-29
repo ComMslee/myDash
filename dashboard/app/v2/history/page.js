@@ -184,21 +184,21 @@ function HistoryInner() {
             </button>
           ) : (
             <>
-              {/* 토글 헤더 — list/map 양쪽 모드 모두 노출. 접기 버튼은 map 모드에만(list 는 카드 자체가 항상 헤더 역할). */}
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-1">
+              {/* 토글 헤더 — list/map 양쪽 모드 모두 노출. 접기 버튼은 map 모드에만. */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5 bg-zinc-800/40 border border-white/[0.06] rounded-lg p-0.5">
                   <button
                     onClick={() => { setPlacesMode('frequent'); setPlacesExpanded(false); }}
-                    className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors ${
-                      !isLong ? 'text-zinc-300 bg-white/[0.06]' : 'text-zinc-600 hover:text-zinc-400'
+                    className={`text-xs font-semibold px-2.5 py-1 rounded-md transition-colors ${
+                      !isLong ? 'text-zinc-100 bg-white/[0.10]' : 'text-zinc-500 hover:text-zinc-300'
                     }`}
-                  >📍 자주</button>
+                  >📍 자주 가는 곳</button>
                   <button
                     onClick={() => { setPlacesMode('long-stay'); setPlacesExpanded(false); }}
-                    className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors ${
-                      isLong ? 'text-zinc-300 bg-white/[0.06]' : 'text-zinc-600 hover:text-zinc-400'
+                    className={`text-xs font-semibold px-2.5 py-1 rounded-md transition-colors ${
+                      isLong ? 'text-zinc-100 bg-white/[0.10]' : 'text-zinc-500 hover:text-zinc-300'
                     }`}
-                  >🕐 오래</button>
+                  >🕐 오래 머문 곳</button>
                 </div>
                 {viewMode === 'map' && (
                   <button onClick={() => setPlacesCollapsed(true)} className="text-[10px] text-zinc-600 hover:text-zinc-300 px-1.5">접기</button>
