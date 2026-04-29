@@ -6,10 +6,9 @@ import { WarmDiagCard } from '@/app/v2/battery/home-charger/poll-log/diag';
 // ── 라우트 메타데이터 ─────────────────────────────────────────
 // dashboard: 펼침 시 raw peek 위에 추가로 보여줄 대시보드 ('server' | 'charging' | 'poll')
 // params[].sample 의 'auto:firstDriveId' 는 마운트 시 /api/drives 응답에서 자동 픽
+// /api/server-status 는 ROUTES 에서 제외 — 상단 항상-표시 카드(`서버` 섹션)
+// 가 동일 엔드포인트를 30초 자동 갱신해 그림. 카테고리 행으로 또 두면 중복.
 const ROUTES = [
-  // 시스템
-  { path: '/api/server-status',    label: '서버 상태',       desc: '호스트/메모리/CPU/uptime + DB pool·latency·time skew', category: '시스템', dashboard: 'server' },
-
   // 차량
   { path: '/api/car',              label: '차량',           desc: '현재 상태(주차/주행/충전) + SOC·범위·위치 + 추천 충전일', category: '차량' },
   { path: '/api/drives',           label: '주행 요약',      desc: '최근 주행 목록 + 거리/시간/효율 (from·to 로 기간 필터)', category: '차량',
@@ -65,7 +64,7 @@ const ROUTES = [
     ] },
 ];
 
-const CATEGORIES = ['시스템', '차량', '주행', '배터리', '집충전기'];
+const CATEGORIES = ['차량', '주행', '배터리', '집충전기'];
 
 const SLOW_MS = 1500;
 
