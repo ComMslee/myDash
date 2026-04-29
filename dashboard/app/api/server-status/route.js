@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/auth-helper';
 import os from 'node:os';
 import pool from '@/lib/db';
+import { getContainerStats } from '@/lib/docker-stats';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,12 +13,15 @@ export async function GET() {
   const cpu = process.cpuUsage();
 
   const dbT0 = performance.now();
-  const dbResults = await Promise.allSettled([
-    pool.query('SELECT MAX(date)     AS latest FROM positions'),
-    pool.query('SELECT MAX(end_date) AS latest FROM drives'),
-    pool.query('SELECT MAX(end_date) AS latest FROM charges'),
-    pool.query('SELECT COUNT(*)::int AS n      FROM cars'),
-    pool.query('SELECT version()     AS v'),
+  const [dbResults, dockerStats] = await Promise.all([
+    Promise.allSettled([
+      pool.query('SELECT MAX(date)     AS latest FROM positions'),
+      pool.query('SELECT MAX(end_date) AS latest FROM drives'),
+      pool.query('SELECT MAX(end_date) AS latest FROM charges'),
+      pool.query('SELECT COUNT(*)::int AS n      FROM cars'),
+      pool.query('SELECT version()     AS v'),
+    ]),
+    getContainerStats(), // docker.sock RO — 실패 시 ok:false 반환
   ]);
   const dbLatencyMs = Math.round(performance.now() - dbT0);
   const dbOk = dbResults.every(r => r.status === 'fulfilled');
@@ -71,5 +75,6 @@ export async function GET() {
       version: pick(4, 'v'),
       error: dbError,
     },
+    docker: dockerStats,
   });
 }

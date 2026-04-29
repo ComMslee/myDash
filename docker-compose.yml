@@ -59,6 +59,7 @@ services:
       - HOME_CHARGER_STAT_IDS=${HOME_CHARGER_STAT_IDS:-PI795111,PI313299,PIH01089}
     volumes:
       - dashboard-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # 컨테이너별 stats 조회용 (api-status 페이지)
     ports:
       - 80:5000
       - 5000:5000
