@@ -636,6 +636,22 @@ function ServerStatusCard({ data, latencyMs, history }) {
   const swapTotal = data.host?.swapTotal;
   const swapUsedPct = swapTotal && data.host?.swapFree != null
     ? Math.round((1 - data.host.swapFree / swapTotal) * 100) : null;
+
+  // 24h 피크/한산 — pg 가 real 을 string 으로 줄 수 있어 Number 강제 + 시각 사전 포맷
+  const dailyPeakCpuRaw = data.daily?.peak?.cpu;
+  const dailyPeakCpu = dailyPeakCpuRaw != null ? Number(dailyPeakCpuRaw) : null;
+  const dailyQuietCpuRaw = data.daily?.quiet?.cpu;
+  const dailyQuietCpu = dailyQuietCpuRaw != null ? Number(dailyQuietCpuRaw) : null;
+  const fmtClock = (raw) => {
+    if (!raw) return null;
+    try {
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) return null;
+      return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+    } catch { return null; }
+  };
+  const dailyPeakTime = fmtClock(data.daily?.peak?.ts);
+  const dailyQuietTime = fmtClock(data.daily?.quiet?.ts);
   const load = data.host?.loadavg || [];
   const loadColor = load[0] != null && data.host?.cpuCount
     ? (load[0] / data.host.cpuCount > 1 ? 'text-rose-400'
@@ -847,39 +863,34 @@ function ServerStatusCard({ data, latencyMs, history }) {
             />
           )}
           {/* 24h 피크/한산 — DB 로그 기반. pg 가 real 을 string 으로 줄 수 있어 Number 강제. */}
-          {data.daily?.peak && (() => {
-            const peakCpu = data.daily.peak.cpu != null ? Number(data.daily.peak.cpu) : null;
-            const quietCpu = data.daily.quiet?.cpu != null ? Number(data.daily.quiet.cpu) : null;
-            const peakTs = data.daily.peak.ts ? new Date(data.daily.peak.ts) : null;
-            const quietTs = data.daily.quiet?.ts ? new Date(data.daily.quiet.ts) : null;
-            const fmtTime = (d) => d && !isNaN(d.getTime())
-              ? d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
-              : null;
-            return (
-              <>
-                <Divider />
-                <Row
-                  label="24h 피크 CPU"
-                  value={Number.isFinite(peakCpu) ? peakCpu.toFixed(2) : '—'}
-                  valClass="text-amber-400"
-                  trail={fmtTime(peakTs) && (
-                    <span className="text-[9px] text-zinc-500 font-normal">{fmtTime(peakTs)}</span>
-                  )}
-                />
+          {dailyPeakCpu != null && (
+            <>
+              <Divider />
+              <Row
+                label="24h 피크 CPU"
+                value={Number.isFinite(dailyPeakCpu) ? dailyPeakCpu.toFixed(2) : '—'}
+                valClass="text-amber-400"
+                trail={dailyPeakTime && (
+                  <span className="text-[9px] text-zinc-500 font-normal">{dailyPeakTime}</span>
+                )}
+              />
+              {dailyQuietCpu != null && (
                 <Row
                   label="24h 한산 CPU"
-                  value={Number.isFinite(quietCpu) ? quietCpu.toFixed(2) : '—'}
+                  value={Number.isFinite(dailyQuietCpu) ? dailyQuietCpu.toFixed(2) : '—'}
                   valClass="text-emerald-400/80"
-                  trail={fmtTime(quietTs) && (
-                    <span className="text-[9px] text-zinc-500 font-normal">{fmtTime(quietTs)}</span>
+                  trail={dailyQuietTime && (
+                    <span className="text-[9px] text-zinc-500 font-normal">{dailyQuietTime}</span>
                   )}
                 />
+              )}
+              {data.daily?.samples != null && (
                 <div className="text-[9px] text-zinc-600 pt-0.5">
-                  {data.daily.samples} 샘플 (5분 간격 로그)
+                  {Number(data.daily.samples)} 샘플 (5분 간격 로그)
                 </div>
-              </>
-            );
-          })()}
+              )}
+            </>
+          )}
           <div className="text-[10px] text-zinc-500 pt-1 leading-snug">
             {(() => {
               const verdict =
