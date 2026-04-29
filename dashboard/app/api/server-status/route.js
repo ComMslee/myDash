@@ -1,7 +1,46 @@
 import { requireAuth } from '@/lib/auth-helper';
 import os from 'node:os';
+import { readFile, statfs } from 'node:fs/promises';
 import pool from '@/lib/db';
 import { getContainerStats } from '@/lib/docker-stats';
+
+// /proc/meminfo 파싱 — Linux 가용 메모리는 MemAvailable 가 실제 지표.
+// os.freemem() 의 MemFree 는 캐시 회수 가능분 미반영이라 왜곡됨.
+async function readMemInfo() {
+  try {
+    const text = await readFile('/proc/meminfo', 'utf8');
+    const m = {};
+    for (const line of text.split('\n')) {
+      const mt = line.match(/^(\w+):\s+(\d+)/);
+      if (mt) m[mt[1]] = +mt[2] * 1024; // kB → bytes
+    }
+    return {
+      memTotal: m.MemTotal ?? null,
+      memFree: m.MemFree ?? null,
+      memAvailable: m.MemAvailable ?? null,
+      buffers: m.Buffers ?? null,
+      cached: m.Cached ?? null,
+      swapTotal: m.SwapTotal ?? null,
+      swapFree: m.SwapFree ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// 루트 파일시스템 가용 용량 — fs.statfs (Node 18.15+).
+async function getDiskRoot() {
+  try {
+    const s = await statfs('/');
+    return {
+      total: s.blocks * s.bsize,
+      free: s.bfree * s.bsize,
+      available: s.bavail * s.bsize, // 비-루트 사용자 가용분
+    };
+  } catch {
+    return null;
+  }
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +66,7 @@ export async function GET() {
   const cpu = process.cpuUsage();
 
   const dbT0 = performance.now();
-  const [dbResults, dockerStats] = await Promise.all([
+  const [dbResults, dockerStats, memInfo, disk] = await Promise.all([
     Promise.allSettled([
       pool.query('SELECT MAX(date)     AS latest FROM positions'),
       pool.query('SELECT MAX(end_date) AS latest FROM drives'),
@@ -37,6 +76,8 @@ export async function GET() {
       pool.query('SELECT version()     AS v'),
     ]),
     getContainerStats(), // docker.sock RO — 실패 시 ok:false 반환
+    readMemInfo(),
+    getDiskRoot(),
   ]);
   const dbLatencyMs = Math.round(performance.now() - dbT0);
   const dbOk = dbResults.every(r => r.status === 'fulfilled');
@@ -46,8 +87,11 @@ export async function GET() {
   const pick = (i, key = 'latest') =>
     dbResults[i].status === 'fulfilled' ? dbResults[i].value.rows[0]?.[key] ?? null : null;
 
-  const memTotal = os.totalmem();
-  const memFree = os.freemem();
+  // 메모리 — /proc/meminfo 가능하면 MemAvailable 기반(정확), 폴백은 os.freemem().
+  const memTotal = memInfo?.memTotal || os.totalmem();
+  const memFree = memInfo?.memFree ?? os.freemem();
+  const memAvailable = memInfo?.memAvailable ?? memFree; // 폴백: free 사용
+  const memUsedActual = memTotal - memAvailable;          // 실제 사용 (캐시 제외)
   const loadavg = os.loadavg().map(n => +n.toFixed(2));
   const containers = dockerStats?.ok ? (dockerStats.containers || []) : [];
   const findC = (n) => containers.find(c => c.name === n);
@@ -58,7 +102,8 @@ export async function GET() {
   pushHistorySample({
     ts: startedAt,
     hostCpu: loadavg[0] ?? null,
-    hostMemPct: memTotal ? +((1 - memFree / memTotal) * 100).toFixed(1) : null,
+    hostMemPct: memTotal ? +((memUsedActual / memTotal) * 100).toFixed(1) : null,
+    hostMemAvailPct: memTotal ? +((memAvailable / memTotal) * 100).toFixed(1) : null,
     dbMs: dbOk ? dbLatencyMs : null,
     tmCpu: tm?.cpuPct ?? null,
     tmMemMB: tm?.memUsage != null ? +(tm.memUsage / 1024 / 1024).toFixed(1) : null,
@@ -94,6 +139,12 @@ export async function GET() {
       loadavg,
       memTotal,
       memFree,
+      memAvailable,    // 캐시 회수 가능분 포함 — 실제 가용
+      memCached: memInfo?.cached ?? null,
+      memBuffers: memInfo?.buffers ?? null,
+      swapTotal: memInfo?.swapTotal ?? null,
+      swapFree: memInfo?.swapFree ?? null,
+      disk,            // { total, free, available } — 루트 파일시스템
     },
     db: {
       ok: dbOk,

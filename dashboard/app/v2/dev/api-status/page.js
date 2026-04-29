@@ -608,8 +608,33 @@ function ServerStatusCard({ data, latencyMs, history }) {
     : Math.abs(skew) < 30_000 ? 'text-amber-400'
     : 'text-rose-400';
 
-  const memUsedPct = data.host?.memTotal
-    ? Math.round((1 - data.host.memFree / data.host.memTotal) * 100) : null;
+  // 메모리 사용% — MemAvailable 기반(정확). 폴백: MemFree.
+  const memAvailable = data.host?.memAvailable ?? data.host?.memFree;
+  const memUsedPct = data.host?.memTotal && memAvailable != null
+    ? Math.round((1 - memAvailable / data.host.memTotal) * 100) : null;
+  const memAvailPct = data.host?.memTotal && memAvailable != null
+    ? Math.round((memAvailable / data.host.memTotal) * 100) : null;
+
+  // 디스크 (루트)
+  const disk = data.host?.disk;
+  const diskUsedPct = disk?.total ? Math.round((1 - disk.available / disk.total) * 100) : null;
+
+  // CPU 여유% — 100 - (loadavg / cpuCount × 100), 캡 0~100
+  const cpuLoadPct = load[0] != null && data.host?.cpuCount
+    ? Math.min(100, Math.max(0, Math.round((load[0] / data.host.cpuCount) * 100)))
+    : null;
+  const cpuFreePct = cpuLoadPct != null ? 100 - cpuLoadPct : null;
+
+  // 여유% 색 (높을수록 좋음 — 색 반전)
+  const freePctColor = (pct) => pct == null ? 'text-zinc-300'
+    : pct > 50 ? 'text-emerald-400'
+    : pct > 20 ? 'text-amber-400'
+    : 'text-rose-400';
+
+  // 스왑 사용% (있으면)
+  const swapTotal = data.host?.swapTotal;
+  const swapUsedPct = swapTotal && data.host?.swapFree != null
+    ? Math.round((1 - data.host.swapFree / swapTotal) * 100) : null;
   const load = data.host?.loadavg || [];
   const loadColor = load[0] != null && data.host?.cpuCount
     ? (load[0] / data.host.cpuCount > 1 ? 'text-rose-400'
@@ -663,8 +688,8 @@ function ServerStatusCard({ data, latencyMs, history }) {
 
   return (
     <div className="space-y-2">
-      {/* 3그룹: 모바일 1열(상하) / md+ 3열 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+      {/* 4그룹: 모바일 1열 / sm 2열(2×2) / xl 4열 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
 
         {/* ─── 서버 (호스트) ─── */}
         <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-2.5 space-y-1.5 min-w-0">
@@ -676,7 +701,7 @@ function ServerStatusCard({ data, latencyMs, history }) {
             trail={<Sparkline values={history?.map(h => h.hostCpu)} color="#f59e0b" />}
           />
           <Row
-            label="메모리"
+            label="메모리 (실 사용)"
             value={memUsedPct != null ? `${memUsedPct}%` : '—'}
             valClass={memPctColor(memUsedPct)}
             trail={<Sparkline values={history?.map(h => h.hostMemPct)} color="#3b82f6" />}
@@ -774,6 +799,64 @@ function ServerStatusCard({ data, latencyMs, history }) {
           <div className="text-[10px] text-zinc-500 pt-1 leading-snug truncate">
             node {data.node} · pid {data.process?.pid} · {data.env}
             {dbVerShort && <span className="text-zinc-600"> · {dbVerShort}</span>}
+          </div>
+        </div>
+
+        {/* ─── 서버 여유 (확장 capacity) ─── */}
+        <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-2.5 space-y-1.5 min-w-0">
+          <SectionHeader title="서버 여유" />
+          <Row
+            label="CPU 여유"
+            value={cpuFreePct != null ? `${cpuFreePct}%` : '—'}
+            valClass={freePctColor(cpuFreePct)}
+          />
+          <Row
+            label="메모리 여유"
+            value={memAvailPct != null ? `${memAvailPct}%` : '—'}
+            valClass={freePctColor(memAvailPct)}
+            trail={<Sparkline values={history?.map(h => h.hostMemAvailPct)} color="#10b981" />}
+          />
+          <Row
+            label="가용 메모리"
+            value={memAvailable != null ? fmtGB(memAvailable) : '—'}
+            valClass="text-zinc-300"
+          />
+          <Divider />
+          <Row
+            label="디스크 여유"
+            value={disk?.total
+              ? `${100 - (diskUsedPct ?? 100)}%`
+              : '—'}
+            valClass={freePctColor(disk ? 100 - diskUsedPct : null)}
+          />
+          <Row
+            label="디스크 가용"
+            value={disk?.available != null ? fmtGB(disk.available) : '—'}
+            valClass="text-zinc-300"
+          />
+          <Row
+            label="디스크 총량"
+            value={disk?.total != null ? fmtGB(disk.total) : '—'}
+          />
+          {swapTotal > 0 && (
+            <Row
+              label="스왑 사용"
+              value={`${swapUsedPct ?? 0}%`}
+              valClass={swapUsedPct != null && swapUsedPct > 30 ? 'text-amber-400' : 'text-zinc-400'}
+            />
+          )}
+          <div className="text-[10px] text-zinc-500 pt-1 leading-snug">
+            {(() => {
+              const verdict =
+                cpuFreePct != null && memAvailPct != null
+                  ? (cpuFreePct > 50 && memAvailPct > 50 && (diskUsedPct == null || diskUsedPct < 80))
+                    ? <span className="text-emerald-500/70">신규 서비스 추가 여유 있음</span>
+                    : (cpuFreePct < 20 || memAvailPct < 20 || (diskUsedPct ?? 0) > 90)
+                      ? <span className="text-rose-400/80">자원 압박 — 추가 비권장</span>
+                      : <span className="text-amber-400/80">제한적 — 가벼운 서비스만</span>
+                  : '—';
+              return verdict;
+            })()}
           </div>
         </div>
       </div>
