@@ -1,7 +1,34 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Component, useEffect, useMemo, useRef, useState } from 'react';
 import { WarmDiagCard } from '@/app/v2/battery/home-charger/poll-log/diag';
+
+// 에러 바운더리 — 모바일에서 콘솔 없이 render 에러를 화면에 직접 표시
+class RenderErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    console.error('[api-status] render error:', error, info);
+  }
+  render() {
+    if (this.state.error) {
+      const e = this.state.error;
+      return (
+        <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-3 text-[10px] text-rose-200 font-mono break-all whitespace-pre-wrap leading-relaxed">
+          ⚠ render error{"\n"}
+          {String(e?.message || e)}{"\n\n"}
+          {String(e?.stack || '').slice(0, 1500)}
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ── 라우트 메타데이터 ─────────────────────────────────────────
 // dashboard: 펼침 시 raw peek 위에 추가로 보여줄 대시보드 ('server' | 'charging' | 'poll')
@@ -328,7 +355,9 @@ export default function ApiStatusPage() {
         <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
           <div className="text-[11px] font-bold tracking-widest uppercase text-zinc-500 mb-2">서버</div>
           {serverData ? (
-            <ServerStatusCard data={serverData} latencyMs={serverLatency} history={serverData.history || []} />
+            <RenderErrorBoundary>
+              <ServerStatusCard data={serverData} latencyMs={serverLatency} history={serverData.history || []} />
+            </RenderErrorBoundary>
           ) : serverErr ? (
             <div className="text-[11px] text-rose-300">로딩 실패 — {serverErr}</div>
           ) : (
