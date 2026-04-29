@@ -137,6 +137,29 @@ export function ServerStatusCard({ data, latencyMs, history }) {
     <div className="text-[10px] font-bold tracking-wide text-zinc-400 truncate">{title}</div>
   );
   const Divider = () => <div className="border-t border-white/[0.04] my-1" />;
+  // 10셀 dotmatrix — 채워진 점 = 사용%, 빈 점 = 여유%
+  const DotGauge = ({ usedPct }) => {
+    if (usedPct == null) return null;
+    const filled = Math.min(10, Math.max(0, Math.round(usedPct / 10)));
+    const color = usedPct > 80 ? 'text-rose-400'
+                : usedPct > 50 ? 'text-amber-400'
+                : 'text-emerald-400';
+    return (
+      <span className="font-mono text-[10px] tracking-tighter leading-none">
+        <span className={color}>{'●'.repeat(filled)}</span>
+        <span className="text-zinc-700">{'○'.repeat(10 - filled)}</span>
+      </span>
+    );
+  };
+  const GaugeRow = ({ label, usedPct, rightText, rightClass = 'text-zinc-200' }) => (
+    <div className="flex items-center justify-between gap-2 text-[11px] tabular-nums">
+      <span className="text-[10px] text-zinc-500 truncate shrink-0">{label}</span>
+      <span className="flex items-center gap-1.5 shrink-0">
+        <DotGauge usedPct={usedPct} />
+        <span className={`font-semibold ${rightClass}`}>{rightText}</span>
+      </span>
+    </div>
+  );
 
   // 컨테이너 메모리 표시 — usage MB + (limit% 작게)
   const fmtContainerMem = (c, pct) => {
@@ -264,16 +287,17 @@ export function ServerStatusCard({ data, latencyMs, history }) {
         {/* ─── 서버 여유 (확장 capacity) ─── */}
         <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-2.5 space-y-1.5 min-w-0">
           <SectionHeader title="서버 여유" />
-          <Row
+          <GaugeRow
             label="CPU 여유"
-            value={cpuFreePct != null ? `${cpuFreePct}%` : '—'}
-            valClass={freePctColor(cpuFreePct)}
+            usedPct={cpuLoadPct}
+            rightText={cpuFreePct != null ? `${cpuFreePct}%` : '—'}
+            rightClass={freePctColor(cpuFreePct)}
           />
-          <Row
+          <GaugeRow
             label="메모리 여유"
-            value={memAvailPct != null ? `${memAvailPct}%` : '—'}
-            valClass={freePctColor(memAvailPct)}
-            trail={<Sparkline values={history?.map(h => h.hostMemAvailPct)} color="#10b981" />}
+            usedPct={memUsedPct}
+            rightText={memAvailPct != null ? `${memAvailPct}%` : '—'}
+            rightClass={freePctColor(memAvailPct)}
           />
           <Row
             label="가용 메모리"
@@ -281,12 +305,11 @@ export function ServerStatusCard({ data, latencyMs, history }) {
             valClass="text-zinc-300"
           />
           <Divider />
-          <Row
+          <GaugeRow
             label="디스크 여유"
-            value={disk?.total
-              ? `${100 - (diskUsedPct ?? 100)}%`
-              : '—'}
-            valClass={freePctColor(disk ? 100 - diskUsedPct : null)}
+            usedPct={diskUsedPct}
+            rightText={disk?.total ? `${100 - (diskUsedPct ?? 100)}%` : '—'}
+            rightClass={freePctColor(disk ? 100 - diskUsedPct : null)}
           />
           <Row
             label="디스크 가용"
@@ -298,10 +321,11 @@ export function ServerStatusCard({ data, latencyMs, history }) {
             value={disk?.total != null ? fmtGB(disk.total) : '—'}
           />
           {swapTotal > 0 && (
-            <Row
+            <GaugeRow
               label="스왑 사용"
-              value={`${swapUsedPct ?? 0}%`}
-              valClass={swapUsedPct != null && swapUsedPct > 30 ? 'text-amber-400' : 'text-zinc-400'}
+              usedPct={swapUsedPct}
+              rightText={`${swapUsedPct ?? 0}%`}
+              rightClass={swapUsedPct != null && swapUsedPct > 30 ? 'text-amber-400' : 'text-zinc-400'}
             />
           )}
           {/* 24h 피크/한산 — DB 로그 기반. pg 가 real 을 string 으로 줄 수 있어 Number 강제. */}

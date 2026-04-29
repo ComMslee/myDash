@@ -116,6 +116,7 @@ export default function ApiStatusPage() {
   const [serverLatency, setServerLatency] = useState(null);
   const [serverErr, setServerErr] = useState(null);
   const runIdRef = useRef(0);
+  const [tab, setTab] = useState('server');
 
   // 서버 상태 — 페이지 진입 시 즉시 + 30초 주기 자동 갱신.
   // history 는 서버측 ring buffer(/api/server-status 응답.history) 를 그대로 사용.
@@ -247,8 +248,31 @@ export default function ApiStatusPage() {
     <main className="min-h-screen bg-[#0f0f0f] text-white">
       <div className="max-w-2xl mx-auto px-4 py-5 pb-8 flex flex-col gap-4">
 
-        {/* Hero — 전체 상태 한 줄 + 진행 바 */}
-        {(() => {
+        {/* Tab bar */}
+        <div className="flex gap-1 bg-[#161618] border border-white/[0.06] rounded-2xl p-1">
+          <button
+            onClick={() => setTab('server')}
+            className={`flex-1 px-4 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
+              tab === 'server' ? 'bg-white/[0.06] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            서버
+            {serverErr && <span className="ml-1.5 text-rose-400">⚠</span>}
+          </button>
+          <button
+            onClick={() => setTab('api')}
+            className={`flex-1 px-4 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
+              tab === 'api' ? 'bg-white/[0.06] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            API 테스트
+            {counts.fail > 0 && <span className="ml-1.5 text-rose-400 text-[11px] tabular-nums">✕{counts.fail}</span>}
+            {counts.fail === 0 && counts.slow > 0 && <span className="ml-1.5 text-amber-400 text-[11px] tabular-nums">⚠{counts.slow}</span>}
+          </button>
+        </div>
+
+        {/* Hero — API 탭 */}
+        {tab === 'api' && (() => {
           const overall =
             counts.fail > 0 ? 'fail'
             : counts.slow > 0 ? 'slow'
@@ -313,22 +337,23 @@ export default function ApiStatusPage() {
           );
         })()}
 
-        {/* 서버 상태 — 항상 상단 노출, 30초 자동 갱신 */}
-        <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
-          <div className="text-[11px] font-bold tracking-widest uppercase text-zinc-500 mb-2">서버</div>
-          {serverData ? (
-            <RenderErrorBoundary>
-              <ServerStatusCard data={serverData} latencyMs={serverLatency} history={serverData.history || []} />
-            </RenderErrorBoundary>
-          ) : serverErr ? (
-            <div className="text-[11px] text-rose-300">로딩 실패 — {serverErr}</div>
-          ) : (
-            <div className="text-[11px] text-zinc-500">로딩 중…</div>
-          )}
-        </div>
+        {/* 서버 탭 */}
+        {tab === 'server' && (
+          <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
+            {serverData ? (
+              <RenderErrorBoundary>
+                <ServerStatusCard data={serverData} latencyMs={serverLatency} history={serverData.history || []} />
+              </RenderErrorBoundary>
+            ) : serverErr ? (
+              <div className="text-[11px] text-rose-300">로딩 실패 — {serverErr}</div>
+            ) : (
+              <div className="text-[11px] text-zinc-500">로딩 중…</div>
+            )}
+          </div>
+        )}
 
-        {/* 카테고리별 */}
-        {CATEGORIES.map(cat => {
+        {/* 카테고리별 — API 탭 */}
+        {tab === 'api' && CATEGORIES.map(cat => {
           const list = ROUTES.filter(r => r.category === cat);
           return (
             <div key={cat} className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
