@@ -184,25 +184,26 @@ function HistoryInner() {
             </button>
           ) : (
             <>
-              {viewMode === 'map' && (
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => { setPlacesMode('frequent'); setPlacesExpanded(false); }}
-                      className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors ${
-                        !isLong ? 'text-zinc-300 bg-white/[0.06]' : 'text-zinc-600 hover:text-zinc-400'
-                      }`}
-                    >📍 자주</button>
-                    <button
-                      onClick={() => { setPlacesMode('long-stay'); setPlacesExpanded(false); }}
-                      className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors ${
-                        isLong ? 'text-zinc-300 bg-white/[0.06]' : 'text-zinc-600 hover:text-zinc-400'
-                      }`}
-                    >🕐 오래</button>
-                  </div>
-                  <button onClick={() => setPlacesCollapsed(true)} className="text-[10px] text-zinc-600 hover:text-zinc-300 px-1.5">접기</button>
+              {/* 토글 헤더 — list/map 양쪽 모드 모두 노출. 접기 버튼은 map 모드에만(list 는 카드 자체가 항상 헤더 역할). */}
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => { setPlacesMode('frequent'); setPlacesExpanded(false); }}
+                    className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors ${
+                      !isLong ? 'text-zinc-300 bg-white/[0.06]' : 'text-zinc-600 hover:text-zinc-400'
+                    }`}
+                  >📍 자주</button>
+                  <button
+                    onClick={() => { setPlacesMode('long-stay'); setPlacesExpanded(false); }}
+                    className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors ${
+                      isLong ? 'text-zinc-300 bg-white/[0.06]' : 'text-zinc-600 hover:text-zinc-400'
+                    }`}
+                  >🕐 오래</button>
                 </div>
-              )}
+                {viewMode === 'map' && (
+                  <button onClick={() => setPlacesCollapsed(true)} className="text-[10px] text-zinc-600 hover:text-zinc-300 px-1.5">접기</button>
+                )}
+              </div>
               <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
                 {displayPlaces.slice(0, 5).map((p, i) => (
                   <button
