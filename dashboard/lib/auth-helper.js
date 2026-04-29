@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { readAuth } from './auth-store.js';
 
 export const COOKIE = 'myDash_auth';
-export const MAX_AGE = 60 * 60 * 24 * 365;
+export const MAX_AGE = 60 * 60 * 24 * 90;
 
 export async function requireAuth() {
   const auth = await readAuth();
