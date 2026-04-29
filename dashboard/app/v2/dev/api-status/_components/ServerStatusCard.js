@@ -170,8 +170,8 @@ export function ServerStatusCard({ data, latencyMs, history }) {
 
   return (
     <div className="space-y-2">
-      {/* 4그룹: 모바일 1열 / sm 2열(2×2) / xl 4열 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+      {/* 4그룹: 항상 1열 세로 스택 */}
+      <div className="grid grid-cols-1 gap-2">
 
         {/* ─── 서버 (호스트) ─── */}
         <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-2.5 space-y-1.5 min-w-0">
