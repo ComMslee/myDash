@@ -862,35 +862,52 @@ function ServerStatusCard({ data, latencyMs, history }) {
               valClass={swapUsedPct != null && swapUsedPct > 30 ? 'text-amber-400' : 'text-zinc-400'}
             />
           )}
-          {/* 24h 피크/한산 — DB 로그 기반. pg 가 real 을 string 으로 줄 수 있어 Number 강제. */}
-          {dailyPeakCpu != null && (
-            <>
-              <Divider />
-              <Row
-                label="24h 피크 CPU"
-                value={Number.isFinite(dailyPeakCpu) ? dailyPeakCpu.toFixed(2) : '—'}
-                valClass="text-amber-400"
-                trail={dailyPeakTime && (
-                  <span className="text-[9px] text-zinc-500 font-normal">{dailyPeakTime}</span>
-                )}
-              />
-              {dailyQuietCpu != null && (
-                <Row
-                  label="24h 한산 CPU"
-                  value={Number.isFinite(dailyQuietCpu) ? dailyQuietCpu.toFixed(2) : '—'}
-                  valClass="text-emerald-400/80"
-                  trail={dailyQuietTime && (
-                    <span className="text-[9px] text-zinc-500 font-normal">{dailyQuietTime}</span>
-                  )}
-                />
-              )}
-              {data.daily?.samples != null && (
-                <div className="text-[9px] text-zinc-600 pt-0.5">
-                  {Number(data.daily.samples)} 샘플 (5분 간격 로그)
-                </div>
-              )}
-            </>
-          )}
+          {/* DEBUG (모바일에서 콘솔 없이 진단) — daily raw + 각 필드 typeof 출력.
+              크래시 원인 좁히면 정상 표시로 복원. */}
+          <Divider />
+          <div className="text-[10px] text-zinc-400 font-bold">DEBUG · daily</div>
+          <div className="text-[9px] text-zinc-500 font-mono break-all leading-snug whitespace-pre-wrap">
+            {(() => {
+              try {
+                const lines = [];
+                lines.push(`daily=${data.daily === undefined ? 'undef' : data.daily === null ? 'null' : 'obj'}`);
+                if (data.daily && typeof data.daily === 'object') {
+                  const peak = data.daily.peak;
+                  const quiet = data.daily.quiet;
+                  const samples = data.daily.samples;
+                  lines.push(`peak=${peak === undefined ? 'undef' : peak === null ? 'null' : 'obj'}`);
+                  if (peak && typeof peak === 'object') {
+                    lines.push(`  cpu=${String(peak.cpu)} (${typeof peak.cpu})`);
+                    lines.push(`  ts=${String(peak.ts)} (${typeof peak.ts})`);
+                  }
+                  lines.push(`quiet=${quiet === undefined ? 'undef' : quiet === null ? 'null' : 'obj'}`);
+                  if (quiet && typeof quiet === 'object') {
+                    lines.push(`  cpu=${String(quiet.cpu)} (${typeof quiet.cpu})`);
+                    lines.push(`  ts=${String(quiet.ts)} (${typeof quiet.ts})`);
+                  }
+                  lines.push(`samples=${String(samples)} (${typeof samples})`);
+                }
+                lines.push('---');
+                lines.push(`disk=${data.host?.disk === undefined ? 'undef' : data.host?.disk === null ? 'null' : 'obj'}`);
+                if (data.host?.disk) {
+                  lines.push(`  total=${String(data.host.disk.total)} (${typeof data.host.disk.total})`);
+                  lines.push(`  available=${String(data.host.disk.available)} (${typeof data.host.disk.available})`);
+                }
+                lines.push(`memAvailable=${String(data.host?.memAvailable)} (${typeof data.host?.memAvailable})`);
+                lines.push(`swapTotal=${String(data.host?.swapTotal)} (${typeof data.host?.swapTotal})`);
+                lines.push(`docker.ok=${String(data.docker?.ok)}`);
+                if (data.docker?.containers) {
+                  lines.push(`docker.containers.length=${data.docker.containers.length}`);
+                  for (const c of data.docker.containers.slice(0, 5)) {
+                    lines.push(`  ${c.name}: cpu=${String(c.cpuPct)} (${typeof c.cpuPct}), mem=${String(c.memUsage)} (${typeof c.memUsage})${c.error ? ' err=' + c.error : ''}`);
+                  }
+                }
+                return lines.join('\n');
+              } catch (e) {
+                return `DEBUG render error: ${e?.message || String(e)}`;
+              }
+            })()}
+          </div>
           <div className="text-[10px] text-zinc-500 pt-1 leading-snug">
             {(() => {
               const verdict =
