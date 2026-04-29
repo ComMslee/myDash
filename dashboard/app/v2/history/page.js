@@ -11,6 +11,26 @@ import RouteSparklines from '@/app/components/RouteSparklines';
 import DriveListView from '@/app/v2/history/DriveListView';
 import { useDriveData } from '@/app/v2/history/useDriveData';
 
+// 체류 시간 포맷 — 초 단위 → 분/시간/일/주 자동 스케일.
+function fmtDwell(sec) {
+  if (sec == null) return '—';
+  if (sec < 60) return `${Math.floor(sec)}초`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}분`;
+  if (sec < 86400) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    return m === 0 ? `${h}시간` : `${h}h${m}m`;
+  }
+  if (sec < 7 * 86400) {
+    const d = Math.floor(sec / 86400);
+    const h = Math.floor((sec % 86400) / 3600);
+    return h === 0 ? `${d}일` : `${d}일 ${h}h`;
+  }
+  const w = Math.floor(sec / (7 * 86400));
+  const d = Math.floor((sec % (7 * 86400)) / 86400);
+  return d === 0 ? `${w}주` : `${w}주 ${d}일`;
+}
+
 function efficiency(d) {
   if (!d.start_rated_range_km || !d.end_rated_range_km || !d.distance) return null;
   const dist = parseFloat(d.distance);
@@ -50,7 +70,7 @@ function HistoryInner() {
   const driveDayStr = (d) => kstDateStr(d.start_date);
 
   const {
-    drives, places,
+    drives, places, longStayPlaces,
     selectedDrive, setSelectedDrive,
     positions, setPositions,
     routeData,
@@ -65,6 +85,8 @@ function HistoryInner() {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [placesExpanded, setPlacesExpanded] = useState(false);
   const [placesCollapsed, setPlacesCollapsed] = useState(false);
+  // 'frequent' = 자주 가는 곳(방문 횟수) | 'long-stay' = 오래 머문 곳(체류 시간)
+  const [placesMode, setPlacesMode] = useState('frequent');
 
   const entryInMapView = !!initialId || !!initialDate;
   const [viewMode, setViewMode] = useState(entryInMapView ? 'map' : 'list');
@@ -140,15 +162,22 @@ function HistoryInner() {
     <main className="bg-[#0f0f0f] text-white">
       <div className="max-w-2xl mx-auto flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 57px - 58px - env(safe-area-inset-bottom, 0px))' }}>
 
-      {/* 자주 방문하는 장소 */}
-      {places.length > 0 && (
+      {/* 자주 가는 곳 / 오래 머문 곳 — 탭 토글로 메트릭 전환 */}
+      {(places.length > 0 || longStayPlaces.length > 0) && (() => {
+        const isLong = placesMode === 'long-stay';
+        const displayPlaces = isLong ? longStayPlaces : places;
+        if (displayPlaces.length === 0) return null;
+        const titleText = isLong ? '🕐 오래 머문 곳' : '📍 자주 가는 곳';
+        const titleShort = isLong ? '오래 머문 곳' : '자주 가는 곳';
+        const metric = (p) => isLong ? fmtDwell(p.total_dwell_sec) : `${p.visit_count}회`;
+        return (
         <div className="flex-shrink-0 px-4 pt-3 pb-2">
           {placesCollapsed ? (
             <button
               onClick={() => setPlacesCollapsed(false)}
               className="w-full flex items-center justify-between px-3 py-1.5 bg-zinc-800/40 border border-white/[0.06] rounded-lg hover:bg-zinc-800/70 transition-colors"
             >
-              <span className="text-xs text-zinc-400">📍 자주 가는 곳 <span className="text-zinc-600 ml-1">· {places.length}개</span></span>
+              <span className="text-xs text-zinc-400">{titleText} <span className="text-zinc-600 ml-1">· {displayPlaces.length}개</span></span>
               <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -157,12 +186,25 @@ function HistoryInner() {
             <>
               {viewMode === 'map' && (
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">자주 가는 곳</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => { setPlacesMode('frequent'); setPlacesExpanded(false); }}
+                      className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors ${
+                        !isLong ? 'text-zinc-300 bg-white/[0.06]' : 'text-zinc-600 hover:text-zinc-400'
+                      }`}
+                    >📍 자주</button>
+                    <button
+                      onClick={() => { setPlacesMode('long-stay'); setPlacesExpanded(false); }}
+                      className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors ${
+                        isLong ? 'text-zinc-300 bg-white/[0.06]' : 'text-zinc-600 hover:text-zinc-400'
+                      }`}
+                    >🕐 오래</button>
+                  </div>
                   <button onClick={() => setPlacesCollapsed(true)} className="text-[10px] text-zinc-600 hover:text-zinc-300 px-1.5">접기</button>
                 </div>
               )}
               <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
-                {places.slice(0, 5).map((p, i) => (
+                {displayPlaces.slice(0, 5).map((p, i) => (
                   <button
                     key={p.id}
                     onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMonthMode(null); setMapEverShown(true); setViewMode('map'); }}
@@ -174,12 +216,12 @@ function HistoryInner() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-zinc-600 text-sm font-bold leading-none">#{i + 1}</span>
-                      <span className="text-zinc-500 text-xs leading-none">{p.visit_count}회</span>
+                      <span className="text-zinc-500 text-xs leading-none tabular-nums">{metric(p)}</span>
                     </div>
                     <p className="text-zinc-300 text-xs leading-snug line-clamp-3 flex-1">{p.label || p.city || '—'}</p>
                   </button>
                 ))}
-                {places.length > 5 && (
+                {displayPlaces.length > 5 && (
                   <button
                     onClick={() => setPlacesExpanded(v => !v)}
                     className={`flex-shrink-0 flex flex-col items-center justify-center gap-1 border rounded-xl px-3 py-3 w-[64px] transition-colors ${
@@ -196,7 +238,7 @@ function HistoryInner() {
               {placesExpanded && (
                 <div className="mt-2 border border-white/[0.06] rounded-xl bg-[#161618] overflow-hidden">
                   <div className="overflow-y-auto" style={{ maxHeight: '40vh' }}>
-                    {places.slice(5).map((p, i) => (
+                    {displayPlaces.slice(5).map((p, i) => (
                       <button
                         key={p.id}
                         onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMonthMode(null); setPlacesExpanded(false); setMapEverShown(true); setViewMode('map'); }}
@@ -207,7 +249,7 @@ function HistoryInner() {
                           <p className="text-zinc-300 text-sm truncate">{p.label || p.city || '—'}</p>
                           {p.city && p.label !== p.city && <p className="text-zinc-600 text-xs truncate">{p.city}</p>}
                         </div>
-                        <span className="text-zinc-400 text-sm tabular-nums flex-shrink-0">{p.visit_count}회</span>
+                        <span className="text-zinc-400 text-sm tabular-nums flex-shrink-0">{metric(p)}</span>
                       </button>
                     ))}
                   </div>
@@ -216,7 +258,8 @@ function HistoryInner() {
             </>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {/* 지도 모드 */}
       {mapEverShown && (
