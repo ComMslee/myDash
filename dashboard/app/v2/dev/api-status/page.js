@@ -125,10 +125,11 @@ export default function ApiStatusPage() {
   const [serverData, setServerData] = useState(null);
   const [serverLatency, setServerLatency] = useState(null);
   const [serverErr, setServerErr] = useState(null);
-  const [serverHistory, setServerHistory] = useState([]); // 최근 N 샘플 — 스파크라인용
   const runIdRef = useRef(0);
 
-  // 서버 상태 — 페이지 진입 시 즉시 + 30초 주기 자동 갱신
+  // 서버 상태 — 페이지 진입 시 즉시 + 30초 주기 자동 갱신.
+  // history 는 서버측 ring buffer(/api/server-status 응답.history) 를 그대로 사용.
+  // → 새로고침해도 트렌드 유지, 앱 재시작 시 리셋.
   useEffect(() => {
     let alive = true;
     const tick = async () => {
@@ -142,29 +143,9 @@ export default function ApiStatusPage() {
         if (!res.ok) {
           setServerErr(data?.error || `HTTP ${res.status}`);
         } else {
-          const latency = performance.now() - t0;
           setServerData(data);
-          setServerLatency(latency);
+          setServerLatency(performance.now() - t0);
           setServerErr(null);
-          setServerHistory(prev => {
-            const containers = data.docker?.containers || [];
-            const findC = (n) => containers.find(c => c.name === n);
-            const tm = findC('teslamate');
-            const dash = findC('dashboard');
-            const sample = {
-              ts: Date.now(),
-              hostCpu: data.host?.loadavg?.[0] ?? null,
-              hostMemPct: data.host?.memTotal
-                ? (1 - data.host.memFree / data.host.memTotal) * 100
-                : null,
-              dbMs: data.db?.latencyMs ?? null,
-              tmCpu: tm?.cpuPct ?? null,
-              tmMemMB: tm?.memUsage != null ? tm.memUsage / 1024 / 1024 : null,
-              dashCpu: dash?.cpuPct ?? null,
-              dashMemMB: dash?.memUsage != null ? dash.memUsage / 1024 / 1024 : null,
-            };
-            return [...prev, sample].slice(-30); // 30 샘플 × 30초 = 15분 트렌드
-          });
         }
       } catch (e) {
         if (alive) setServerErr(e?.message || 'fetch 실패');
@@ -346,7 +327,7 @@ export default function ApiStatusPage() {
         <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
           <div className="text-[11px] font-bold tracking-widest uppercase text-zinc-500 mb-2">서버</div>
           {serverData ? (
-            <ServerStatusCard data={serverData} latencyMs={serverLatency} history={serverHistory} />
+            <ServerStatusCard data={serverData} latencyMs={serverLatency} history={serverData.history || []} />
           ) : serverErr ? (
             <div className="text-[11px] text-rose-300">로딩 실패 — {serverErr}</div>
           ) : (
@@ -602,12 +583,23 @@ function ServerStatusCard({ data, latencyMs, history }) {
     if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h 전`;
     return `${Math.floor(ms / 86_400_000)}일 전`;
   };
+  // 센서 데이터 freshness — 차량이 sleep 이면 수 시간 갭은 정상이라 임계 완화.
+  // 12h 넘어가야 빨강 (실제 polling 문제 시그널).
   const freshColor = (iso) => {
     if (!iso) return 'text-zinc-500';
     const ms = Date.now() - new Date(iso).getTime();
-    if (ms < 5 * 60_000)  return 'text-emerald-400';
-    if (ms < 30 * 60_000) return 'text-amber-400';
+    if (ms < 30 * 60_000) return 'text-emerald-400';
+    if (ms < 6 * 3600_000) return 'text-amber-400';
+    if (ms < 12 * 3600_000) return 'text-orange-400';
     return 'text-rose-400';
+  };
+  // 사용자 활동 freshness (drives/charges) — 매일 운행 안 할 수도 있어 더 완화.
+  const activityColor = (iso) => {
+    if (!iso) return 'text-zinc-500';
+    const ms = Date.now() - new Date(iso).getTime();
+    if (ms < 24 * 3600_000) return 'text-zinc-200';
+    if (ms < 7 * 86400_000) return 'text-zinc-400';
+    return 'text-zinc-500';
   };
 
   const skew = data.serverTime ? Date.now() - data.serverTime - (latencyMs || 0) / 2 : null;
@@ -624,13 +616,6 @@ function ServerStatusCard({ data, latencyMs, history }) {
        : load[0] / data.host.cpuCount > 0.7 ? 'text-amber-400'
        : 'text-emerald-400')
     : 'text-zinc-300';
-
-  const Item = ({ label, children, valClass = 'text-zinc-200' }) => (
-    <div>
-      <div className="text-[9px] text-zinc-600">{label}</div>
-      <div className={`${valClass} font-semibold`}>{children}</div>
-    </div>
-  );
 
   // 컨테이너 stats — docker.sock 미마운트면 docker.ok = false
   const containers = data.docker?.ok ? (data.docker.containers || []) : [];
@@ -651,114 +636,146 @@ function ServerStatusCard({ data, latencyMs, history }) {
   const tmMemPct = containerMemPct(tm);
   const dashMemPct = containerMemPct(dash);
 
-  // 미니 패널 — 헤더 + CPU + Mem + 트렌드 두 줄
-  const ResourcePanel = ({ title, cpuLabel, cpuValue, cpuColor, cpuTrend, memLabel, memValue, memColor, memTrend, footnote }) => (
-    <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-2.5 flex flex-col gap-1.5 min-w-0">
-      <div className="text-[10px] font-bold text-zinc-400 truncate">{title}</div>
-      <div className="space-y-0.5 min-w-0">
-        <div className="text-[9px] text-zinc-600">{cpuLabel}</div>
-        <div className={`text-[12px] font-semibold tabular-nums flex items-center gap-1 ${cpuColor}`}>
-          <span className="truncate">{cpuValue}</span>
-          {cpuTrend && <Sparkline values={cpuTrend} color="#f59e0b" width={36} />}
-        </div>
-      </div>
-      <div className="space-y-0.5 min-w-0">
-        <div className="text-[9px] text-zinc-600">{memLabel}</div>
-        <div className={`text-[12px] font-semibold tabular-nums flex items-center gap-1 ${memColor}`}>
-          <span className="truncate">{memValue}</span>
-          {memTrend && <Sparkline values={memTrend} color="#3b82f6" width={36} />}
-        </div>
-      </div>
-      {footnote && <div className="text-[9px] text-zinc-600 truncate">{footnote}</div>}
+  // PostgreSQL 16.13 (Debian 16.13-1.pgdg13+1) on x86_64-... → "PostgreSQL 16.13"
+  const dbVerShort = data.db?.version ? String(data.db.version).match(/PostgreSQL\s+[\d.]+/)?.[0] || '—' : null;
+  const cpuModelShort = (data.host?.cpuModel || '').replace(/\s+/g, ' ').replace(/Intel\(R\)\s+|CPU\s*@.*/g, '').trim();
+
+  // 미니 컴포넌트들
+  const Row = ({ label, value, valClass = 'text-zinc-200', trail }) => (
+    <div className="flex items-baseline justify-between gap-2 text-[11px] tabular-nums">
+      <span className="text-[10px] text-zinc-500 truncate">{label}</span>
+      <span className={`font-semibold ${valClass} flex items-center gap-1 shrink-0`}>
+        <span className="truncate">{value}</span>{trail}
+      </span>
     </div>
   );
+  const SectionHeader = ({ title }) => (
+    <div className="text-[10px] font-bold tracking-wide text-zinc-400 truncate">{title}</div>
+  );
+  const Divider = () => <div className="border-t border-white/[0.04] my-1" />;
+
+  // 컨테이너 메모리 표시 — usage MB + (limit% 작게)
+  const fmtContainerMem = (c, pct) => {
+    if (c?.memUsage == null) return '—';
+    const usage = fmtMB(c.memUsage);
+    return pct != null ? `${usage} (${pct}%)` : usage;
+  };
 
   return (
-    <div className="space-y-2.5">
-      {/* 3열: 서버 (호스트) | 테슬라메이트 | 우리서비스 — CPU/Mem + 15분 트렌드 */}
-      <div className="grid grid-cols-3 gap-2">
-        <ResourcePanel
-          title="서버 (호스트)"
-          cpuLabel={`CPU 부하 (1m / ${data.host?.cpuCount ?? '?'}코어)`}
-          cpuValue={load[0] != null ? load[0].toFixed(2) : '—'}
-          cpuColor={loadColor}
-          cpuTrend={history?.map(h => h.hostCpu)}
-          memLabel="메모리"
-          memValue={memUsedPct != null ? `${memUsedPct}%` : '—'}
-          memColor={memPctColor(memUsedPct)}
-          memTrend={history?.map(h => h.hostMemPct)}
-          footnote={data.host?.memTotal ? `${fmtGB(data.host.memTotal)} 중 사용` : null}
-        />
-        <ResourcePanel
-          title="테슬라메이트"
-          cpuLabel="CPU"
-          cpuValue={tm?.cpuPct != null ? `${tm.cpuPct.toFixed(1)}%`
-            : !data.docker?.ok ? '미연결'
-            : tm ? '—' : '없음'}
-          cpuColor={tm?.cpuPct == null ? 'text-zinc-500' : memPctColor(tm.cpuPct)}
-          cpuTrend={tm ? history?.map(h => h.tmCpu) : null}
-          memLabel="메모리"
-          memValue={tm?.memUsage != null ? `${fmtMB(tm.memUsage)}${tmMemPct != null ? ` (${tmMemPct}%)` : ''}` : '—'}
-          memColor={memPctColor(tmMemPct)}
-          memTrend={tm ? history?.map(h => h.tmMemMB) : null}
-          footnote={tm?.state ? `state: ${tm.state}` : !data.docker?.ok ? data.docker?.error?.slice(0, 40) : null}
-        />
-        <ResourcePanel
-          title="우리서비스 (대시보드)"
-          cpuLabel={dash ? 'CPU (컨테이너)' : 'CPU (프로세스 누적)'}
-          cpuValue={dash?.cpuPct != null ? `${dash.cpuPct.toFixed(1)}%`
-            : `user ${data.process?.cpuUserSec ?? 0}s`}
-          cpuColor={dash?.cpuPct == null ? 'text-zinc-300' : memPctColor(dash.cpuPct)}
-          cpuTrend={dash ? history?.map(h => h.dashCpu) : null}
-          memLabel="메모리 (RSS)"
-          memValue={dash?.memUsage != null
-            ? `${fmtMB(dash.memUsage)}${dashMemPct != null ? ` (${dashMemPct}%)` : ''}`
-            : fmtMB(data.memory?.rss)}
-          memColor={memPctColor(dashMemPct)}
-          memTrend={dash ? history?.map(h => h.dashMemMB) : null}
-          footnote={`힙 ${fmtMB(data.memory?.heapUsed)} / 가동 ${fmtUptime(data.uptimeSec)}`}
-        />
-      </div>
+    <div className="space-y-2">
+      {/* 3그룹: 모바일 1열(상하) / md+ 3열 */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
 
-      {/* DB · 시계 · TeslaMate freshness — 한 줄 */}
-      <div className="border-t border-white/[0.04] pt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] tabular-nums">
-        <Item label="DB 응답"
-              valClass={data.db?.ok ? 'text-emerald-400' : 'text-rose-400'}>
-          {data.db?.ok ? `✓ ${data.db.latencyMs}ms` : `✕ ${data.db?.error || '—'}`}
-          {data.db?.ok && <Sparkline values={history?.map(h => h.dbMs)} color="#10b981" />}
-        </Item>
-        <Item label="TeslaMate 최신" valClass={freshColor(data.db?.latestPosition)}>
-          {fmtAgo(data.db?.latestPosition)}
-        </Item>
-        <Item label="DB pool">
-          {data.db?.poolStats
-            ? `t${data.db.poolStats.total} i${data.db.poolStats.idle} w${data.db.poolStats.waiting}`
-            : '—'}
-        </Item>
-        <Item label="시계 차이" valClass={skewColor}>
-          {skew == null ? '—' : `${skew >= 0 ? '+' : ''}${Math.abs(skew) >= 1000 ? `${(skew / 1000).toFixed(1)}s` : `${Math.round(skew)}ms`}`}
-        </Item>
-      </div>
+        {/* ─── 서버 (호스트) ─── */}
+        <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-2.5 space-y-1.5 min-w-0">
+          <SectionHeader title="서버 (호스트)" />
+          <Row
+            label={`CPU 부하 (1m / ${data.host?.cpuCount ?? '?'}코어)`}
+            value={load[0] != null ? load[0].toFixed(2) : '—'}
+            valClass={loadColor}
+            trail={<Sparkline values={history?.map(h => h.hostCpu)} color="#f59e0b" />}
+          />
+          <Row
+            label="메모리"
+            value={memUsedPct != null ? `${memUsedPct}%` : '—'}
+            valClass={memPctColor(memUsedPct)}
+            trail={<Sparkline values={history?.map(h => h.hostMemPct)} color="#3b82f6" />}
+          />
+          <Divider />
+          <Row label="가동 시간 (호스트)" value={fmtUptime(data.host?.uptime)} />
+          <Row label="시계 차이" value={skew == null ? '—'
+            : `${skew >= 0 ? '+' : ''}${Math.abs(skew) >= 1000 ? `${(skew / 1000).toFixed(1)}s` : `${Math.round(skew)}ms`}`}
+            valClass={skewColor} />
+          <Row label="메모리 총량" value={fmtGB(data.host?.memTotal)} />
+          <div className="text-[10px] text-zinc-500 pt-1 leading-snug">
+            {data.host?.platform}/{data.host?.arch} · {data.host?.cpuCount}×{cpuModelShort && <span className="text-zinc-600"> {cpuModelShort.slice(0, 24)}</span>}
+          </div>
+        </div>
 
-      {/* DB freshness 보조 */}
-      <div className="grid grid-cols-3 gap-x-2 text-[10px] tabular-nums">
-        <Item label="latest drive" valClass={freshColor(data.db?.latestDrive)}>
-          {fmtAgo(data.db?.latestDrive)}
-        </Item>
-        <Item label="latest charge" valClass={freshColor(data.db?.latestCharge)}>
-          {fmtAgo(data.db?.latestCharge)}
-        </Item>
-        <Item label="cars">
-          {data.db?.carCount ?? '—'}
-        </Item>
-      </div>
+        {/* ─── 테슬라메이트 ─── */}
+        <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-2.5 space-y-1.5 min-w-0">
+          <SectionHeader title="테슬라메이트" />
+          <Row
+            label="CPU (컨테이너)"
+            value={tm?.cpuPct != null ? `${tm.cpuPct.toFixed(1)}%`
+              : !data.docker?.ok ? '미연결'
+              : tm?.error ? 'stats 실패'
+              : tm ? '—' : '없음'}
+            valClass={tm?.cpuPct == null ? 'text-zinc-500' : memPctColor(tm.cpuPct)}
+            trail={tm?.cpuPct != null && <Sparkline values={history?.map(h => h.tmCpu)} color="#f59e0b" />}
+          />
+          <Row
+            label="메모리"
+            value={fmtContainerMem(tm, tmMemPct)}
+            valClass={memPctColor(tmMemPct)}
+            trail={tm?.memUsage != null && <Sparkline values={history?.map(h => h.tmMemMB)} color="#3b82f6" />}
+          />
+          <Divider />
+          <Row
+            label="최신 위치"
+            value={fmtAgo(data.db?.latestPosition)}
+            valClass={freshColor(data.db?.latestPosition)}
+          />
+          <Row
+            label="최근 주행"
+            value={fmtAgo(data.db?.latestDrive)}
+            valClass={activityColor(data.db?.latestDrive)}
+          />
+          <Row
+            label="최근 충전"
+            value={fmtAgo(data.db?.latestCharge)}
+            valClass={activityColor(data.db?.latestCharge)}
+          />
+          <Row label="차량 수" value={data.db?.carCount ?? '—'} />
+          <div className="text-[10px] text-zinc-500 pt-1 leading-snug truncate">
+            {tm?.state ? <>state: <span className="text-zinc-400">{tm.state}</span></>
+              : !data.docker?.ok ? <span className="text-rose-400/80">{(data.docker?.error || 'docker 미연결').slice(0, 40)}</span>
+              : '—'}
+            {tm?.error && <span className="text-rose-400/80 ml-1">· {String(tm.error).slice(0, 30)}</span>}
+          </div>
+        </div>
 
-      {/* 호스트/프로세스 메타 */}
-      <div className="border-t border-white/[0.04] pt-2 text-[10px] text-zinc-500 leading-relaxed font-mono break-all">
-        {data.host?.hostname && <div>host: <span className="text-zinc-300">{data.host.hostname}</span> · {data.host.platform}/{data.host.arch} · {data.host.cpuCount}× <span className="text-zinc-600">{(data.host.cpuModel || '').replace(/\s+/g, ' ').slice(0, 40)}</span></div>}
-        <div>node: <span className="text-zinc-300">{data.node}</span> · v8 {data.process?.v8} · pid {data.process?.pid} · env <span className="text-zinc-300">{data.env}</span></div>
-        <div>cpu: user {data.process?.cpuUserSec}s + sys {data.process?.cpuSysSec}s · host uptime {fmtUptime(data.host?.uptime)}</div>
-        {data.db?.version && <div>db: <span className="text-zinc-400">{String(data.db.version).slice(0, 80)}</span></div>}
+        {/* ─── 우리서비스 (대시보드) ─── */}
+        <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-2.5 space-y-1.5 min-w-0">
+          <SectionHeader title="우리서비스 (대시보드)" />
+          <Row
+            label={dash ? 'CPU (컨테이너)' : 'CPU (프로세스 누적)'}
+            value={dash?.cpuPct != null ? `${dash.cpuPct.toFixed(1)}%`
+              : `user ${data.process?.cpuUserSec ?? 0}s`}
+            valClass={dash?.cpuPct == null ? 'text-zinc-300' : memPctColor(dash.cpuPct)}
+            trail={dash?.cpuPct != null && <Sparkline values={history?.map(h => h.dashCpu)} color="#f59e0b" />}
+          />
+          <Row
+            label="메모리 (RSS)"
+            value={dash?.memUsage != null
+              ? fmtContainerMem(dash, dashMemPct)
+              : fmtMB(data.memory?.rss)}
+            valClass={memPctColor(dashMemPct)}
+            trail={dash?.memUsage != null && <Sparkline values={history?.map(h => h.dashMemMB)} color="#3b82f6" />}
+          />
+          <Divider />
+          <Row label="가동 시간 (앱)" value={fmtUptime(data.uptimeSec)} />
+          <Row
+            label="DB 응답"
+            value={data.db?.ok ? `${data.db.latencyMs}ms` : '실패'}
+            valClass={data.db?.ok ? 'text-emerald-400' : 'text-rose-400'}
+            trail={data.db?.ok && <Sparkline values={history?.map(h => h.dbMs)} color="#10b981" />}
+          />
+          {!data.db?.ok && data.db?.error && (
+            <div className="text-[10px] text-rose-400/80 truncate" title={data.db.error}>
+              {data.db.error}
+            </div>
+          )}
+          <Row label="DB pool"
+            value={data.db?.poolStats
+              ? `t${data.db.poolStats.total} i${data.db.poolStats.idle} w${data.db.poolStats.waiting}`
+              : '—'} />
+          <Row label="힙 (Node)" value={fmtMB(data.memory?.heapUsed)} />
+          <div className="text-[10px] text-zinc-500 pt-1 leading-snug truncate">
+            node {data.node} · pid {data.process?.pid} · {data.env}
+            {dbVerShort && <span className="text-zinc-600"> · {dbVerShort}</span>}
+          </div>
+        </div>
       </div>
     </div>
   );
