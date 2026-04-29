@@ -169,7 +169,7 @@ function HistoryInner() {
         if (displayPlaces.length === 0) return null;
         const titleText = isLong ? '🕐 오래 머문 곳' : '📍 자주 가는 곳';
         const titleShort = isLong ? '오래 머문 곳' : '자주 가는 곳';
-        const metric = (p) => isLong ? fmtDwell(p.total_dwell_sec) : `${p.visit_count}회`;
+        const metric = (p) => isLong ? fmtDwell(p.max_dwell_sec) : `${p.visit_count}회`;
         return (
         <div className="flex-shrink-0 px-4 pt-3 pb-2">
           {placesCollapsed ? (

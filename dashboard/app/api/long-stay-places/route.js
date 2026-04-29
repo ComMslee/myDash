@@ -8,6 +8,10 @@ export const dynamic = 'force-dynamic';
 // 단발 정차(신호/잠깐 하차) 노이즈 제거 — 10분 미만은 dwell 으로 카운트 안 함.
 const MIN_DWELL_SEC = 600;
 
+// 집/회사 지오펜스는 맨 뒤로 (자주 가는 곳과 동일 — 일상적으로 가장 오래 머물러
+// 압도하지만 정보로서 가치 낮음, 그 외 장소 가시성 우선)
+const PINNED_GEOFENCE_NAMES = ['집', '회사', 'Home', 'Work'];
+
 // 오래 머문 곳 — drives 의 종료 시각과 다음 drives 의 시작 시각 간 갭을 dwell 로 산출.
 // LEAD 윈도우 함수로 다음 주행 start_date 끌어오고, 마지막 주행은 NOW() 로 대체해
 // 현재 진행 중인 체류도 포함. 좌표 0.0005° bin(~55m) 단위로 그룹핑(자주가는곳과 동일).
@@ -61,7 +65,7 @@ export async function GET() {
            FLOOR(COALESCE(g.latitude, a.latitude)::numeric * 2000),
            FLOOR(COALESCE(g.longitude, a.longitude)::numeric * 2000)
        ) sub
-       ORDER BY total_dwell_sec DESC
+       ORDER BY max_dwell_sec DESC
        LIMIT 100`,
       [carId, MIN_DWELL_SEC]
     );
@@ -73,7 +77,7 @@ export async function GET() {
     }));
     const kakaoLabels = await batchReverseGeocode(coords);
 
-    const places = result.rows.map((p, i) => {
+    const allPlaces = result.rows.map((p, i) => {
       const geofenceName = p.geofence_name || null;
       const kakaoLabel = kakaoLabels[i] || null;
       const dbLabel = p.label || null;
@@ -94,8 +98,22 @@ export async function GET() {
       };
     });
 
-    // 오래 머문 곳에선 집/회사가 자연스레 1·2위 — 분리 핀 처리 안 함 (정렬 그대로 유지).
-    return Response.json({ places, min_dwell_sec: MIN_DWELL_SEC });
+    // 집/회사 핀 → 맨 뒤로 (자주 가는 곳과 동일 처리)
+    const pinned = [];
+    const normal = [];
+    for (const p of allPlaces) {
+      if (p.geofence_name && PINNED_GEOFENCE_NAMES.includes(p.geofence_name)) {
+        pinned.push(p);
+      } else {
+        normal.push(p);
+      }
+    }
+    pinned.sort((a, b) =>
+      PINNED_GEOFENCE_NAMES.indexOf(a.geofence_name) -
+      PINNED_GEOFENCE_NAMES.indexOf(b.geofence_name)
+    );
+
+    return Response.json({ places: [...normal, ...pinned], min_dwell_sec: MIN_DWELL_SEC });
   } catch (err) {
     console.error('/api/long-stay-places error:', err);
     return Response.json({ error: 'DB error', detail: err.message }, { status: 500 });
