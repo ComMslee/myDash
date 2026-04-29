@@ -1,3 +1,4 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
@@ -5,6 +6,8 @@ import { KWH_PER_KM } from '@/lib/constants';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
     const car = await getDefaultCar();
     if (!car) {

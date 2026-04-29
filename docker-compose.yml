@@ -57,7 +57,8 @@ services:
       - EV_CHARGER_API_KEY=${EV_CHARGER_API_KEY}
       - HOME_CHARGER_STAT_ID=${HOME_CHARGER_STAT_ID:-PI795111}
       - HOME_CHARGER_STAT_IDS=${HOME_CHARGER_STAT_IDS:-PI795111,PI313299,PIH01089}
-      - DASHBOARD_PIN=${DASHBOARD_PIN:-}
+    volumes:
+      - dashboard-data:/data
     ports:
       - 80:5000
       - 5000:5000
@@ -68,3 +69,4 @@ volumes:
   teslamate-db:
   mosquitto-conf:
   mosquitto-data:
+  dashboard-data:

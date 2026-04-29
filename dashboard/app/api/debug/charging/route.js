@@ -1,3 +1,4 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 
@@ -6,6 +7,8 @@ export const dynamic = 'force-dynamic';
 // 진단 전용 — TeslaMate 가 충전 신호를 인지 못 하는 케이스 추적용 raw 덤프.
 // /api/charging-status 가 false 인데 실제로는 플러그 꽂혀 있을 때 어디서 끊겼는지 본다.
 export async function GET() {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
     const car = await getDefaultCar();
     if (!car) return Response.json({ error: 'no car' });

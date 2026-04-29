@@ -1,3 +1,4 @@
+import { requireAuth } from '@/lib/auth-helper';
 // 집충전기 주변 스테이션 탐색 임시 API (1회성 조사용)
 // GET /api/find-nearby-chargers?base=PI795111&radius=1000&count=12
 
@@ -62,6 +63,8 @@ async function fetchPage(pageNo, key, { zcode, zscode }) {
 }
 
 export async function GET(req) {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   const key = process.env.EV_CHARGER_API_KEY;
   if (!key) return jsonUtf8({ error: 'EV_CHARGER_API_KEY 미설정' }, { status: 503 });
 

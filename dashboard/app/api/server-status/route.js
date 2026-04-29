@@ -1,9 +1,12 @@
+import { requireAuth } from '@/lib/auth-helper';
 import os from 'node:os';
 import pool from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   const startedAt = Date.now();
   const memUsage = process.memoryUsage();
   const cpu = process.cpuUsage();

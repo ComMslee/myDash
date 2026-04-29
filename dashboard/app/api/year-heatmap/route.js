@@ -1,3 +1,4 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 
@@ -6,6 +7,8 @@ export const dynamic = 'force-dynamic';
 // 365일 GitHub 스타일 히트맵용 일별 집계
 // 응답: { days: { 'YYYY-MM-DD': { km, kwh, drives, charges } }, max_km, max_kwh }
 export async function GET() {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
     const car = await getDefaultCar();
     if (!car) {

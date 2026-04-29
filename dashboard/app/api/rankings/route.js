@@ -1,3 +1,4 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
@@ -7,6 +8,8 @@ export const dynamic = 'force-dynamic';
 
 // GET /api/rankings?type=drive_distance|drive_duration|drive_avg_speed|drive_eff|day_distance|day_duration|day_avg_speed|day_eff&limit=50
 export async function GET(request) {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'drive_distance';

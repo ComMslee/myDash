@@ -1,3 +1,4 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { KWH_PER_KM, RATED_RANGE_MAX_KM } from '@/lib/constants';
 import { KST_OFFSET_MS } from '@/lib/kst';
@@ -31,6 +32,8 @@ function getISOWeekNumber(mondayUTC) {
 }
 
 export async function GET() {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
     const car = await getDefaultCar();
     if (!car) return Response.json({ error: 'No car found' }, { status: 404 });

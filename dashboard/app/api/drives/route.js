@@ -1,3 +1,4 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
@@ -7,6 +8,8 @@ import { batchReverseGeocode } from '@/lib/kakao-geo';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
     const { searchParams } = new URL(request.url);
     const from = searchParams.get('from'); // 선택: YYYY-MM-DD 형식 시작일

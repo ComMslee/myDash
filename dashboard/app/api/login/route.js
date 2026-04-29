@@ -1,32 +1,14 @@
 import { NextResponse } from 'next/server';
+import { readAuth, pinToken } from '@/lib/auth-store';
+import { COOKIE, MAX_AGE, timingSafeEqual } from '@/lib/auth-helper';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-const PIN = process.env.DASHBOARD_PIN || '';
-const COOKIE = 'myDash_auth';
-const SALT = 'myDash-auth-v1';
-const MAX_AGE = 60 * 60 * 24 * 365;
 
 const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 60_000;
 const LOCK_MS = 60_000;
 const attempts = new Map();
-
-async function buildToken(pin) {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(pin),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(SALT));
-  return Array.from(new Uint8Array(sig))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
 
 function clientIp(req) {
   const fwd = req.headers.get('x-forwarded-for');
@@ -34,16 +16,10 @@ function clientIp(req) {
   return req.headers.get('x-real-ip') || 'unknown';
 }
 
-function timingSafeEqual(a, b) {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
 export async function POST(req) {
-  if (!PIN) {
-    return NextResponse.json({ error: 'PIN_NOT_CONFIGURED' }, { status: 500 });
+  const auth = await readAuth();
+  if (!auth) {
+    return NextResponse.json({ error: 'NEED_SETUP' }, { status: 412 });
   }
 
   const ip = clientIp(req);
@@ -58,14 +34,11 @@ export async function POST(req) {
   }
 
   let body;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  try { body = await req.json(); } catch { body = {}; }
   const submitted = String(body.pin ?? '');
+  const submittedToken = await pinToken(submitted);
 
-  if (!timingSafeEqual(submitted, PIN)) {
+  if (!timingSafeEqual(submittedToken, auth.token)) {
     if (!entry || now - entry.first > WINDOW_MS) {
       entry = { count: 0, first: now, lockUntil: 0 };
     }
@@ -76,9 +49,8 @@ export async function POST(req) {
   }
 
   attempts.delete(ip);
-  const token = await buildToken(PIN);
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(COOKIE, token, {
+  res.cookies.set(COOKIE, auth.token, {
     httpOnly: true,
     sameSite: 'lax',
     path: '/',

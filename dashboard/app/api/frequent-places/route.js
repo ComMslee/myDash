@@ -1,3 +1,4 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { batchReverseGeocode } from '@/lib/kakao-geo';
@@ -8,6 +9,8 @@ export const dynamic = 'force-dynamic';
 const PINNED_GEOFENCE_NAMES = ['집', '회사', 'Home', 'Work'];
 
 export async function GET() {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
     const car = await getDefaultCar();
     if (!car) {

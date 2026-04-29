@@ -1,3 +1,4 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { haversineMeters } from '@/lib/geo';
@@ -49,6 +50,8 @@ function thinPositions(positions, minMeters = 5) {
 }
 
 export async function GET(request) {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
     const { searchParams } = new URL(request.url);
     const raw = searchParams.get('driveId');

@@ -1,3 +1,4 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 
@@ -12,6 +13,8 @@ const FALLBACK_WINDOW_SEC = 180;
 const FALLBACK_POWER_THRESHOLD = -0.1; // kW (충전=음수)
 
 export async function GET() {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
     const car = await getDefaultCar();
     if (!car) {
