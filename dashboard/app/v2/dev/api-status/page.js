@@ -246,7 +246,7 @@ export default function ApiStatusPage() {
 
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white">
-      <div className="max-w-2xl mx-auto px-4 py-5 pb-8 flex flex-col gap-4">
+      <div className="max-w-2xl xl:max-w-6xl mx-auto px-4 py-5 pb-8 flex flex-col gap-4">
 
         {/* Tab bar */}
         <div className="flex gap-1 bg-[#161618] border border-white/[0.06] rounded-2xl p-1">
