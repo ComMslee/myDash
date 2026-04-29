@@ -115,12 +115,36 @@ function summarizePayload(text) {
   return { kind: 'json', hint, peek, parsed };
 }
 
-function stateColor(s) {
-  if (s === 'ok')      return { dot: 'bg-emerald-400', text: 'text-emerald-400' };
-  if (s === 'slow')    return { dot: 'bg-amber-400',   text: 'text-amber-400' };
-  if (s === 'fail')    return { dot: 'bg-rose-400',    text: 'text-rose-400' };
-  if (s === 'running') return { dot: 'bg-blue-400 animate-pulse', text: 'text-blue-400' };
-  return { dot: 'bg-zinc-700', text: 'text-zinc-600' };
+const ACCENT = {
+  emerald: { text: 'text-emerald-400', dim: 'text-emerald-300/60', bg: 'bg-emerald-500/[0.06]', border: 'border-emerald-500/30' },
+  amber:   { text: 'text-amber-400',   dim: 'text-amber-300/60',   bg: 'bg-amber-500/[0.06]',   border: 'border-amber-500/30' },
+  rose:    { text: 'text-rose-400',    dim: 'text-rose-300/60',    bg: 'bg-rose-500/[0.07]',    border: 'border-rose-500/30' },
+  zinc:    { text: 'text-zinc-400',    dim: 'text-zinc-600',       bg: 'bg-white/[0.02]',       border: 'border-white/[0.06]' },
+};
+
+function CountBox({ mark, label, value, accent, total }) {
+  const a = ACCENT[accent];
+  const active = value > 0;
+  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+  return (
+    <div className={`relative rounded-lg border ${a.border} ${active ? a.bg : 'bg-transparent'} px-2 py-1.5 flex flex-col items-center justify-center overflow-hidden`}>
+      <div className="flex items-baseline gap-1">
+        <span className={`text-base ${active ? a.text : 'text-zinc-700'}`}>{mark}</span>
+        <span className={`text-xl font-black leading-none tabular-nums ${active ? a.text : 'text-zinc-700'}`}>{value}</span>
+      </div>
+      <span className={`text-[9px] mt-0.5 ${active ? a.dim : 'text-zinc-700'}`}>
+        {label}{active && <span className="ml-1 tabular-nums">{pct}%</span>}
+      </span>
+    </div>
+  );
+}
+
+function stateInfo(s) {
+  if (s === 'ok')      return { mark: '✓', text: 'text-emerald-400', border: 'border-l-emerald-500/70', bg: 'bg-emerald-500/[0.04]', pill: 'bg-emerald-500/15 text-emerald-300' };
+  if (s === 'slow')    return { mark: '⚠', text: 'text-amber-400',   border: 'border-l-amber-500/80',   bg: 'bg-amber-500/[0.05]',   pill: 'bg-amber-500/15 text-amber-300' };
+  if (s === 'fail')    return { mark: '✕', text: 'text-rose-400',    border: 'border-l-rose-500/90',    bg: 'bg-rose-500/[0.06]',    pill: 'bg-rose-500/20 text-rose-300' };
+  if (s === 'running') return { mark: '…', text: 'text-blue-400',    border: 'border-l-blue-500/70',    bg: 'bg-blue-500/[0.04]',    pill: 'bg-blue-500/15 text-blue-300' };
+  return { mark: '○', text: 'text-zinc-600', border: 'border-l-transparent', bg: '', pill: 'text-zinc-700' };
 }
 
 export default function ApiStatusPage() {
@@ -245,13 +269,17 @@ export default function ApiStatusPage() {
               전체 재실행
             </button>
           </div>
-          <div className="flex items-center gap-3 text-xs tabular-nums">
-            <span className="text-emerald-400">✓ {counts.ok}</span>
-            <span className="text-amber-400">⚠ {counts.slow}</span>
-            <span className="text-rose-400">✕ {counts.fail}</span>
-            {counts.running > 0 && <span className="text-blue-400">… {counts.running}</span>}
-            <span className="text-zinc-600">⏸ {counts.idle}</span>
-            <span className="ml-auto text-[10px] text-zinc-600">
+          <div className="grid grid-cols-4 gap-1.5 tabular-nums">
+            <CountBox mark="✓" label="OK"   value={counts.ok}   accent="emerald" total={ROUTES.length} />
+            <CountBox mark="⚠" label="느림" value={counts.slow} accent="amber"   total={ROUTES.length} />
+            <CountBox mark="✕" label="실패" value={counts.fail} accent="rose"    total={ROUTES.length} />
+            <CountBox mark="○" label="대기" value={counts.idle} accent="zinc"    total={ROUTES.length} />
+          </div>
+          <div className="flex items-center justify-between mt-1.5">
+            {counts.running > 0 ? (
+              <span className="text-[10px] text-blue-400">… 실행중 {counts.running}</span>
+            ) : <span />}
+            <span className="text-[10px] text-zinc-600 tabular-nums">
               {lastRun ? new Date(lastRun).toLocaleTimeString('ko-KR') : '미실행'}
             </span>
           </div>
@@ -295,36 +323,41 @@ export default function ApiStatusPage() {
 
 function RouteRow({ route, result, values, setValue, expanded, onToggleExpand, editing, onToggleEdit, onRun }) {
   const state = result?.state || 'idle';
-  const c = stateColor(state);
+  const s = stateInfo(state);
   const hasParams = !!route.params?.length;
   const missingRequired = route.params?.some(p => p.required && !values[p.key]);
 
   return (
-    <div className="border-b border-white/[0.04] last:border-0">
-      <div className="px-4 py-2.5 flex items-center gap-2 text-[11px]">
-        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${c.dot}`} />
+    <div className={`border-b border-white/[0.04] last:border-0 border-l-4 ${s.border} ${s.bg} transition-colors`}>
+      <div className="px-3 py-2 flex items-center gap-2 text-[11px]">
+        <span className={`${s.text} ${state === 'running' ? 'animate-pulse' : ''} text-base font-bold leading-none w-4 text-center shrink-0`}>
+          {s.mark}
+        </span>
 
         <button
           onClick={onToggleExpand}
-          className="flex-1 min-w-0 text-left flex items-center gap-2"
+          className="flex-1 min-w-0 text-left flex items-center gap-1.5"
         >
           <span className="font-mono text-zinc-300 truncate">{route.path}</span>
-          <span className="text-[9px] text-zinc-700 font-mono shrink-0">GET</span>
           {route.dashboard && (
-            <span className="text-[8px] px-1 rounded bg-blue-500/15 text-blue-300 shrink-0" title="대시보드 뷰 제공">📊</span>
+            <span className="text-[9px] px-1 rounded bg-blue-500/15 text-blue-300 shrink-0" title="대시보드 뷰 제공">📊</span>
           )}
+          <span className={`text-[9px] text-zinc-600 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}>▾</span>
         </button>
 
-        <span className="flex items-center gap-2 tabular-nums shrink-0">
+        <span className="flex items-center gap-1.5 tabular-nums shrink-0">
           {state === 'idle' ? (
-            <span className="text-zinc-700">대기</span>
+            <span className="text-[10px] text-zinc-700 px-1.5">대기</span>
           ) : state === 'running' ? (
-            <span className="text-blue-400">…</span>
+            <span className="text-[10px] text-blue-400 px-1.5">…</span>
           ) : (
             <>
-              <span className={c.text}>{result.status ?? 'ERR'}</span>
-              <span className={result.ms >= SLOW_MS ? 'text-amber-400' : 'text-zinc-500'}>{fmtMs(result.ms)}</span>
-              <span className="text-zinc-600">{fmtBytes(result.bytes)}</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${s.pill}`}>
+                {result.status ?? 'ERR'}
+              </span>
+              <span className={`text-[10px] ${result.ms >= SLOW_MS ? 'text-amber-400' : 'text-zinc-500'}`}>
+                {fmtMs(result.ms)}
+              </span>
             </>
           )}
           <button
