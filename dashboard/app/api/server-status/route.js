@@ -58,6 +58,81 @@ function pushHistorySample(sample) {
   _lastPushTs = Date.now();
 }
 
+// DB 영구 로그 — 일별 피크/한산 시간 추적용. 5분 dedupe.
+// 테이블은 /api/server-status 첫 호출 시 idempotent CREATE.
+const DB_WRITE_INTERVAL_MS = 5 * 60_000;
+let _lastDbWriteTs = 0;
+let _schemaReady = false;
+
+async function ensureSchema() {
+  if (_schemaReady) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS server_health_log (
+      ts                 timestamptz PRIMARY KEY,
+      host_cpu           real,
+      host_mem_pct       real,
+      host_mem_avail_pct real,
+      db_ms              integer,
+      tm_cpu             real,
+      tm_mem_mb          real,
+      dash_cpu           real,
+      dash_mem_mb        real,
+      disk_used_pct      real,
+      swap_used_pct      real
+    );
+    CREATE INDEX IF NOT EXISTS idx_server_health_log_ts ON server_health_log(ts DESC);
+  `);
+  _schemaReady = true;
+}
+
+async function logSampleToDb(sample) {
+  if (Date.now() - _lastDbWriteTs < DB_WRITE_INTERVAL_MS) return;
+  try {
+    await ensureSchema();
+    await pool.query(
+      `INSERT INTO server_health_log (ts, host_cpu, host_mem_pct, host_mem_avail_pct,
+         db_ms, tm_cpu, tm_mem_mb, dash_cpu, dash_mem_mb, disk_used_pct, swap_used_pct)
+       VALUES (NOW(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (ts) DO NOTHING`,
+      [sample.hostCpu, sample.hostMemPct, sample.hostMemAvailPct,
+       sample.dbMs, sample.tmCpu, sample.tmMemMB, sample.dashCpu, sample.dashMemMB,
+       sample.diskUsedPct, sample.swapUsedPct]
+    );
+    _lastDbWriteTs = Date.now();
+  } catch (e) {
+    // DB 로깅 실패는 응답을 깨뜨리지 않음 — 콘솔만.
+    console.warn('[server-status] db log failed:', e.message);
+  }
+}
+
+// 최근 24h 피크/한산 (호스트 CPU 기준).
+async function fetchDailyExtremes() {
+  try {
+    const res = await pool.query(
+      `WITH d AS (
+         SELECT ts, host_cpu, host_mem_pct
+         FROM server_health_log
+         WHERE ts >= NOW() - INTERVAL '24 hours' AND host_cpu IS NOT NULL
+       )
+       SELECT
+         (SELECT host_cpu FROM d ORDER BY host_cpu DESC LIMIT 1)  AS peak_cpu,
+         (SELECT ts       FROM d ORDER BY host_cpu DESC LIMIT 1)  AS peak_ts,
+         (SELECT host_cpu FROM d ORDER BY host_cpu ASC  LIMIT 1)  AS quiet_cpu,
+         (SELECT ts       FROM d ORDER BY host_cpu ASC  LIMIT 1)  AS quiet_ts,
+         (SELECT COUNT(*) FROM d)::int                            AS samples`
+    );
+    const r = res.rows[0];
+    if (!r || !r.samples) return null;
+    return {
+      peak: { cpu: r.peak_cpu, ts: r.peak_ts },
+      quiet: { cpu: r.quiet_cpu, ts: r.quiet_ts },
+      samples: r.samples,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function GET() {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
@@ -98,8 +173,7 @@ export async function GET() {
   const tm = findC('teslamate');
   const dash = findC('dashboard');
 
-  // ring buffer 푸시 — 25s dedupe (다중 클라 폴링 / 페이지 새로고침 안 중복)
-  pushHistorySample({
+  const sample = {
     ts: startedAt,
     hostCpu: loadavg[0] ?? null,
     hostMemPct: memTotal ? +((memUsedActual / memTotal) * 100).toFixed(1) : null,
@@ -109,7 +183,19 @@ export async function GET() {
     tmMemMB: tm?.memUsage != null ? +(tm.memUsage / 1024 / 1024).toFixed(1) : null,
     dashCpu: dash?.cpuPct ?? null,
     dashMemMB: dash?.memUsage != null ? +(dash.memUsage / 1024 / 1024).toFixed(1) : null,
-  });
+    diskUsedPct: disk?.total ? +((1 - disk.available / disk.total) * 100).toFixed(1) : null,
+    swapUsedPct: memInfo?.swapTotal
+      ? +((1 - (memInfo.swapFree ?? 0) / memInfo.swapTotal) * 100).toFixed(1) : null,
+  };
+
+  // ring buffer 푸시 (25s dedupe) — 메모리, 새로고침 후에도 유지(앱 재시작 시 리셋)
+  pushHistorySample(sample);
+  // DB 영구 로그 (5min dedupe) — 일별 피크/한산 추적
+  // await 안 함: 응답 latency 영향 최소화, 실패해도 응답 안 깸
+  logSampleToDb(sample);
+
+  // 최근 24h 피크/한산 — DB 로그 기반
+  const daily = await fetchDailyExtremes();
 
   return Response.json({
     serverTime: startedAt,
@@ -163,5 +249,6 @@ export async function GET() {
     },
     docker: dockerStats,
     history: _history.slice(),
+    daily, // { peak: {cpu, ts}, quiet: {cpu, ts}, samples } | null
   });
 }

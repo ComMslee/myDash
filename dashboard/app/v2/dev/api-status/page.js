@@ -845,6 +845,35 @@ function ServerStatusCard({ data, latencyMs, history }) {
               valClass={swapUsedPct != null && swapUsedPct > 30 ? 'text-amber-400' : 'text-zinc-400'}
             />
           )}
+          {/* 24h 피크/한산 — DB 로그 기반 */}
+          {data.daily?.peak && (
+            <>
+              <Divider />
+              <Row
+                label="24h 피크 CPU"
+                value={data.daily.peak.cpu != null ? data.daily.peak.cpu.toFixed(2) : '—'}
+                valClass="text-amber-400"
+                trail={data.daily.peak.ts && (
+                  <span className="text-[9px] text-zinc-500 font-normal">
+                    {new Date(data.daily.peak.ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                  </span>
+                )}
+              />
+              <Row
+                label="24h 한산 CPU"
+                value={data.daily.quiet.cpu != null ? data.daily.quiet.cpu.toFixed(2) : '—'}
+                valClass="text-emerald-400/80"
+                trail={data.daily.quiet.ts && (
+                  <span className="text-[9px] text-zinc-500 font-normal">
+                    {new Date(data.daily.quiet.ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                  </span>
+                )}
+              />
+              <div className="text-[9px] text-zinc-600 pt-0.5">
+                {data.daily.samples} 샘플 (5분 간격 로그)
+              </div>
+            </>
+          )}
           <div className="text-[10px] text-zinc-500 pt-1 leading-snug">
             {(() => {
               const verdict =
