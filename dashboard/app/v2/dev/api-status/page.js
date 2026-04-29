@@ -6,6 +6,9 @@ import { WarmDiagCard } from '@/app/v2/battery/home-charger/poll-log/diag';
 // ── 라우트 메타데이터 ─────────────────────────────────────────
 // params[].sample 의 'auto:firstDriveId' 는 마운트 시 /api/drives 응답에서 자동 픽
 const ROUTES = [
+  // 시스템
+  { path: '/api/server-status',    label: '서버 상태',       category: '시스템' },
+
   // 차량
   { path: '/api/car',              label: '차량',           category: '차량' },
   { path: '/api/drives',           label: '주행 요약',      category: '차량',
@@ -61,7 +64,7 @@ const ROUTES = [
     ] },
 ];
 
-const CATEGORIES = ['차량', '주행', '배터리', '집충전기'];
+const CATEGORIES = ['시스템', '차량', '주행', '배터리', '집충전기'];
 
 const SLOW_MS = 1500;
 
@@ -139,6 +142,13 @@ export default function ApiStatusPage() {
   const [diagLoading, setDiagLoading] = useState(false);
   const [diagErr, setDiagErr] = useState({ charging: null, poll: null });
   const [diagAt, setDiagAt] = useState(null);
+
+  // 서버 상태
+  const [serverStatus, setServerStatus] = useState(null);
+  const [serverErr, setServerErr] = useState(null);
+  const [serverLatencyMs, setServerLatencyMs] = useState(null);
+  const [serverLoading, setServerLoading] = useState(false);
+  const [serverFetchedAt, setServerFetchedAt] = useState(null);
 
   // 마운트 시 driveId 자동 픽 — /api/drives → recent_drives[0].id
   useEffect(() => {
@@ -236,7 +246,32 @@ export default function ApiStatusPage() {
     await Promise.allSettled([
       ...ROUTES.map(r => runOne(r)),
       loadDiag(),
+      loadServerStatus(),
     ]);
+  }
+
+  async function loadServerStatus() {
+    setServerLoading(true);
+    const t0 = performance.now();
+    try {
+      const res = await fetch('/api/server-status', { cache: 'no-store' });
+      const data = await res.json();
+      setServerLatencyMs(Math.round(performance.now() - t0));
+      if (!res.ok || data?.error) {
+        setServerErr(data?.error || `HTTP ${res.status}`);
+        setServerStatus(null);
+      } else {
+        setServerStatus(data);
+        setServerErr(null);
+      }
+    } catch (e) {
+      setServerLatencyMs(Math.round(performance.now() - t0));
+      setServerErr(e.message || 'fetch 실패');
+      setServerStatus(null);
+    } finally {
+      setServerFetchedAt(Date.now());
+      setServerLoading(false);
+    }
   }
 
   async function loadDiag() {
@@ -259,12 +294,22 @@ export default function ApiStatusPage() {
     setDiagLoading(false);
   }
 
-  // 마운트 시 1회 진단 호출
-  useEffect(() => { loadDiag(); }, []);
+  // 마운트 시 1회 진단 + 서버 상태 호출
+  useEffect(() => { loadDiag(); loadServerStatus(); }, []);
 
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white">
       <div className="max-w-2xl mx-auto px-4 py-5 pb-24 flex flex-col gap-4">
+
+        {/* 서버 상태 — 최상단 */}
+        <ServerStatusCard
+          status={serverStatus}
+          err={serverErr}
+          latencyMs={serverLatencyMs}
+          loading={serverLoading}
+          fetchedAt={serverFetchedAt}
+          onReload={loadServerStatus}
+        />
 
         {/* 헤더 + 요약 */}
         <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
@@ -463,6 +508,116 @@ function RouteRow({ route, result, values, setValue, expanded, onToggleExpand, e
           <pre className="bg-zinc-900/60 border border-white/[0.04] rounded-lg p-2 text-[10px] text-zinc-300 overflow-auto max-h-60 font-mono whitespace-pre-wrap break-all">
 {result.peek || '(empty)'}
           </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 서버 상태 카드 — 최상단
+function ServerStatusCard({ status, err, latencyMs, loading, fetchedAt, onReload }) {
+  const fmtUptime = (sec) => {
+    if (sec == null) return '—';
+    if (sec < 60) return `${sec}초`;
+    if (sec < 3600) return `${Math.floor(sec / 60)}분`;
+    if (sec < 86400) {
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      return `${h}h${String(m).padStart(2, '0')}`;
+    }
+    const d = Math.floor(sec / 86400);
+    const h = Math.floor((sec % 86400) / 3600);
+    return `${d}일 ${h}h`;
+  };
+  const fmtMemMB = (b) => b == null ? '—' : `${(b / 1024 / 1024).toFixed(0)}MB`;
+  const fmtAgo = (iso) => {
+    if (!iso) return '—';
+    const ms = Date.now() - new Date(iso).getTime();
+    if (ms < 0) return '미래?';
+    if (ms < 60_000) return `${Math.floor(ms / 1000)}초 전`;
+    if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}분 전`;
+    if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h 전`;
+    return `${Math.floor(ms / 86_400_000)}일 전`;
+  };
+
+  // 데이터 신선도 임계 — 5분 이내 emerald, 30분 이내 amber, 그 이상 rose
+  const freshnessColor = (() => {
+    if (!status?.db?.latestPosition) return 'text-zinc-500';
+    const ms = Date.now() - new Date(status.db.latestPosition).getTime();
+    if (ms < 5 * 60_000) return 'text-emerald-400';
+    if (ms < 30 * 60_000) return 'text-amber-400';
+    return 'text-rose-400';
+  })();
+
+  // 서버 시계 - 클라 시계 차이 (ms) — > 5초면 amber, > 30초면 rose
+  const clockSkew = status?.serverTime ? Date.now() - status.serverTime - (latencyMs || 0) / 2 : null;
+  const skewColor = clockSkew == null ? 'text-zinc-500'
+    : Math.abs(clockSkew) < 5_000 ? 'text-emerald-400'
+    : Math.abs(clockSkew) < 30_000 ? 'text-amber-400'
+    : 'text-rose-400';
+
+  const overallOk = status && status.db?.ok && !err;
+
+  return (
+    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center justify-between">
+        <span className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${
+            err ? 'bg-rose-400' : !status ? 'bg-zinc-700' : overallOk ? 'bg-emerald-400' : 'bg-amber-400'
+          }`} />
+          <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">서버 상태</span>
+        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-zinc-600 tabular-nums">
+            {fetchedAt ? new Date(fetchedAt).toLocaleTimeString('ko-KR') : '미실행'}
+          </span>
+          <button
+            onClick={onReload}
+            disabled={loading}
+            className="px-2 py-0.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-[10px] text-zinc-300 disabled:opacity-30"
+          >
+            {loading ? '…' : '갱신'}
+          </button>
+        </div>
+      </div>
+
+      {err ? (
+        <div className="px-4 py-3 text-[11px] text-rose-400">{err}</div>
+      ) : !status ? (
+        <div className="px-4 py-3 text-[11px] text-zinc-600">로딩…</div>
+      ) : (
+        <div className="px-4 py-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[11px] tabular-nums">
+          <div>
+            <div className="text-[9px] text-zinc-600">가동 시간</div>
+            <div className="text-zinc-200 font-semibold">{fmtUptime(status.uptimeSec)}</div>
+          </div>
+          <div>
+            <div className="text-[9px] text-zinc-600">DB 응답</div>
+            <div className={status.db?.ok ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}>
+              {status.db?.ok ? `✓ ${status.db.latencyMs}ms` : `✕ ${status.db?.error || '연결 실패'}`}
+            </div>
+          </div>
+          <div>
+            <div className="text-[9px] text-zinc-600">TeslaMate 최신</div>
+            <div className={`${freshnessColor} font-semibold`}>{fmtAgo(status.db?.latestPosition)}</div>
+          </div>
+          <div>
+            <div className="text-[9px] text-zinc-600">시계 차이</div>
+            <div className={`${skewColor} font-semibold`}>
+              {clockSkew == null ? '—' : `${clockSkew >= 0 ? '+' : ''}${clockSkew >= 1000 ? `${(clockSkew / 1000).toFixed(1)}s` : `${Math.round(clockSkew)}ms`}`}
+            </div>
+          </div>
+          <div>
+            <div className="text-[9px] text-zinc-600">메모리 (RSS)</div>
+            <div className="text-zinc-200 font-semibold">
+              {fmtMemMB(status.memory?.rss)}
+              <span className="text-[9px] text-zinc-600 ml-1">힙 {fmtMemMB(status.memory?.heapUsed)}</span>
+            </div>
+          </div>
+          <div>
+            <div className="text-[9px] text-zinc-600">Node · 환경</div>
+            <div className="text-zinc-400 font-mono text-[10px]">{status.node} · {status.env}</div>
+          </div>
         </div>
       )}
     </div>
