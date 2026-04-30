@@ -37,8 +37,58 @@ export default function ReportPanel() {
         <WeeklyLine weekly={d.weekly} />
         <DongBars byDong={d.by_dong} />
         <Footer />
+        <DebugDump data={d} />
       </div>
     </div>
+  );
+}
+
+// 디버그 — 데이터 검증용. 응답 raw 와 핵심 카운트.
+function DebugDump({ data }) {
+  return (
+    <details className="text-[10px] text-zinc-600 mt-1">
+      <summary className="cursor-pointer select-none hover:text-zinc-400">🔍 디버그 (raw 응답)</summary>
+      <div className="mt-1.5 space-y-1.5 bg-black/30 rounded p-2 border border-white/[0.04]">
+        <div>
+          <span className="text-zinc-500">meta:</span>{' '}
+          <span className="text-zinc-300">
+            chargers={data.meta.total_chargers} (관측 {data.meta.observed_chargers}) ·
+            관측일수={data.meta.days_observed}
+          </span>
+        </div>
+        <div>
+          <span className="text-zinc-500">kpi:</span>{' '}
+          <span className="text-zinc-300 break-all">
+            overall={data.kpi.overall_pct}% ·
+            day(평/피)={data.kpi.daily_avg_pct}/{data.kpi.daily_peak_pct} ·
+            week={data.kpi.weekly_avg_pct}/{data.kpi.weekly_peak_pct} ·
+            month={data.kpi.monthly_avg_pct}/{data.kpi.monthly_peak_pct} ·
+            trend={data.kpi.trend_6m_delta_pp}%p
+          </span>
+        </div>
+        <div>
+          <span className="text-zinc-500">weekly[{data.weekly?.length || 0}]:</span>{' '}
+          {data.weekly?.length ? (
+            <span className="text-zinc-300">
+              {data.weekly[0].label}~{data.weekly[data.weekly.length - 1].label} ·
+              평균 {(data.weekly.reduce((s, w) => s + w.occupancy_pct, 0) / data.weekly.length).toFixed(1)}%
+            </span>
+          ) : <span className="text-zinc-500">empty</span>}
+        </div>
+        <div>
+          <span className="text-zinc-500">by_dong[{data.by_dong?.length || 0}]:</span>{' '}
+          <span className="text-zinc-300 break-all">
+            {(data.by_dong || []).map(d => `${d.title}=${d.occupancy_pct}%(${d.total}기)`).join(' · ')}
+          </span>
+        </div>
+        <details className="mt-1">
+          <summary className="cursor-pointer text-zinc-500 hover:text-zinc-400">전체 JSON</summary>
+          <pre className="mt-1 text-[9px] text-zinc-400 overflow-auto max-h-64 leading-relaxed">
+{JSON.stringify(data, null, 2)}
+          </pre>
+        </details>
+      </div>
+    </details>
   );
 }
 
