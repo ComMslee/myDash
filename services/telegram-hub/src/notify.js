@@ -1,14 +1,20 @@
 import http from 'node:http';
 import { sendMessage } from './telegram.js';
+import { getState } from './state.js';
 
 const SECRET = process.env.HUB_SHARED_SECRET || '';
 const PORT = Number(process.env.PORT || 3000);
+const BOOTED_AT = Date.now();
 
 export function startHttpServer() {
   const srv = http.createServer((req, res) => {
     if (req.method === 'GET' && (req.url === '/health' || req.url === '/')) {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end('{"ok":true}');
+      res.end(JSON.stringify({
+        ok: true,
+        uptime_sec: Math.round((Date.now() - BOOTED_AT) / 1000),
+        state: getState(),
+      }));
       return;
     }
     if (req.method !== 'POST' || req.url !== '/notify') {

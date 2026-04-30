@@ -106,6 +106,7 @@ export function ServerStatusCard({ data, latencyMs, history }) {
   const findContainer = (name) => containers.find(c => c.name === name);
   const tm = findContainer('teslamate');
   const dash = findContainer('dashboard');
+  const tgHubC = findContainer('telegram-hub');
 
   // 메모리% 색
   const memPctColor = (pct) => pct == null ? 'text-zinc-300'
@@ -119,6 +120,7 @@ export function ServerStatusCard({ data, latencyMs, history }) {
 
   const tmMemPct = containerMemPct(tm);
   const dashMemPct = containerMemPct(dash);
+  const tgHubMemPct = containerMemPct(tgHubC);
 
   // PostgreSQL 16.13 (Debian 16.13-1.pgdg13+1) on x86_64-... → "PostgreSQL 16.13"
   const dbVerShort = data.db?.version ? String(data.db.version).match(/PostgreSQL\s+[\d.]+/)?.[0] || '—' : null;
@@ -281,6 +283,47 @@ export function ServerStatusCard({ data, latencyMs, history }) {
           <div className="text-[10px] text-zinc-500 pt-1 leading-snug truncate">
             node {data.node} · pid {data.process?.pid} · {data.env}
             {dbVerShort && <span className="text-zinc-600"> · {dbVerShort}</span>}
+          </div>
+        </div>
+
+        {/* ─── 텔레그램 봇 ─── */}
+        <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-2.5 space-y-1.5 min-w-0">
+          <SectionHeader title="텔레그램 봇" />
+          <Row
+            label="상태"
+            value={data.tgHub?.ok ? '정상' : (data.tgHub?.error ? String(data.tgHub.error).slice(0, 32) : '응답 없음')}
+            valClass={data.tgHub?.ok ? 'text-emerald-400' : 'text-rose-400'}
+          />
+          <Row
+            label="CPU (컨테이너)"
+            value={tgHubC?.cpuPct != null ? `${tgHubC.cpuPct.toFixed(1)}%`
+              : !data.docker?.ok ? '미연결'
+              : tgHubC?.error ? 'stats 실패'
+              : tgHubC ? '—' : '없음'}
+            valClass={tgHubC?.cpuPct == null ? 'text-zinc-500' : memPctColor(tgHubC.cpuPct)}
+          />
+          <Row
+            label="메모리"
+            value={fmtContainerMem(tgHubC, tgHubMemPct)}
+            valClass={memPctColor(tgHubMemPct)}
+          />
+          <Divider />
+          <Row label="가동 시간 (hub)" value={fmtUptime(data.tgHub?.uptime_sec)} />
+          <Row
+            label="알림 baseline"
+            value={data.tgHub?.state
+              ? `c${data.tgHub.state.last_charge_start_id ?? '-'} d${data.tgHub.state.last_drive_end_id ?? '-'}`
+              : '—'}
+          />
+          <Row
+            label="명령 offset"
+            value={data.tgHub?.state?.telegram_offset ?? '—'}
+          />
+          <div className="text-[10px] text-zinc-500 pt-1 leading-snug truncate">
+            {tgHubC?.state ? <>state: <span className="text-zinc-400">{tgHubC.state}</span></>
+              : !data.tgHub?.ok && data.tgHub?.error
+                ? <span className="text-rose-400/80">{String(data.tgHub.error).slice(0, 60)}</span>
+                : '—'}
           </div>
         </div>
 

@@ -28,6 +28,22 @@ async function readMemInfo() {
   }
 }
 
+// telegram-hub /health — docker network 내부 호출. 미가동/미설정 시 ok:false.
+const TG_HUB_URL = process.env.TELEGRAM_HUB_URL || 'http://telegram-hub:3000';
+async function fetchTgHubHealth() {
+  try {
+    const r = await fetch(`${TG_HUB_URL}/health`, {
+      signal: AbortSignal.timeout(1500),
+      cache: 'no-store',
+    });
+    if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+    const j = await r.json();
+    return { ok: true, ...j };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
 // 루트 파일시스템 가용 용량 — fs.statfs (Node 18.15+).
 async function getDiskRoot() {
   try {
@@ -141,7 +157,7 @@ export async function GET() {
   const cpu = process.cpuUsage();
 
   const dbT0 = performance.now();
-  const [dbResults, dockerStats, memInfo, disk] = await Promise.all([
+  const [dbResults, dockerStats, memInfo, disk, tgHub] = await Promise.all([
     Promise.allSettled([
       pool.query('SELECT MAX(date)     AS latest FROM positions'),
       pool.query('SELECT MAX(end_date) AS latest FROM drives'),
@@ -153,6 +169,7 @@ export async function GET() {
     getContainerStats(), // docker.sock RO — 실패 시 ok:false 반환
     readMemInfo(),
     getDiskRoot(),
+    fetchTgHubHealth(),
   ]);
   const dbLatencyMs = Math.round(performance.now() - dbT0);
   const dbOk = dbResults.every(r => r.status === 'fulfilled');
@@ -248,6 +265,7 @@ export async function GET() {
       error: dbError,
     },
     docker: dockerStats,
+    tgHub, // { ok, uptime_sec, state? } | { ok:false, error }
     history: _history.slice(),
     daily, // { peak: {cpu, ts}, quiet: {cpu, ts}, samples } | null
   });
