@@ -35,101 +35,8 @@ const COMMANDS = {
   '/deny':      { rootOnly: true, handler: cmdDeny },
 };
 
-// 자연어 매칭 전 정규화 — 이모지/문장부호 제거 + 공백 단일화.
-// "충전 됐어??? 🤔" → "충전 됐어" 처럼 변형으로 매칭이 깨지지 않게.
-function normalizeForMatch(text) {
-  return text
-    .replace(/[\p{Extended_Pictographic}‍️]/gu, '') // 이모지·VS·ZWJ
-    .replace(/[?？!！.。．,，;；:：~～\-_/\\()\[\]{}「」『』""'']/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-// ── 자연어 라우팅 (feature 태그 포함) ─────────────────
-// 첫 매칭 승. 위에서 아래로 검사. 의도가 모호한 표현은 더 명확한 패턴이 위로.
-// 정규식은 normalizeForMatch 통과한 텍스트에 적용 — 문장부호/이모지는 신경 X.
-const NL_PATTERNS = [
-  // /charge — 충전 진행 상세 (속도·경과·ETA). /soc 보다 먼저 매칭되어야 함.
-  {
-    feature: 'car',
-    re: /(충전\s*(속도|진행|상태|어떻|어디까지|언제\s*까지|언제\s*(끝|완료|다)|얼마나\s*(됐|돼|됨|남|걸려)|마저|끝났|완료|몇\s*(분|시간))|언제\s*(끝|완료|다\s*(돼|됐))|얼마나\s*(더\s*)?충전|완충|다\s*(찼|채워|됐어|됐냐)|급속|완속|충전.*\bkw\b|\bkw\s*들어|charging\s*(progress|status|when|done))/i,
-    handler: cmdCharge,
-  },
-  // /range — 주행가능거리. /soc 보다 먼저 (남은 km/거리 선점).
-  {
-    feature: 'car',
-    re: /(주행\s*가능|주행\s*거리|잔여\s*(거리|km)|남은\s*(km|거리|주행)|(얼마나|얼만큼|더|몇\s*km)\s*갈|갈\s*수\s*있|거리\s*(얼마|얼만큼|남)|몇\s*km|\brange\b|how\s*far)/i,
-    handler: cmdRange,
-  },
-  // /soc — 배터리 % + 충전 중 여부 (단순). km/거리/충전속도는 위에서 처리됨.
-  {
-    feature: 'car',
-    re: /(배터리|\bsoc\b|\bbattery\b|몇\s*[%％]|남은\s*(배터리|전기|충전)|잔량|퍼센트|몇\s*프로|충전\s*(중|됐|됨|상태)|방전|전기\s*(얼마|얼만큼|남))/i,
-    handler: cmdSoc,
-  },
-  // /yesterday — 어제 (KST). /today 보다 먼저.
-  {
-    feature: 'car',
-    re: /(어제|어젯|yesterday)/i,
-    handler: cmdYesterday,
-  },
-  // /week — 지난 7일.
-  {
-    feature: 'car',
-    re: /(이번\s*주|지난\s*주|이번주|지난주|한\s*주|일주일|7\s*일|주간|(최근|요번|지난)\s*(주|7\s*일|일주일)|this\s*week|past\s*week|last\s*week|\bweek\b)/i,
-    handler: cmdWeek,
-  },
-  // /today — 오늘 활동.
-  {
-    feature: 'car',
-    re: /(오늘|today|얼마나\s*(달렸|달려|달리|뛰었|뛰|운전|운행|다녀|다녔)|오늘\s*(뭐|얼마|기록|총|요약|운전|운행|다녀|다녔|주행|충전|km|거리|효율)|운행\s*기록|일일\s*(요약|기록))/i,
-    handler: cmdToday,
-  },
-  // /parked — 마지막 주차 장소·경과. /where 보다 먼저 (특수성).
-  {
-    feature: 'car',
-    re: /(마지막\s*주차|주차한\s*지|얼마나\s*(세웠|세워|됐)|세워둔\s*지|언제\s*(주차|세웠|세움)|어디\s*(세웠|세움|세워)|차\s*세운\s*지|정차\s*(언제|얼마|시간)|주차\s*(언제|시간|장소)|parked\s*(when|how|where))/i,
-    handler: cmdParked,
-  },
-  // /where — 현재 위치 좌표/지도.
-  {
-    feature: 'car',
-    re: /(차\s*(어디|위치)|어디\s*있|어디야|어디에|어디지|어디인|지금\s*어디|현재\s*위치|내\s*차\s*(어디|위치)|위치\s*(어디|어딘|알려)|지도|(주차장|차고)\s*(어디|위치)|where.*(car|는|있)|location|navigate|gps|map\s*me)/i,
-    handler: cmdWhere,
-  },
-  // open: /categories — /help 의 "기능 목록" 와 겹치므로 더 구체적인 이쪽이 위.
-  {
-    feature: null,
-    re: /(카테고리|categor|메뉴\s*보|기능\s*(목록|뭐))/i,
-    handler: cmdCategories,
-  },
-  // open: /help
-  {
-    feature: null,
-    re: /(도움말|사용법|명령어|커맨드|메뉴|\bhelp\b|\bcommands?\b|뭐\s*할\s*수|어떻게.*(써|사용)|(명령|기능)\s*(뭐|뭐가)|쓸\s*수\s*있|할\s*수\s*있|뭐가\s*(돼|되)|뭘\s*(해|할))/i,
-    handler: cmdHelp,
-  },
-  // open: /whoami
-  {
-    feature: null,
-    re: /(내\s*(권한|역할|정보|계정|그룹|아이디|chat)|나는\s*누구|whoami|권한\s*(뭐|있))/i,
-    handler: cmdWhoami,
-  },
-  // open: 인사 — /help 로 안내. 학습 로그에 쌓이지 않도록 매칭 처리.
-  {
-    feature: null,
-    re: /^(안녕|반가|hi|hello|hey|yo|좋은\s*(아침|저녁|밤)|good\s*(morning|evening|night)|ㅎㅇ+|ㅎㅎ+|ㅋㅋ+)/i,
-    handler: cmdGreet,
-  },
-  // open: 감사 — 짧은 응답.
-  {
-    feature: null,
-    re: /^(고마|감사|thanks|thank\s*you|땡큐|sankyu|ty\b)/i,
-    handler: cmdThanks,
-  },
-];
-
 // hub_unmatched_inputs 스키마.
+// 자연어 라우팅은 미지원 — 슬래시 외 입력은 모두 여기 적재돼 추후 분석/재도입 자료가 됨.
 let _unmatchedSchemaReady = false;
 async function ensureUnmatchedSchema() {
   if (_unmatchedSchemaReady) return;
@@ -213,15 +120,7 @@ export async function handleMessage(message) {
     return meta.handler({ chatId, args, user });
   }
 
-  // 2) NL 패턴 — 정규화 텍스트로 매칭. 권한 없는 feature 매칭은 존재 숨김 위해 조용히 폴스루.
-  const norm = normalizeForMatch(t);
-  for (const p of NL_PATTERNS) {
-    if (!p.re.test(norm)) continue;
-    if (p.feature && !(await hasPermission(chatId, p.feature))) continue;
-    return p.handler({ chatId, args: '', user });
-  }
-
-  // 3) 미해결 — 로그 + 폴백
+  // 2) 슬래시 외 입력 — 미해결 로그 + 폴백.
   return logAndPunt(chatId, t, null);
 }
 
@@ -252,16 +151,6 @@ async function logAndPunt(chatId, text, slashHead) {
 
 async function cmdStart({ chatId }) {
   return cmdHelp({ chatId });
-}
-
-async function cmdGreet({ chatId, user }) {
-  const name = user?.name ? escapeHtml(user.name.split(' ')[0]) : null;
-  const hi = name ? `안녕하세요, ${name}님 👋` : '안녕하세요 👋';
-  return sendMessage(`${hi}\n무엇을 도와드릴까요? /help 로 사용 가능한 명령을 볼 수 있어요.`, chatId);
-}
-
-async function cmdThanks({ chatId }) {
-  return sendMessage('🙂 천만에요. 더 필요한 게 있으면 말씀하세요.', chatId);
 }
 
 // 카테고리별 명령 카탈로그 — /help 표시용.
@@ -311,8 +200,6 @@ async function cmdHelp({ chatId, user }) {
     lines.push('');
     lines.push('<i>권한·방송·로그 관리는 /v2/tg 웹에서</i>');
   }
-  lines.push('');
-  lines.push('<i>자연어 일부 지원</i> (예: "오늘 얼마나 달렸어?")');
   return sendMessage(lines.join('\n'), chatId);
 }
 

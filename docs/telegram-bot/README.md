@@ -7,8 +7,8 @@
 - **알림(out)**: TeslaMate DB 변동 감지 → 권한 보유자에게 Telegram 메시지
   - 충전 시작 / 충전 완료 / 주행 종료(>=0.5 km)
 - **명령(in)**: Telegram에서 사용자가 보낸 메시지 → **dashboard API 호출** → 텔레그램 응답으로 포맷
-  - `/cmd` 스타일 + 자연어 키워드 일부 인식
-- **운영**: 가입 신청 / 승인 / 권한 부여 / 자연어 학습 루프
+  - `/cmd` 스타일만 (자연어 매칭 미지원, §6 참고)
+- **운영**: 가입 신청 / 승인 / 권한 부여 / 미인식 입력 학습 로그
 
 > **아키텍처 원칙**: TeslaMate DB 직접 쿼리는 **dashboard 가 전적으로 책임**.
 > hub 는 dashboard `/api/*` 를 호출해 결과를 텔레그램 메시지로 포맷만 함.
@@ -155,44 +155,11 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 | `/setgroup <chat_id> <group>` | `/setgroup 123 guest` | 가입승인 또는 그룹변경 — `role` + `group_key` + `hub_permissions` 트랜잭션 갱신 |
 | `/deny <chat_id>` | `/deny 123` | 어떤 role이든 → denied (차단/탈퇴) |
 
-## 6. 자연어 라우팅
+## 6. 자연어 라우팅 — 미지원
 
-`/cmd`를 안 붙여도 일부 표현은 매칭됨. 패턴은 [commands.js](../../services/telegram-hub/src/commands.js)의 `NL_PATTERNS`.
+현재 봇은 **슬래시 명령만** 인식. 자연어 키워드 매칭(`NL_PATTERNS`)은 정확도 부족으로 제거됨.
 
-매칭 전 입력은 정규화됨(`normalizeForMatch`): 이모지·문장부호(`?!.,~()` 등) 제거 + 다중 공백 단일화. "충전 됐어??? 🤔" → "충전 됐어".
-
-우선순위: 위에서 아래로, 첫 매칭 승. 더 구체적인 명령(예: `/charge` `/range`)을 일반 명령(`/soc`) 보다 위에 둠.
-
-| 명령 | 매칭되는 키워드 (예시) |
-|---|---|
-| `/charge` | 충전 속도/진행/상태/어떻게/끝났/완료/완충/다 찼 / 언제 끝·다 돼 / 얼마나 충전됐 / kw 들어 / 급속·완속 / charging status |
-| `/range` | 주행가능 / 주행거리 / 잔여 거리·km / 남은 km·거리·주행 / 얼마나·몇 km 갈 / 갈 수 있 / 거리 얼마 / range / how far |
-| `/soc` | 배터리 / soc / battery / 몇 % / 남은 배터리·전기·충전 / 잔량 / 퍼센트 / 몇 프로 / 충전 중·됐·됨·상태 / 방전 / 전기 얼마 |
-| `/yesterday` | 어제 / 어젯 / yesterday |
-| `/week` | 이번주·이번 주 / 지난주·지난 주 / 한 주 / 일주일 / 7일 / 주간 / 최근·요번·지난 (주·일주일·7일) / this·past·last week |
-| `/today` | 오늘 / today / 얼마나 (달렸·달려·뛰었·운전·운행·다녀·다녔) / 오늘 (뭐·얼마·기록·요약·운전·운행·주행·충전·km·거리·효율) / 운행 기록 / 일일 요약·기록 |
-| `/parked` | 마지막 주차 / 주차한 지 / 얼마나 (세웠·세워·됐) / 세워둔 지 / 언제 (주차·세웠·세움) / 어디 (세웠·세움·세워) / 차 세운 지 / 정차 (언제·얼마·시간) / 주차 (언제·시간·장소) |
-| `/where` | 차 (어디·위치) / 어디 (있·야·에·지·인) / 지금 어디 / 현재 위치 / 내 차 어디·위치 / 위치 (어디·알려) / 지도 / 주차장·차고 어디·위치 / location / navigate / gps / map me |
-| `/categories` | 카테고리 / category / 메뉴 보 / 기능 (목록·뭐) |
-| `/help` | 도움말 / 사용법 / 명령어 / 커맨드 / 메뉴 / help / commands / 뭐 할 수 / 어떻게 써·사용 / 명령·기능 (뭐·뭐가) / 쓸·할 수 있 / 뭐가 돼 / 뭘 해·할 |
-| `/whoami` | 내 (권한·역할·정보·계정·그룹·아이디·chat) / 나는 누구 / whoami / 권한 (뭐·있) |
-| (인사) | ^안녕 / ^반가 / ^hi / ^hello / ^hey / ^yo / 좋은 아침·저녁·밤 / good morning·evening·night / ㅎㅇ / ㅎㅎ / ㅋㅋ → 가벼운 인사 + /help 안내 |
-| (감사) | ^고마 / ^감사 / ^thanks / ^thank you / ^땡큐 / ^sankyu / ^ty → 짧은 답례 |
-
-권한 없는 user 한테 자연어가 매칭되어도 결과는 "잘 모르겠어요" — feature 존재 자체 숨김.
-
-매칭 실패 시 → `hub_unmatched_inputs`에 기록 + "잘 모르겠어요" 응답.
-
-### 학습 루프
-
-```
-1. 사용자가 자연어 입력
-2. 매칭 안 됨 → DB에 로깅
-3. 며칠 운영
-4. /v2/tg "알림" 탭의 학습 로그에서 자주 등장하는 미인식 표현 확인
-5. NL_PATTERNS 에 한 줄 추가 → push → 자동 배포
-6. /resolve <ids> 로 정리
-```
+슬래시 외 입력은 모두 `hub_unmatched_inputs` 에 적재됨 + 사용자에겐 "잘 모르겠어요 / /help 보기" 응답. `/v2/tg` "알림" 탭 학습 로그에서 누적 분포 확인 가능 — 추후 자연어 재도입(LLM 라우팅 또는 DB 패턴) 결정 자료.
 
 ## 7. `/notify` HTTP 엔드포인트 (외부 서비스용)
 
@@ -238,16 +205,6 @@ curl -X POST http://telegram-hub:3000/notify \
 본인: /pending → #5555 stranger
 본인: /deny 5555
        → 이후 그 사람 메시지 silent 처리
-```
-
-### 자연어 패턴 보강
-
-```
-1. /v2/tg "알림" 탭의 학습 로그(미인식 입력) 확인 — 자주 등장하는 표현 식별
-2. commands.js NL_PATTERNS 에 한 줄 추가:
-   { feature: 'car', re: /(전기|에너지).*(썼|사용)/i, handler: cmdUsage }
-   (cmdUsage 신규 작성 + push)
-3. 학습 로그 화면에서 해당 항목 체크 후 "선택 해결"
 ```
 
 ## 9. 관찰성
