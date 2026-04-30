@@ -173,7 +173,29 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 - `/help` 응답에 `reply_markup.keyboard` 동봉 — 채팅창 하단에 권한 보유한 데이터 명령들이 3열 그리드로 깔림 (`is_persistent: true`)
 - 누르면 슬래시 텍스트 자동 전송 → 슬래시 외울 필요 없음
 
-명령 카탈로그 단일 소스: `commands.js` 의 `CATEGORY_COMMANDS` / `COMMON_COMMANDS` / `ADMIN_COMMANDS` — `/help` 본문, [/] 메뉴, Reply 키보드가 같은 정의를 공유.
+### 6-3. Inline 후속 액션 (데이터 명령 응답)
+
+각 데이터 명령 응답 끝에 `inline_keyboard` 동봉 — 1행 3버튼.
+
+| 응답 | 후속 버튼 |
+|---|---|
+| `/soc` | 🔄 / ⚡ 충전 / 🛣 거리 |
+| `/range` | 🔄 / 🔋 SOC / 📍 위치 |
+| `/charge` | 🔄 / 🔋 SOC / 📍 위치 |
+| `/parked` | 🔄 / 📍 위치 / 📅 오늘 |
+| `/where` | 🔄 / 🅿️ 주차 / 🛣 거리 |
+| `/today` | 🔄 / 📅 어제 / 📆 주간 |
+| `/yesterday` | 🔄 / 📅 오늘 / 📆 주간 |
+| `/week` | 🔄 / 📅 오늘 / 📅 어제 |
+
+- callback_data 포맷: `cmd:<name>` — 같은 명령 새 실행 (=새로고침) 또는 인접 명령 단축
+- `tg_poller` 가 `callback_query` 분기에서 `handleCallback` 호출 → `CB_ROUTES` 매핑 → 핸들러 실행
+- 매번 새 메시지로 응답 (stateless) — `editMessageText` 인프라는 깔려 있고 향후 다단계 대화에서 사용
+
+### 6-4. 단일 소스
+
+명령 카탈로그: `commands.js` 의 `CATEGORY_COMMANDS` / `COMMON_COMMANDS` / `ADMIN_COMMANDS` — `/help` 본문, [/] 메뉴, Reply 키보드 공유.
+후속 액션: `FOLLOWUP` 맵.
 
 ## 7. `/notify` HTTP 엔드포인트 (외부 서비스용)
 

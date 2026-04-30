@@ -1,5 +1,8 @@
 import { pool } from './db.js';
-import { sendMessage, sendLocation, escapeHtml, setMyCommands } from './telegram.js';
+import {
+  sendMessage, sendLocation, escapeHtml,
+  setMyCommands, answerCallbackQuery, editMessageText,
+} from './telegram.js';
 import { formatKst } from './format.js';
 import {
   ensureAuthSchema,
@@ -124,6 +127,38 @@ export async function handleMessage(message) {
   return logAndPunt(chatId, t, null);
 }
 
+// ── callback_query 라우터 ─────────────────────────────
+// inline 키보드 버튼 클릭 → 라우팅. 현재는 'cmd:<name>' 형태만 — 같은 명령 새로 실행 (=
+// "새로고침" 또는 인접 명령 단축). 응답은 새 메시지로 보냄(stateless).
+// 향후 SNS 등 다단계 대화는 'sns:tw', 'post:confirm' 같은 prefix 로 확장.
+const CB_ROUTES = {
+  soc: cmdSoc, range: cmdRange, charge: cmdCharge,
+  today: cmdToday, yesterday: cmdYesterday, week: cmdWeek,
+  parked: cmdParked, where: cmdWhere,
+};
+
+export async function handleCallback(cb) {
+  const chatId = String(cb.message?.chat?.id || '');
+  const data = String(cb.data || '');
+  const callbackQueryId = cb.id;
+
+  // ack 우선 — 안 하면 모바일 앱 로딩 spinner 가 30초간 남음.
+  await answerCallbackQuery(callbackQueryId);
+
+  if (!chatId) return;
+  const user = await getUser(chatId);
+  if (!user || user.role === 'denied' || user.role === 'pending') return;
+
+  const m = data.match(/^cmd:([a-z]+)$/);
+  if (!m) return;
+  const fn = CB_ROUTES[m[1]];
+  if (!fn) return;
+
+  // 데이터 명령 = car feature 권한 필요.
+  if (!(await hasPermission(chatId, 'car'))) return;
+  return fn({ chatId, args: '', user });
+}
+
 async function notifyRoots(text) {
   const roots = await getRoots();
   for (const r of roots) {
@@ -179,6 +214,29 @@ const ADMIN_COMMANDS = [
   { cmd: '/setgroup', desc: '가입승인·그룹변경' },
   { cmd: '/deny',     desc: '차단/탈퇴' },
 ];
+
+// 데이터 명령 응답 끝에 동봉할 inline 후속 액션 (1행 3버튼).
+// callback_data 포맷: 'cmd:<name>' — 같은 명령 재실행(=새로고침) 또는 인접 명령.
+const FOLLOWUP = {
+  soc:       [['🔄', 'cmd:soc'], ['⚡ 충전', 'cmd:charge'], ['🛣 거리', 'cmd:range']],
+  range:     [['🔄', 'cmd:range'], ['🔋 SOC', 'cmd:soc'], ['📍 위치', 'cmd:where']],
+  charge:    [['🔄', 'cmd:charge'], ['🔋 SOC', 'cmd:soc'], ['📍 위치', 'cmd:where']],
+  parked:    [['🔄', 'cmd:parked'], ['📍 위치', 'cmd:where'], ['📅 오늘', 'cmd:today']],
+  where:     [['🔄', 'cmd:where'], ['🅿️ 주차', 'cmd:parked'], ['🛣 거리', 'cmd:range']],
+  today:     [['🔄', 'cmd:today'], ['📅 어제', 'cmd:yesterday'], ['📆 주간', 'cmd:week']],
+  yesterday: [['🔄', 'cmd:yesterday'], ['📅 오늘', 'cmd:today'], ['📆 주간', 'cmd:week']],
+  week:      [['🔄', 'cmd:week'], ['📅 오늘', 'cmd:today'], ['📅 어제', 'cmd:yesterday']],
+};
+
+function followUp(cmdKey) {
+  const set = FOLLOWUP[cmdKey];
+  if (!set) return null;
+  return {
+    reply_markup: {
+      inline_keyboard: [set.map(([text, callback_data]) => ({ text, callback_data }))],
+    },
+  };
+}
 
 // 사용자 권한 기반 슬래시 명령 목록 — Telegram [/] 메뉴 + Reply 키보드 공통.
 async function buildUserCommands(chatId, role) {
@@ -321,7 +379,7 @@ async function cmdSoc({ chatId }) {
     lines.push('충전 중 아님');
   }
   if (car.last_seen) lines.push(`<i>업데이트: ${formatKst(car.last_seen)} KST</i>`);
-  return sendMessage(lines.join('\n'), chatId);
+  return sendMessage(lines.join('\n'), chatId, followUp('soc'));
 }
 
 async function cmdToday({ chatId }) {
@@ -332,7 +390,7 @@ async function cmdToday({ chatId }) {
     '<b>오늘 (KST)</b>',
     d.n > 0 ? `🚗 ${d.n}회 주행 · ${Number(d.km).toFixed(1)} km · ${d.dur}분` : '🚗 주행 없음',
     c.n > 0 ? `⚡ ${c.n}회 충전 · ${Number(c.kwh).toFixed(2)} kWh` : '⚡ 충전 없음',
-  ].join('\n'), chatId);
+  ].join('\n'), chatId, followUp('today'));
 }
 
 async function cmdWhere({ chatId }) {
@@ -346,6 +404,7 @@ async function cmdWhere({ chatId }) {
   await sendMessage(
     `📍 <a href="${url}">현재 위치 (${lat}, ${lng})</a>\n<i>업데이트: ${formatKst(j.date)} KST</i>`,
     chatId,
+    followUp('where'),
   );
   return sendLocation(j.lat, j.lng, chatId);
 }
@@ -368,7 +427,7 @@ async function cmdYesterday({ chatId }) {
     '<b>어제 (KST)</b>',
     d.n > 0 ? `🚗 ${d.n}회 주행 · ${Number(d.km).toFixed(1)} km · ${d.dur}분` : '🚗 주행 없음',
     c.n > 0 ? `⚡ ${c.n}회 충전 · ${Number(c.kwh).toFixed(2)} kWh` : '⚡ 충전 없음',
-  ].join('\n'), chatId);
+  ].join('\n'), chatId, followUp('yesterday'));
 }
 
 async function cmdWeek({ chatId }) {
@@ -379,7 +438,7 @@ async function cmdWeek({ chatId }) {
     '<b>지난 7일 (KST)</b>',
     d.n > 0 ? `🚗 ${d.n}회 · ${Number(d.km).toFixed(1)} km · ${d.dur}분` : '🚗 주행 없음',
     c.n > 0 ? `⚡ ${c.n}회 · ${Number(c.kwh).toFixed(2)} kWh` : '⚡ 충전 없음',
-  ].join('\n'), chatId);
+  ].join('\n'), chatId, followUp('week'));
 }
 
 async function cmdRange({ chatId }) {
@@ -391,14 +450,14 @@ async function cmdRange({ chatId }) {
   const lines = [`🛣 <b>${rated} km</b> 남음 (${j.battery_level ?? '-'}%)`];
   if (est && est !== rated) lines.push(`<i>예상 ${est} km</i>`);
   if (j.last_seen) lines.push(`<i>업데이트: ${formatKst(j.last_seen)} KST</i>`);
-  return sendMessage(lines.join('\n'), chatId);
+  return sendMessage(lines.join('\n'), chatId, followUp('range'));
 }
 
 async function cmdParked({ chatId }) {
   const j = await dashGet('/api/parked');
   if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
   if (j.driving) {
-    return sendMessage(`🚗 주행 중 — 시작 ${formatKst(j.drive_started_at)} KST`, chatId);
+    return sendMessage(`🚗 주행 중 — 시작 ${formatKst(j.drive_started_at)} KST`, chatId, followUp('parked'));
   }
   if (!j.parked) return sendMessage('주행 기록 없음', chatId);
   const p = j.parked;
@@ -406,7 +465,7 @@ async function cmdParked({ chatId }) {
   return sendMessage([
     `🅿️ <b>${escapeHtml(place)}</b>`,
     `정차: ${formatKst(p.end_date)} KST (${fmtElapsed(p.elapsed_min)} 전)`,
-  ].join('\n'), chatId);
+  ].join('\n'), chatId, followUp('parked'));
 }
 
 async function cmdCharge({ chatId }) {
@@ -417,11 +476,11 @@ async function cmdCharge({ chatId }) {
     // 충전 기록 자체는 /api/car last_charge 로.
     const car = await dashGet('/api/car');
     const last = car?.last_charge;
-    if (!last) return sendMessage('⚡ 현재 충전 중 아님 — 충전 기록 없음', chatId);
+    if (!last) return sendMessage('⚡ 현재 충전 중 아님 — 충전 기록 없음', chatId, followUp('charge'));
     return sendMessage([
       '⚡ 현재 충전 중 아님',
       `<i>마지막: ${formatKst(last.end_date)} KST · ${last.soc_start ?? '?'}% → ${last.soc_end ?? '?'}%</i>`,
-    ].join('\n'), chatId);
+    ].join('\n'), chatId, followUp('charge'));
   }
 
   const power = j.charger_power != null ? Number(j.charger_power).toFixed(1) : null;
@@ -437,7 +496,7 @@ async function cmdCharge({ chatId }) {
     `📥 ${kwh} kWh${power ? ` · 현재 ${power} kW` : ''}`,
   ];
   if (j.start_date) lines.push(`⏱ 시작 ${formatKst(j.start_date)} KST (${fmtElapsed(elapsedMin)} 경과)`);
-  return sendMessage(lines.join('\n'), chatId);
+  return sendMessage(lines.join('\n'), chatId, followUp('charge'));
 }
 
 // ── 운영 명령 (root) ─────────────────────────────────

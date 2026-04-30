@@ -63,6 +63,54 @@ export async function getChat(chatId) {
   }
 }
 
+// callback_query 응답 — inline 키보드 버튼 클릭 후 상단 로딩 끄기 + 옵션 토스트.
+export async function answerCallbackQuery(callbackQueryId, text = null) {
+  if (!API || !callbackQueryId) return null;
+  try {
+    const body = { callback_query_id: callbackQueryId };
+    if (text) body.text = text;
+    const r = await fetch(`${API}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) console.error('[telegram] answerCallbackQuery', r.status);
+    return r.ok ? await r.json() : null;
+  } catch (e) {
+    console.error('[telegram] answerCallbackQuery threw', e?.message);
+    return null;
+  }
+}
+
+// 기존 메시지를 갈아끼움 — inline 키보드의 "새로고침"/"뒤로가기" 같은 흐름에 사용.
+export async function editMessageText(text, chatId, messageId, opts = {}) {
+  if (!API || !chatId || !messageId) return null;
+  try {
+    const r = await fetch(`${API}/editMessageText`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        ...opts,
+      }),
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(() => '');
+      // "message is not modified" 는 정상 (같은 내용으로 edit) — 디버그 노이즈 줄임.
+      if (!t.includes('not modified')) console.error('[telegram] editMessageText', r.status, t);
+      return null;
+    }
+    return await r.json();
+  } catch (e) {
+    console.error('[telegram] editMessageText threw', e?.message);
+    return null;
+  }
+}
+
 // 사용자별 텔레그램 입력창 [/] 메뉴 자동완성 갱신.
 // commands: [{ command:'soc', description:'배터리 % + 충전 여부' }, ...] (앞에 / 없이)
 // chatId 미지정 시 봇 전역 default 갱신.

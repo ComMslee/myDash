@@ -1,5 +1,5 @@
 import { getUpdates } from './telegram.js';
-import { handleMessage } from './commands.js';
+import { handleMessage, handleCallback } from './commands.js';
 import { getState, setState } from './state.js';
 
 export function startTelegramPoller() {
@@ -15,6 +15,7 @@ async function loop() {
         const next = u.update_id + 1;
         try {
           if (u.message) await handleMessage(u.message);
+          else if (u.callback_query) await handleCallback(u.callback_query);
         } catch (e) {
           console.error('[tg-poller] handler error', e);
         } finally {
