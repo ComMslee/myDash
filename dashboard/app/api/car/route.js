@@ -40,6 +40,9 @@ export async function GET() {
       pool.query(
         `SELECT
            (SELECT battery_level FROM positions WHERE car_id = $1 ORDER BY date DESC LIMIT 1) AS battery_level,
+           (SELECT usable_battery_level FROM positions
+              WHERE car_id = $1 AND usable_battery_level IS NOT NULL
+              ORDER BY date DESC LIMIT 1) AS usable_battery_level,
            (SELECT est_battery_range_km FROM positions
               WHERE car_id = $1 AND est_battery_range_km IS NOT NULL
               ORDER BY date DESC LIMIT 1) AS est_battery_range_km,
@@ -168,6 +171,7 @@ export async function GET() {
       id: carId,
       name: car.name,
       battery_level: currentBattery,
+      usable_battery_level: pos?.usable_battery_level ?? null,
       est_battery_range: pos?.est_battery_range_km ? parseFloat(pos.est_battery_range_km).toFixed(0) : null,
       rated_battery_range: pos?.rated_battery_range_km ? parseFloat(pos.rated_battery_range_km).toFixed(0) : null,
       odometer: pos?.odometer != null ? parseFloat(pos.odometer) : null,

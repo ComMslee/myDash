@@ -22,6 +22,7 @@ const ROUTES = [
   { path: '/api/summary',          label: '일자 요약',      desc: 'drives+charges 일자 집계 (range=today|yesterday|week) — 봇 /today /yesterday /week 공용', category: '차량',
     params: [{ key: 'range', sample: 'today' }] },
   { path: '/api/parked',           label: '주차 정보',      desc: '마지막 종료 drive 위치·경과 (driving=true 면 진행 중) — 봇 /parked 공용', category: '차량' },
+  { path: '/api/location',         label: '현재 좌표',      desc: '최신 positions 의 lat/lng/date — 봇 /where 공용', category: '차량' },
 
   // 주행
   { path: '/api/route-map',        label: '경로 지도',      desc: '단일 주행의 polyline + start/end + 통계 (driveId 필수)', category: '주행',

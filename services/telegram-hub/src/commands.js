@@ -1,4 +1,4 @@
-import { pool, getCarId } from './db.js';
+import { pool } from './db.js';
 import { sendMessage, sendLocation, escapeHtml } from './telegram.js';
 import { formatKst } from './format.js';
 import {
@@ -317,98 +317,52 @@ async function cmdWhoami({ chatId, user }) {
 }
 
 async function cmdSoc({ chatId }) {
-  const carId = await getCarId();
-  if (!carId) return sendMessage('차량 정보 없음', chatId);
+  // /api/car 와 /api/charging-status 병렬 — battery + 충전 진행 정보 결합.
+  const [car, ch] = await Promise.all([
+    dashGet('/api/car'),
+    dashGet('/api/charging-status'),
+  ]);
+  if (!car || car.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
+  if (car.battery_level == null) return sendMessage('포지션 데이터 없음', chatId);
 
-  const { rows } = await pool.query(
-    `SELECT battery_level, usable_battery_level, date
-     FROM positions WHERE car_id = $1 ORDER BY date DESC LIMIT 1`,
-    [carId],
-  );
-  const p = rows[0];
-  if (!p) return sendMessage('포지션 데이터 없음', chatId);
-
-  const { rows: chRows } = await pool.query(
-    `SELECT id, start_date, charge_energy_added
-     FROM charging_processes
-     WHERE car_id = $1 AND end_date IS NULL
-     ORDER BY id DESC LIMIT 1`,
-    [carId],
-  );
-  const ch = chRows[0];
-
-  const lines = [];
-  const useable = p.usable_battery_level != null && p.usable_battery_level !== p.battery_level
-    ? ` (사용가능 ${p.usable_battery_level}%)`
+  const usable = car.usable_battery_level != null && car.usable_battery_level !== car.battery_level
+    ? ` (사용가능 ${car.usable_battery_level}%)`
     : '';
-  lines.push(`🔋 <b>${p.battery_level}%</b>${useable}`);
-  if (ch) {
+  const lines = [`🔋 <b>${car.battery_level}%</b>${usable}`];
+  if (ch?.charging) {
     const kwh = Number(ch.charge_energy_added || 0).toFixed(2);
     lines.push(`⚡ 충전 중 — 시작 ${formatKst(ch.start_date)} · ${kwh} kWh 추가됨`);
   } else {
     lines.push('충전 중 아님');
   }
-  lines.push(`<i>업데이트: ${formatKst(p.date)} KST</i>`);
+  if (car.last_seen) lines.push(`<i>업데이트: ${formatKst(car.last_seen)} KST</i>`);
   return sendMessage(lines.join('\n'), chatId);
 }
 
 async function cmdToday({ chatId }) {
-  const carId = await getCarId();
-  if (!carId) return sendMessage('차량 정보 없음', chatId);
-
-  const KST_OFFSET_MS = 9 * 3600 * 1000;
-  const nowKst = new Date(Date.now() + KST_OFFSET_MS);
-  const todayStart = new Date(Date.UTC(
-    nowKst.getUTCFullYear(),
-    nowKst.getUTCMonth(),
-    nowKst.getUTCDate(),
-  ) - KST_OFFSET_MS);
-
-  const { rows: dr } = await pool.query(
-    `SELECT COUNT(*)::int AS n,
-            COALESCE(SUM(distance), 0)::float AS km,
-            COALESCE(SUM(duration_min), 0)::int AS dur
-     FROM drives
-     WHERE car_id = $1 AND start_date >= $2`,
-    [carId, todayStart],
-  );
-  const { rows: ch } = await pool.query(
-    `SELECT COUNT(*)::int AS n,
-            COALESCE(SUM(charge_energy_added), 0)::float AS kwh
-     FROM charging_processes
-     WHERE car_id = $1 AND start_date >= $2`,
-    [carId, todayStart],
-  );
-  const d = dr[0];
-  const c = ch[0];
-  const lines = [
+  const j = await dashGet('/api/summary?range=today');
+  if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
+  const d = j.drives || {}; const c = j.charges || {};
+  return sendMessage([
     '<b>오늘 (KST)</b>',
-    d.n > 0 ? `🚗 ${d.n}회 주행 · ${d.km.toFixed(1)} km · ${d.dur}분` : '🚗 주행 없음',
-    c.n > 0 ? `⚡ ${c.n}회 충전 · ${c.kwh.toFixed(2)} kWh` : '⚡ 충전 없음',
-  ];
-  return sendMessage(lines.join('\n'), chatId);
+    d.n > 0 ? `🚗 ${d.n}회 주행 · ${Number(d.km).toFixed(1)} km · ${d.dur}분` : '🚗 주행 없음',
+    c.n > 0 ? `⚡ ${c.n}회 충전 · ${Number(c.kwh).toFixed(2)} kWh` : '⚡ 충전 없음',
+  ].join('\n'), chatId);
 }
 
 async function cmdWhere({ chatId }) {
-  const carId = await getCarId();
-  if (!carId) return sendMessage('차량 정보 없음', chatId);
+  const j = await dashGet('/api/location');
+  if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
+  if (j.lat == null) return sendMessage('위치 데이터 없음', chatId);
 
-  const { rows } = await pool.query(
-    `SELECT latitude::float AS lat, longitude::float AS lng, date
-     FROM positions WHERE car_id = $1 ORDER BY date DESC LIMIT 1`,
-    [carId],
-  );
-  const p = rows[0];
-  if (!p) return sendMessage('위치 데이터 없음', chatId);
-
-  const lat = p.lat.toFixed(6);
-  const lng = p.lng.toFixed(6);
+  const lat = Number(j.lat).toFixed(6);
+  const lng = Number(j.lng).toFixed(6);
   const url = `https://maps.google.com/?q=${lat},${lng}`;
   await sendMessage(
-    `📍 <a href="${url}">현재 위치 (${lat}, ${lng})</a>\n<i>업데이트: ${formatKst(p.date)} KST</i>`,
+    `📍 <a href="${url}">현재 위치 (${lat}, ${lng})</a>\n<i>업데이트: ${formatKst(j.date)} KST</i>`,
     chatId,
   );
-  return sendLocation(p.lat, p.lng, chatId);
+  return sendLocation(j.lat, j.lng, chatId);
 }
 
 // 새 핸들러는 dashboard API 호출만 — TeslaMate DB 직접 쿼리는 dashboard 가 책임.

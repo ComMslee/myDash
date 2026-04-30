@@ -123,16 +123,18 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 
 ### 데이터 (`car` 권한 필요)
 
+모든 데이터 명령은 dashboard `/api/*` 호출 — TeslaMate DB 직접 쿼리 0.
+
 | 명령 | 설명 | 호출 API |
 |---|---|---|
-| `/soc` | 현재 배터리 % + 충전 여부 | (DB 직접 — 마이그 예정) |
+| `/soc` | 현재 배터리 % + 충전 여부 | `/api/car` + `/api/charging-status` |
 | `/range` | 남은 주행거리 (rated/est) | `/api/car` |
-| `/charge` | 충전 진행 상세 (속도·경과·시작 SOC→현재) | `/api/charging-status` |
-| `/today` | 오늘(KST) 주행/충전 요약 | (DB 직접 — 마이그 예정) |
+| `/charge` | 충전 진행 상세 (속도·경과·시작 SOC→현재) | `/api/charging-status` (+ `/api/car` for last_charge) |
+| `/today` | 오늘(KST) 주행/충전 요약 | `/api/summary?range=today` |
 | `/yesterday` | 어제(KST) 주행/충전 요약 | `/api/summary?range=yesterday` |
 | `/week` | 지난 7일 주행/충전 요약 | `/api/summary?range=week` |
 | `/parked` | 마지막 주차 장소·경과 (또는 주행 중 표시) | `/api/parked` |
-| `/where` | 현재 위치 (지도 링크 + 핀) | (DB 직접 — 마이그 예정) |
+| `/where` | 현재 위치 (지도 링크 + 핀) | `/api/location` |
 
 ### 공통 (누구나)
 
@@ -157,12 +159,23 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 
 `/cmd`를 안 붙여도 일부 표현은 매칭됨. 패턴은 [commands.js](../../services/telegram-hub/src/commands.js)의 `NL_PATTERNS`.
 
+우선순위: 위에서 아래로, 첫 매칭 승. 더 구체적인 명령(예: `/charge` `/range`)을 일반 명령(`/soc`) 보다 위에 둠.
+
 | 명령 | 매칭되는 키워드 |
 |---|---|
-| `/soc` | 배터리 / 충전상태 / soc / 몇 % / 얼마나 남 / 잔량 / 등 |
+| `/charge` | 충전 속도 / 충전 진행 / 언제 끝 / 얼마나 충전됐 / kw 들어 / 등 |
+| `/range` | 주행가능 / 남은 km / 남은 거리 / 몇 km 남 / range / 얼마나 갈 |
+| `/soc` | 배터리 / soc / 몇 % / 잔량 / 퍼센트 / 충전 중 / 등 |
+| `/yesterday` | 어제 / yesterday / 어젯밤 |
+| `/week` | 이번 주 / 지난 주 / 일주일 / 7일 / 주간 / week |
 | `/today` | 오늘 / today / 얼마나 달렸 / 운행 기록 / 등 |
-| `/where` | 어디 / 위치 / where / 지도 / 등 |
+| `/parked` | 마지막 주차 / 주차한 지 / 얼마나 세웠 / 세워둔 지 / 언제 주차 |
+| `/where` | 어디 / 위치 / where / 지도 / 주차.*어디 / 등 |
 | `/help` | 도움말 / help / 명령 뭐 / 등 |
+| `/whoami` | 내 권한 / 내 역할 / whoami |
+| `/categories` | 카테고리 / 메뉴 보 / 기능 목록 |
+
+권한 없는 user 한테 자연어가 매칭되어도 결과는 "잘 모르겠어요" — feature 존재 자체 숨김.
 
 매칭 실패 시 → `hub_unmatched_inputs`에 기록 + "잘 모르겠어요" 응답.
 

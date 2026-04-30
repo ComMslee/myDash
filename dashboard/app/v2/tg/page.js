@@ -692,22 +692,38 @@ function GuidePane() {
         </div>
       </div>
       <div>
-        <div className="font-medium mb-1">주요 명령</div>
+        <div className="font-medium mb-1">차량 명령 (car 권한 필요)</div>
         <ul className="text-zinc-400 list-disc list-inside space-y-0.5">
           <li><code className="text-blue-300">/soc</code> — 배터리 % + 충전 여부</li>
-          <li><code className="text-blue-300">/today</code> — 오늘 주행/충전 요약</li>
-          <li><code className="text-blue-300">/where</code> — 차량 현재 위치</li>
-          <li><code className="text-blue-300">/help</code> — 전체 명령 보기</li>
+          <li><code className="text-blue-300">/range</code> — 남은 주행거리 (km)</li>
+          <li><code className="text-blue-300">/charge</code> — 충전 진행 상세 (속도·경과)</li>
+          <li><code className="text-blue-300">/today</code> — 오늘(KST) 주행/충전 요약</li>
+          <li><code className="text-blue-300">/yesterday</code> — 어제(KST) 주행/충전 요약</li>
+          <li><code className="text-blue-300">/week</code> — 지난 7일 요약</li>
+          <li><code className="text-blue-300">/parked</code> — 마지막 주차 장소·경과</li>
+          <li><code className="text-blue-300">/where</code> — 현재 위치 (지도 핀)</li>
+        </ul>
+      </div>
+      <div>
+        <div className="font-medium mb-1">공통 명령 (누구나)</div>
+        <ul className="text-zinc-400 list-disc list-inside space-y-0.5">
+          <li><code className="text-blue-300">/help</code> — 본인 권한 기준 도움말</li>
           <li><code className="text-blue-300">/whoami</code> — 내 권한 확인</li>
+          <li><code className="text-blue-300">/categories</code> — 이용 가능한 카테고리</li>
         </ul>
       </div>
       <div>
         <div className="font-medium mb-1">자연어도 일부 가능</div>
         <ul className="text-zinc-400 list-disc list-inside space-y-0.5">
-          <li>"오늘 얼마나 달렸어?"</li>
-          <li>"배터리 얼마나 남았어?"</li>
-          <li>"지금 어디?"</li>
+          <li>"오늘 얼마나 달렸어?" / "이번 주는?" / "어제 충전했어?"</li>
+          <li>"배터리 얼마나 남았어?" / "지금 몇 % 야?"</li>
+          <li>"몇 km 갈 수 있어?" / "주행가능거리"</li>
+          <li>"지금 충전 얼마나 됐어?" / "언제 끝나?"</li>
+          <li>"지금 어디?" / "주차한 지 얼마나 됐어?"</li>
         </ul>
+      </div>
+      <div className="text-[11px] text-zinc-500">
+        권한 없는 명령은 "알 수 없는 명령" 으로 표시 — 기능 존재 자체가 노출되지 않아요.
       </div>
     </div>
   );
