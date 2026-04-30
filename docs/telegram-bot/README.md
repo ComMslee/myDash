@@ -40,7 +40,15 @@ TeslaMate DB ──┬──► telegram-hub (Node 20, ~80MB RAM)
 | `TG_HUB_DB_POLL_MS` | 선택 | 기본 5000(5초). 이벤트 감지 주기 |
 | `TELEGRAM_HUB_URL` | 선택 | dashboard에서 hub /health 호출 URL. 기본 `http://telegram-hub:3000` |
 
-**root 부트스트랩**: 컨테이너 부팅 시 `TELEGRAM_CHAT_ID`를 `hub_users` 에 `role=root` + `car` 권한으로 강제 upsert.
+**root 부트스트랩**: 컨테이너 부팅 시 `TELEGRAM_CHAT_ID`를 `hub_users` 에 `role=root` + `car` 권한으로 강제 upsert. dashboard 가 처음 `/v2/tg` 로딩 시 `group_key='root'` 도 자동 매핑.
+
+### `/v2/tg` 페이지 구조
+
+- **인증된 관리자**: 3개 탭
+  1. **권한관리** — 가입 대기 / 사용자 그룹 CRUD / 사용자 매트릭스
+  2. **알림** — 방송 + 못 알아들은 입력(학습 로그)
+  3. **가이드** — 봇 사용법
+- **미인증(공개 URL 공유)**: 가이드만 노출.
 
 ## 4. RBAC — 역할/권한
 
@@ -53,21 +61,40 @@ TeslaMate DB ──┬──► telegram-hub (Node 20, ~80MB RAM)
 | `pending` | 가입 신청 상태. 데이터 명령 사용 불가 (자동 안내) |
 | `denied` | 차단됨. 모든 메시지 무시(silent) |
 
-### 카테고리(feature)
+### 두 종류의 그룹
 
-DB 테이블 `hub_categories` 가 단일 소스. 부팅 시 hub 가 lazy create + 기본 `car` 시드, dashboard `/v2/tg` 의 "📂 그룹 관리" 에서 CRUD.
+| 종류 | 테이블 | 의미 | 누가 관리 |
+|---|---|---|---|
+| **기능 그룹** (feature/category) | `hub_categories` | 봇의 명령 묶음 (`car`, `common`, `sns` …) | **개발자만** — `services/telegram-hub/src/categories.js` 시드 + `commands.js` 핸들러 |
+| **사용자 그룹** (user group) | `hub_user_groups` | 권한 프리셋 — 어떤 기능 그룹들을 묶어줄지 | **관리자** — `/v2/tg` 의 "권한관리" 탭 |
+
+### 기능 그룹 (개발자 전용)
 
 | key | label | 설명 |
 |---|---|---|
-| `car` | 🚗 차 | 내 테슬라 상태/위치/충전 (시드, 삭제 불가) |
-| `common` | 🧰 공통 | 전 사용자 공용 기능 (시드, 삭제 불가) |
-| `sns` | 💬 SNS | 소셜 발행/예약 — 구현 예정 (시드, 삭제 불가) |
+| `car` | 🚗 차 | 내 테슬라 상태/위치/충전 |
+| `common` | 🧰 공통 | 전 사용자 공용 기능 (예정) |
+| `sns` | 💬 SNS | 소셜 발행/예약 (예정) |
 
-**한계** — 명령 핸들러(`/soc`, `/today` 등)는 코드(`commands.js`)에 묶여 있어, 새 그룹 추가만으로 거기 매칭될 명령이 자동 생기지는 않음. 새 그룹은
-- (a) **방송 타깃** (`/v2/tg` 의 "알림 보내기" 에서 그룹별 발송)
-- (b) **새 명령용 슬롯** (코드에 `feature: 'sns'` 핸들러 추가하면 즉시 그 그룹 권한자에게 풀림)
+신규 기능 그룹 추가 = `categories.js` 시드 + `commands.js` 의 `CATEGORY_COMMANDS` 매핑 + 핸들러 작성. UI 에서는 추가/편집 불가.
 
-용도. hub `categories.js` 캐시 TTL 5초 — dashboard 에서 만들면 5초 안에 봇에도 반영.
+### 사용자 그룹 (관리자가 CRUD)
+
+기본 그룹 — **편집/삭제 불가**:
+
+| key | label | 포함 기능 | 비고 |
+|---|---|---|---|
+| `root` | 👑 Root | * (전체) | `is_root=true` → 코드에서 모든 권한 bypass |
+| `guest` | 👋 게스트 | `common` | 일반 사용자 기본값 |
+
+관리자가 추가 그룹을 만들 때: 라벨 + 설명 + 포함 기능 그룹들 multi-select. `is_root` 는 시드 root 만 가능.
+
+**적용 흐름** — 가입 대기 사용자에게 `→ Root` / `→ 게스트` / `→ <custom>` 버튼 클릭:
+1. `hub_users.role` 갱신 (`is_root=true` → `root`, 아니면 `user`)
+2. `hub_users.group_key` 에 그룹 키 저장
+3. `hub_permissions` 트랜잭션으로 비우고 그룹의 feature 들 삽입 (root 그룹은 bypass 라 삽입 생략)
+
+방송도 사용자 그룹 단위 — `/v2/tg` "알림" 탭에서 전체 / Root 그룹 / 게스트 그룹 / 커스텀 그룹 선택.
 
 ### 상태 전이
 

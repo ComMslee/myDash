@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
+import { ensureUserGroupsSchema } from '@/lib/tg-user-groups';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,20 +23,23 @@ export async function GET() {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
 
-  // hub 자체가 안 떠 있으면 hub_* 테이블도 없을 수 있음 — try/catch.
+  // user-group 스키마는 dashboard 가 관리. hub 안 떠 있으면 hub_users 에 ALTER 실패할 수 있어 try.
+  try { await ensureUserGroupsSchema(); } catch {}
+
   let users = [];
   let pending = [];
   let unmatched = [];
   let categories = [];
+  let userGroups = [];
   let dbError = null;
 
   try {
     const usersQ = pool.query(`
-      SELECT u.chat_id::text, u.name, u.role, u.registered_at, u.approved_at,
+      SELECT u.chat_id::text, u.name, u.role, u.group_key, u.registered_at, u.approved_at,
              COALESCE(array_agg(p.feature ORDER BY p.feature) FILTER (WHERE p.feature IS NOT NULL), '{}') AS features
       FROM hub_users u
       LEFT JOIN hub_permissions p ON p.chat_id = u.chat_id
-      GROUP BY u.chat_id, u.name, u.role, u.registered_at, u.approved_at
+      GROUP BY u.chat_id, u.name, u.role, u.group_key, u.registered_at, u.approved_at
       ORDER BY CASE u.role WHEN 'root' THEN 0 WHEN 'user' THEN 1 WHEN 'pending' THEN 2 ELSE 3 END,
                u.registered_at DESC
     `);
@@ -54,16 +58,25 @@ export async function GET() {
     dbError = e?.message || String(e);
   }
 
-  // hub_categories 는 hub 가 부팅 시 생성. 미존재 시 빈 배열로 폴백.
   try {
     const { rows } = await pool.query(
       `SELECT key, label, description AS desc, sort_order
        FROM hub_categories ORDER BY sort_order, key`,
     );
     categories = rows;
-  } catch {
-    categories = [];
-  }
+  } catch { categories = []; }
+
+  try {
+    const { rows } = await pool.query(`
+      SELECT g.key, g.label, g.description AS desc, g.is_root, g.is_default, g.sort_order,
+             COALESCE(array_agg(f.feature ORDER BY f.feature) FILTER (WHERE f.feature IS NOT NULL), '{}') AS features
+      FROM hub_user_groups g
+      LEFT JOIN hub_user_group_features f ON f.group_key = g.key
+      GROUP BY g.key, g.label, g.description, g.is_root, g.is_default, g.sort_order
+      ORDER BY g.sort_order, g.key
+    `);
+    userGroups = rows;
+  } catch { userGroups = []; }
 
   const hubHealth = await fetchHubHealth();
 
@@ -73,6 +86,7 @@ export async function GET() {
     pending,
     unmatched,
     categories,
+    userGroups,
     dbError,
   });
 }

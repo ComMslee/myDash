@@ -12,20 +12,28 @@ const fmtAgo = (iso) => {
   return `${Math.floor(ms / 86_400_000)}일 전`;
 };
 
-export default function TgAdminPage() {
+export default function TgPage() {
   const [data, setData] = useState(null);
+  const [view, setView] = useState('loading'); // 'loading' | 'admin' | 'public'
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState('perm');
 
   async function load() {
     try {
       const r = await fetch('/api/tg', { cache: 'no-store' });
+      if (r.status === 401 || r.status === 412) {
+        setView('public');
+        return;
+      }
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
       setData(j);
+      setView('admin');
       setErr(null);
     } catch (e) {
       setErr(e.message || String(e));
+      setView('admin');
     }
   }
 
@@ -54,6 +62,27 @@ export default function TgAdminPage() {
     }
   }
 
+  if (view === 'loading') {
+    return (
+      <main className="min-h-screen bg-[#0f0f0f] text-white p-4">
+        <div className="text-zinc-500">로딩 중…</div>
+      </main>
+    );
+  }
+
+  if (view === 'public') {
+    return (
+      <main className="min-h-screen bg-[#0f0f0f] text-white">
+        <div className="max-w-2xl mx-auto px-4 py-5 pb-12 flex flex-col gap-4">
+          <h1 className="text-xl font-light">📖 봇 가이드</h1>
+          <Section title="📖 사용법">
+            <GuidePane />
+          </Section>
+        </div>
+      </main>
+    );
+  }
+
   if (err && !data) {
     return (
       <main className="min-h-screen bg-[#0f0f0f] text-white p-4">
@@ -69,186 +98,46 @@ export default function TgAdminPage() {
     );
   }
 
-  const { hubHealth, users, pending, unmatched, categories } = data;
-  const hubOk = hubHealth?.ok;
+  const { hubHealth, users, pending, unmatched, categories, userGroups } = data;
 
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white">
       <div className="max-w-2xl mx-auto px-4 py-5 pb-12 flex flex-col gap-4">
         <h1 className="text-xl font-light">🤖 Telegram 봇 관리</h1>
 
-        {/* Hub 상태 */}
-        <section className="bg-[#161618] border border-white/[0.06] rounded-2xl p-4">
-          <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${hubOk ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-            <span className="font-medium">{hubOk ? '정상' : '응답 없음'}</span>
-            {hubOk && (
-              <span className="text-[11px] text-zinc-500 ml-2">
-                uptime {Math.floor((hubHealth.uptime_sec || 0) / 60)}분
-              </span>
-            )}
-          </div>
-          {!hubOk && hubHealth?.error && (
-            <div className="text-[11px] text-rose-400 mt-1">{hubHealth.error}</div>
-          )}
-        </section>
+        <HubStatus health={hubHealth} />
 
-        {/* 가입 대기 */}
-        <Section title={`📋 가입 대기 ${pending.length ? `(${pending.length})` : ''}`}>
-          {!pending.length ? (
-            <div className="text-[12px] text-zinc-500">대기자 없음</div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {pending.map((p) => (
-                <div key={p.chat_id} className="flex items-center justify-between gap-2 bg-white/[0.02] rounded-lg p-2.5">
-                  <div className="min-w-0">
-                    <div className="text-[13px] font-medium truncate">{p.name || '(이름 없음)'}</div>
-                    <div className="text-[11px] text-zinc-500">#{p.chat_id} · {fmtAgo(p.registered_at)}</div>
-                  </div>
-                  <div className="flex gap-1.5 shrink-0">
-                    <button
-                      disabled={busy}
-                      onClick={() => action({ action: 'approve', chat_id: p.chat_id })}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-300 text-[12px] hover:bg-emerald-500/25 disabled:opacity-50"
-                    >
-                      승인
-                    </button>
-                    <button
-                      disabled={busy}
-                      onClick={() => confirm(`#${p.chat_id} 거부할까요?`) && action({ action: 'deny', chat_id: p.chat_id })}
-                      className="px-3 py-1.5 rounded-lg bg-rose-500/15 text-rose-300 text-[12px] hover:bg-rose-500/25 disabled:opacity-50"
-                    >
-                      거부
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Section>
+        <Tabs tab={tab} onChange={setTab} />
 
-        {/* 사용자 매트릭스 */}
-        <Section title={`👥 사용자 (${users.length})`}>
-          {!users.length ? (
-            <div className="text-[12px] text-zinc-500">없음</div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {users.map((u) => (
-                <div key={u.chat_id} className="bg-white/[0.02] rounded-lg p-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-medium truncate">
-                        <span className="inline-block px-1.5 py-0.5 rounded bg-white/[0.05] text-[10px] mr-1.5 align-middle">
-                          {u.role}
-                        </span>
-                        {u.name || '(이름 없음)'}
-                      </div>
-                      <div className="text-[11px] text-zinc-500">#{u.chat_id}</div>
-                    </div>
-                    {u.role === 'user' && (
-                      <button
-                        disabled={busy}
-                        onClick={() => confirm(`#${u.chat_id} 차단할까요?`) && action({ action: 'deny', chat_id: u.chat_id })}
-                        className="px-2 py-1 rounded bg-rose-500/10 text-rose-300/80 text-[11px] hover:bg-rose-500/20 shrink-0"
-                      >
-                        차단
-                      </button>
-                    )}
-                    {u.role === 'denied' && (
-                      <button
-                        disabled={busy}
-                        onClick={() => action({ action: 'approve', chat_id: u.chat_id })}
-                        className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-300/80 text-[11px] hover:bg-emerald-500/20 shrink-0"
-                      >
-                        해제
-                      </button>
-                    )}
-                  </div>
-                  {(u.role === 'user' || u.role === 'root') && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {categories.map((c) => {
-                        const has = u.role === 'root' || u.features.includes(c.key);
-                        const isRoot = u.role === 'root';
-                        return (
-                          <button
-                            key={c.key}
-                            disabled={busy || isRoot}
-                            onClick={() => action({
-                              action: has ? 'revoke' : 'grant',
-                              chat_id: u.chat_id,
-                              feature: c.key,
-                            })}
-                            className={`px-2.5 py-1 rounded-full text-[11px] transition-colors ${
-                              has
-                                ? 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30'
-                                : 'bg-white/[0.04] text-zinc-500 hover:bg-white/[0.08]'
-                            } ${isRoot ? 'cursor-default' : ''}`}
-                            title={c.desc}
-                          >
-                            {has ? '✓' : '+'} {c.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </Section>
-
-        {/* 그룹(카테고리) 관리 */}
-        <Section title={`📂 그룹 관리 (${categories.length})`}>
-          <CategoriesAdmin categories={categories} action={action} busy={busy} />
-        </Section>
-
-        {/* 미인식 입력 (학습 로그) */}
-        <Section title={`🔍 못 알아들은 입력 ${unmatched.length ? `(${unmatched.length})` : ''}`}>
-          {!unmatched.length ? (
-            <div className="text-[12px] text-zinc-500">없음 ✨</div>
-          ) : (
-            <UnmatchedList items={unmatched} action={action} busy={busy} />
-          )}
-        </Section>
-
-        {/* Broadcast */}
-        <Section title="📢 알림 보내기">
-          <Broadcast categories={categories} action={action} busy={busy} />
-        </Section>
-
-        {/* 사용법 가이드 (사용자 입장) */}
-        <Section title="📖 봇 사용법 (사용자에게 안내)">
-          <div className="text-[12px] text-zinc-300 space-y-3 leading-relaxed">
-            <div>
-              <div className="font-medium mb-1">시작하는 방법</div>
-              <div className="text-zinc-400">
-                Telegram 앱에서 <code className="text-blue-300">@liam_mydash_bot</code> 검색 → "Start" 누르기 → 관리자 승인 대기 → 승인되면 사용 가능
-              </div>
-            </div>
-            <div>
-              <div className="font-medium mb-1">주요 명령</div>
-              <ul className="text-zinc-400 list-disc list-inside space-y-0.5">
-                <li><code className="text-blue-300">/soc</code> — 배터리 % + 충전 여부</li>
-                <li><code className="text-blue-300">/today</code> — 오늘 주행/충전 요약</li>
-                <li><code className="text-blue-300">/where</code> — 차량 현재 위치</li>
-                <li><code className="text-blue-300">/help</code> — 전체 명령 보기</li>
-                <li><code className="text-blue-300">/whoami</code> — 내 권한 확인</li>
-              </ul>
-            </div>
-            <div>
-              <div className="font-medium mb-1">자연어도 일부 가능</div>
-              <ul className="text-zinc-400 list-disc list-inside space-y-0.5">
-                <li>"오늘 얼마나 달렸어?"</li>
-                <li>"배터리 얼마나 남았어?"</li>
-                <li>"지금 어디?"</li>
-              </ul>
-            </div>
-          </div>
-        </Section>
+        {tab === 'perm' && (
+          <PermPane
+            pending={pending}
+            users={users}
+            userGroups={userGroups}
+            categories={categories}
+            action={action}
+            busy={busy}
+          />
+        )}
+        {tab === 'broadcast' && (
+          <BroadcastPane
+            userGroups={userGroups}
+            unmatched={unmatched}
+            action={action}
+            busy={busy}
+          />
+        )}
+        {tab === 'guide' && (
+          <Section title="📖 사용법">
+            <GuidePane />
+          </Section>
+        )}
       </div>
     </main>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────
 
 function Section({ title, children }) {
   return (
@@ -256,6 +145,485 @@ function Section({ title, children }) {
       <h2 className="text-[12px] font-bold tracking-widest uppercase text-zinc-500 mb-3">{title}</h2>
       {children}
     </section>
+  );
+}
+
+function HubStatus({ health }) {
+  const ok = health?.ok;
+  return (
+    <section className="bg-[#161618] border border-white/[0.06] rounded-2xl p-4">
+      <div className="flex items-center gap-2">
+        <span className={`w-2 h-2 rounded-full ${ok ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+        <span className="font-medium">{ok ? '정상' : '응답 없음'}</span>
+        {ok && (
+          <span className="text-[11px] text-zinc-500 ml-2">
+            uptime {Math.floor((health.uptime_sec || 0) / 60)}분
+          </span>
+        )}
+      </div>
+      {!ok && health?.error && (
+        <div className="text-[11px] text-rose-400 mt-1">{health.error}</div>
+      )}
+    </section>
+  );
+}
+
+const TAB_LIST = [
+  { key: 'perm', label: '권한관리' },
+  { key: 'broadcast', label: '알림' },
+  { key: 'guide', label: '가이드' },
+];
+
+function Tabs({ tab, onChange }) {
+  return (
+    <div className="flex gap-1 bg-[#161618] border border-white/[0.06] rounded-xl p-1">
+      {TAB_LIST.map((t) => (
+        <button
+          key={t.key}
+          onClick={() => onChange(t.key)}
+          className={`flex-1 px-3 py-2 rounded-lg text-[12px] font-medium transition-colors ${
+            tab === t.key
+              ? 'bg-white/[0.08] text-white'
+              : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── 권한관리 탭 ────────────────────────────────────────────
+
+function PermPane({ pending, users, userGroups, categories, action, busy }) {
+  return (
+    <>
+      <Section title={`📋 가입 대기 ${pending.length ? `(${pending.length})` : ''}`}>
+        {!pending.length ? (
+          <div className="text-[12px] text-zinc-500">대기자 없음</div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {pending.map((p) => (
+              <PendingRow
+                key={p.chat_id}
+                p={p}
+                userGroups={userGroups}
+                busy={busy}
+                action={action}
+              />
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section title={`👥 사용자 그룹 (${userGroups.length})`}>
+        <UserGroupsAdmin
+          userGroups={userGroups}
+          categories={categories}
+          action={action}
+          busy={busy}
+        />
+      </Section>
+
+      <Section title={`👤 사용자 (${users.length})`}>
+        {!users.length ? (
+          <div className="text-[12px] text-zinc-500">없음</div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {users.map((u) => (
+              <UserRow
+                key={u.chat_id}
+                u={u}
+                userGroups={userGroups}
+                busy={busy}
+                action={action}
+              />
+            ))}
+          </div>
+        )}
+      </Section>
+    </>
+  );
+}
+
+function PendingRow({ p, userGroups, busy, action }) {
+  return (
+    <div className="bg-white/[0.02] rounded-lg p-2.5 flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-[13px] font-medium truncate">{p.name || '(이름 없음)'}</div>
+          <div className="text-[11px] text-zinc-500">#{p.chat_id} · {fmtAgo(p.registered_at)}</div>
+        </div>
+        <button
+          disabled={busy}
+          onClick={() => confirm(`#${p.chat_id} 거부할까요?`) && action({ action: 'deny', chat_id: p.chat_id })}
+          className="px-2.5 py-1 rounded bg-rose-500/15 text-rose-300 text-[11px] hover:bg-rose-500/25 disabled:opacity-50 shrink-0"
+        >
+          거부
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {userGroups.map((g) => (
+          <button
+            key={g.key}
+            disabled={busy}
+            onClick={() => action({ action: 'usergroup_apply', chat_id: p.chat_id, group_key: g.key })}
+            className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-[11px] hover:bg-emerald-500/25 disabled:opacity-50"
+            title={g.desc}
+          >
+            → {g.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function UserRow({ u, userGroups, busy, action }) {
+  const currentGroup = userGroups.find((g) => g.key === u.group_key);
+  const isRoot = u.role === 'root';
+  const isDenied = u.role === 'denied';
+
+  return (
+    <div className="bg-white/[0.02] rounded-lg p-2.5 flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-[13px] font-medium truncate flex items-center gap-1.5">
+            <span className="inline-block px-1.5 py-0.5 rounded bg-white/[0.05] text-[10px]">
+              {u.role}
+            </span>
+            {currentGroup && (
+              <span className="inline-block px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 text-[10px]">
+                {currentGroup.label}
+              </span>
+            )}
+            <span className="truncate">{u.name || '(이름 없음)'}</span>
+          </div>
+          <div className="text-[11px] text-zinc-500">#{u.chat_id}</div>
+        </div>
+        {!isRoot && !isDenied && (
+          <button
+            disabled={busy}
+            onClick={() => confirm(`#${u.chat_id} 차단할까요?`) && action({ action: 'deny', chat_id: u.chat_id })}
+            className="px-2 py-1 rounded bg-rose-500/10 text-rose-300/80 text-[11px] hover:bg-rose-500/20 shrink-0"
+          >
+            차단
+          </button>
+        )}
+      </div>
+      {isDenied ? (
+        <div className="flex flex-wrap gap-1.5">
+          <span className="text-[11px] text-zinc-500 self-center mr-1">재활성:</span>
+          {userGroups.map((g) => (
+            <button
+              key={g.key}
+              disabled={busy}
+              onClick={() => action({ action: 'usergroup_apply', chat_id: u.chat_id, group_key: g.key })}
+              className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-[11px] hover:bg-emerald-500/25 disabled:opacity-50"
+            >
+              → {g.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <label className="text-[11px] text-zinc-500">그룹 변경</label>
+          <select
+            value={u.group_key || ''}
+            disabled={busy}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v || v === u.group_key) return;
+              if (!confirm(`그룹을 '${v}' 로 변경할까요?\n해당 그룹의 권한 프리셋이 그대로 적용됩니다.`)) return;
+              action({ action: 'usergroup_apply', chat_id: u.chat_id, group_key: v });
+            }}
+            className="bg-white/[0.04] border border-white/[0.06] rounded px-2 py-1 text-[12px] flex-1"
+          >
+            {!u.group_key && <option value="">(미할당)</option>}
+            {userGroups.map((g) => (
+              <option key={g.key} value={g.key}>{g.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UserGroupsAdmin({ userGroups, categories, action, busy }) {
+  const [adding, setAdding] = useState(false);
+  const [editKey, setEditKey] = useState(null);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="text-[11px] text-zinc-500 leading-relaxed">
+        사용자 그룹은 권한 프리셋. 기본 그룹(<b>root</b>/<b>guest</b>)은 편집/삭제 불가.
+      </div>
+
+      {!userGroups.length ? (
+        <div className="text-[12px] text-zinc-500">그룹 없음</div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {userGroups.map((g) =>
+            editKey === g.key ? (
+              <UserGroupEditRow
+                key={g.key}
+                group={g}
+                categories={categories}
+                busy={busy}
+                onCancel={() => setEditKey(null)}
+                onSave={async (patch) => {
+                  await action({ action: 'usergroup_update', key: g.key, ...patch });
+                  setEditKey(null);
+                }}
+              />
+            ) : (
+              <UserGroupRow
+                key={g.key}
+                g={g}
+                busy={busy}
+                onEdit={() => setEditKey(g.key)}
+                onDelete={() =>
+                  confirm(`'${g.label}' 그룹을 삭제할까요?`) &&
+                  action({ action: 'usergroup_delete', key: g.key })
+                }
+              />
+            ),
+          )}
+        </div>
+      )}
+
+      {adding ? (
+        <UserGroupEditRow
+          isNew
+          categories={categories}
+          busy={busy}
+          onCancel={() => setAdding(false)}
+          onSave={async (patch) => {
+            await action({ action: 'usergroup_create', ...patch });
+            setAdding(false);
+          }}
+        />
+      ) : (
+        <button
+          disabled={busy}
+          onClick={() => setAdding(true)}
+          className="self-start px-3 py-1.5 rounded-lg bg-blue-500/15 text-blue-300 text-[12px] hover:bg-blue-500/25 disabled:opacity-30"
+        >
+          + 새 그룹
+        </button>
+      )}
+    </div>
+  );
+}
+
+function UserGroupRow({ g, busy, onEdit, onDelete }) {
+  return (
+    <div className="bg-white/[0.02] rounded-lg p-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-medium truncate flex items-center gap-1.5">
+            {g.label}
+            <span className="text-[10px] text-zinc-500">#{g.key}</span>
+            {g.is_default && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">기본</span>
+            )}
+            {g.is_root && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300">root</span>
+            )}
+          </div>
+          {g.desc && <div className="text-[11px] text-zinc-400">{g.desc}</div>}
+          <div className="text-[10px] text-zinc-500 mt-1">
+            기능: {g.is_root ? '* (전체)' : (g.features.length ? g.features.join(', ') : '없음')}
+          </div>
+        </div>
+        <div className="flex gap-1.5 shrink-0">
+          <button
+            disabled={busy || g.is_default}
+            onClick={onEdit}
+            className="px-2 py-1 rounded bg-white/[0.05] text-zinc-300 text-[11px] hover:bg-white/[0.1] disabled:opacity-30"
+            title={g.is_default ? '기본 그룹은 편집 불가' : ''}
+          >
+            편집
+          </button>
+          <button
+            disabled={busy || g.is_default}
+            onClick={onDelete}
+            className="px-2 py-1 rounded bg-rose-500/10 text-rose-300/80 text-[11px] hover:bg-rose-500/20 disabled:opacity-30"
+            title={g.is_default ? '기본 그룹은 삭제 불가' : ''}
+          >
+            삭제
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UserGroupEditRow({ group, categories, isNew, busy, onSave, onCancel }) {
+  const [key, setKey] = useState(group?.key || '');
+  const [label, setLabel] = useState(group?.label || '');
+  const [desc, setDesc] = useState(group?.desc || '');
+  const [sort, setSort] = useState(group?.sort_order ?? 100);
+  const [features, setFeatures] = useState(group?.features || []);
+
+  const toggleFeature = (k) => {
+    setFeatures((prev) =>
+      prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k],
+    );
+  };
+
+  const submit = () => {
+    if (!label.trim()) return alert('label 필수');
+    if (isNew && !/^[a-z][a-z0-9_]{0,31}$/.test(key.trim())) {
+      return alert('key: 영문 소문자/숫자/_ 1~32자 (첫 글자 영문)');
+    }
+    const patch = {
+      label: label.trim(),
+      desc: desc.trim(),
+      sort_order: +sort,
+      features,
+    };
+    if (isNew) patch.key = key.trim();
+    onSave(patch);
+  };
+
+  return (
+    <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-2.5 flex flex-col gap-1.5">
+      {isNew && (
+        <input
+          value={key}
+          onChange={(e) => setKey(e.target.value.toLowerCase())}
+          placeholder="key (예: editor, family)"
+          className="bg-white/[0.04] border border-white/[0.06] rounded px-2 py-1 text-[12px] font-mono"
+          autoFocus
+        />
+      )}
+      <input
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        placeholder="label (예: 📝 편집자)"
+        className="bg-white/[0.04] border border-white/[0.06] rounded px-2 py-1 text-[12px]"
+        autoFocus={!isNew}
+      />
+      <input
+        value={desc}
+        onChange={(e) => setDesc(e.target.value)}
+        placeholder="설명 (선택)"
+        className="bg-white/[0.04] border border-white/[0.06] rounded px-2 py-1 text-[12px]"
+      />
+      <div>
+        <div className="text-[11px] text-zinc-500 mb-1">포함 기능 그룹</div>
+        <div className="flex flex-wrap gap-1.5">
+          {categories.length ? categories.map((c) => {
+            const has = features.includes(c.key);
+            return (
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => toggleFeature(c.key)}
+                className={`px-2.5 py-1 rounded-full text-[11px] transition-colors ${
+                  has
+                    ? 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30'
+                    : 'bg-white/[0.04] text-zinc-500 hover:bg-white/[0.08]'
+                }`}
+              >
+                {has ? '✓' : '+'} {c.label}
+              </button>
+            );
+          }) : <span className="text-[11px] text-zinc-600">기능 그룹 없음</span>}
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="text-[11px] text-zinc-500">정렬</label>
+        <input
+          type="number"
+          value={sort}
+          onChange={(e) => setSort(e.target.value)}
+          className="bg-white/[0.04] border border-white/[0.06] rounded px-2 py-1 text-[12px] w-20"
+        />
+        <div className="flex-1" />
+        <button
+          disabled={busy}
+          onClick={onCancel}
+          className="px-2.5 py-1 rounded bg-white/[0.05] text-zinc-300 text-[11px] hover:bg-white/[0.1]"
+        >
+          취소
+        </button>
+        <button
+          disabled={busy}
+          onClick={submit}
+          className="px-3 py-1 rounded bg-emerald-500/20 text-emerald-200 text-[11px] hover:bg-emerald-500/30 disabled:opacity-30"
+        >
+          {isNew ? '만들기' : '저장'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── 알림 탭 ─────────────────────────────────────────────
+
+function BroadcastPane({ userGroups, unmatched, action, busy }) {
+  return (
+    <>
+      <Section title="📢 알림 보내기">
+        <Broadcast userGroups={userGroups} action={action} busy={busy} />
+      </Section>
+
+      <Section title={`🔍 못 알아들은 입력 ${unmatched.length ? `(${unmatched.length})` : ''}`}>
+        {!unmatched.length ? (
+          <div className="text-[12px] text-zinc-500">없음 ✨</div>
+        ) : (
+          <UnmatchedList items={unmatched} action={action} busy={busy} />
+        )}
+      </Section>
+    </>
+  );
+}
+
+function Broadcast({ userGroups, action, busy }) {
+  const [text, setText] = useState('');
+  const [target, setTarget] = useState('all');
+
+  const send = async () => {
+    if (!text.trim()) return;
+    const targetLabel = target === 'all'
+      ? '전체'
+      : userGroups.find((g) => g.key === target)?.label || target;
+    if (!confirm(`"${text}"\n\n→ ${targetLabel} 에게 전송할까요?`)) return;
+    await action({ action: 'broadcast', text: text.trim(), target });
+    setText('');
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <select
+        value={target}
+        onChange={(e) => setTarget(e.target.value)}
+        className="bg-white/[0.04] border border-white/[0.06] rounded-lg px-3 py-2 text-[13px]"
+      >
+        <option value="all">전체 (root + user)</option>
+        {userGroups.map((g) => (
+          <option key={g.key} value={g.key}>{g.label} 그룹</option>
+        ))}
+      </select>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="보낼 메시지"
+        rows={3}
+        className="bg-white/[0.04] border border-white/[0.06] rounded-lg px-3 py-2 text-[13px] resize-y"
+      />
+      <button
+        disabled={busy || !text.trim()}
+        onClick={send}
+        className="px-4 py-2 rounded-lg bg-blue-500/20 text-blue-200 text-[13px] hover:bg-blue-500/30 disabled:opacity-30 self-end"
+      >
+        보내기
+      </button>
+    </div>
   );
 }
 
@@ -309,197 +677,35 @@ function UnmatchedList({ items, action, busy }) {
   );
 }
 
-const SEED_KEYS = new Set(['car', 'common', 'sns']);
+// ── 가이드 탭 ───────────────────────────────────────────
 
-function CategoriesAdmin({ categories, action, busy }) {
-  const [adding, setAdding] = useState(false);
-  const [editKey, setEditKey] = useState(null);
-
+function GuidePane() {
   return (
-    <div className="flex flex-col gap-2">
-      <div className="text-[11px] text-zinc-500 leading-relaxed">
-        명령 핸들러는 코드에 묶여 있어요 — 새 그룹은 <b>방송 타깃</b> 또는 <b>새 명령용 슬롯</b> 용도.
-      </div>
-
-      {!categories.length ? (
-        <div className="text-[12px] text-zinc-500">등록된 그룹 없음</div>
-      ) : (
-        <div className="flex flex-col gap-1.5">
-          {categories.map((c) =>
-            editKey === c.key ? (
-              <CategoryEditRow
-                key={c.key}
-                cat={c}
-                busy={busy}
-                onCancel={() => setEditKey(null)}
-                onSave={async (patch) => {
-                  await action({ action: 'category_update', key: c.key, ...patch });
-                  setEditKey(null);
-                }}
-              />
-            ) : (
-              <div key={c.key} className="flex items-center gap-2 bg-white/[0.02] rounded-lg p-2.5">
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-medium truncate">
-                    {c.label}
-                    <span className="text-[10px] text-zinc-500 ml-1.5">#{c.key}</span>
-                  </div>
-                  {c.desc && <div className="text-[11px] text-zinc-400 truncate">{c.desc}</div>}
-                </div>
-                <div className="flex gap-1.5 shrink-0">
-                  <button
-                    disabled={busy}
-                    onClick={() => setEditKey(c.key)}
-                    className="px-2 py-1 rounded bg-white/[0.05] text-zinc-300 text-[11px] hover:bg-white/[0.1] disabled:opacity-30"
-                  >
-                    편집
-                  </button>
-                  <button
-                    disabled={busy || SEED_KEYS.has(c.key)}
-                    onClick={() =>
-                      confirm(`'${c.label}' 그룹을 삭제할까요?\n해당 그룹의 모든 권한도 함께 제거됩니다.`) &&
-                      action({ action: 'category_delete', key: c.key })
-                    }
-                    className="px-2 py-1 rounded bg-rose-500/10 text-rose-300/80 text-[11px] hover:bg-rose-500/20 disabled:opacity-30"
-                    title={SEED_KEYS.has(c.key) ? '기본 그룹은 삭제 불가' : ''}
-                  >
-                    삭제
-                  </button>
-                </div>
-              </div>
-            ),
-          )}
+    <div className="text-[12px] text-zinc-300 space-y-3 leading-relaxed">
+      <div>
+        <div className="font-medium mb-1">시작하는 방법</div>
+        <div className="text-zinc-400">
+          Telegram 앱에서 <code className="text-blue-300">@liam_mydash_bot</code> 검색 → "Start" 누르기 → 관리자 승인 대기 → 승인되면 사용 가능
         </div>
-      )}
-
-      {adding ? (
-        <CategoryEditRow
-          isNew
-          busy={busy}
-          onCancel={() => setAdding(false)}
-          onSave={async (patch) => {
-            await action({ action: 'category_create', ...patch });
-            setAdding(false);
-          }}
-        />
-      ) : (
-        <button
-          disabled={busy}
-          onClick={() => setAdding(true)}
-          className="self-start px-3 py-1.5 rounded-lg bg-blue-500/15 text-blue-300 text-[12px] hover:bg-blue-500/25 disabled:opacity-30"
-        >
-          + 새 그룹
-        </button>
-      )}
-    </div>
-  );
-}
-
-function CategoryEditRow({ cat, isNew, busy, onSave, onCancel }) {
-  const [key, setKey] = useState(cat?.key || '');
-  const [label, setLabel] = useState(cat?.label || '');
-  const [desc, setDesc] = useState(cat?.desc || '');
-  const [sort, setSort] = useState(cat?.sort_order ?? 0);
-
-  const submit = () => {
-    if (!label.trim()) return alert('label 필수');
-    if (isNew && !/^[a-z][a-z0-9_]{0,31}$/.test(key.trim())) {
-      return alert('key: 영문 소문자/숫자/_ 1~32자 (첫 글자 영문)');
-    }
-    const patch = { label: label.trim(), desc: desc.trim(), sort_order: +sort };
-    if (isNew) patch.key = key.trim();
-    onSave(patch);
-  };
-
-  return (
-    <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-2.5 flex flex-col gap-1.5">
-      {isNew && (
-        <input
-          value={key}
-          onChange={(e) => setKey(e.target.value.toLowerCase())}
-          placeholder="key (예: sns, finance)"
-          className="bg-white/[0.04] border border-white/[0.06] rounded px-2 py-1 text-[12px] font-mono"
-          autoFocus
-        />
-      )}
-      <input
-        value={label}
-        onChange={(e) => setLabel(e.target.value)}
-        placeholder="label (예: 💬 SNS)"
-        className="bg-white/[0.04] border border-white/[0.06] rounded px-2 py-1 text-[12px]"
-        autoFocus={!isNew}
-      />
-      <input
-        value={desc}
-        onChange={(e) => setDesc(e.target.value)}
-        placeholder="설명 (선택)"
-        className="bg-white/[0.04] border border-white/[0.06] rounded px-2 py-1 text-[12px]"
-      />
-      <div className="flex items-center gap-2">
-        <label className="text-[11px] text-zinc-500">정렬</label>
-        <input
-          type="number"
-          value={sort}
-          onChange={(e) => setSort(e.target.value)}
-          className="bg-white/[0.04] border border-white/[0.06] rounded px-2 py-1 text-[12px] w-20"
-        />
-        <div className="flex-1" />
-        <button
-          disabled={busy}
-          onClick={onCancel}
-          className="px-2.5 py-1 rounded bg-white/[0.05] text-zinc-300 text-[11px] hover:bg-white/[0.1]"
-        >
-          취소
-        </button>
-        <button
-          disabled={busy}
-          onClick={submit}
-          className="px-3 py-1 rounded bg-emerald-500/20 text-emerald-200 text-[11px] hover:bg-emerald-500/30 disabled:opacity-30"
-        >
-          {isNew ? '만들기' : '저장'}
-        </button>
       </div>
-    </div>
-  );
-}
-
-function Broadcast({ categories, action, busy }) {
-  const [text, setText] = useState('');
-  const [target, setTarget] = useState('all');
-
-  const send = async () => {
-    if (!text.trim()) return;
-    if (!confirm(`"${text}"\n\n→ ${target === 'all' ? '전체' : target} 에게 전송할까요?`)) return;
-    await action({ action: 'broadcast', text: text.trim(), target });
-    setText('');
-  };
-
-  return (
-    <div className="flex flex-col gap-2">
-      <select
-        value={target}
-        onChange={(e) => setTarget(e.target.value)}
-        className="bg-white/[0.04] border border-white/[0.06] rounded-lg px-3 py-2 text-[13px]"
-      >
-        <option value="all">전체 (root + user)</option>
-        {categories.map((c) => (
-          <option key={c.key} value={c.key}>{c.label} 권한자만</option>
-        ))}
-      </select>
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="보낼 메시지"
-        rows={3}
-        className="bg-white/[0.04] border border-white/[0.06] rounded-lg px-3 py-2 text-[13px] resize-y"
-      />
-      <button
-        disabled={busy || !text.trim()}
-        onClick={send}
-        className="px-4 py-2 rounded-lg bg-blue-500/20 text-blue-200 text-[13px] hover:bg-blue-500/30 disabled:opacity-30 self-end"
-      >
-        보내기
-      </button>
+      <div>
+        <div className="font-medium mb-1">주요 명령</div>
+        <ul className="text-zinc-400 list-disc list-inside space-y-0.5">
+          <li><code className="text-blue-300">/soc</code> — 배터리 % + 충전 여부</li>
+          <li><code className="text-blue-300">/today</code> — 오늘 주행/충전 요약</li>
+          <li><code className="text-blue-300">/where</code> — 차량 현재 위치</li>
+          <li><code className="text-blue-300">/help</code> — 전체 명령 보기</li>
+          <li><code className="text-blue-300">/whoami</code> — 내 권한 확인</li>
+        </ul>
+      </div>
+      <div>
+        <div className="font-medium mb-1">자연어도 일부 가능</div>
+        <ul className="text-zinc-400 list-disc list-inside space-y-0.5">
+          <li>"오늘 얼마나 달렸어?"</li>
+          <li>"배터리 얼마나 남았어?"</li>
+          <li>"지금 어디?"</li>
+        </ul>
+      </div>
     </div>
   );
 }

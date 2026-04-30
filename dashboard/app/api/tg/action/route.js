@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
+import { applyUserGroup, ensureUserGroupsSchema } from '@/lib/tg-user-groups';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,7 @@ function bad(msg, status = 400) {
 
 const KEY_RE = /^[a-z][a-z0-9_]{0,31}$/;
 
-function validateCategoryFields({ key, label, desc }, { requireKey = true } = {}) {
+function validateGroupFields({ key, label, desc }, { requireKey = true } = {}) {
   if (requireKey) {
     if (!key || !KEY_RE.test(key)) return 'key: 영문 소문자/숫자/_ 1~32자 (첫 글자는 영문)';
   }
@@ -48,19 +49,6 @@ export async function POST(req) {
   const { action } = body || {};
 
   switch (action) {
-    case 'approve': {
-      const chatId = String(body.chat_id || '');
-      if (!/^\d+$/.test(chatId)) return bad('chat_id required');
-      const { rowCount } = await pool.query(
-        `UPDATE hub_users
-         SET role='user', approved_at=COALESCE(approved_at, NOW())
-         WHERE chat_id=$1`,
-        [chatId],
-      );
-      if (!rowCount) return bad('not found', 404);
-      notifyChat(chatId, '✅ 가입 승인됐습니다. /help 확인.');
-      return Response.json({ ok: true });
-    }
     case 'deny': {
       const chatId = String(body.chat_id || '');
       if (!/^\d+$/.test(chatId)) return bad('chat_id required');
@@ -69,33 +57,6 @@ export async function POST(req) {
         [chatId],
       );
       if (!rowCount) return bad('not found', 404);
-      return Response.json({ ok: true });
-    }
-    case 'grant': {
-      const chatId = String(body.chat_id || '');
-      const feature = String(body.feature || '').trim();
-      if (!/^\d+$/.test(chatId) || !feature) return bad('chat_id, feature required');
-      const u = await pool.query('SELECT role FROM hub_users WHERE chat_id=$1', [chatId]);
-      if (!u.rowCount) return bad('not found', 404);
-      if (u.rows[0].role !== 'user' && u.rows[0].role !== 'root')
-        return bad('user not approved');
-      await pool.query(
-        `INSERT INTO hub_permissions (chat_id, feature)
-         VALUES ($1, $2)
-         ON CONFLICT (chat_id, feature) DO NOTHING`,
-        [chatId, feature],
-      );
-      notifyChat(chatId, `🎁 '${feature}' 권한이 부여됐어요. /help 확인.`);
-      return Response.json({ ok: true });
-    }
-    case 'revoke': {
-      const chatId = String(body.chat_id || '');
-      const feature = String(body.feature || '').trim();
-      if (!/^\d+$/.test(chatId) || !feature) return bad('chat_id, feature required');
-      await pool.query(
-        'DELETE FROM hub_permissions WHERE chat_id=$1 AND feature=$2',
-        [chatId, feature],
-      );
       return Response.json({ ok: true });
     }
     case 'resolve': {
@@ -109,69 +70,131 @@ export async function POST(req) {
       );
       return Response.json({ ok: true, count: rowCount });
     }
-    case 'category_create': {
+    case 'usergroup_apply': {
+      const chatId = String(body.chat_id || '');
+      const groupKey = String(body.group_key || '').trim();
+      if (!/^\d+$/.test(chatId)) return bad('chat_id required');
+      if (!KEY_RE.test(groupKey)) return bad('group_key 잘못됨');
+      try {
+        const r = await applyUserGroup(chatId, groupKey);
+        const label = r.role === 'root' ? '👑 Root' : groupKey;
+        notifyChat(chatId, `✅ '${label}' 그룹이 적용됐어요. /help 확인.`);
+        return Response.json({ ok: true, role: r.role });
+      } catch (e) {
+        const msg = e?.message || 'apply failed';
+        if (msg === 'user not found') return bad(msg, 404);
+        return bad(msg, 500);
+      }
+    }
+    case 'usergroup_create': {
+      await ensureUserGroupsSchema();
       const key = String(body.key || '').trim();
       const label = String(body.label || '').trim();
       const desc = String(body.desc || '').trim();
-      const sortOrder = Number.isFinite(+body.sort_order) ? +body.sort_order : 0;
-      const err = validateCategoryFields({ key, label, desc });
+      const sortOrder = Number.isFinite(+body.sort_order) ? +body.sort_order : 100;
+      const features = Array.isArray(body.features)
+        ? body.features.map((s) => String(s).trim()).filter(Boolean)
+        : [];
+      const err = validateGroupFields({ key, label, desc });
       if (err) return bad(err);
-      try {
-        await pool.query(
-          `INSERT INTO hub_categories (key, label, description, sort_order)
-           VALUES ($1, $2, $3, $4)`,
-          [key, label, desc, sortOrder],
-        );
-      } catch (e) {
-        if (e?.code === '23505') return bad(`이미 존재하는 key: ${key}`, 409);
-        if (e?.code === '42P01') return bad('hub_categories 테이블 없음 — hub 가 안 떴는지 확인', 503);
-        return bad(e?.message || 'create failed', 500);
-      }
-      return Response.json({ ok: true });
-    }
-    case 'category_update': {
-      const key = String(body.key || '').trim();
-      const label = body.label != null ? String(body.label).trim() : null;
-      const desc = body.desc != null ? String(body.desc).trim() : null;
-      const sortOrder = Number.isFinite(+body.sort_order) ? +body.sort_order : null;
-      if (!KEY_RE.test(key)) return bad('key 잘못됨');
-      const err = validateCategoryFields({ key, label, desc });
-      if (err) return bad(err);
-      const sets = [];
-      const vals = [key];
-      if (label != null) { sets.push(`label = $${vals.length + 1}`); vals.push(label); }
-      if (desc != null) { sets.push(`description = $${vals.length + 1}`); vals.push(desc); }
-      if (sortOrder != null) { sets.push(`sort_order = $${vals.length + 1}`); vals.push(sortOrder); }
-      if (!sets.length) return bad('변경할 필드 없음');
-      const { rowCount } = await pool.query(
-        `UPDATE hub_categories SET ${sets.join(', ')} WHERE key = $1`,
-        vals,
-      );
-      if (!rowCount) return bad('not found', 404);
-      return Response.json({ ok: true });
-    }
-    case 'category_delete': {
-      const key = String(body.key || '').trim();
-      if (!KEY_RE.test(key)) return bad('key 잘못됨');
+
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
-        // hub_permissions 에 FK 가 없어서 명시적으로 같이 정리.
-        await client.query('DELETE FROM hub_permissions WHERE feature = $1', [key]);
-        const { rowCount } = await client.query('DELETE FROM hub_categories WHERE key = $1', [key]);
+        await client.query(
+          `INSERT INTO hub_user_groups (key, label, description, is_root, is_default, sort_order)
+           VALUES ($1, $2, $3, false, false, $4)`,
+          [key, label, desc, sortOrder],
+        );
+        if (features.length) {
+          const ph = features.map((_, i) => `($1, $${i + 2})`).join(', ');
+          await client.query(
+            `INSERT INTO hub_user_group_features (group_key, feature) VALUES ${ph}`,
+            [key, ...features],
+          );
+        }
         await client.query('COMMIT');
-        if (!rowCount) return bad('not found', 404);
         return Response.json({ ok: true });
       } catch (e) {
         await client.query('ROLLBACK').catch(() => {});
-        return bad(e?.message || 'delete failed', 500);
+        if (e?.code === '23505') return bad(`이미 존재하는 key: ${key}`, 409);
+        return bad(e?.message || 'create failed', 500);
       } finally {
         client.release();
       }
     }
+    case 'usergroup_update': {
+      const key = String(body.key || '').trim();
+      if (!KEY_RE.test(key)) return bad('key 잘못됨');
+      const g = await pool.query(
+        `SELECT is_default FROM hub_user_groups WHERE key=$1`, [key],
+      );
+      if (!g.rowCount) return bad('not found', 404);
+      if (g.rows[0].is_default) return bad('기본 그룹은 편집 불가', 403);
+
+      const label = body.label != null ? String(body.label).trim() : null;
+      const desc = body.desc != null ? String(body.desc).trim() : null;
+      const sortOrder = Number.isFinite(+body.sort_order) ? +body.sort_order : null;
+      const features = Array.isArray(body.features)
+        ? body.features.map((s) => String(s).trim()).filter(Boolean)
+        : null;
+      const err = validateGroupFields({ key, label, desc });
+      if (err) return bad(err);
+
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const sets = [];
+        const vals = [key];
+        if (label != null) { sets.push(`label=$${vals.length + 1}`); vals.push(label); }
+        if (desc != null) { sets.push(`description=$${vals.length + 1}`); vals.push(desc); }
+        if (sortOrder != null) { sets.push(`sort_order=$${vals.length + 1}`); vals.push(sortOrder); }
+        if (sets.length) {
+          await client.query(
+            `UPDATE hub_user_groups SET ${sets.join(', ')} WHERE key=$1`,
+            vals,
+          );
+        }
+        if (features != null) {
+          await client.query('DELETE FROM hub_user_group_features WHERE group_key=$1', [key]);
+          if (features.length) {
+            const ph = features.map((_, i) => `($1, $${i + 2})`).join(', ');
+            await client.query(
+              `INSERT INTO hub_user_group_features (group_key, feature) VALUES ${ph}`,
+              [key, ...features],
+            );
+          }
+        }
+        await client.query('COMMIT');
+        return Response.json({ ok: true });
+      } catch (e) {
+        await client.query('ROLLBACK').catch(() => {});
+        return bad(e?.message || 'update failed', 500);
+      } finally {
+        client.release();
+      }
+    }
+    case 'usergroup_delete': {
+      const key = String(body.key || '').trim();
+      if (!KEY_RE.test(key)) return bad('key 잘못됨');
+      const g = await pool.query(
+        `SELECT is_default FROM hub_user_groups WHERE key=$1`, [key],
+      );
+      if (!g.rowCount) return bad('not found', 404);
+      if (g.rows[0].is_default) return bad('기본 그룹은 삭제 불가', 403);
+      // 멤버가 있으면 거부 — 그룹 변경 후 삭제하도록 강제.
+      const m = await pool.query(
+        `SELECT COUNT(*)::int AS n FROM hub_users WHERE group_key=$1`, [key],
+      );
+      if (m.rows[0].n > 0) {
+        return bad(`멤버 ${m.rows[0].n}명 있음 — 다른 그룹으로 옮긴 후 삭제`, 409);
+      }
+      await pool.query('DELETE FROM hub_user_groups WHERE key=$1', [key]);
+      return Response.json({ ok: true });
+    }
     case 'broadcast': {
       const text = String(body.text || '').trim();
-      const target = String(body.target || 'all').trim(); // 'all' | feature key
+      const target = String(body.target || 'all').trim(); // 'all' | <user_group_key>
       if (!text) return bad('text required');
       let recipients = [];
       if (target === 'all') {
@@ -180,11 +203,10 @@ export async function POST(req) {
         );
         recipients = r.rows.map((x) => x.chat_id);
       } else {
+        if (!KEY_RE.test(target)) return bad('target 잘못됨');
         const r = await pool.query(
-          `SELECT DISTINCT u.chat_id::text
-           FROM hub_users u
-           LEFT JOIN hub_permissions p ON p.chat_id=u.chat_id AND p.feature=$1
-           WHERE u.role='root' OR (u.role='user' AND p.feature IS NOT NULL)`,
+          `SELECT chat_id::text FROM hub_users
+           WHERE group_key = $1 AND role IN ('root','user')`,
           [target],
         );
         recipients = r.rows.map((x) => x.chat_id);
