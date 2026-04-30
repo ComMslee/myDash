@@ -111,27 +111,26 @@ export async function editMessageText(text, chatId, messageId, opts = {}) {
   }
 }
 
-// 사용자별 텔레그램 입력창 [/] 메뉴 자동완성 갱신.
-// commands: [{ command:'soc', description:'배터리 % + 충전 여부' }, ...] (앞에 / 없이)
-// chatId 미지정 시 봇 전역 default 갱신.
-export async function setMyCommands(commands, chatId = null, languageCode = 'ko') {
+// 텔레그램 입력창 [/] 메뉴 자동완성 비우기 — 봇은 Reply 키보드 진입만 사용.
+// chatId 미지정 시 전역 default 메뉴 삭제.
+export async function deleteMyCommands(chatId = null, languageCode = 'ko') {
   if (!API) return null;
-  const body = { commands, language_code: languageCode };
+  const body = { language_code: languageCode };
   if (chatId) body.scope = { type: 'chat', chat_id: Number(chatId) };
   try {
-    const r = await fetch(`${API}/setMyCommands`, {
+    const r = await fetch(`${API}/deleteMyCommands`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
     if (!r.ok) {
       const t = await r.text().catch(() => '');
-      console.error('[telegram] setMyCommands', r.status, t);
+      console.error('[telegram] deleteMyCommands', r.status, t);
       return null;
     }
     return await r.json();
   } catch (e) {
-    console.error('[telegram] setMyCommands threw', e?.message);
+    console.error('[telegram] deleteMyCommands threw', e?.message);
     return null;
   }
 }

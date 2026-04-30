@@ -1,7 +1,7 @@
 import { pool } from './db.js';
 import {
   sendMessage, sendLocation, escapeHtml,
-  setMyCommands, answerCallbackQuery, editMessageText,
+  deleteMyCommands, answerCallbackQuery, editMessageText,
 } from './telegram.js';
 import { formatKst } from './format.js';
 import {
@@ -259,18 +259,6 @@ const CATEGORY_COMMANDS = {
   // 새 카테고리 추가 시 여기에 명령 목록.
 };
 
-const COMMON_COMMANDS = [
-  { cmd: '/help',       desc: '도움말' },
-  { cmd: '/whoami',     desc: '내 권한·정보' },
-  { cmd: '/categories', desc: '카테고리' },
-];
-
-const ADMIN_COMMANDS = [
-  { cmd: '/pending',  desc: '가입 대기자 보기' },
-  { cmd: '/setgroup', desc: '가입승인·그룹변경' },
-  { cmd: '/deny',     desc: '차단/탈퇴' },
-];
-
 // Reply 키보드 한글 라벨 → 슬래시 명령 매핑. 정확 일치만 허용 (자연어 매칭 X).
 const BUTTON_TO_CMD = {};
 for (const arr of Object.values(CATEGORY_COMMANDS)) {
@@ -300,32 +288,11 @@ function followUp(cmdKey) {
   };
 }
 
-// 사용자 권한 기반 슬래시 명령 목록 — Telegram [/] 메뉴 + Reply 키보드 공통.
-async function buildUserCommands(chatId, role) {
-  const list = [...COMMON_COMMANDS];
-  const cats = await getCategories();
-  for (const cat of cats) {
-    if (!(await hasPermission(chatId, cat.key))) continue;
-    list.push(...(CATEGORY_COMMANDS[cat.key] || []));
-  }
-  if (role === 'root') list.push(...ADMIN_COMMANDS);
-  return list;
-}
-
-// Telegram 입력창 [/] 메뉴 자동완성을 사용자 권한에 맞게 갱신.
-// 가입 승인 / 그룹 변경 시점에 호출.
+// 텔레그램 입력창 [/] 메뉴 자동완성을 사용자별로 비움.
+// 봇은 Reply 키보드 진입만 사용 — 슬래시는 채팅창에 직접 입력하면 응답·가이드가 잘 나오므로
+// 좌측 [/] 메뉴는 중복. 기존에 등록됐던 메뉴를 비우려고 가입 승인/그룹 변경 시 호출.
 export async function syncUserMenu(chatId) {
-  const u = await getUser(chatId);
-  if (!u || u.role === 'denied' || u.role === 'pending') {
-    // pending/denied 는 메뉴 비움.
-    return setMyCommands([], chatId);
-  }
-  const list = await buildUserCommands(chatId, u.role);
-  const cmds = list.map((c) => ({
-    command: c.cmd.replace(/^\//, ''),
-    description: c.desc,
-  }));
-  return setMyCommands(cmds, chatId);
+  return deleteMyCommands(chatId);
 }
 
 // 카테고리 폴더형 Reply 키보드 — 메인 진입은 카테고리 라벨, 누르면 sub-keyboard 로 갈아끼움.

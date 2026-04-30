@@ -178,16 +178,11 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 
 현재 봇은 **슬래시 명령만** 인식. 자연어 키워드 매칭은 정확도 부족으로 제거됨. 슬래시 외 입력은 `hub_unmatched_inputs` 에 적재 + "잘 모르겠어요 / /help 보기" 응답.
 
-대신 슬래시 진입 부담을 두 가지 UI 로 낮춤:
+대신 슬래시 진입 부담을 Reply 키보드(카테고리 폴더형)로 낮춤. 텔레그램 입력창 좌측 [/] 자동완성 메뉴는 **사용 안 함** — 슬래시는 채팅창에 직접 입력하면 응답·가이드가 잘 나오므로 좌측 메뉴는 중복.
 
-### 6-1. 텔레그램 [/] 자동완성 메뉴 (`setMyCommands`)
+`syncUserMenu(chatId)` / 부팅 시 `deleteMyCommands()` 호출로 텔레그램 측 [/] 메뉴 비움 (이전 `setMyCommands` 잔재 청소).
 
-- 가입 승인 / 그룹 변경 / `/deny` 시점에 `syncUserMenu(chatId)` 호출 → 해당 사용자의 [/] 메뉴를 권한 기반으로 갱신
-- 부팅 시 root 한 번 등록
-- pending/denied 사용자는 메뉴 비움
-- scope=`chat` 라 사용자별 다른 명령 노출 — guest 는 root 명령 안 보임
-
-### 6-2. Reply 키보드 — 카테고리 폴더형
+### 6-1. Reply 키보드 — 카테고리 폴더형
 
 비IT 가족 친화 + 카테고리 확장성 모두 잡기 위해 **2단 폴더 구조**.
 
@@ -219,7 +214,7 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 4. `/cmd` → 핸들러
 5. 그 외 → 폴백
 
-### 6-3. Inline 후속 액션 (데이터 명령 응답)
+### 6-2. Inline 후속 액션 (데이터 명령 응답)
 
 각 데이터 명령 응답 끝에 `inline_keyboard` 동봉 — 1행 3버튼.
 
@@ -238,10 +233,11 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 - `tg_poller` 가 `callback_query` 분기에서 `handleCallback` 호출 → `CB_ROUTES` 매핑 → 핸들러 실행
 - 매번 새 메시지로 응답 (stateless) — `editMessageText` 인프라는 깔려 있고 향후 다단계 대화에서 사용
 
-### 6-4. 단일 소스
+### 6-3. 단일 소스
 
-명령 카탈로그: `commands.js` 의 `CATEGORY_COMMANDS` / `COMMON_COMMANDS` / `ADMIN_COMMANDS` — `/help` 본문, [/] 메뉴, Reply 키보드 공유.
+명령 카탈로그: `commands.js` 의 `CATEGORY_COMMANDS` — `/help` 본문, Reply 키보드 (메인/sub) 공유.
 후속 액션: `FOLLOWUP` 맵.
+한글 라벨 → 슬래시 매핑: `BUTTON_TO_CMD`.
 
 ## 7. `/notify` HTTP 엔드포인트 (외부 서비스용)
 
