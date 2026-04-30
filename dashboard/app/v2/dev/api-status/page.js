@@ -22,6 +22,8 @@ const ROUTES = [
   { path: '/api/summary',          label: '일자 요약',      desc: 'drives+charges 집계 + 전비(eff_wh_km). range=today|yesterday|week|this-week|last-week|month|last-month|multi — 봇 /period', category: '차량',
     params: [{ key: 'range', sample: 'multi' }] },
   { path: '/api/home-charger/groups', label: '충전기 그룹',  desc: '동별 그룹 카운트 (구성 = constants.js) — 봇 /chargers', category: '집충전기' },
+  { path: '/api/home-charger/report', label: '활용도 리포트', desc: '월별 점유율·시간대×요일 히트맵·KPI — /v2/chargers/report 페이지', category: '집충전기',
+    dashboard: 'report' },
   { path: '/api/parked',           label: '주차 정보',      desc: '마지막 종료 drive 위치·경과 (driving=true 면 진행 중) — 봇 /where 의 정차/주행 분기에 사용', category: '차량' },
   { path: '/api/location',         label: '현재 좌표',      desc: '최신 positions 의 lat/lng/date — 봇 /where 공용', category: '차량' },
 
