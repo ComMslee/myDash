@@ -4,6 +4,7 @@ import { startDbPoller } from './poller.js';
 import { startTelegramPoller } from './tg_poller.js';
 import { bootstrapRoot, grantPermission } from './auth.js';
 import { ensureCategoriesSchema } from './categories.js';
+import { ensureUserGroupsSchema } from './user_groups.js';
 
 const required = ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'TM_DB_USER', 'TM_DB_PASS'];
 const missing = required.filter((k) => !process.env[k]);
@@ -20,6 +21,7 @@ try {
   await ensureCategoriesSchema();
   await bootstrapRoot(rootChatId);
   await grantPermission(rootChatId, 'car');
+  await ensureUserGroupsSchema();
   console.log('[boot] root chat_id =', rootChatId);
 } catch (e) {
   console.error('[boot] auth bootstrap failed', e.message);

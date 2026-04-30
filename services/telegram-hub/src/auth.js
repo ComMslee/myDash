@@ -25,13 +25,19 @@ export async function ensureAuthSchema() {
 }
 
 // .env 의 TELEGRAM_CHAT_ID 를 root 로 강제. 매 부팅마다 멱등.
+// name 은 NULL 로 두고 첫 메시지 때 텔레그램 first_name 으로 동기화.
 export async function bootstrapRoot(rootChatId) {
   if (!rootChatId) return;
   await ensureAuthSchema();
   await pool.query(
     `INSERT INTO hub_users (chat_id, role, name, approved_at)
-     VALUES ($1, 'root', 'root', NOW())
+     VALUES ($1, 'root', NULL, NOW())
      ON CONFLICT (chat_id) DO UPDATE SET role = 'root', approved_at = COALESCE(hub_users.approved_at, NOW())`,
+    [rootChatId],
+  );
+  // 과거 부트스트랩에서 박힌 'root' placeholder 정리.
+  await pool.query(
+    `UPDATE hub_users SET name = NULL WHERE chat_id = $1 AND name = 'root'`,
     [rootChatId],
   );
 }

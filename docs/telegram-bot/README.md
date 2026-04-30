@@ -99,12 +99,12 @@ TeslaMate DB ──┬──► telegram-hub (Node 20, ~80MB RAM)
 ### 상태 전이
 
 ```
-       /start (첫 메시지)         /approve
-   ┌────────────────────► pending ────────► user ◄──┐
-   │                                          │      │ /approve
-   │                                          │      │
-   └─                              /deny      ▼      │
-                                            denied ──┘
+       /start (첫 메시지)        /setgroup
+   ┌────────────────────► pending ─────────► user ◄──┐
+   │                                          │       │ /setgroup
+   │                                          │       │
+   └─                              /deny      ▼       │
+                                            denied ───┘
 ```
 
 ## 5. 명령 레퍼런스
@@ -128,17 +128,13 @@ TeslaMate DB ──┬──► telegram-hub (Node 20, ~80MB RAM)
 
 ### 관리자 (root)
 
+모바일에서 빠르게 처리할 최소 셋만 봇에 둠. 권한 매트릭스·방송·학습로그·사용자 목록은 `/v2/tg` 웹.
+
 | 명령 | 사용법 | 효과 |
 |---|---|---|
-| `/pending` | — | 가입 대기자 목록 |
-| `/approve <chat_id>` | `/approve 123` | pending/denied → user |
-| `/deny <chat_id>` | `/deny 123` | 어떤 role이든 → denied |
-| `/grant <chat_id> <feature>` | `/grant 123 car` | 권한 부여 |
-| `/revoke <chat_id> <feature>` | `/revoke 123 car` | 권한 회수 |
-| `/users` | — | 전체 사용자 + 카테고리 매트릭스 |
-| `/unmatched` | — | 미인식 입력 최근 20건 |
-| `/topnope` | — | 자주 못 알아들은 표현 TOP 5 |
-| `/resolve <id1,id2,...>` | `/resolve 1,2,3` | 미인식 입력 해결 처리 |
+| `/pending` | — | 가입 대기자 목록 (적용 가이드 포함) |
+| `/setgroup <chat_id> <group>` | `/setgroup 123 guest` | 가입승인 또는 그룹변경 — `role` + `group_key` + `hub_permissions` 트랜잭션 갱신 |
+| `/deny <chat_id>` | `/deny 123` | 어떤 role이든 → denied (차단/탈퇴) |
 
 ## 6. 자연어 라우팅
 
@@ -159,7 +155,7 @@ TeslaMate DB ──┬──► telegram-hub (Node 20, ~80MB RAM)
 1. 사용자가 자연어 입력
 2. 매칭 안 됨 → DB에 로깅
 3. 며칠 운영
-4. /topnope 로 자주 등장하는 미인식 표현 확인
+4. /v2/tg "알림" 탭의 학습 로그에서 자주 등장하는 미인식 표현 확인
 5. NL_PATTERNS 에 한 줄 추가 → push → 자동 배포
 6. /resolve <ids> 로 정리
 ```
@@ -184,18 +180,22 @@ curl -X POST http://telegram-hub:3000/notify \
 
 ## 8. 운영 시나리오
 
-### 와이프 추가하고 SNS만 부여
+### 와이프 추가하고 게스트 그룹으로 가입
 
 ```
 와이프: 봇한테 "hi" 또는 /start
        ← "가입 신청 접수됨"
 본인 (root에게 자동 푸시):
   🔔 신규 가입 신청 #9999 김와이프
-본인: /approve 9999
-본인: /grant 9999 sns         ← car 안 줌
+  적용: /setgroup 9999 guest
+        /setgroup 9999 root
+  거부: /deny 9999
+본인: /setgroup 9999 guest    ← guest 그룹의 features=['common'] 일괄 적용
 와이프: /soc                  ← "🔒 'car' 권한이 필요해요"
-와이프: /sns ...              ← (미래에 SNS 구현 시 작동)
+와이프: /help                 ← guest 그룹 기준 도움말
 ```
+
+커스텀 그룹이 필요하면 `/v2/tg` "권한관리" 탭에서 그룹 만들고 적용.
 
 ### 모르는 사람 차단
 
@@ -209,13 +209,11 @@ curl -X POST http://telegram-hub:3000/notify \
 ### 자연어 패턴 보강
 
 ```
-본인: /topnope
-봇: × 4  전기 얼마나 썼어
-   × 2  에너지 사용량
-본인: (commands.js NL_PATTERNS 에 추가)
-       { feature: 'car', re: /(전기|에너지).*(썼|사용)/i, handler: cmdUsage }
-       (cmdUsage 신규 작성 + push)
-본인: /resolve 42,51
+1. /v2/tg "알림" 탭의 학습 로그(미인식 입력) 확인 — 자주 등장하는 표현 식별
+2. commands.js NL_PATTERNS 에 한 줄 추가:
+   { feature: 'car', re: /(전기|에너지).*(썼|사용)/i, handler: cmdUsage }
+   (cmdUsage 신규 작성 + push)
+3. 학습 로그 화면에서 해당 항목 체크 후 "선택 해결"
 ```
 
 ## 9. 관찰성

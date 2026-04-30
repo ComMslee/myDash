@@ -4,10 +4,11 @@ import { formatKst } from './format.js';
 import {
   ensureAuthSchema,
   getUser, upsertPending, setRole,
-  listPending, listAllUsers, getRoots,
-  hasPermission, grantPermission, revokePermission,
+  listPending, getRoots,
+  hasPermission,
 } from './auth.js';
 import { getCategories, categoryByKey, labelOf } from './categories.js';
+import { listUserGroups, applyUserGroup } from './user_groups.js';
 
 // ── 명령 카탈로그 ─────────────────────────────────────
 // open: 누구나 (등록 안 된 사람도 가능)
@@ -21,16 +22,11 @@ const COMMANDS = {
   '/soc':       { feature: 'car', handler: cmdSoc },
   '/today':     { feature: 'car', handler: cmdToday },
   '/where':     { feature: 'car', handler: cmdWhere },
-  // 운영
+  // 운영 — 모바일에서 빠르게 처리할 최소 셋. 나머지(/users, /grant, /revoke,
+  // /unmatched, /topnope, /resolve, /broadcast)는 /v2/tg 웹에서.
   '/pending':   { rootOnly: true, handler: cmdPending },
-  '/approve':   { rootOnly: true, handler: cmdApprove },
+  '/setgroup':  { rootOnly: true, handler: cmdSetGroup },
   '/deny':      { rootOnly: true, handler: cmdDeny },
-  '/grant':     { rootOnly: true, handler: cmdGrant },
-  '/revoke':    { rootOnly: true, handler: cmdRevoke },
-  '/users':     { rootOnly: true, handler: cmdUsers },
-  '/unmatched': { rootOnly: true, handler: cmdUnmatched },
-  '/topnope':   { rootOnly: true, handler: cmdTopNope },
-  '/resolve':   { rootOnly: true, handler: cmdResolve },
 };
 
 // ── 자연어 라우팅 (feature 태그 포함) ─────────────────
@@ -103,12 +99,28 @@ export async function handleMessage(message) {
   await ensureAuthSchema();
   let user = await getUser(chatId);
 
+  // 매 메시지마다 텔레그램 first_name 으로 name 동기화 — placeholder/이름변경 케이스.
+  const liveName = [message.from?.first_name, message.from?.last_name].filter(Boolean).join(' ') || null;
+  if (user && liveName && user.name !== liveName) {
+    try {
+      await pool.query('UPDATE hub_users SET name = $2 WHERE chat_id = $1', [chatId, liveName]);
+      user.name = liveName;
+    } catch (e) { console.error('[commands] name sync failed', e?.message); }
+  }
+
   // 미등록 → pending 으로 등록 + root 알림.
   if (!user) {
     const name = [message.from?.first_name, message.from?.last_name].filter(Boolean).join(' ') || null;
     await upsertPending(chatId, name);
     await notifyRoots(
-      `🔔 신규 가입 신청\n#${chatId} ${escapeHtml(name || '(이름 없음)')}\n승인: <code>/approve ${chatId}</code>`,
+      [
+        '🔔 <b>신규 가입 신청</b>',
+        `#${chatId} ${escapeHtml(name || '(이름 없음)')}`,
+        '',
+        `적용: <code>/setgroup ${chatId} guest</code>`,
+        `      <code>/setgroup ${chatId} root</code>`,
+        `거부: <code>/deny ${chatId}</code>`,
+      ].join('\n'),
     );
     return sendMessage(
       '👋 가입 신청이 접수됐습니다.\n관리자 승인 후 사용 가능해요.',
@@ -215,10 +227,15 @@ async function cmdHelp({ chatId, user }) {
   lines.push('/help — 이 도움말');
 
   if (isRoot) {
+    const groups = await listUserGroups();
+    const keys = groups.map((g) => g.key).join(' / ') || 'root / guest';
     lines.push('');
     lines.push('<b>관리자</b>');
-    lines.push('/pending /approve /deny /grant /revoke /users');
-    lines.push('/unmatched /topnope /resolve');
+    lines.push('/pending — 가입 대기자 보기');
+    lines.push(`/setgroup &lt;chat_id&gt; &lt;group&gt; — 가입승인·그룹변경 (${keys})`);
+    lines.push('/deny &lt;chat_id&gt; — 차단/탈퇴');
+    lines.push('');
+    lines.push('<i>권한·방송·로그 관리는 /v2/tg 웹에서</i>');
   }
   lines.push('');
   lines.push('<i>자연어 일부 지원</i> (예: "오늘 얼마나 달렸어?")');
@@ -356,121 +373,51 @@ async function cmdWhere({ chatId }) {
 async function cmdPending({ chatId }) {
   const rows = await listPending();
   if (!rows.length) return sendMessage('가입 대기 없음 ✨', chatId);
+  const groups = await listUserGroups();
+  const keys = groups.map((g) => g.key).join(' / ') || 'root / guest';
   const lines = ['<b>📋 가입 대기</b>'];
   for (const r of rows) {
     lines.push(`#${r.chat_id} · ${escapeHtml(r.name || '-')} · ${formatKst(r.registered_at)}`);
   }
   lines.push('');
-  lines.push('<i>승인: /approve &lt;chat_id&gt;</i>');
+  lines.push(`<i>적용: /setgroup &lt;chat_id&gt; &lt;group&gt; (${keys})</i>`);
   lines.push('<i>거부: /deny &lt;chat_id&gt;</i>');
   return sendMessage(lines.join('\n'), chatId);
 }
 
-async function cmdApprove({ chatId, args, user }) {
-  const target = (args || '').split(/\s+/)[0];
-  if (!/^\d+$/.test(target)) return sendMessage('사용법: /approve <chat_id>', chatId);
-  const ok = await setRole(target, 'user', user.chat_id);
-  if (!ok) return sendMessage(`#${target} 없음`, chatId);
-  await sendMessage(`✅ #${target} 승인 완료. 권한 부여: <code>/grant ${target} car</code>`, chatId);
-  // 당사자에게 알림
+async function cmdSetGroup({ chatId, args, user }) {
+  const [target, groupKey] = (args || '').split(/\s+/);
+  const groups = await listUserGroups();
+
+  if (!/^\d+$/.test(target) || !groupKey) {
+    const list = groups.length
+      ? groups.map((g) => `  • <code>${g.key}</code> ${g.label}${g.is_root ? ' [root]' : ''}`).join('\n')
+      : '  (없음)';
+    return sendMessage(
+      [
+        '사용법: <code>/setgroup &lt;chat_id&gt; &lt;group&gt;</code>',
+        '예: <code>/setgroup 1234567890 guest</code>',
+        '',
+        '사용 가능 그룹:',
+        list,
+      ].join('\n'),
+      chatId,
+    );
+  }
+
+  const r = await applyUserGroup(target, groupKey, user.chat_id);
+  if (!r.ok) return sendMessage(`❌ ${r.error}`, chatId);
+  const label = groups.find((g) => g.key === groupKey)?.label || groupKey;
+  await sendMessage(`✅ #${target} → ${label} (role=${r.role})`, chatId);
   try {
-    await sendMessage('✅ 가입 승인됐습니다. 관리자가 권한을 추가할 때까지 일부 명령은 막혀 있을 수 있어요.\n/help 로 사용 가능 확인.', target);
+    await sendMessage(`✅ '${label}' 그룹이 적용됐어요. /help 확인.`, target);
   } catch {}
 }
 
 async function cmdDeny({ chatId, args, user }) {
   const target = (args || '').split(/\s+/)[0];
-  if (!/^\d+$/.test(target)) return sendMessage('사용법: /deny <chat_id>', chatId);
+  if (!/^\d+$/.test(target)) return sendMessage('사용법: /deny &lt;chat_id&gt;', chatId);
   const ok = await setRole(target, 'denied', user.chat_id);
   if (!ok) return sendMessage(`#${target} 없음`, chatId);
-  return sendMessage(`🚫 #${target} 거부됨`, chatId);
-}
-
-async function cmdGrant({ chatId, args, user }) {
-  const [target, feature] = (args || '').split(/\s+/);
-  const cats = await getCategories();
-  if (!/^\d+$/.test(target) || !feature) {
-    const known = cats.map((c) => c.key).join(', ') || '(없음)';
-    return sendMessage(`사용법: /grant <chat_id> <feature>\n예: /grant 1234567890 car\n등록된 카테고리: ${known}`, chatId);
-  }
-  const known = !!categoryByKey(feature);
-  const ok = await grantPermission(target, feature, user.chat_id);
-  if (!ok) return sendMessage(`#${target} 없거나 승인 안 됨`, chatId);
-  const labelStr = known ? labelOf(feature) : `${feature} <i>(미등록 카테고리)</i>`;
-  await sendMessage(`✅ #${target} 에게 ${labelStr} 권한 부여`, chatId);
-  try {
-    await sendMessage(`🎁 ${labelStr} 권한이 부여됐어요. /help 확인.`, target);
-  } catch {}
-}
-
-async function cmdRevoke({ chatId, args }) {
-  const [target, feature] = (args || '').split(/\s+/);
-  if (!/^\d+$/.test(target) || !feature) {
-    return sendMessage('사용법: /revoke <chat_id> <feature>', chatId);
-  }
-  const ok = await revokePermission(target, feature);
-  return sendMessage(ok ? `🗑 #${target} '${feature}' 회수` : '권한 없음', chatId);
-}
-
-async function cmdUsers({ chatId }) {
-  await getCategories(); // warm cache for sync labelOf
-  const rows = await listAllUsers();
-  if (!rows.length) return sendMessage('사용자 없음', chatId);
-  const lines = ['<b>👥 사용자</b>'];
-  for (const r of rows) {
-    const feats = r.features.length ? r.features.map(labelOf).join(' ') : '-';
-    lines.push(`[${r.role}] #${r.chat_id} ${escapeHtml(r.name || '-')} · ${feats}`);
-  }
-  return sendMessage(lines.join('\n'), chatId);
-}
-
-async function cmdUnmatched({ chatId }) {
-  await ensureUnmatchedSchema();
-  const { rows } = await pool.query(
-    `SELECT id, ts, text, chat_id::text FROM hub_unmatched_inputs
-     WHERE resolved = false
-     ORDER BY ts DESC LIMIT 20`,
-  );
-  if (!rows.length) return sendMessage('미해결 입력 없음 ✨', chatId);
-  const lines = ['<b>📋 미해결 (최근 20)</b>'];
-  for (const r of rows) {
-    lines.push(`#${r.id} · ${formatKst(r.ts)} · #${r.chat_id} · ${escapeHtml(r.text).slice(0, 60)}`);
-  }
-  lines.push('');
-  lines.push('<i>패턴 추가 후 /resolve 1,2,3</i>');
-  return sendMessage(lines.join('\n'), chatId);
-}
-
-async function cmdTopNope({ chatId }) {
-  await ensureUnmatchedSchema();
-  const { rows } = await pool.query(
-    `SELECT lower(trim(text)) AS norm, COUNT(*)::int AS n
-     FROM hub_unmatched_inputs
-     WHERE resolved = false
-     GROUP BY norm
-     ORDER BY n DESC, MAX(ts) DESC
-     LIMIT 5`,
-  );
-  if (!rows.length) return sendMessage('미해결 입력 없음 ✨', chatId);
-  const lines = ['<b>🔝 자주 못 알아들은 표현 TOP 5</b>'];
-  for (const r of rows) {
-    lines.push(`× ${r.n}  ${escapeHtml(r.norm).slice(0, 60)}`);
-  }
-  return sendMessage(lines.join('\n'), chatId);
-}
-
-async function cmdResolve({ chatId, args }) {
-  await ensureUnmatchedSchema();
-  const ids = String(args || '')
-    .split(/[\s,]+/)
-    .map((s) => parseInt(s, 10))
-    .filter((n) => Number.isFinite(n) && n > 0);
-  if (!ids.length) return sendMessage('사용법: /resolve 1,2,3', chatId);
-  const { rowCount } = await pool.query(
-    `UPDATE hub_unmatched_inputs
-     SET resolved=true, resolved_at=NOW()
-     WHERE id = ANY($1::int[]) AND resolved = false`,
-    [ids],
-  );
-  return sendMessage(`✅ ${rowCount}건 해결 처리`, chatId);
+  return sendMessage(`🚫 #${target} 차단됨`, chatId);
 }
