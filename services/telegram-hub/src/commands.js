@@ -34,11 +34,44 @@ const COMMANDS = {
 };
 
 // ── 자연어 라우팅 (feature 태그 포함) ─────────────────
+// 첫 매칭 승. 위에서 아래로 검사. 의도가 모호한 표현은 더 명확한 패턴이 위로.
 const NL_PATTERNS = [
-  { feature: 'car', re: /(배터리|충전.*상태|soc|몇\s*%|얼마나.*남|남은|잔량)/i,                 handler: cmdSoc   },
-  { feature: 'car', re: /(오늘|today|얼마나.*달렸|오늘.*주행|오늘.*충전|운행.*기록)/i,        handler: cmdToday },
-  { feature: 'car', re: /(어디|위치|where|지도|location|어디야|어디에)/i,                       handler: cmdWhere },
-  { feature: null,  re: /(도움말|help|뭐\s*할|어떻게.*써|명령.*뭐|기능.*뭐)/i,                    handler: cmdHelp  },
+  // /soc — 배터리/충전 상태
+  {
+    feature: 'car',
+    re: /(배터리|soc|몇\s*[%％]|얼마나.*(남|차)|남은\s*(배터리|km|거리|전기)|잔량|퍼센트|충전중|충전\s*(상태|됐|됨|끝|중\?)|지금.*충전|몇\s*프로)/i,
+    handler: cmdSoc,
+  },
+  // /today — 오늘 활동
+  {
+    feature: 'car',
+    re: /(오늘|today|얼마나.*(달렸|달려|달리|뛰었|뛰)|오늘.*(주행|충전|km|거리|효율)|운행\s*기록|일일\s*요약|오늘\s*뭐|일주.*기록)/i,
+    handler: cmdToday,
+  },
+  // /where — 현재 위치
+  {
+    feature: 'car',
+    re: /(어디|위치|where.*(car|는|있)|지도|location|어디야|어디에|주차.*어디|차.*어디|내\s*차|현재\s*위치|navigate|map.*me)/i,
+    handler: cmdWhere,
+  },
+  // open: /help
+  {
+    feature: null,
+    re: /(도움말|help\b|뭐\s*할\s*수|어떻게.*(써|사용)|명령.*뭐|기능.*뭐|쓸\s*수\s*있|할\s*수\s*있는|뭐가\s*돼)/i,
+    handler: cmdHelp,
+  },
+  // open: /whoami
+  {
+    feature: null,
+    re: /(내\s*권한|내\s*역할|나는\s*누구|whoami|내\s*정보|내\s*chat)/i,
+    handler: cmdWhoami,
+  },
+  // open: /categories
+  {
+    feature: null,
+    re: /(카테고리|categor|메뉴\s*보|기능\s*목록)/i,
+    handler: cmdCategories,
+  },
 ];
 
 // hub_unmatched_inputs 스키마.
