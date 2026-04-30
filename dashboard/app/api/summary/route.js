@@ -1,10 +1,12 @@
 import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
+import { KWH_PER_KM } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
-// drives + charging_processes 일자 집계 — 봇 /today /yesterday /week /period 공용.
+// drives + charging_processes 일자 집계 — 봇 /period 공용.
+// drives 응답에 efficiency_wh_km(전비) 도 같이 — (range_used) * KWH_PER_KM / distance * 1000.
 // range:
 //   today        오늘 (KST 자정~)
 //   yesterday    어제 (KST)
@@ -12,7 +14,8 @@ export const dynamic = 'force-dynamic';
 //   this-week    이번 주 (KST 월요일~오늘)
 //   last-week    지난 주 (KST 월요일~일요일)
 //   month        이번 달 (KST 1일~오늘)
-//   multi        today + this-week + last-week + month 한 번에 — 봇 /period 용.
+//   last-month   지난 달 (KST 1일~말일)
+//   multi        today + this-week + month + last-month 한 번에 — 봇 /period 용.
 
 const KST_OFFSET_MS = 9 * 3600 * 1000;
 
@@ -25,10 +28,9 @@ function kstStartOfTodayUtc() {
   ) - KST_OFFSET_MS);
 }
 
-// KST 기준 이번 주 월요일 자정 UTC.
 function kstStartOfThisWeekUtc() {
   const nowKst = new Date(Date.now() + KST_OFFSET_MS);
-  const dow = nowKst.getUTCDay(); // 0=일, 1=월, ..., 6=토
+  const dow = nowKst.getUTCDay();
   const offsetToMon = dow === 0 ? -6 : 1 - dow;
   return new Date(Date.UTC(
     nowKst.getUTCFullYear(),
@@ -37,7 +39,6 @@ function kstStartOfThisWeekUtc() {
   ) - KST_OFFSET_MS);
 }
 
-// KST 기준 이번 달 1일 자정 UTC.
 function kstStartOfThisMonthUtc() {
   const nowKst = new Date(Date.now() + KST_OFFSET_MS);
   return new Date(Date.UTC(
@@ -47,19 +48,28 @@ function kstStartOfThisMonthUtc() {
   ) - KST_OFFSET_MS);
 }
 
+function kstStartOfLastMonthUtc() {
+  const nowKst = new Date(Date.now() + KST_OFFSET_MS);
+  return new Date(Date.UTC(
+    nowKst.getUTCFullYear(),
+    nowKst.getUTCMonth() - 1,
+    1,
+  ) - KST_OFFSET_MS);
+}
+
 function rangeBounds(range, today) {
   switch (range) {
-    case 'today':     return [today, null];
-    case 'yesterday': return [new Date(today.getTime() - 86_400_000), today];
-    case 'week':      return [new Date(today.getTime() - 6 * 86_400_000), null];
-    case 'this-week': return [kstStartOfThisWeekUtc(), null];
+    case 'today':      return [today, null];
+    case 'yesterday':  return [new Date(today.getTime() - 86_400_000), today];
+    case 'week':       return [new Date(today.getTime() - 6 * 86_400_000), null];
+    case 'this-week':  return [kstStartOfThisWeekUtc(), null];
     case 'last-week': {
       const thisMon = kstStartOfThisWeekUtc();
-      const lastMon = new Date(thisMon.getTime() - 7 * 86_400_000);
-      return [lastMon, thisMon];
+      return [new Date(thisMon.getTime() - 7 * 86_400_000), thisMon];
     }
-    case 'month':     return [kstStartOfThisMonthUtc(), null];
-    default:          return null;
+    case 'month':      return [kstStartOfThisMonthUtc(), null];
+    case 'last-month': return [kstStartOfLastMonthUtc(), kstStartOfThisMonthUtc()];
+    default: return null;
   }
 }
 
@@ -70,7 +80,8 @@ async function aggregateRange(carId, start, end) {
     pool.query(
       `SELECT COUNT(*)::int AS n,
               COALESCE(SUM(distance), 0)::float AS km,
-              COALESCE(SUM(duration_min), 0)::int AS dur
+              COALESCE(SUM(duration_min), 0)::int AS dur,
+              COALESCE(SUM(start_rated_range_km - end_rated_range_km), 0)::float AS range_used
        FROM drives WHERE car_id = $1 AND ${where}`,
       params,
     ),
@@ -81,7 +92,18 @@ async function aggregateRange(carId, start, end) {
       params,
     ),
   ]);
-  return { drives: drives.rows[0], charges: charges.rows[0] };
+  const d = drives.rows[0];
+  // 전비 (Wh/km) — range_used 기반. 노이즈 방지 위해 km>=1 일 때만.
+  const eff = d.km >= 1 ? (d.range_used * KWH_PER_KM / d.km * 1000) : 0;
+  return {
+    drives: {
+      n: d.n,
+      km: d.km,
+      dur: d.dur,
+      eff_wh_km: Math.round(eff),
+    },
+    charges: charges.rows[0],
+  };
 }
 
 export async function GET(req) {
@@ -96,9 +118,8 @@ export async function GET(req) {
 
     const today = kstStartOfTodayUtc();
 
-    // multi: today + this-week + last-week + month 한 번에.
     if (range === 'multi') {
-      const ranges = ['today', 'this-week', 'last-week', 'month'];
+      const ranges = ['today', 'this-week', 'month', 'last-month'];
       const out = {};
       await Promise.all(ranges.map(async (r) => {
         const b = rangeBounds(r, today);

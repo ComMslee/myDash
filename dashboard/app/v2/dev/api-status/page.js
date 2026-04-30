@@ -19,8 +19,9 @@ const ROUTES = [
       { key: 'to',   sample: '' },
     ] },
   { path: '/api/insights',         label: '인사이트',       desc: '누적 거리·kWh·평균효율·요약 통계', category: '차량' },
-  { path: '/api/summary',          label: '일자 요약',      desc: 'drives+charges 집계 (range=today|yesterday|week|this-week|last-week|month|multi) — 봇 /today /period 공용', category: '차량',
+  { path: '/api/summary',          label: '일자 요약',      desc: 'drives+charges 집계 + 전비(eff_wh_km). range=today|yesterday|week|this-week|last-week|month|last-month|multi — 봇 /period', category: '차량',
     params: [{ key: 'range', sample: 'multi' }] },
+  { path: '/api/home-charger/groups', label: '충전기 그룹',  desc: '동별 그룹 카운트 (구성 = constants.js) — 봇 /chargers', category: '집충전기' },
   { path: '/api/parked',           label: '주차 정보',      desc: '마지막 종료 drive 위치·경과 (driving=true 면 진행 중) — 봇 /where 의 정차/주행 분기에 사용', category: '차량' },
   { path: '/api/location',         label: '현재 좌표',      desc: '최신 positions 의 lat/lng/date — 봇 /where 공용', category: '차량' },
 
