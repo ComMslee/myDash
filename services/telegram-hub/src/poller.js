@@ -2,6 +2,24 @@ import { pool, getCarId } from './db.js';
 import { sendMessage, escapeHtml } from './telegram.js';
 import { getState, setState } from './state.js';
 import { formatDur } from './format.js';
+import { getUsersWithFeature } from './auth.js';
+
+// 'car' feature 권한자 전원에게 발송 (root + 권한 부여된 user).
+async function broadcast(text) {
+  let recipients = [];
+  try {
+    recipients = await getUsersWithFeature('car');
+  } catch (e) {
+    console.error('[poller] recipients lookup failed', e.message);
+  }
+  if (!recipients.length && process.env.TELEGRAM_CHAT_ID) {
+    // 부트스트랩 직후 등 — 아직 hub_users 비어 있을 때 root 직접 발송.
+    recipients = [String(process.env.TELEGRAM_CHAT_ID)];
+  }
+  for (const r of recipients) {
+    try { await sendMessage(text, r); } catch (e) { console.error('[poller] send', e.message); }
+  }
+}
 
 const INTERVAL_MS = Number(process.env.DB_POLL_MS || 5000);
 const KWH_PER_KM = 0.150;
@@ -71,7 +89,7 @@ async function checkChargeStart(carId) {
   for (const r of rows) {
     const where = r.geo_name || r.addr_name || '알 수 없음';
     const soc = r.start_battery_level != null ? ` (${r.start_battery_level}%부터)` : '';
-    await sendMessage(`⚡ <b>충전 시작</b>${soc}\n📍 ${escapeHtml(where)}`);
+    await broadcast(`⚡ <b>충전 시작</b>${soc}\n📍 ${escapeHtml(where)}`);
     setState({ last_charge_start_id: Number(r.id) });
   }
 }
@@ -96,7 +114,7 @@ async function checkChargeEnd(carId) {
     const socPart = (r.start_battery_level != null && r.end_battery_level != null)
       ? ` ${r.start_battery_level}% → ${r.end_battery_level}%`
       : '';
-    await sendMessage([
+    await broadcast([
       `✅ <b>충전 완료</b>${socPart}`,
       `⚡ ${kwh} kWh · ${dur}`,
       `📍 ${escapeHtml(where)}`,
@@ -135,7 +153,7 @@ async function checkDriveEnd(carId) {
     const kwh = Math.max(0, rangeUsed * KWH_PER_KM);
     const eff = km > 0 ? (kwh * 1000) / km : 0;
     const effPart = eff > 0 ? ` · ${eff.toFixed(0)} Wh/km` : '';
-    await sendMessage([
+    await broadcast([
       '🚗 <b>주행 종료</b>',
       `${escapeHtml(start)} → ${escapeHtml(end)}`,
       `${km.toFixed(1)} km · ${dur}${effPart}`,

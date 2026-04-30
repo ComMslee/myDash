@@ -1,20 +1,48 @@
 import { pool, getCarId } from './db.js';
 import { sendMessage, sendLocation, escapeHtml } from './telegram.js';
 import { formatKst } from './format.js';
+import {
+  ensureAuthSchema,
+  getUser, upsertPending, setRole,
+  listPending, listAllUsers, getRoots,
+  hasPermission, grantPermission, revokePermission,
+} from './auth.js';
 
-// ── 자연어 라우팅 패턴 ─────────────────────────────────
-// 첫 매칭 승. /cmd 보다 후순위.
+// ── 명령 카탈로그 ─────────────────────────────────────
+// open: 누구나 (등록 안 된 사람도 가능)
+// rootOnly: root 만
+// feature: 'car' / 'sns' 등 — user 는 해당 권한 보유 시만
+const COMMANDS = {
+  '/help':      { open: true,     handler: cmdHelp },
+  '/start':     { open: true,     handler: cmdStart },
+  '/whoami':    { open: true,     handler: cmdWhoami },
+  '/soc':       { feature: 'car', handler: cmdSoc },
+  '/today':     { feature: 'car', handler: cmdToday },
+  '/where':     { feature: 'car', handler: cmdWhere },
+  // 운영
+  '/pending':   { rootOnly: true, handler: cmdPending },
+  '/approve':   { rootOnly: true, handler: cmdApprove },
+  '/deny':      { rootOnly: true, handler: cmdDeny },
+  '/grant':     { rootOnly: true, handler: cmdGrant },
+  '/revoke':    { rootOnly: true, handler: cmdRevoke },
+  '/users':     { rootOnly: true, handler: cmdUsers },
+  '/unmatched': { rootOnly: true, handler: cmdUnmatched },
+  '/topnope':   { rootOnly: true, handler: cmdTopNope },
+  '/resolve':   { rootOnly: true, handler: cmdResolve },
+};
+
+// ── 자연어 라우팅 (feature 태그 포함) ─────────────────
 const NL_PATTERNS = [
-  { name: 'soc',   re: /(배터리|충전.*상태|soc|몇\s*%|얼마나.*남|남은|잔량)/i,                      handler: cmdSoc   },
-  { name: 'today', re: /(오늘|today|얼마나.*달렸|오늘.*주행|오늘.*충전|운행.*기록)/i,             handler: cmdToday },
-  { name: 'where', re: /(어디|위치|where|지도|location|어디야|어디에)/i,                            handler: cmdWhere },
-  { name: 'help',  re: /(도움말|help|뭐\s*할|어떻게.*써|명령.*뭐|기능.*뭐)/i,                         handler: cmdHelp  },
+  { feature: 'car', re: /(배터리|충전.*상태|soc|몇\s*%|얼마나.*남|남은|잔량)/i,                 handler: cmdSoc   },
+  { feature: 'car', re: /(오늘|today|얼마나.*달렸|오늘.*주행|오늘.*충전|운행.*기록)/i,        handler: cmdToday },
+  { feature: 'car', re: /(어디|위치|where|지도|location|어디야|어디에)/i,                       handler: cmdWhere },
+  { feature: null,  re: /(도움말|help|뭐\s*할|어떻게.*써|명령.*뭐|기능.*뭐)/i,                    handler: cmdHelp  },
 ];
 
-// hub_unmatched_inputs 스키마 idempotent 생성 (첫 호출 시).
-let _schemaReady = false;
-async function ensureSchema() {
-  if (_schemaReady) return;
+// hub_unmatched_inputs 스키마.
+let _unmatchedSchemaReady = false;
+async function ensureUnmatchedSchema() {
+  if (_unmatchedSchemaReady) return;
   await pool.query(`
     CREATE TABLE IF NOT EXISTS hub_unmatched_inputs (
       id               SERIAL PRIMARY KEY,
@@ -28,43 +56,79 @@ async function ensureSchema() {
     CREATE INDEX IF NOT EXISTS idx_hub_unmatched_resolved_ts
       ON hub_unmatched_inputs (resolved, ts DESC);
   `);
-  _schemaReady = true;
+  _unmatchedSchemaReady = true;
 }
 
-export async function handleCommand(text, chatId) {
-  const t = (text || '').trim();
-  if (!t) return;
+// ── 진입점 ────────────────────────────────────────────
+export async function handleMessage(message) {
+  const chatId = String(message.chat?.id);
+  const text = message.text || '';
+  if (!chatId || !text) return;
+
+  await ensureAuthSchema();
+  let user = await getUser(chatId);
+
+  // 미등록 → pending 으로 등록 + root 알림.
+  if (!user) {
+    const name = [message.from?.first_name, message.from?.last_name].filter(Boolean).join(' ') || null;
+    await upsertPending(chatId, name);
+    await notifyRoots(
+      `🔔 신규 가입 신청\n#${chatId} ${escapeHtml(name || '(이름 없음)')}\n승인: <code>/approve ${chatId}</code>`,
+    );
+    return sendMessage(
+      '👋 가입 신청이 접수됐습니다.\n관리자 승인 후 사용 가능해요.',
+      chatId,
+    );
+  }
+  if (user.role === 'denied') return; // silent
+  if (user.role === 'pending') {
+    return sendMessage('⏳ 아직 승인 대기 중입니다. 관리자가 승인하면 알려드릴게요.', chatId);
+  }
+
+  const t = text.trim();
 
   // 1) /cmd
   if (t.startsWith('/')) {
     const head = t.split(/\s+/)[0].toLowerCase().split('@')[0];
     const args = t.slice(head.length).trim();
-    switch (head) {
-      case '/start':
-      case '/help':       return cmdHelp(chatId);
-      case '/soc':        return cmdSoc(chatId);
-      case '/today':      return cmdToday(chatId);
-      case '/where':      return cmdWhere(chatId);
-      case '/unmatched':  return cmdUnmatched(chatId);
-      case '/topnope':    return cmdTopNope(chatId);
-      case '/resolve':    return cmdResolve(args, chatId);
-      default:
-        return logAndPunt(t, chatId, head);
+    const meta = COMMANDS[head];
+    if (!meta) return logAndPunt(chatId, t, head);
+
+    if (!meta.open) {
+      if (meta.rootOnly && user.role !== 'root') {
+        return sendMessage('🔒 관리자 전용 명령입니다.', chatId);
+      }
+      if (meta.feature && !(await hasPermission(chatId, meta.feature))) {
+        return sendMessage(`🔒 이 명령은 '${meta.feature}' 권한이 필요해요.\n관리자에게 요청하세요.`, chatId);
+      }
     }
+    return meta.handler({ chatId, args, user });
   }
 
   // 2) NL 패턴
   for (const p of NL_PATTERNS) {
-    if (p.re.test(t)) return p.handler(chatId);
+    if (p.re.test(t)) {
+      if (p.feature && !(await hasPermission(chatId, p.feature))) {
+        return sendMessage(`🔒 '${p.feature}' 권한이 필요해요.`, chatId);
+      }
+      return p.handler({ chatId, args: '', user });
+    }
   }
 
   // 3) 미해결 — 로그 + 폴백
-  return logAndPunt(t, chatId, null);
+  return logAndPunt(chatId, t, null);
 }
 
-async function logAndPunt(text, chatId, slashHead) {
+async function notifyRoots(text) {
+  const roots = await getRoots();
+  for (const r of roots) {
+    try { await sendMessage(text, r); } catch (e) { console.error('[notify root]', e.message); }
+  }
+}
+
+async function logAndPunt(chatId, text, slashHead) {
   try {
-    await ensureSchema();
+    await ensureUnmatchedSchema();
     await pool.query(
       `INSERT INTO hub_unmatched_inputs (chat_id, text) VALUES ($1, $2)`,
       [chatId, text],
@@ -75,31 +139,59 @@ async function logAndPunt(text, chatId, slashHead) {
   const head = slashHead
     ? `알 수 없는 명령: ${escapeHtml(slashHead)}`
     : '잘 모르겠어요.';
-  return sendMessage(
-    `${head}\n/help 보기 · /unmatched 로 누적 표현 확인`,
-    chatId,
-  );
+  return sendMessage(`${head}\n/help 보기`, chatId);
 }
 
-async function cmdHelp(chatId) {
+// ── 핸들러 ────────────────────────────────────────────
+
+async function cmdStart({ chatId }) {
+  return cmdHelp({ chatId });
+}
+
+async function cmdHelp({ chatId, user }) {
+  const u = user || await getUser(chatId);
+  const role = u?.role || 'pending';
+  const isRoot = role === 'root';
+  const lines = ['<b>Ye\'s Home 봇</b>', ''];
+  if (await hasPermission(chatId, 'car')) {
+    lines.push('<b>차</b>');
+    lines.push('/soc — 배터리 % + 충전 여부');
+    lines.push('/today — 오늘 (KST) 주행/충전');
+    lines.push('/where — 현재 위치');
+    lines.push('');
+  }
+  lines.push('<b>공통</b>');
+  lines.push('/whoami — 내 권한');
+  lines.push('/help — 이 도움말');
+  if (isRoot) {
+    lines.push('');
+    lines.push('<b>관리자</b>');
+    lines.push('/pending /approve /deny /grant /revoke /users');
+    lines.push('/unmatched /topnope /resolve');
+  }
+  lines.push('');
+  lines.push('<i>자연어 일부 지원</i> (예: "오늘 얼마나 달렸어?")');
+  return sendMessage(lines.join('\n'), chatId);
+}
+
+async function cmdWhoami({ chatId, user }) {
+  const u = user || await getUser(chatId);
+  if (!u) return sendMessage('등록 안 됨', chatId);
+  const { rows } = await pool.query(
+    "SELECT feature FROM hub_permissions WHERE chat_id = $1 ORDER BY feature",
+    [chatId],
+  );
+  const feats = rows.map((r) => r.feature).join(', ') || '없음';
   return sendMessage([
-    '<b>Ye\'s Home 봇</b>',
-    '',
-    '<b>데이터</b>',
-    '/soc — 현재 배터리 % + 충전 여부',
-    '/today — 오늘 (KST) 주행/충전 요약',
-    '/where — 현재 위치 (지도 핀)',
-    '',
-    '<b>운영</b>',
-    '/unmatched — 미해결 입력 누적',
-    '/topnope — 자주 못 알아들은 표현 TOP 5',
-    '/resolve 1,2,3 — 해당 ID 해결 처리',
-    '',
-    '<i>자연어도 일부 지원</i> (예: "오늘 얼마나 달렸어?", "배터리 얼마나 남았어?")',
+    `<b>내 정보</b>`,
+    `chat_id: <code>${chatId}</code>`,
+    `이름: ${escapeHtml(u.name || '-')}`,
+    `역할: ${u.role}`,
+    `권한: ${feats}`,
   ].join('\n'), chatId);
 }
 
-async function cmdSoc(chatId) {
+async function cmdSoc({ chatId }) {
   const carId = await getCarId();
   if (!carId) return sendMessage('차량 정보 없음', chatId);
 
@@ -135,12 +227,10 @@ async function cmdSoc(chatId) {
   return sendMessage(lines.join('\n'), chatId);
 }
 
-async function cmdToday(chatId) {
+async function cmdToday({ chatId }) {
   const carId = await getCarId();
   if (!carId) return sendMessage('차량 정보 없음', chatId);
 
-  // KST 자정의 UTC 시각 — TeslaMate start_date 가 timestamp(no tz, UTC 값) 이라
-  // 세션 타임존에 의존하지 않게 JS 에서 계산해서 파라미터로 전달.
   const KST_OFFSET_MS = 9 * 3600 * 1000;
   const nowKst = new Date(Date.now() + KST_OFFSET_MS);
   const todayStart = new Date(Date.UTC(
@@ -174,7 +264,7 @@ async function cmdToday(chatId) {
   return sendMessage(lines.join('\n'), chatId);
 }
 
-async function cmdWhere(chatId) {
+async function cmdWhere({ chatId }) {
   const carId = await getCarId();
   if (!carId) return sendMessage('차량 정보 없음', chatId);
 
@@ -196,27 +286,93 @@ async function cmdWhere(chatId) {
   return sendLocation(p.lat, p.lng, chatId);
 }
 
-async function cmdUnmatched(chatId) {
-  await ensureSchema();
-  const { rows } = await pool.query(
-    `SELECT id, ts, text FROM hub_unmatched_inputs
-     WHERE resolved = false
-     ORDER BY ts DESC LIMIT 20`,
-  );
-  if (!rows.length) {
-    return sendMessage('미해결 입력 없음 ✨', chatId);
-  }
-  const lines = ['<b>📋 미해결 (최근 20)</b>'];
+// ── 운영 명령 (root) ─────────────────────────────────
+
+async function cmdPending({ chatId }) {
+  const rows = await listPending();
+  if (!rows.length) return sendMessage('가입 대기 없음 ✨', chatId);
+  const lines = ['<b>📋 가입 대기</b>'];
   for (const r of rows) {
-    lines.push(`#${r.id} · ${formatKst(r.ts)} · ${escapeHtml(r.text).slice(0, 60)}`);
+    lines.push(`#${r.chat_id} · ${escapeHtml(r.name || '-')} · ${formatKst(r.registered_at)}`);
   }
   lines.push('');
-  lines.push('<i>패턴 추가 후 /resolve 1,2,3 으로 정리</i>');
+  lines.push('<i>승인: /approve &lt;chat_id&gt;</i>');
+  lines.push('<i>거부: /deny &lt;chat_id&gt;</i>');
   return sendMessage(lines.join('\n'), chatId);
 }
 
-async function cmdTopNope(chatId) {
-  await ensureSchema();
+async function cmdApprove({ chatId, args, user }) {
+  const target = (args || '').split(/\s+/)[0];
+  if (!/^\d+$/.test(target)) return sendMessage('사용법: /approve <chat_id>', chatId);
+  const ok = await setRole(target, 'user', user.chat_id);
+  if (!ok) return sendMessage(`#${target} 없음`, chatId);
+  await sendMessage(`✅ #${target} 승인 완료. 권한 부여: <code>/grant ${target} car</code>`, chatId);
+  // 당사자에게 알림
+  try {
+    await sendMessage('✅ 가입 승인됐습니다. 관리자가 권한을 추가할 때까지 일부 명령은 막혀 있을 수 있어요.\n/help 로 사용 가능 확인.', target);
+  } catch {}
+}
+
+async function cmdDeny({ chatId, args, user }) {
+  const target = (args || '').split(/\s+/)[0];
+  if (!/^\d+$/.test(target)) return sendMessage('사용법: /deny <chat_id>', chatId);
+  const ok = await setRole(target, 'denied', user.chat_id);
+  if (!ok) return sendMessage(`#${target} 없음`, chatId);
+  return sendMessage(`🚫 #${target} 거부됨`, chatId);
+}
+
+async function cmdGrant({ chatId, args, user }) {
+  const [target, feature] = (args || '').split(/\s+/);
+  if (!/^\d+$/.test(target) || !feature) {
+    return sendMessage('사용법: /grant <chat_id> <feature>\n예: /grant 1234567890 car', chatId);
+  }
+  const ok = await grantPermission(target, feature, user.chat_id);
+  if (!ok) return sendMessage(`#${target} 없거나 승인 안 됨`, chatId);
+  await sendMessage(`✅ #${target} 에게 '${feature}' 권한 부여`, chatId);
+  try {
+    await sendMessage(`🎁 '${feature}' 권한이 부여됐어요. /help 확인.`, target);
+  } catch {}
+}
+
+async function cmdRevoke({ chatId, args }) {
+  const [target, feature] = (args || '').split(/\s+/);
+  if (!/^\d+$/.test(target) || !feature) {
+    return sendMessage('사용법: /revoke <chat_id> <feature>', chatId);
+  }
+  const ok = await revokePermission(target, feature);
+  return sendMessage(ok ? `🗑 #${target} '${feature}' 회수` : '권한 없음', chatId);
+}
+
+async function cmdUsers({ chatId }) {
+  const rows = await listAllUsers();
+  if (!rows.length) return sendMessage('사용자 없음', chatId);
+  const lines = ['<b>👥 사용자</b>'];
+  for (const r of rows) {
+    const feats = r.features.length ? r.features.join(',') : '-';
+    lines.push(`[${r.role}] #${r.chat_id} ${escapeHtml(r.name || '-')} · ${feats}`);
+  }
+  return sendMessage(lines.join('\n'), chatId);
+}
+
+async function cmdUnmatched({ chatId }) {
+  await ensureUnmatchedSchema();
+  const { rows } = await pool.query(
+    `SELECT id, ts, text, chat_id::text FROM hub_unmatched_inputs
+     WHERE resolved = false
+     ORDER BY ts DESC LIMIT 20`,
+  );
+  if (!rows.length) return sendMessage('미해결 입력 없음 ✨', chatId);
+  const lines = ['<b>📋 미해결 (최근 20)</b>'];
+  for (const r of rows) {
+    lines.push(`#${r.id} · ${formatKst(r.ts)} · #${r.chat_id} · ${escapeHtml(r.text).slice(0, 60)}`);
+  }
+  lines.push('');
+  lines.push('<i>패턴 추가 후 /resolve 1,2,3</i>');
+  return sendMessage(lines.join('\n'), chatId);
+}
+
+async function cmdTopNope({ chatId }) {
+  await ensureUnmatchedSchema();
   const { rows } = await pool.query(
     `SELECT lower(trim(text)) AS norm, COUNT(*)::int AS n
      FROM hub_unmatched_inputs
@@ -225,9 +381,7 @@ async function cmdTopNope(chatId) {
      ORDER BY n DESC, MAX(ts) DESC
      LIMIT 5`,
   );
-  if (!rows.length) {
-    return sendMessage('미해결 입력 없음 ✨', chatId);
-  }
+  if (!rows.length) return sendMessage('미해결 입력 없음 ✨', chatId);
   const lines = ['<b>🔝 자주 못 알아들은 표현 TOP 5</b>'];
   for (const r of rows) {
     lines.push(`× ${r.n}  ${escapeHtml(r.norm).slice(0, 60)}`);
@@ -235,15 +389,13 @@ async function cmdTopNope(chatId) {
   return sendMessage(lines.join('\n'), chatId);
 }
 
-async function cmdResolve(args, chatId) {
-  await ensureSchema();
+async function cmdResolve({ chatId, args }) {
+  await ensureUnmatchedSchema();
   const ids = String(args || '')
     .split(/[\s,]+/)
     .map((s) => parseInt(s, 10))
     .filter((n) => Number.isFinite(n) && n > 0);
-  if (!ids.length) {
-    return sendMessage('사용법: /resolve 1,2,3', chatId);
-  }
+  if (!ids.length) return sendMessage('사용법: /resolve 1,2,3', chatId);
   const { rowCount } = await pool.query(
     `UPDATE hub_unmatched_inputs
      SET resolved=true, resolved_at=NOW()

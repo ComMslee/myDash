@@ -1,8 +1,6 @@
 import { getUpdates } from './telegram.js';
-import { handleCommand } from './commands.js';
+import { handleMessage } from './commands.js';
 import { getState, setState } from './state.js';
-
-const ALLOWED_CHAT = String(process.env.TELEGRAM_CHAT_ID || '');
 
 export function startTelegramPoller() {
   loop().catch((e) => console.error('[tg-poller] fatal', e));
@@ -16,10 +14,7 @@ async function loop() {
       for (const u of updates) {
         const next = u.update_id + 1;
         try {
-          const m = u.message;
-          if (m && m.text && String(m.chat?.id) === ALLOWED_CHAT) {
-            await handleCommand(m.text, m.chat.id);
-          }
+          if (u.message) await handleMessage(u.message);
         } catch (e) {
           console.error('[tg-poller] handler error', e);
         } finally {
