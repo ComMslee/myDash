@@ -13,6 +13,7 @@ import {
 import { getCategories, categoryByKey, labelOf } from './categories.js';
 import { listUserGroups, applyUserGroup } from './user_groups.js';
 import { dashGet, dashPost } from './dash.js';
+import { setPending, getPending, clearPending } from './pending.js';
 
 // ── 명령 카탈로그 ─────────────────────────────────────
 // open: 누구나 (등록 안 된 사람도 가능)
@@ -69,8 +70,11 @@ async function ensureUnmatchedSchema() {
 // ── 진입점 ────────────────────────────────────────────
 export async function handleMessage(message) {
   const chatId = String(message.chat?.id);
-  const text = message.text || '';
-  if (!chatId || !text) return;
+  // 텍스트 없는 메시지(사진/문서/스티커 등) 도 일단 받음 — 다단계 입력에서
+  // 본문 사진 첨부 케이스를 처리해야 하므로. text 비어있으면 caption 으로 폴백.
+  const text = message.text || message.caption || '';
+  const hasPhoto = Array.isArray(message.photo) && message.photo.length > 0;
+  if (!chatId || (!text && !hasPhoto)) return;
 
   await ensureAuthSchema();
   let user = await getUser(chatId);
@@ -111,6 +115,14 @@ export async function handleMessage(message) {
   if (user.role === 'denied') return; // silent
   if (user.role === 'pending') {
     return sendMessage('⏳ 아직 승인 대기 중입니다. 관리자가 승인하면 알려드릴게요.', chatId);
+  }
+
+  // 0) 다단계 대화 진행 중인지 — pending 액션 우선 처리.
+  //    텍스트/사진/사진+캡션 모두 받음.
+  const pending = getPending(chatId);
+  if (pending) {
+    const handled = await handlePendingMessage(chatId, message, pending, user);
+    if (handled) return;
   }
 
   let t = text.trim();
@@ -192,6 +204,13 @@ export async function handleCallback(cb) {
   const user = await getUser(chatId);
   if (!user || user.role === 'denied' || user.role === 'pending') return;
 
+  // sns:<action> — 글쓰기 다단계 대화 inline 버튼.
+  if (data.startsWith('sns:')) {
+    if (!(await hasPermission(chatId, 'sns'))) return;
+    return handleSnsCallback(chatId, data.slice(4), user);
+  }
+
+  // cmd:<name> — 데이터 명령 후속 액션.
   const m = data.match(/^cmd:([a-z]+)$/);
   if (!m) return;
   const fn = CB_ROUTES[m[1]];
@@ -200,6 +219,134 @@ export async function handleCallback(cb) {
   // 데이터 명령 = car feature 권한 필요.
   if (!(await hasPermission(chatId, 'car'))) return;
   return fn({ chatId, args: '', user });
+}
+
+// SNS 글쓰기 다단계 대화 — pending 상태 + 사용자 액션 분기.
+async function handleSnsCallback(chatId, action, user) {
+  if (action === 'cancel') {
+    clearPending(chatId);
+    return sendMessage('❌ 글쓰기를 취소했어요.', chatId);
+  }
+  if (action === 'edit') {
+    setPending(chatId, 'sns:body');
+    return sendMessage(
+      '✏️ 다시 본문/사진을 보내주세요. (5분 안)',
+      chatId,
+      snsCancelKeyboard(),
+    );
+  }
+  if (action === 'publish') {
+    const p = getPending(chatId);
+    if (!p || p.action !== 'sns:confirm') {
+      return sendMessage('⏰ 입력 시간이 지났어요. 다시 시도해 주세요.', chatId);
+    }
+    const r = await dashPost('/api/sns/blog', {
+      platform: 'naver',
+      body: p.data.body || '',
+      photos: p.data.photos || [],
+      chat_id: chatId,
+      user_name: user?.name || null,
+    });
+    clearPending(chatId);
+    if (r?.ok) {
+      return sendMessage(
+        [
+          '✅ 서버 전달 확인됨 (mock)',
+          '',
+          `<i>요청 ID: ${escapeHtml(r.request_id || '-')}</i>`,
+          '<i>실제 발행은 후속 PR에서 추가됩니다.</i>',
+        ].join('\n'),
+        chatId,
+      );
+    }
+    return sendMessage(
+      `❌ 서버 전달 실패\n<i>${escapeHtml(r?.error || 'unknown')}</i>`,
+      chatId,
+    );
+  }
+}
+
+// 글쓰기 진입/수정 단계용 inline 키보드 ([❌ 취소] 만).
+function snsCancelKeyboard() {
+  return {
+    reply_markup: {
+      inline_keyboard: [[{ text: '❌ 취소', callback_data: 'sns:cancel' }]],
+    },
+  };
+}
+
+// 글쓰기 미리보기 단계용 inline 키보드 ([✅ 발행] [✏️ 수정] [❌ 취소]).
+function snsConfirmKeyboard() {
+  return {
+    reply_markup: {
+      inline_keyboard: [[
+        { text: '✅ 발행', callback_data: 'sns:publish' },
+        { text: '✏️ 수정', callback_data: 'sns:edit' },
+        { text: '❌ 취소', callback_data: 'sns:cancel' },
+      ]],
+    },
+  };
+}
+
+// pending 액션 진행 중인 사용자 메시지 처리.
+// 반환: true = 처리됨(상위 흐름 중단), false = 처리 안 됨(상위 흐름 계속).
+async function handlePendingMessage(chatId, message, pending, user) {
+  if (pending.action !== 'sns:body') return false;
+
+  const text = (message.text || message.caption || '').trim();
+  // 한글 라벨 매핑 — 다단계 중 다른 카테고리 버튼 누르는 케이스.
+  const mapped = BUTTON_TO_CMD[text];
+  // 명시적 명령 / 메인복귀 / 다른 카테고리 라벨이면 pending 취소하고 통과.
+  if (
+    text === NAV_HOME ||
+    (await categoryByLabel(text)) ||
+    text.startsWith('/') ||
+    mapped
+  ) {
+    clearPending(chatId);
+    return false; // 상위 흐름이 처리하도록 통과.
+  }
+
+  // 본문/사진 받기.
+  const body = text;
+  const photos = Array.isArray(message.photo) && message.photo.length
+    ? [{
+        file_id: message.photo[message.photo.length - 1].file_id,
+        width:   message.photo[message.photo.length - 1].width || null,
+        height:  message.photo[message.photo.length - 1].height || null,
+      }]
+    : [];
+
+  if (!body && !photos.length) {
+    return sendMessage(
+      '본문 또는 사진을 보내주세요. 둘 다 가능합니다.',
+      chatId,
+      snsCancelKeyboard(),
+    ).then(() => true);
+  }
+
+  // 미리보기 데이터 저장 — 발행 단계에서 사용.
+  setPending(chatId, 'sns:confirm', { body, photos });
+
+  // 정리된 미리보기 표시.
+  const lines = [
+    '📝 <b>발행 미리보기</b>',
+    '',
+    `<b>플랫폼</b>: 네이버 블로그`,
+  ];
+  if (body) {
+    lines.push(`<b>본문</b> (${body.length}자):`);
+    lines.push(`<code>${escapeHtml(body.slice(0, 500))}${body.length > 500 ? '…' : ''}</code>`);
+  }
+  if (photos.length) {
+    lines.push(`<b>사진</b>: ${photos.length}장 첨부`);
+    lines.push(`<i>file_id: ${escapeHtml(photos[0].file_id.slice(0, 30))}…</i>`);
+  }
+  lines.push('');
+  lines.push('<i>발행하시려면 아래 버튼을 눌러주세요.</i>');
+
+  await sendMessage(lines.join('\n'), chatId, snsConfirmKeyboard());
+  return true;
 }
 
 async function notifyRoots(text) {
@@ -600,48 +747,37 @@ async function cmdMemo({ chatId }) {
 }
 
 // ── SNS (mock) ───────────────────────────────────────
-// 현재는 hub→dashboard 채널 검증용. 실제 블로그 발행 X.
-// 사용: /post <본문> — 본문 없으면 사용법 안내.
+// 다단계 대화: cmdPost → pending 'sns:body' → 사용자 메시지(텍스트/사진/사진+캡션)
+// → handlePendingMessage 가 미리보기 표시 + pending 'sns:confirm' → [✅ 발행] inline
+// → handleSnsCallback('publish') 가 dashboard POST + clearPending.
+// 인자 있으면 즉시 본문 입력으로 간주 — 한 줄 발행 단축 (사진은 다음 메시지로 보낼 수 없음).
 async function cmdPost({ chatId, args, user }) {
   const body = (args || '').trim();
   if (!body) {
+    setPending(chatId, 'sns:body');
     return sendMessage(
       [
         '📝 <b>블로그 글쓰기</b> (mock)',
         '',
-        '사용법: <code>/post 본문 내용</code>',
-        '예: <code>/post 오늘 모델Y 출고함. 가속 미쳤음</code>',
-        '',
-        '<i>현재는 서버 전달 확인용. 실제 발행은 아직 안 돼요.</i>',
+        '본문을 보내주세요. 사진도 첨부 가능합니다.',
+        '<i>(텍스트만 / 사진만 / 사진+캡션 모두 OK · 5분 안)</i>',
       ].join('\n'),
       chatId,
+      snsCancelKeyboard(),
     );
   }
-  const r = await dashPost('/api/sns/blog', {
-    platform: 'naver',
-    body,
-    chat_id: chatId,
-    user_name: user?.name || null,
-  });
-  if (r?.ok) {
-    return sendMessage(
-      [
-        '✅ 서버 전달 확인됨 (mock)',
-        '',
-        `<b>플랫폼</b>: 네이버 블로그`,
-        `<b>본문</b> (${body.length}자):`,
-        `<code>${escapeHtml(body.slice(0, 200))}${body.length > 200 ? '…' : ''}</code>`,
-        '',
-        `<i>요청 ID: ${escapeHtml(r.request_id || '-')}</i>`,
-        '<i>실제 발행 기능은 다음 단계에서 추가됩니다.</i>',
-      ].join('\n'),
-      chatId,
-    );
-  }
-  return sendMessage(
-    `❌ 서버 전달 실패\n<i>${escapeHtml(r?.error || 'unknown')}</i>`,
-    chatId,
-  );
+  // 인자로 들어온 단축 모드 — 즉시 미리보기 단계로.
+  setPending(chatId, 'sns:confirm', { body, photos: [] });
+  const lines = [
+    '📝 <b>발행 미리보기</b>',
+    '',
+    `<b>플랫폼</b>: 네이버 블로그`,
+    `<b>본문</b> (${body.length}자):`,
+    `<code>${escapeHtml(body.slice(0, 500))}${body.length > 500 ? '…' : ''}</code>`,
+    '',
+    '<i>발행하시려면 아래 버튼을 눌러주세요.</i>',
+  ];
+  return sendMessage(lines.join('\n'), chatId, snsConfirmKeyboard());
 }
 
 // ── 운영 명령 (root) ─────────────────────────────────

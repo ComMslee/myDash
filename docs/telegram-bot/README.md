@@ -151,9 +151,25 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 
 | 명령 | 버튼 | 설명 | 호출 API |
 |---|---|---|---|
-| `/post <본문>` | 📝 글쓰기 | 네이버 블로그 발행 (mock — 채널 검증용) | `POST /api/sns/blog` |
+| `/post [본문]` | 📝 글쓰기 | 네이버 블로그 발행 다단계 대화 (mock — 채널 검증용) | `POST /api/sns/blog` |
 
-`/api/sns/blog` 는 현재 받기만 하고 콘솔 로그 + `request_id` 반환. 실제 OAuth/발행은 후속 PR.
+**다단계 대화 흐름** (`pending.js` + `handlePendingMessage` + `handleSnsCallback`):
+
+```
+[📝 글쓰기] 또는 /post (인자 없이)
+  ↓ pending 'sns:body' + [❌ 취소] inline
+사용자 메시지 (텍스트 / 사진 / 사진+캡션 — 5분 안)
+  ↓ pending 'sns:confirm' 으로 전환
+📝 발행 미리보기 — 본문 + 사진 흔적
+  + [✅ 발행] [✏️ 수정] [❌ 취소] inline
+  ↓ [✅ 발행] 누름
+POST /api/sns/blog → ✅ 서버 전달 확인됨 (mock)
+```
+
+- 사진은 `message.photo` 의 가장 큰 해상도 `file_id` 만 추적. 실제 다운로드/리업로드는 후속 PR.
+- `/post 한 줄 본문` 형태로 인자 직접 입력 시 미리보기 단계로 단축.
+- 다단계 중에 메인 카테고리 라벨(예: `🚗 차량`) 이나 슬래시 명령 보내면 자동 취소.
+- `/api/sns/blog` 는 현재 받기만 하고 콘솔 로그 + `request_id` 반환. 실제 OAuth/발행은 후속 PR.
 
 ### 공통 (누구나)
 

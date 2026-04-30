@@ -21,6 +21,7 @@ export async function POST(req) {
 
   const platform = String(payload?.platform || '').toLowerCase();
   const body = String(payload?.body || '').trim();
+  const photos = Array.isArray(payload?.photos) ? payload.photos : [];
 
   if (platform !== 'naver') {
     return Response.json(
@@ -28,8 +29,9 @@ export async function POST(req) {
       { status: 400 },
     );
   }
-  if (!body) {
-    return Response.json({ ok: false, error: 'empty_body' }, { status: 400 });
+  // 본문 또는 사진 중 하나는 있어야 함.
+  if (!body && !photos.length) {
+    return Response.json({ ok: false, error: 'empty_body_and_photos' }, { status: 400 });
   }
 
   const requestId = `mock-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -44,6 +46,7 @@ export async function POST(req) {
       chat_id: payload.chat_id || null,
       user_name: payload.user_name || null,
       body_len: body.length,
+      photos: photos.length,
       preview: body.slice(0, 80),
     }),
   );
@@ -54,6 +57,7 @@ export async function POST(req) {
     accepted_at: acceptedAt,
     platform,
     body_len: body.length,
+    photos: photos.length,
     note: 'mock — 실제 발행은 후속 PR. 채널 검증용.',
   });
 }
