@@ -571,15 +571,22 @@ async function cmdSoc({ chatId }) {
   if (car.battery_level == null) return sendMessage('포지션 데이터 없음', chatId);
 
   const usable = car.usable_battery_level != null && car.usable_battery_level !== car.battery_level
-    ? ` (사용가능 ${car.usable_battery_level}%)`
+    ? `  <i>(사용가능 ${car.usable_battery_level}%)</i>`
     : '';
-  const head1 = `🔋 <b>${car.battery_level}%</b>${usable}`;
   const rated = car.rated_battery_range;
   const est = car.est_battery_range;
-  const rangeStr = rated != null
-    ? ` · 🛣 <b>${rated} km</b>${est && est !== rated ? ` <i>(예상 ${est})</i>` : ''}`
-    : '';
-  const lines = [head1 + rangeStr];
+
+  // 1행: 배터리 % (큰 글씨)
+  // 2행: 거리 (rated · 예상)
+  // 3행~: 충전 상태
+  const lines = [
+    `🔋  <b>${car.battery_level}%</b>${usable}`,
+  ];
+  if (rated != null) {
+    const estPart = est && est !== rated ? `  <i>(예상 ${est} km)</i>` : '';
+    lines.push(`🛣  <b>${rated} km</b> 남음${estPart}`);
+  }
+  lines.push(''); // 충전 정보 사이 빈 줄
 
   if (ch?.charging) {
     const power = ch.charger_power != null ? Number(ch.charger_power).toFixed(1) : null;
@@ -588,20 +595,17 @@ async function cmdSoc({ chatId }) {
     const elapsedMin = ch.start_date
       ? Math.floor((Date.now() - new Date(ch.start_date).getTime()) / 60000)
       : null;
-    const fb = ch.fallback ? ' <i>(폴백 감지)</i>' : '';
-    lines.push(`⚡ <b>충전 중</b>${fb} — ${startSoc}% → <b>${car.battery_level}%</b>`);
-    const meta = [];
-    meta.push(`📥 ${kwh} kWh`);
+    const fb = ch.fallback ? ' <i>(폴백)</i>' : '';
+    lines.push(`⚡  <b>충전 중</b>${fb}  ${startSoc}% → <b>${car.battery_level}%</b>`);
+    const meta = [`📥 ${kwh} kWh`];
     if (power) meta.push(`${power} kW`);
     if (elapsedMin != null) meta.push(`${fmtElapsed(elapsedMin)} 경과`);
-    lines.push(meta.join(' · '));
+    lines.push(`<i>${meta.join(' · ')}</i>`);
   } else {
+    lines.push(`⚡  충전 중 아님`);
     const last = car.last_charge;
     if (last) {
-      lines.push(`⚡ 충전 중 아님`);
-      lines.push(`<i>마지막: ${formatKst(last.end_date)} · ${last.soc_start ?? '?'}% → ${last.soc_end ?? '?'}%</i>`);
-    } else {
-      lines.push('⚡ 충전 중 아님');
+      lines.push(`<i>마지막: ${formatKst(last.end_date)}  ${last.soc_start ?? '?'}% → ${last.soc_end ?? '?'}%</i>`);
     }
   }
 
@@ -678,13 +682,13 @@ async function cmdPeriod({ chatId }) {
   const lines = [
     '<b>📊 요약</b>',
     '',
-    fmt('today',           '오늘  '),
-    fmt('this_week',       '이번주'),
-    fmt('last_week',       '저번주'),
-    fmt('rolling_4w',      '이번달'),
-    fmt('prev_rolling_4w', '이전달'),
+    fmt('today',           '오늘   '),
+    fmt('this_week',       '이번주 '),
+    fmt('last_week',       '저번주 '),
+    fmt('rolling_4w',      '최근 4주'),
+    fmt('prev_rolling_4w', '직전 4주'),
     '',
-    '<i>이번달=최근 4주, 이전달=직전 4주</i>',
+    '<i>최근 4주 = 28일 롤링 (월초 빈약 회피)</i>',
     '<i>상세는 대시보드 /v2 에서</i>',
   ];
   return sendMessage(lines.join('\n'), chatId, followUp('period'));
