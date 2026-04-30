@@ -127,13 +127,12 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 
 | 명령 | 설명 | 호출 API |
 |---|---|---|
-| `/soc` | 배터리 % + 충전 상세 (충전 중이면 시작SOC→현재·kWh·kW·경과 / 아니면 마지막 충전 기록) | `/api/car` + `/api/charging-status` |
-| `/range` | 남은 주행거리 (rated/est) | `/api/car` |
-| `/today` | 오늘(KST) 주행/충전 요약 | `/api/summary?range=today` |
-| `/period` | 이번주·지난주·이번달 한 번에 (퀵뷰) | `/api/summary?range=multi` |
+| `/soc` | 배터리 % · 거리 · 충전 상세 (배터리·거리·충전 통합) | `/api/car` + `/api/charging-status` |
+| `/period` | 오늘·이번주·저번주·이번달·이전달 (km·전비) — 이번달=최근 4주 롤링 | `/api/summary?range=multi` |
 | `/where` | 현재 위치 — 정차/주행 통합 (지도 링크 + 핀) | `/api/parked` + `/api/location` |
-| `/chargers` | 즐겨찾기 충전기 가용/사용중 요약 (대시보드 캐시 우선) | `/api/home-charger` |
-| `/charge` `/yesterday` `/week` `/parked` | alias — `/charge→/soc`, `/yesterday`·`/week`→`/period`, `/parked`→`/where` | — |
+| `/places` | 자주가는 곳 / 오래머문 곳 TOP 3 (집·회사 제외) | `/api/frequent-places` + `/api/long-stay-places` |
+| `/chargers` | 즐겨찾기 충전기 가용/사용중 요약 (동별 그룹화) | `/api/home-charger/groups` |
+| alias | `/charge` `/range` `/battery` → `/soc`. `/today` `/yesterday` `/week` `/summary` → `/period`. `/parked` → `/where` | — |
 
 **퀵뷰 컨셉**: 봇은 한 화면에 들어오는 짧은 요약. 상세 통계·내역은 대시보드 `/v2/*` 에서.
 

@@ -30,7 +30,10 @@ export async function GET(request) {
     const weekStart     = new Date(todayStart.getTime() - 7  * 86400000);
     const prevWeekEnd   = new Date(weekStart);
     const prevWeekStart = new Date(todayStart.getTime() - 14 * 86400000);
-    const monthStart    = new Date(Date.UTC(ky, km, 1) - KST);
+    // 캘린더 '이번달' 은 월초 며칠은 빈약 → '최근 4주(28일)' 롤링 윈도로 보강.
+    const last4wStart   = new Date(todayStart.getTime() - 28 * 86400000);
+    const prev4wStart   = new Date(todayStart.getTime() - 56 * 86400000);
+    const prev4wEnd     = last4wStart;
 
     // 날짜 범위 WHERE 절 동적 구성 (recent_drives 용)
     let rangeClause = '';
@@ -53,11 +56,12 @@ export async function GET(request) {
     };
 
     // DB 레벨 SUM으로 각 기간 집계 (LIMIT 없이 정확한 값 보장)
-    const [todayResult, weekResult, prevWeekResult, monthResult, drivesResult] = await Promise.all([
+    const [todayResult, weekResult, prevWeekResult, last4wResult, prev4wResult, drivesResult] = await Promise.all([
       aggQuery(todayStart),
       aggQuery(weekStart),
       aggQuery(prevWeekStart, prevWeekEnd),
-      aggQuery(monthStart),
+      aggQuery(last4wStart),
+      aggQuery(prev4wStart, prev4wEnd),
       pool.query(
         `SELECT d.id, d.start_date, d.end_date, d.distance, d.duration_min,
                 d.start_rated_range_km, d.end_rated_range_km,
@@ -101,8 +105,11 @@ export async function GET(request) {
       week_energy_kwh:      toKwh(weekResult.rows[0].range_used),
       prev_week_distance:   parseFloat(prevWeekResult.rows[0].distance.toFixed(1)),
       prev_week_energy_kwh: toKwh(prevWeekResult.rows[0].range_used),
-      month_distance:       parseFloat(monthResult.rows[0].distance.toFixed(1)),
-      month_energy_kwh:     toKwh(monthResult.rows[0].range_used),
+      // '이번달' 은 캘린더가 아닌 최근 4주(28일) 롤링.
+      month_distance:       parseFloat(last4wResult.rows[0].distance.toFixed(1)),
+      month_energy_kwh:     toKwh(last4wResult.rows[0].range_used),
+      prev_month_distance:   parseFloat(prev4wResult.rows[0].distance.toFixed(1)),
+      prev_month_energy_kwh: toKwh(prev4wResult.rows[0].range_used),
       recent_drives: drives.map((d, i) => ({
         id: d.id,
         start_date: d.start_date,

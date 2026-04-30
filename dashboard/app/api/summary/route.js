@@ -59,16 +59,19 @@ function kstStartOfLastMonthUtc() {
 
 function rangeBounds(range, today) {
   switch (range) {
-    case 'today':      return [today, null];
-    case 'yesterday':  return [new Date(today.getTime() - 86_400_000), today];
-    case 'week':       return [new Date(today.getTime() - 6 * 86_400_000), null];
-    case 'this-week':  return [kstStartOfThisWeekUtc(), null];
+    case 'today':           return [today, null];
+    case 'yesterday':       return [new Date(today.getTime() - 86_400_000), today];
+    case 'week':            return [new Date(today.getTime() - 6 * 86_400_000), null];
+    case 'this-week':       return [kstStartOfThisWeekUtc(), null];
     case 'last-week': {
       const thisMon = kstStartOfThisWeekUtc();
       return [new Date(thisMon.getTime() - 7 * 86_400_000), thisMon];
     }
-    case 'month':      return [kstStartOfThisMonthUtc(), null];
-    case 'last-month': return [kstStartOfLastMonthUtc(), kstStartOfThisMonthUtc()];
+    case 'month':           return [kstStartOfThisMonthUtc(), null];
+    case 'last-month':      return [kstStartOfLastMonthUtc(), kstStartOfThisMonthUtc()];
+    // 캘린더 월은 월초 빈약 → 최근 4주(28일) 롤링 + 그 직전 4주.
+    case 'rolling-4w':      return [new Date(today.getTime() - 28 * 86_400_000), null];
+    case 'prev-rolling-4w': return [new Date(today.getTime() - 56 * 86_400_000), new Date(today.getTime() - 28 * 86_400_000)];
     default: return null;
   }
 }
@@ -119,12 +122,13 @@ export async function GET(req) {
     const today = kstStartOfTodayUtc();
 
     if (range === 'multi') {
-      const ranges = ['today', 'this-week', 'month', 'last-month'];
+      const ranges = ['today', 'this-week', 'last-week', 'rolling-4w', 'prev-rolling-4w'];
       const out = {};
       await Promise.all(ranges.map(async (r) => {
         const b = rangeBounds(r, today);
         if (!b) return;
-        out[r.replace('-', '_')] = await aggregateRange(car.id, b[0], b[1]);
+        // 키 변환: 'rolling-4w' → 'rolling_4w' 등 (단 prev-rolling-4w → prev_rolling_4w).
+        out[r.replace(/-/g, '_')] = await aggregateRange(car.id, b[0], b[1]);
       }));
       return Response.json({ range: 'multi', ...out });
     }

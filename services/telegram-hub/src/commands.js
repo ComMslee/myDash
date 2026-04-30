@@ -26,15 +26,17 @@ const COMMANDS = {
   '/categories':{ open: true,     handler: cmdCategories },
   '/soc':       { feature: 'car', handler: cmdSoc },
   '/charge':    { feature: 'car', handler: cmdSoc },        // alias — /soc 응답에 충전 상세 통합.
+  '/range':     { feature: 'car', handler: cmdSoc },        // alias — /soc 응답에 거리 통합.
+  '/battery':   { feature: 'car', handler: cmdSoc },        // alias.
   '/today':     { feature: 'car', handler: cmdPeriod },     // alias — /period 안에 오늘 포함.
   '/yesterday': { feature: 'car', handler: cmdPeriod },     // alias — 옛 슬래시 호환.
   '/week':      { feature: 'car', handler: cmdPeriod },     // alias.
   '/summary':   { feature: 'car', handler: cmdPeriod },     // alias.
   '/period':    { feature: 'car', handler: cmdPeriod },
-  '/range':     { feature: 'car', handler: cmdRange },
   '/parked':    { feature: 'car', handler: cmdWhere },      // alias — /where 와 통합.
   '/where':     { feature: 'car', handler: cmdWhere },
   '/chargers':  { feature: 'car', handler: cmdChargers },
+  '/places':    { feature: 'car', handler: cmdPlaces },
   // family — mock. 인터페이스 검증용 placeholder.
   '/weather':   { feature: 'family', handler: cmdWeather },
   '/forecast':  { feature: 'family', handler: cmdForecast },
@@ -190,10 +192,11 @@ export async function handleMessage(message) {
 // "새로고침" 또는 인접 명령 단축). 응답은 새 메시지로 보냄(stateless).
 // 향후 SNS 등 다단계 대화는 'sns:tw', 'post:confirm' 같은 prefix 로 확장.
 const CB_ROUTES = {
-  soc: cmdSoc, range: cmdRange,     // /charge 는 /soc 와 통합.
+  soc: cmdSoc,                       // /charge /range /battery 모두 alias.
   period: cmdPeriod,                 // /today /yesterday /week 모두 alias.
   where: cmdWhere,                   // /parked 와 통합.
   chargers: cmdChargers,
+  places: cmdPlaces,
 };
 
 export async function handleCallback(cb) {
@@ -389,10 +392,10 @@ async function cmdStart({ chatId }) {
 // btn: Reply 키보드에 노출되는 한글 라벨. 누르면 그 텍스트가 봇에 전송 → BUTTON_TO_CMD 로 슬래시 매핑.
 const CATEGORY_COMMANDS = {
   car: [
-    { cmd: '/soc',       desc: '배터리 % + 충전 상세',                  btn: '🔋 배터리' },
-    { cmd: '/range',     desc: '남은 주행거리',                          btn: '🛣 주행거리' },
-    { cmd: '/period',    desc: '오늘·이번주·이번달·지난달 (km·전비)',    btn: '📊 요약' },
+    { cmd: '/soc',       desc: '배터리 % · 거리 · 충전 (통합)',          btn: '🔋 배터리' },
+    { cmd: '/period',    desc: '오늘·이번주·저번주·이번달·이전달 (km·전비)', btn: '📊 요약' },
     { cmd: '/where',     desc: '현재 위치 (정차/주행 통합)',             btn: '📍 위치' },
+    { cmd: '/places',    desc: '자주가는 곳 / 오래머문 곳 TOP3 (집·회사 제외)', btn: '🗺 가는 곳' },
     { cmd: '/chargers',  desc: '즐겨찾기 충전기 사용량',                 btn: '🔌 충전기' },
   ],
   family: [
@@ -418,11 +421,11 @@ for (const arr of Object.values(CATEGORY_COMMANDS)) {
 // 나머지 2칸은 응답 컨텍스트와 연관성 높은 후속 명령.
 // callback_data 포맷: 'cmd:<name>'.
 const FOLLOWUP = {
-  soc:      [['🔄', 'cmd:soc'],      ['🛣 거리', 'cmd:range'],    ['🔌 충전기', 'cmd:chargers']],
-  range:    [['🔄', 'cmd:range'],    ['🔋 배터리', 'cmd:soc'],    ['📊 요약', 'cmd:period']],
-  where:    [['🔄', 'cmd:where'],    ['📊 요약', 'cmd:period'],   ['🛣 거리', 'cmd:range']],
+  soc:      [['🔄', 'cmd:soc'],      ['📍 위치', 'cmd:where'],    ['🔌 충전기', 'cmd:chargers']],
+  where:    [['🔄', 'cmd:where'],    ['🗺 가는 곳', 'cmd:places'],['📊 요약', 'cmd:period']],
   period:   [['🔄', 'cmd:period'],   ['🔋 배터리', 'cmd:soc'],    ['🔌 충전기', 'cmd:chargers']],
   chargers: [['🔄', 'cmd:chargers'], ['🔋 배터리', 'cmd:soc'],    ['📊 요약', 'cmd:period']],
+  places:   [['🔄', 'cmd:places'],   ['📍 위치', 'cmd:where'],    ['📊 요약', 'cmd:period']],
 };
 
 function followUp(cmdKey) {
@@ -556,8 +559,9 @@ async function cmdWhoami({ chatId, user }) {
   return sendMessage(lines.join('\n'), chatId);
 }
 
-// 배터리 + 충전 통합 응답 — 충전 중이면 상세 (시작SOC→현재, kWh, kW, 경과),
-// 충전 중 아니면 마지막 충전 기록만 짧게.
+// 배터리 + 거리 + 충전 통합 응답.
+//   1행: 🔋 % (사용가능) · 🛣 km 남음 (예상)
+//   2행: ⚡ 충전 중 (상세) | ⚡ 충전 중 아님 + 마지막 충전 기록
 async function cmdSoc({ chatId }) {
   const [car, ch] = await Promise.all([
     dashGet('/api/car'),
@@ -569,7 +573,13 @@ async function cmdSoc({ chatId }) {
   const usable = car.usable_battery_level != null && car.usable_battery_level !== car.battery_level
     ? ` (사용가능 ${car.usable_battery_level}%)`
     : '';
-  const lines = [`🔋 <b>${car.battery_level}%</b>${usable}`];
+  const head1 = `🔋 <b>${car.battery_level}%</b>${usable}`;
+  const rated = car.rated_battery_range;
+  const est = car.est_battery_range;
+  const rangeStr = rated != null
+    ? ` · 🛣 <b>${rated} km</b>${est && est !== rated ? ` <i>(예상 ${est})</i>` : ''}`
+    : '';
+  const lines = [head1 + rangeStr];
 
   if (ch?.charging) {
     const power = ch.charger_power != null ? Number(ch.charger_power).toFixed(1) : null;
@@ -647,8 +657,9 @@ function fmtElapsed(min) {
 }
 
 // 이번주·지난주·이번달 한 응답에 — 짧은 퀵뷰. 상세는 대시보드.
-// 오늘 + 이번주 + 이번달 + 지난달 한 응답에 — km 와 전비만 표시 (퀵뷰).
-// 충전·횟수·시간 등 상세는 대시보드.
+// 5구간 한 응답에 — km 와 전비만 (퀵뷰). 상세는 대시보드.
+//   오늘 / 이번주(월~) / 저번주 / 이번달(=최근 4주 롤링) / 이전달(=직전 4주)
+//   '이번달' 은 캘린더가 아닌 28일 롤링 — 월초 빈약 회피.
 async function cmdPeriod({ chatId }) {
   const j = await dashGet('/api/summary?range=multi');
   if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
@@ -660,33 +671,23 @@ async function cmdPeriod({ chatId }) {
     const km = Number(d.km || 0);
     if (km <= 0) return `<b>${label}</b>  -`;
     const eff = Number(d.eff_wh_km || 0);
-    const effStr = eff > 0 ? `· ${eff} Wh/km` : '';
-    return `<b>${label}</b>  ${km.toFixed(0)} km ${effStr}`;
+    const effStr = eff > 0 ? ` · ${eff} Wh/km` : '';
+    return `<b>${label}</b>  ${km.toFixed(0)} km${effStr}`;
   };
 
   const lines = [
     '<b>📊 요약</b>',
     '',
-    fmt('today',      '오늘  '),
-    fmt('this_week',  '이번주'),
-    fmt('month',      '이번달'),
-    fmt('last_month', '지난달'),
+    fmt('today',           '오늘  '),
+    fmt('this_week',       '이번주'),
+    fmt('last_week',       '저번주'),
+    fmt('rolling_4w',      '이번달'),
+    fmt('prev_rolling_4w', '이전달'),
     '',
+    '<i>이번달=최근 4주, 이전달=직전 4주</i>',
     '<i>상세는 대시보드 /v2 에서</i>',
   ];
   return sendMessage(lines.join('\n'), chatId, followUp('period'));
-}
-
-async function cmdRange({ chatId }) {
-  const j = await dashGet('/api/car');
-  if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
-  if (j.rated_battery_range == null) return sendMessage('주행거리 데이터 없음', chatId);
-  const rated = j.rated_battery_range;
-  const est = j.est_battery_range;
-  const lines = [`🛣 <b>${rated} km</b> 남음 (${j.battery_level ?? '-'}%)`];
-  if (est && est !== rated) lines.push(`<i>예상 ${est} km</i>`);
-  if (j.last_seen) lines.push(`<i>업데이트: ${formatKst(j.last_seen)}</i>`);
-  return sendMessage(lines.join('\n'), chatId, followUp('range'));
 }
 
 // 즐겨찾기 충전기 — 대시보드의 동별 그룹과 동일하게 묶어 한 줄 요약.
@@ -731,6 +732,64 @@ async function cmdChargers({ chatId }) {
   if (j.fetchedAt) lines.push(`<i>업데이트: ${formatKst(j.fetchedAt)}${j.stale ? ' · 캐시' : ''}</i>`);
   lines.push('<i>상세는 대시보드 /v2 에서</i>');
   return sendMessage(lines.join('\n'), chatId, followUp('chargers'));
+}
+
+// 자주 가는 곳 + 오래 머문 곳 TOP 3 — 집/회사 제외.
+const PINNED_PLACES = new Set(['집', '회사', 'Home', 'Work']);
+
+function fmtSecHm(sec) {
+  if (!Number.isFinite(sec) || sec <= 0) return '?';
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (h >= 1) return m > 0 ? `${h}시간 ${m}분` : `${h}시간`;
+  return `${m}분`;
+}
+
+async function cmdPlaces({ chatId }) {
+  const [freqJ, dwellJ] = await Promise.all([
+    dashGet('/api/frequent-places'),
+    dashGet('/api/long-stay-places'),
+  ]);
+  const freqOk = freqJ && !freqJ.error;
+  const dwellOk = dwellJ && !dwellJ.error;
+  if (!freqOk && !dwellOk) {
+    return sendMessage('데이터를 가져오지 못했어요', chatId, followUp('places'));
+  }
+
+  const freqTop = freqOk
+    ? (freqJ.places || []).filter((p) => !PINNED_PLACES.has(p.geofence_name)).slice(0, 3)
+    : [];
+  const dwellTop = dwellOk
+    ? (dwellJ.places || []).filter((p) => !PINNED_PLACES.has(p.geofence_name)).slice(0, 3)
+    : [];
+
+  const cap = (s) => escapeHtml(String(s || '?').slice(0, 25));
+
+  const lines = ['🗺 <b>가는 곳</b> <i>(집·회사 제외)</i>', ''];
+
+  lines.push('<b>자주</b>');
+  if (freqTop.length) {
+    freqTop.forEach((p, i) => {
+      lines.push(`${i + 1}. ${cap(p.label)} · ${p.visit_count}회`);
+    });
+  } else {
+    lines.push('-');
+  }
+
+  lines.push('');
+
+  lines.push('<b>오래 머문</b>');
+  if (dwellTop.length) {
+    dwellTop.forEach((p, i) => {
+      lines.push(`${i + 1}. ${cap(p.label)} · ${fmtSecHm(p.total_dwell_sec || p.max_dwell_sec || 0)}`);
+    });
+  } else {
+    lines.push('-');
+  }
+
+  lines.push('');
+  lines.push('<i>상세는 대시보드 /v2 에서</i>');
+  return sendMessage(lines.join('\n'), chatId, followUp('places'));
 }
 
 // ── family (mock) ────────────────────────────────────
