@@ -15,9 +15,14 @@ export default function ReportPanel() {
         const r = await fetch('/api/home-charger/report', { cache: 'no-store' });
         const j = await r.json();
         if (!alive) return;
-        if (j.error) setErr(j.error); else setD(j);
+        if (j.error) {
+          setErr({ error: j.error, detail: j.detail, where: j.where, code: j.code });
+        } else {
+          setD(j);
+          setErr(null);
+        }
       } catch (e) {
-        if (alive) setErr(e.message || '로딩 실패');
+        if (alive) setErr({ error: 'fetch', detail: e.message || '로딩 실패' });
       }
     };
     load();
@@ -25,7 +30,22 @@ export default function ReportPanel() {
     return () => { alive = false; clearInterval(t); };
   }, []);
 
-  if (err) return <Wrap><div className="p-4 text-rose-400 text-sm">에러: {err}</div></Wrap>;
+  if (err) return (
+    <Wrap>
+      <div className="p-4 text-sm">
+        <div className="text-rose-400 font-bold">⚠️ {err.error}</div>
+        {err.detail && (
+          <div className="text-rose-300 text-xs mt-1 break-all">{err.detail}</div>
+        )}
+        {(err.where || err.code) && (
+          <div className="text-rose-300/70 text-[10px] mt-1 break-all">
+            {err.code && <span>code={err.code} </span>}
+            {err.where && <span>where={err.where}</span>}
+          </div>
+        )}
+      </div>
+    </Wrap>
+  );
   if (!d)  return <Wrap><div className="p-4 text-zinc-500 text-sm">로딩 중…</div></Wrap>;
   if (!d.kpi) return <Wrap><div className="p-4 text-zinc-500 text-sm">데이터 누적 시작 전입니다.</div></Wrap>;
 

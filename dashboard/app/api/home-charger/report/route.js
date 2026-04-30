@@ -278,6 +278,12 @@ export async function GET() {
     });
   } catch (e) {
     console.error('/api/home-charger/report error:', e);
-    return Response.json({ error: 'DB error', detail: e.message }, { status: 500 });
+    console.error('  stack:', e?.stack);
+    return Response.json({
+      error: 'DB error',
+      detail: e?.message || String(e),
+      where: e?.where || null,
+      code: e?.code || null,
+    }, { status: 500 });
   }
 }
