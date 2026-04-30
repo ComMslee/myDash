@@ -23,3 +23,29 @@ export async function dashGet(path) {
     return null;
   }
 }
+
+// dashboard 로 POST — SNS 발행 같은 액션. 응답: { ok, ... } 또는 null.
+export async function dashPost(path, body) {
+  try {
+    const r = await fetch(`${URL}${path}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(SECRET ? { 'x-hub-secret': SECRET } : {}),
+      },
+      body: JSON.stringify(body || {}),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const text = await r.text();
+    let json = null;
+    try { json = text ? JSON.parse(text) : null; } catch {}
+    if (!r.ok) {
+      console.error('[dash] POST', path, r.status, text.slice(0, 200));
+      return { ok: false, status: r.status, error: json?.error || text.slice(0, 200) };
+    }
+    return json || { ok: true };
+  } catch (e) {
+    console.error('[dash] POST threw', path, e.message);
+    return { ok: false, error: e.message };
+  }
+}

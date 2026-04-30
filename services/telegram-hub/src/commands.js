@@ -12,7 +12,7 @@ import {
 } from './auth.js';
 import { getCategories, categoryByKey, labelOf } from './categories.js';
 import { listUserGroups, applyUserGroup } from './user_groups.js';
-import { dashGet } from './dash.js';
+import { dashGet, dashPost } from './dash.js';
 
 // ── 명령 카탈로그 ─────────────────────────────────────
 // open: 누구나 (등록 안 된 사람도 가능)
@@ -31,6 +31,8 @@ const COMMANDS = {
   '/parked':    { feature: 'car', handler: cmdParked },
   '/charge':    { feature: 'car', handler: cmdCharge },
   '/where':     { feature: 'car', handler: cmdWhere },
+  // sns — 현재는 dashboard 까지 전달되는지 확인용 mock. 실제 발행 X.
+  '/post':      { feature: 'sns', handler: cmdPost },
   // 운영 — 모바일에서 빠르게 처리할 최소 셋. 나머지(/users, /grant, /revoke,
   // /unmatched, /topnope, /resolve, /broadcast)는 /v2/tg 웹에서.
   '/pending':   { rootOnly: true, handler: cmdPending },
@@ -92,7 +94,12 @@ export async function handleMessage(message) {
       ].join('\n'),
     );
     return sendMessage(
-      '👋 가입 신청이 접수됐습니다.\n관리자 승인 후 사용 가능해요.',
+      [
+        '👋 안녕하세요! 가입 신청이 접수됐어요.',
+        '',
+        '관리자가 승인하면 알림을 드릴게요.',
+        '잠시만 기다려 주세요 🙏',
+      ].join('\n'),
       chatId,
     );
   }
@@ -101,9 +108,12 @@ export async function handleMessage(message) {
     return sendMessage('⏳ 아직 승인 대기 중입니다. 관리자가 승인하면 알려드릴게요.', chatId);
   }
 
-  const t = text.trim();
+  let t = text.trim();
 
-  // 1) /cmd
+  // 1a) Reply 키보드 한글 버튼 → 슬래시 치환. 정확 일치만.
+  if (BUTTON_TO_CMD[t]) t = BUTTON_TO_CMD[t];
+
+  // 1b) /cmd
   if (t.startsWith('/')) {
     const head = t.split(/\s+/)[0].toLowerCase().split('@')[0];
     const args = t.slice(head.length).trim();
@@ -116,8 +126,11 @@ export async function handleMessage(message) {
         return logAndPunt(chatId, t, head);
       }
       if (meta.feature && !(await hasPermission(chatId, meta.feature))) {
-        // 권한 없는 feature 명령은 존재 숨김 — 오타와 구분 불가.
-        return logAndPunt(chatId, t, head);
+        // 가족 봇 톤 — 보안 숨김 X, 권한 부재를 명시적으로 안내.
+        return sendMessage(
+          `🔒 이 기능은 아직 권한이 없어요.\n관리자에게 요청해 주세요.`,
+          chatId,
+        );
       }
     }
     return meta.handler({ chatId, args, user });
@@ -177,9 +190,12 @@ async function logAndPunt(chatId, text, slashHead) {
     console.error('[commands] unmatched log failed', e.message);
   }
   const head = slashHead
-    ? `알 수 없는 명령: ${escapeHtml(slashHead)}`
-    : '잘 모르겠어요.';
-  return sendMessage(`${head}\n/help 보기`, chatId);
+    ? `🤔 '${escapeHtml(slashHead)}' 명령은 아직 없어요.`
+    : '🤔 메시지를 이해하지 못했어요.';
+  return sendMessage(
+    `${head}\n채팅창 하단의 버튼을 누르거나 <b>/help</b> 를 확인해 주세요.`,
+    chatId,
+  );
 }
 
 // ── 핸들러 ────────────────────────────────────────────
@@ -189,16 +205,20 @@ async function cmdStart({ chatId }) {
 }
 
 // 카테고리별 명령 카탈로그 — /help 표시 + setMyCommands + reply 키보드 공통 소스.
+// btn: Reply 키보드에 노출되는 한글 라벨. 누르면 그 텍스트가 봇에 전송 → BUTTON_TO_CMD 로 슬래시 매핑.
 const CATEGORY_COMMANDS = {
   car: [
-    { cmd: '/soc',       desc: '배터리 % + 충전 여부' },
-    { cmd: '/range',     desc: '남은 주행거리' },
-    { cmd: '/charge',    desc: '충전 진행 상세 (속도·경과)' },
-    { cmd: '/today',     desc: '오늘 (KST) 주행/충전' },
-    { cmd: '/yesterday', desc: '어제 (KST) 주행/충전' },
-    { cmd: '/week',      desc: '지난 7일 요약' },
-    { cmd: '/parked',    desc: '마지막 주차 장소·경과' },
-    { cmd: '/where',     desc: '현재 위치' },
+    { cmd: '/soc',       desc: '배터리 % + 충전 여부',       btn: '🔋 배터리' },
+    { cmd: '/range',     desc: '남은 주행거리',               btn: '🛣 주행거리' },
+    { cmd: '/charge',    desc: '충전 진행 상세 (속도·경과)', btn: '⚡ 충전' },
+    { cmd: '/today',     desc: '오늘 (KST) 주행/충전',       btn: '📊 오늘' },
+    { cmd: '/yesterday', desc: '어제 (KST) 주행/충전',       btn: '📅 어제' },
+    { cmd: '/week',      desc: '지난 7일 요약',              btn: '📆 주간' },
+    { cmd: '/parked',    desc: '마지막 주차 장소·경과',     btn: '🅿️ 주차' },
+    { cmd: '/where',     desc: '현재 위치',                  btn: '📍 위치' },
+  ],
+  sns: [
+    { cmd: '/post',      desc: '블로그 발행 (mock)',         btn: '📝 글쓰기' },
   ],
   // 새 카테고리 추가 시 여기에 명령 목록.
 };
@@ -214,6 +234,12 @@ const ADMIN_COMMANDS = [
   { cmd: '/setgroup', desc: '가입승인·그룹변경' },
   { cmd: '/deny',     desc: '차단/탈퇴' },
 ];
+
+// Reply 키보드 한글 라벨 → 슬래시 명령 매핑. 정확 일치만 허용 (자연어 매칭 X).
+const BUTTON_TO_CMD = {};
+for (const arr of Object.values(CATEGORY_COMMANDS)) {
+  for (const c of arr) if (c.btn) BUTTON_TO_CMD[c.btn] = c.cmd;
+}
 
 // 데이터 명령 응답 끝에 동봉할 inline 후속 액션 (1행 3버튼).
 // callback_data 포맷: 'cmd:<name>' — 같은 명령 재실행(=새로고침) 또는 인접 명령.
@@ -267,6 +293,7 @@ export async function syncUserMenu(chatId) {
 }
 
 // /help 응답에 동봉할 Reply 키보드 — 자주 쓰는 데이터 명령 위주.
+// 한글 라벨(c.btn) 사용 — 비IT 사용자 친화. 누르면 BUTTON_TO_CMD 로 슬래시 매핑.
 // 권한 없으면 null 반환 (키보드 생략).
 async function buildReplyKeyboard(chatId) {
   const cats = await getCategories();
@@ -274,7 +301,7 @@ async function buildReplyKeyboard(chatId) {
   for (const cat of cats) {
     if (!(await hasPermission(chatId, cat.key))) continue;
     const cmds = CATEGORY_COMMANDS[cat.key] || [];
-    for (const c of cmds) dataButtons.push({ text: c.cmd });
+    for (const c of cmds) dataButtons.push({ text: c.btn || c.cmd });
   }
   if (!dataButtons.length) return null;
   // 3열 그리드.
@@ -350,13 +377,16 @@ async function cmdWhoami({ chatId, user }) {
     [chatId],
   );
   const feats = rows.map((r) => labelOf(r.feature)).join(' ') || '없음';
-  return sendMessage([
+  const isRoot = u.role === 'root';
+  const lines = [
     `<b>내 정보</b>`,
-    `chat_id: <code>${chatId}</code>`,
     `이름: ${escapeHtml(u.name || '-')}`,
     `역할: ${u.role}`,
     `권한: ${feats}`,
-  ].join('\n'), chatId);
+  ];
+  // chat_id 는 운영용 식별자라 root 한테만 노출 — 일반 가족 사용자엔 의미 없는 숫자.
+  if (isRoot) lines.push(`<i>chat_id: <code>${chatId}</code></i>`);
+  return sendMessage(lines.join('\n'), chatId);
 }
 
 async function cmdSoc({ chatId }) {
@@ -499,6 +529,51 @@ async function cmdCharge({ chatId }) {
   return sendMessage(lines.join('\n'), chatId, followUp('charge'));
 }
 
+// ── SNS (mock) ───────────────────────────────────────
+// 현재는 hub→dashboard 채널 검증용. 실제 블로그 발행 X.
+// 사용: /post <본문> — 본문 없으면 사용법 안내.
+async function cmdPost({ chatId, args, user }) {
+  const body = (args || '').trim();
+  if (!body) {
+    return sendMessage(
+      [
+        '📝 <b>블로그 글쓰기</b> (mock)',
+        '',
+        '사용법: <code>/post 본문 내용</code>',
+        '예: <code>/post 오늘 모델Y 출고함. 가속 미쳤음</code>',
+        '',
+        '<i>현재는 서버 전달 확인용. 실제 발행은 아직 안 돼요.</i>',
+      ].join('\n'),
+      chatId,
+    );
+  }
+  const r = await dashPost('/api/sns/blog', {
+    platform: 'naver',
+    body,
+    chat_id: chatId,
+    user_name: user?.name || null,
+  });
+  if (r?.ok) {
+    return sendMessage(
+      [
+        '✅ 서버 전달 확인됨 (mock)',
+        '',
+        `<b>플랫폼</b>: 네이버 블로그`,
+        `<b>본문</b> (${body.length}자):`,
+        `<code>${escapeHtml(body.slice(0, 200))}${body.length > 200 ? '…' : ''}</code>`,
+        '',
+        `<i>요청 ID: ${escapeHtml(r.request_id || '-')}</i>`,
+        '<i>실제 발행 기능은 다음 단계에서 추가됩니다.</i>',
+      ].join('\n'),
+      chatId,
+    );
+  }
+  return sendMessage(
+    `❌ 서버 전달 실패\n<i>${escapeHtml(r?.error || 'unknown')}</i>`,
+    chatId,
+  );
+}
+
 // ── 운영 명령 (root) ─────────────────────────────────
 
 async function cmdPending({ chatId }) {
@@ -543,7 +618,16 @@ async function cmdSetGroup({ chatId, args, user }) {
   // 대상자 [/] 메뉴 갱신 + 도움말 안내.
   try { await syncUserMenu(target); } catch (e) { console.error('[setgroup] syncUserMenu', e?.message); }
   try {
-    await sendMessage(`✅ '${label}' 그룹이 적용됐어요. /help 확인.`, target);
+    await sendMessage(
+      [
+        `🎉 사용 가능해요!`,
+        ``,
+        `채팅창 하단의 버튼을 누르거나 <b>/help</b> 로 시작하세요.`,
+      ].join('\n'),
+      target,
+    );
+    // /help 자동 호출 — 첫 사용 진입 부담 줄임.
+    await cmdHelp({ chatId: target });
   } catch {}
 }
 

@@ -136,12 +136,20 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 | `/parked` | 마지막 주차 장소·경과 (또는 주행 중 표시) | `/api/parked` |
 | `/where` | 현재 위치 (지도 링크 + 핀) | `/api/location` |
 
+### SNS (`sns` 권한 필요) — mock
+
+| 명령 | 설명 | 호출 API |
+|---|---|---|
+| `/post <본문>` | 네이버 블로그 발행 (mock — 채널 검증용) | `POST /api/sns/blog` |
+
+`/api/sns/blog` 는 현재 받기만 하고 콘솔 로그 + `request_id` 반환. 실제 OAuth/발행은 후속 PR.
+
 ### 공통 (누구나)
 
 | 명령 | 설명 |
 |---|---|
-| `/help` | 본인 권한 기준 도움말 |
-| `/whoami` | 본인 chat_id, 역할, 보유 카테고리 |
+| `/help` | 본인 권한 기준 도움말 (Reply 키보드 동봉) |
+| `/whoami` | 이름·역할·권한 (root 만 chat_id 추가 노출) |
 | `/categories` | 등록된 카테고리 + 본인 보유 표시(✅/⬜) |
 | `/start` | `/help`와 동일 |
 
@@ -171,7 +179,8 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 ### 6-2. Reply 키보드 (`/help` 응답)
 
 - `/help` 응답에 `reply_markup.keyboard` 동봉 — 채팅창 하단에 권한 보유한 데이터 명령들이 3열 그리드로 깔림 (`is_persistent: true`)
-- 누르면 슬래시 텍스트 자동 전송 → 슬래시 외울 필요 없음
+- **한글 라벨 사용** (예: `🔋 배터리`, `📊 오늘`) — 비IT 사용자도 한눈에 인식
+- 누르면 한글 텍스트가 그대로 봇에 전송 → `BUTTON_TO_CMD` 매핑으로 슬래시 명령 치환 (정확 일치만, 자연어 매칭 X)
 
 ### 6-3. Inline 후속 액션 (데이터 명령 응답)
 
