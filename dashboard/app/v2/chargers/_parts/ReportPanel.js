@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from 'react';
 
-const DOW_KO = ['일', '월', '화', '수', '목', '금', '토'];
-
 // 단지 충전 인프라 활용도 라이브 패널.
 // /v2/chargers 페이지 하단 인라인 + /v2/chargers/report 별도 페이지 캡처용 공유.
 export default function ReportPanel() {
@@ -36,8 +34,8 @@ export default function ReportPanel() {
       <Header meta={d.meta} />
       <div className="p-3 space-y-3">
         <KpiGrid kpi={d.kpi} />
-        <MonthlyLine monthly={d.monthly} />
-        <Heatmap grid={d.hourly_dow} kpi={d.kpi} />
+        <WeeklyLine weekly={d.weekly} />
+        <DongBars byDong={d.by_dong} />
         <Footer />
       </div>
     </div>
@@ -113,9 +111,9 @@ function KpiGrid({ kpi }) {
   );
 }
 
-function MonthlyLine({ monthly }) {
+function WeeklyLine({ weekly: monthly }) {
   if (!monthly?.length) {
-    return <div className="bg-black/20 rounded-lg p-3 text-zinc-500 text-xs text-center">월별 데이터 부족</div>;
+    return <div className="bg-black/20 rounded-lg p-3 text-zinc-500 text-xs text-center">주별 데이터 부족</div>;
   }
   const W = 600, H = 170;
   const PAD_L = 32, PAD_R = 12, PAD_T = 22, PAD_B = 24;
@@ -140,7 +138,7 @@ function MonthlyLine({ monthly }) {
   return (
     <div className="bg-black/20 rounded-lg p-2.5">
       <div className="flex items-baseline justify-between mb-1 px-1">
-        <span className="text-[10px] font-bold tracking-wider uppercase text-zinc-400">월별 점유율 추이</span>
+        <span className="text-[10px] font-bold tracking-wider uppercase text-zinc-400">주별 점유율 추이</span>
         <span className="text-[9px] text-zinc-600">
           <span className="text-emerald-400">●</span> 점유율(%) ·
           <span className="text-blue-400/60 ml-1">▮</span> 세션
@@ -191,12 +189,11 @@ function MonthlyLine({ monthly }) {
             })()}
           </g>
         ))}
-        {/* x축 월 라벨 */}
+        {/* x축 라벨 (주 시작 월/일) */}
         {linePts.map(([x, , m], i) => {
           const showAll = monthly.length <= 8;
           const skip = showAll ? 1 : Math.ceil(monthly.length / 8);
           if (i % skip !== 0 && i !== monthly.length - 1) return null;
-          const [y, mm] = m.ym.split('-');
           return (
             <text
               key={`xl-${i}`}
@@ -207,7 +204,7 @@ function MonthlyLine({ monthly }) {
               fill="#71717a"
               className="tabular-nums"
             >
-              {y.slice(2)}/{mm}
+              {m.label /* MM/DD */}
             </text>
           );
         })}
@@ -216,90 +213,40 @@ function MonthlyLine({ monthly }) {
   );
 }
 
-function Heatmap({ grid, kpi }) {
-  if (!grid) return null;
-  const flat = grid.flat();
-  const max = Math.max(1, ...flat);
-  const cellW = 13, cellH = 12, gap = 2, labelW = 22, labelH = 12;
-  const order = [1, 2, 3, 4, 5, 6, 0]; // 월~일
-
+function DongBars({ byDong }) {
+  if (!byDong?.length) return null;
+  const max = Math.max(10, ...byDong.map(d => d.occupancy_pct));
   return (
     <div className="bg-black/20 rounded-lg p-2.5">
-      <div className="flex items-baseline justify-between mb-1 px-1">
-        <span className="text-[10px] font-bold tracking-wider uppercase text-zinc-400">요일·시간대 점유율</span>
-        {kpi.peak_dow != null && (
-          <span className="text-[9px] text-zinc-600">
-            피크: {DOW_KO[kpi.peak_dow]} {kpi.peak_hour}시 (가장 진한 셀)
-          </span>
-        )}
+      <div className="flex items-baseline justify-between mb-1.5 px-1">
+        <span className="text-[10px] font-bold tracking-wider uppercase text-zinc-400">동별 가동률</span>
+        <span className="text-[9px] text-zinc-600">⭐ = 즐겨찾기 · 막대 = 점유율 %</span>
       </div>
-      <svg
-        width="100%"
-        viewBox={`0 0 ${labelW + 24 * (cellW + gap)} ${labelH + 7 * (cellH + gap)}`}
-        preserveAspectRatio="none"
-        className="block"
-      >
-        {[0, 6, 12, 18].map((h) => (
-          <text
-            key={h}
-            x={labelW + h * (cellW + gap) + cellW / 2}
-            y={labelH - 3}
-            fontSize="8"
-            textAnchor="middle"
-            fill="#71717a"
-            className="tabular-nums"
-          >
-            {h}시
-          </text>
-        ))}
-        {order.map((dow, rowIdx) => (
-          <g key={dow}>
-            <text
-              x={labelW - 4}
-              y={labelH + rowIdx * (cellH + gap) + cellH - 2}
-              fontSize="9"
-              textAnchor="end"
-              fill="#71717a"
-            >
-              {DOW_KO[dow]}
-            </text>
-            {grid[dow].map((v, h) => {
-              const intensity = v / max;
-              const op = 0.05 + intensity * 0.95;
-              const isPeak = (dow === kpi.peak_dow && h === kpi.peak_hour);
-              return (
-                <g key={h}>
-                  <rect
-                    x={labelW + h * (cellW + gap)}
-                    y={labelH + rowIdx * (cellH + gap)}
-                    width={cellW}
-                    height={cellH}
-                    fill="#3b82f6"
-                    opacity={op}
-                    rx="1.5"
-                  >
-                    <title>{`${DOW_KO[dow]} ${h}시 — 평균 ${v.toFixed(1)}% 점유`}</title>
-                  </rect>
-                  {isPeak && (
-                    <rect
-                      x={labelW + h * (cellW + gap)}
-                      y={labelH + rowIdx * (cellH + gap)}
-                      width={cellW}
-                      height={cellH}
-                      fill="none"
-                      stroke="#fbbf24"
-                      strokeWidth="1.2"
-                      rx="1.5"
-                    />
-                  )}
-                </g>
-              );
-            })}
-          </g>
-        ))}
-      </svg>
-      <div className="text-[9px] text-zinc-600 mt-1.5 leading-relaxed px-0.5">
-        한 셀 = 그 요일·시간대의 평균 점유율(%). 진할수록 사용 많음 · 노란 외곽선이 피크.
+      <div className="space-y-1.5">
+        {byDong.map((d) => {
+          const w = (d.occupancy_pct / max) * 100;
+          const fillColor = d.favorite ? 'bg-amber-400/70' : 'bg-blue-400/50';
+          return (
+            <div key={d.key} className="flex items-center gap-2">
+              <div className="w-[60px] text-[10px] text-zinc-300 truncate">
+                {d.favorite && <span className="text-amber-400 mr-0.5">⭐</span>}
+                {d.title}
+              </div>
+              <div className="flex-1 h-3 bg-black/40 rounded-sm overflow-hidden">
+                <div
+                  className={`h-full ${fillColor}`}
+                  style={{ width: `${Math.max(2, w)}%` }}
+                />
+              </div>
+              <div className="w-[64px] text-right text-[10px] tabular-nums text-zinc-300">
+                {d.occupancy_pct.toFixed(1)}% <span className="text-zinc-600">({d.total}기)</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="text-[9px] text-zinc-600 mt-2 leading-relaxed px-0.5">
+        동별 충전기 가동률 = SUM(사용 슬롯) / (그 동 충전기수 × 관측 일수 × 48) × 100.
       </div>
     </div>
   );
