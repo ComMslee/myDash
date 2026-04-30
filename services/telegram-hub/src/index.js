@@ -22,6 +22,7 @@ try {
   await ensureCategoriesSchema();
   await bootstrapRoot(rootChatId);
   await grantPermission(rootChatId, 'car');
+  await grantPermission(rootChatId, 'family');
   await grantPermission(rootChatId, 'sns');
   await ensureUserGroupsSchema();
   // name=NULL 사용자(특히 env 부트스트랩 root) 텔레그램에서 이름 가져와 채움.

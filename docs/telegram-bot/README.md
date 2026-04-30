@@ -136,11 +136,22 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 | `/parked` | 마지막 주차 장소·경과 (또는 주행 중 표시) | `/api/parked` |
 | `/where` | 현재 위치 (지도 링크 + 핀) | `/api/location` |
 
+### 가족 (`family` 권한 필요) — mock
+
+| 명령 | 버튼 | 설명 |
+|---|---|---|
+| `/weather` | 🌤 오늘 날씨 | 기상청 단기예보 (mock) |
+| `/forecast` | 🌧 강수 예보 | 비/눈 사전 알림 (mock) |
+| `/event` | 📅 일정 | 일정 등록·조회·반복 + 사전 알림 (mock) |
+| `/memo` | 📝 메모 | 가족 공유 메모/장보기 (mock) |
+
+현재 모두 placeholder 응답. 실제 구현은 후속 PR (날씨 → 일정 → 메모 순).
+
 ### SNS (`sns` 권한 필요) — mock
 
-| 명령 | 설명 | 호출 API |
-|---|---|---|
-| `/post <본문>` | 네이버 블로그 발행 (mock — 채널 검증용) | `POST /api/sns/blog` |
+| 명령 | 버튼 | 설명 | 호출 API |
+|---|---|---|---|
+| `/post <본문>` | 📝 글쓰기 | 네이버 블로그 발행 (mock — 채널 검증용) | `POST /api/sns/blog` |
 
 `/api/sns/blog` 는 현재 받기만 하고 콘솔 로그 + `request_id` 반환. 실제 OAuth/발행은 후속 PR.
 
@@ -176,11 +187,37 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 - pending/denied 사용자는 메뉴 비움
 - scope=`chat` 라 사용자별 다른 명령 노출 — guest 는 root 명령 안 보임
 
-### 6-2. Reply 키보드 (`/help` 응답)
+### 6-2. Reply 키보드 — 카테고리 폴더형
 
-- `/help` 응답에 `reply_markup.keyboard` 동봉 — 채팅창 하단에 권한 보유한 데이터 명령들이 3열 그리드로 깔림 (`is_persistent: true`)
-- **한글 라벨 사용** (예: `🔋 배터리`, `📊 오늘`) — 비IT 사용자도 한눈에 인식
-- 누르면 한글 텍스트가 그대로 봇에 전송 → `BUTTON_TO_CMD` 매핑으로 슬래시 명령 치환 (정확 일치만, 자연어 매칭 X)
+비IT 가족 친화 + 카테고리 확장성 모두 잡기 위해 **2단 폴더 구조**.
+
+**메인 진입** (`/help` 또는 `⬅️ 메인` 버튼):
+
+```
+[🚗 차량]  [🏠 가족]  [📝 SNS]
+```
+
+권한 보유한 카테고리만 노출. 누르면 봇이 새 메시지로 **sub-keyboard** 갈아끼움.
+
+**Sub-keyboard** (예: `🚗 차량` 선택 후):
+
+```
+[🔋 배터리] [🛣 주행거리] [⚡ 충전]
+[📊 오늘]   [📅 어제]    [📆 주간]
+[🅿️ 주차]  [📍 위치]
+[⬅️ 메인]
+```
+
+- 한글 라벨 그대로 봇에 전송 → `BUTTON_TO_CMD` 매핑으로 슬래시 명령 치환 (정확 일치만, 자연어 매칭 X)
+- 데이터 명령 응답에는 inline 후속 액션이 별도로 붙음 (Reply 키보드는 갈아끼우지 않고 sub 유지)
+- `⬅️ 메인` 누르면 메인 키보드로 복귀
+
+**라우팅 흐름** (`handleMessage`):
+1. `⬅️ 메인` → `buildMainKeyboard`
+2. 카테고리 라벨 (`🚗 차량` 등 `categories.label` 매칭) → `buildSubKeyboard(catKey)`
+3. 한글 명령 라벨 (`🔋 배터리` 등) → `BUTTON_TO_CMD` 슬래시 치환 → 핸들러
+4. `/cmd` → 핸들러
+5. 그 외 → 폴백
 
 ### 6-3. Inline 후속 액션 (데이터 명령 응답)
 

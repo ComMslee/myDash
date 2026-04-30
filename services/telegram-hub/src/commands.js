@@ -31,6 +31,11 @@ const COMMANDS = {
   '/parked':    { feature: 'car', handler: cmdParked },
   '/charge':    { feature: 'car', handler: cmdCharge },
   '/where':     { feature: 'car', handler: cmdWhere },
+  // family — mock. 인터페이스 검증용 placeholder.
+  '/weather':   { feature: 'family', handler: cmdWeather },
+  '/forecast':  { feature: 'family', handler: cmdForecast },
+  '/event':     { feature: 'family', handler: cmdEvent },
+  '/memo':      { feature: 'family', handler: cmdMemo },
   // sns — 현재는 dashboard 까지 전달되는지 확인용 mock. 실제 발행 X.
   '/post':      { feature: 'sns', handler: cmdPost },
   // 운영 — 모바일에서 빠르게 처리할 최소 셋. 나머지(/users, /grant, /revoke,
@@ -110,10 +115,35 @@ export async function handleMessage(message) {
 
   let t = text.trim();
 
-  // 1a) Reply 키보드 한글 버튼 → 슬래시 치환. 정확 일치만.
+  // 1a) ⬅️ 메인 — 메인 키보드로 복귀.
+  if (t === NAV_HOME) {
+    const kb = await buildMainKeyboard(chatId);
+    return sendMessage(
+      '메인 메뉴로 돌아왔어요. 카테고리를 선택하세요.',
+      chatId,
+      kb ? { reply_markup: kb } : {},
+    );
+  }
+
+  // 1b) 카테고리 라벨 (예: '🚗 차량') → sub-keyboard 로 갈아끼움.
+  const navCat = await categoryByLabel(t);
+  if (navCat) {
+    if (!(await hasPermission(chatId, navCat))) {
+      return sendMessage('🔒 이 카테고리는 권한이 없어요.\n관리자에게 요청해 주세요.', chatId);
+    }
+    const kb = buildSubKeyboard(navCat);
+    const cat = (await getCategories()).find((c) => c.key === navCat);
+    return sendMessage(
+      `<b>${escapeHtml(cat?.label || t)}</b> 메뉴 — 원하는 항목을 선택하세요.`,
+      chatId,
+      kb ? { reply_markup: kb } : {},
+    );
+  }
+
+  // 1c) Reply 키보드 한글 버튼 → 슬래시 치환. 정확 일치만.
   if (BUTTON_TO_CMD[t]) t = BUTTON_TO_CMD[t];
 
-  // 1b) /cmd
+  // 1d) /cmd
   if (t.startsWith('/')) {
     const head = t.split(/\s+/)[0].toLowerCase().split('@')[0];
     const args = t.slice(head.length).trim();
@@ -217,6 +247,12 @@ const CATEGORY_COMMANDS = {
     { cmd: '/parked',    desc: '마지막 주차 장소·경과',     btn: '🅿️ 주차' },
     { cmd: '/where',     desc: '현재 위치',                  btn: '📍 위치' },
   ],
+  family: [
+    { cmd: '/weather',   desc: '오늘 날씨 (mock)',           btn: '🌤 오늘 날씨' },
+    { cmd: '/forecast',  desc: '강수 사전 알림 (mock)',      btn: '🌧 강수 예보' },
+    { cmd: '/event',     desc: '일정 등록·조회 (mock)',      btn: '📅 일정' },
+    { cmd: '/memo',      desc: '메모/장보기 (mock)',         btn: '📝 메모' },
+  ],
   sns: [
     { cmd: '/post',      desc: '블로그 발행 (mock)',         btn: '📝 글쓰기' },
   ],
@@ -292,28 +328,45 @@ export async function syncUserMenu(chatId) {
   return setMyCommands(cmds, chatId);
 }
 
-// /help 응답에 동봉할 Reply 키보드 — 자주 쓰는 데이터 명령 위주.
-// 한글 라벨(c.btn) 사용 — 비IT 사용자 친화. 누르면 BUTTON_TO_CMD 로 슬래시 매핑.
-// 권한 없으면 null 반환 (키보드 생략).
-async function buildReplyKeyboard(chatId) {
+// 카테고리 폴더형 Reply 키보드 — 메인 진입은 카테고리 라벨, 누르면 sub-keyboard 로 갈아끼움.
+// 비IT 가족 친화: 한글 라벨, 단계 1단, 채팅창 깔끔.
+const NAV_HOME = '⬅️ 메인';
+
+// 메인 키보드 — 사용자가 권한 보유한 카테고리들.
+async function buildMainKeyboard(chatId) {
   const cats = await getCategories();
-  const dataButtons = [];
+  const buttons = [];
   for (const cat of cats) {
+    // 명령이 등록된 카테고리만 (common 처럼 명령 없는 슬롯은 노출 X).
+    if (!CATEGORY_COMMANDS[cat.key]?.length) continue;
     if (!(await hasPermission(chatId, cat.key))) continue;
-    const cmds = CATEGORY_COMMANDS[cat.key] || [];
-    for (const c of cmds) dataButtons.push({ text: c.btn || c.cmd });
+    buttons.push({ text: cat.label });
   }
-  if (!dataButtons.length) return null;
-  // 3열 그리드.
+  if (!buttons.length) return null;
   const rows = [];
-  for (let i = 0; i < dataButtons.length; i += 3) {
-    rows.push(dataButtons.slice(i, i + 3));
+  for (let i = 0; i < buttons.length; i += 3) {
+    rows.push(buttons.slice(i, i + 3));
   }
-  return {
-    keyboard: rows,
-    resize_keyboard: true,
-    is_persistent: true,
-  };
+  return { keyboard: rows, resize_keyboard: true, is_persistent: true };
+}
+
+// 카테고리별 sub-keyboard — 해당 카테고리 명령 + ⬅️ 메인.
+function buildSubKeyboard(catKey) {
+  const cmds = CATEGORY_COMMANDS[catKey] || [];
+  if (!cmds.length) return null;
+  const buttons = cmds.map((c) => ({ text: c.btn || c.cmd }));
+  const rows = [];
+  for (let i = 0; i < buttons.length; i += 3) {
+    rows.push(buttons.slice(i, i + 3));
+  }
+  rows.push([{ text: NAV_HOME }]);
+  return { keyboard: rows, resize_keyboard: true, is_persistent: true };
+}
+
+// 텍스트가 카테고리 라벨이면 그 카테고리 key 반환. 아니면 null.
+async function categoryByLabel(label) {
+  const cats = await getCategories();
+  return cats.find((c) => c.label === label)?.key || null;
 }
 
 async function cmdHelp({ chatId, user }) {
@@ -348,7 +401,7 @@ async function cmdHelp({ chatId, user }) {
     lines.push('');
     lines.push('<i>권한·방송·로그 관리는 /v2/tg 웹에서</i>');
   }
-  const kb = await buildReplyKeyboard(chatId);
+  const kb = await buildMainKeyboard(chatId);
   return sendMessage(lines.join('\n'), chatId, kb ? { reply_markup: kb } : {});
 }
 
@@ -527,6 +580,56 @@ async function cmdCharge({ chatId }) {
   ];
   if (j.start_date) lines.push(`⏱ 시작 ${formatKst(j.start_date)} KST (${fmtElapsed(elapsedMin)} 경과)`);
   return sendMessage(lines.join('\n'), chatId, followUp('charge'));
+}
+
+// ── family (mock) ────────────────────────────────────
+// 인터페이스 검증용 placeholder. 실제 구현은 후속 PR.
+async function cmdWeather({ chatId }) {
+  return sendMessage(
+    [
+      '🌤 <b>오늘 날씨</b> (mock)',
+      '',
+      '<i>기상청 단기예보 연동은 준비 중입니다.</i>',
+      '<i>예정: 강수확률 / 기온 / 미세먼지 한 화면 요약</i>',
+    ].join('\n'),
+    chatId,
+  );
+}
+
+async function cmdForecast({ chatId }) {
+  return sendMessage(
+    [
+      '🌧 <b>강수 사전 알림</b> (mock)',
+      '',
+      '<i>비/눈 1~2시간 전 자동 알림 — 가족 broadcast 예정.</i>',
+      '<i>현재는 알림 폴러 미구현.</i>',
+    ].join('\n'),
+    chatId,
+  );
+}
+
+async function cmdEvent({ chatId }) {
+  return sendMessage(
+    [
+      '📅 <b>일정 관리</b> (mock)',
+      '',
+      '<i>등록·조회·반복 일정 + 사전 알림 — 다단계 대화로 입력 예정.</i>',
+      '<i>현재는 placeholder.</i>',
+    ].join('\n'),
+    chatId,
+  );
+}
+
+async function cmdMemo({ chatId }) {
+  return sendMessage(
+    [
+      '📝 <b>메모/장보기</b> (mock)',
+      '',
+      '<i>가족 공유 메모 + 항목별 ✅ 완료 체크 예정.</i>',
+      '<i>현재는 placeholder.</i>',
+    ].join('\n'),
+    chatId,
+  );
 }
 
 // ── SNS (mock) ───────────────────────────────────────

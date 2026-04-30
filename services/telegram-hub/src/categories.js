@@ -25,9 +25,10 @@ export async function ensureCategoriesSchema() {
   // 기본 시드 — 이미 있으면 건드리지 않음(라벨/설명 변경한 사용자 보존).
   await pool.query(`
     INSERT INTO hub_categories (key, label, description, sort_order) VALUES
-      ('car',    '🚗 차',    '내 테슬라 상태/위치/충전', 0),
-      ('common', '🧰 공통',  '전 사용자 공용 기능',      10),
-      ('sns',    '💬 SNS',   '소셜 발행/예약 (예정)',    20)
+      ('car',    '🚗 차량',  '내 테슬라 상태/위치/충전',          0),
+      ('family', '🏠 가족',  '날씨/일정/메모 (가족 공유, mock)',  5),
+      ('common', '🧰 공통',  '전 사용자 공용 기능',                10),
+      ('sns',    '📝 SNS',   '블로그 발행 (mock)',                 20)
     ON CONFLICT (key) DO NOTHING
   `);
   _schemaReady = true;
