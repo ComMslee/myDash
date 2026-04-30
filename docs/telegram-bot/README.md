@@ -55,13 +55,19 @@ TeslaMate DB ──┬──► telegram-hub (Node 20, ~80MB RAM)
 
 ### 카테고리(feature)
 
-`services/telegram-hub/src/categories.js` 가 단일 소스:
+DB 테이블 `hub_categories` 가 단일 소스. 부팅 시 hub 가 lazy create + 기본 `car` 시드, dashboard `/v2/tg` 의 "📂 그룹 관리" 에서 CRUD.
 
 | key | label | 설명 |
 |---|---|---|
-| `car` | 🚗 차 | 내 테슬라 상태/위치/충전 |
+| `car` | 🚗 차 | 내 테슬라 상태/위치/충전 (시드, 삭제 불가) |
+| `common` | 🧰 공통 | 전 사용자 공용 기능 (시드, 삭제 불가) |
+| `sns` | 💬 SNS | 소셜 발행/예약 — 구현 예정 (시드, 삭제 불가) |
 
-신규 카테고리 추가 시: `categories.js`에 한 줄 + 핸들러에 `feature` 태그.
+**한계** — 명령 핸들러(`/soc`, `/today` 등)는 코드(`commands.js`)에 묶여 있어, 새 그룹 추가만으로 거기 매칭될 명령이 자동 생기지는 않음. 새 그룹은
+- (a) **방송 타깃** (`/v2/tg` 의 "알림 보내기" 에서 그룹별 발송)
+- (b) **새 명령용 슬롯** (코드에 `feature: 'sns'` 핸들러 추가하면 즉시 그 그룹 권한자에게 풀림)
+
+용도. hub `categories.js` 캐시 TTL 5초 — dashboard 에서 만들면 5초 안에 봇에도 반영.
 
 ### 상태 전이
 
@@ -242,7 +248,7 @@ services/telegram-hub/
 └── src/
     ├── index.js        — 부팅 + root 부트스트랩
     ├── auth.js         — RBAC (역할/권한 CRUD)
-    ├── categories.js   — 카테고리 카탈로그
+    ├── categories.js   — 카테고리 DB 조회 + 5s TTL 캐시 (hub_categories)
     ├── commands.js     — 명령 라우팅 + 핸들러
     ├── tg_poller.js    — Telegram getUpdates long-poll
     ├── poller.js       — TeslaMate DB 폴링 → 알림 broadcast

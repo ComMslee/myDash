@@ -7,7 +7,7 @@ import {
   listPending, listAllUsers, getRoots,
   hasPermission, grantPermission, revokePermission,
 } from './auth.js';
-import { CATEGORIES, categoryByKey, labelOf } from './categories.js';
+import { getCategories, categoryByKey, labelOf } from './categories.js';
 
 // ── 명령 카탈로그 ─────────────────────────────────────
 // open: 누구나 (등록 안 된 사람도 가능)
@@ -196,10 +196,11 @@ const CATEGORY_COMMANDS = {
 async function cmdHelp({ chatId, user }) {
   const u = user || await getUser(chatId);
   const isRoot = u?.role === 'root';
+  const cats = await getCategories();
   const lines = ['<b>Ye\'s Home 봇</b>', ''];
 
   // 본인이 가진 카테고리만 표시
-  for (const cat of CATEGORIES) {
+  for (const cat of cats) {
     if (!(await hasPermission(chatId, cat.key))) continue;
     const cmds = CATEGORY_COMMANDS[cat.key] || [];
     if (!cmds.length) continue;
@@ -225,12 +226,13 @@ async function cmdHelp({ chatId, user }) {
 }
 
 async function cmdCategories({ chatId }) {
+  const cats = await getCategories();
   const lines = ['<b>📂 카테고리</b>'];
-  for (const cat of CATEGORIES) {
+  for (const cat of cats) {
     const have = await hasPermission(chatId, cat.key);
     lines.push(`${have ? '✅' : '⬜'} ${cat.label} — <i>${escapeHtml(cat.desc)}</i>`);
   }
-  if (CATEGORIES.length === 0) {
+  if (cats.length === 0) {
     lines.push('<i>등록된 카테고리 없음</i>');
   }
   return sendMessage(lines.join('\n'), chatId);
@@ -239,6 +241,7 @@ async function cmdCategories({ chatId }) {
 async function cmdWhoami({ chatId, user }) {
   const u = user || await getUser(chatId);
   if (!u) return sendMessage('등록 안 됨', chatId);
+  await getCategories(); // warm cache for sync labelOf
   const { rows } = await pool.query(
     "SELECT feature FROM hub_permissions WHERE chat_id = $1 ORDER BY feature",
     [chatId],
@@ -385,8 +388,9 @@ async function cmdDeny({ chatId, args, user }) {
 
 async function cmdGrant({ chatId, args, user }) {
   const [target, feature] = (args || '').split(/\s+/);
+  const cats = await getCategories();
   if (!/^\d+$/.test(target) || !feature) {
-    const known = CATEGORIES.map((c) => c.key).join(', ') || '(없음)';
+    const known = cats.map((c) => c.key).join(', ') || '(없음)';
     return sendMessage(`사용법: /grant <chat_id> <feature>\n예: /grant 1234567890 car\n등록된 카테고리: ${known}`, chatId);
   }
   const known = !!categoryByKey(feature);
@@ -409,6 +413,7 @@ async function cmdRevoke({ chatId, args }) {
 }
 
 async function cmdUsers({ chatId }) {
+  await getCategories(); // warm cache for sync labelOf
   const rows = await listAllUsers();
   if (!rows.length) return sendMessage('사용자 없음', chatId);
   const lines = ['<b>👥 사용자</b>'];

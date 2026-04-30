@@ -25,6 +25,20 @@ function bad(msg, status = 400) {
   return Response.json({ ok: false, error: msg }, { status });
 }
 
+const KEY_RE = /^[a-z][a-z0-9_]{0,31}$/;
+
+function validateCategoryFields({ key, label, desc }, { requireKey = true } = {}) {
+  if (requireKey) {
+    if (!key || !KEY_RE.test(key)) return 'key: 영문 소문자/숫자/_ 1~32자 (첫 글자는 영문)';
+  }
+  if (label != null) {
+    const s = String(label).trim();
+    if (!s || s.length > 50) return 'label: 1~50자';
+  }
+  if (desc != null && String(desc).length > 200) return 'description: 200자 이하';
+  return null;
+}
+
 export async function POST(req) {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
@@ -94,6 +108,66 @@ export async function POST(req) {
         [ids],
       );
       return Response.json({ ok: true, count: rowCount });
+    }
+    case 'category_create': {
+      const key = String(body.key || '').trim();
+      const label = String(body.label || '').trim();
+      const desc = String(body.desc || '').trim();
+      const sortOrder = Number.isFinite(+body.sort_order) ? +body.sort_order : 0;
+      const err = validateCategoryFields({ key, label, desc });
+      if (err) return bad(err);
+      try {
+        await pool.query(
+          `INSERT INTO hub_categories (key, label, description, sort_order)
+           VALUES ($1, $2, $3, $4)`,
+          [key, label, desc, sortOrder],
+        );
+      } catch (e) {
+        if (e?.code === '23505') return bad(`이미 존재하는 key: ${key}`, 409);
+        if (e?.code === '42P01') return bad('hub_categories 테이블 없음 — hub 가 안 떴는지 확인', 503);
+        return bad(e?.message || 'create failed', 500);
+      }
+      return Response.json({ ok: true });
+    }
+    case 'category_update': {
+      const key = String(body.key || '').trim();
+      const label = body.label != null ? String(body.label).trim() : null;
+      const desc = body.desc != null ? String(body.desc).trim() : null;
+      const sortOrder = Number.isFinite(+body.sort_order) ? +body.sort_order : null;
+      if (!KEY_RE.test(key)) return bad('key 잘못됨');
+      const err = validateCategoryFields({ key, label, desc });
+      if (err) return bad(err);
+      const sets = [];
+      const vals = [key];
+      if (label != null) { sets.push(`label = $${vals.length + 1}`); vals.push(label); }
+      if (desc != null) { sets.push(`description = $${vals.length + 1}`); vals.push(desc); }
+      if (sortOrder != null) { sets.push(`sort_order = $${vals.length + 1}`); vals.push(sortOrder); }
+      if (!sets.length) return bad('변경할 필드 없음');
+      const { rowCount } = await pool.query(
+        `UPDATE hub_categories SET ${sets.join(', ')} WHERE key = $1`,
+        vals,
+      );
+      if (!rowCount) return bad('not found', 404);
+      return Response.json({ ok: true });
+    }
+    case 'category_delete': {
+      const key = String(body.key || '').trim();
+      if (!KEY_RE.test(key)) return bad('key 잘못됨');
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        // hub_permissions 에 FK 가 없어서 명시적으로 같이 정리.
+        await client.query('DELETE FROM hub_permissions WHERE feature = $1', [key]);
+        const { rowCount } = await client.query('DELETE FROM hub_categories WHERE key = $1', [key]);
+        await client.query('COMMIT');
+        if (!rowCount) return bad('not found', 404);
+        return Response.json({ ok: true });
+      } catch (e) {
+        await client.query('ROLLBACK').catch(() => {});
+        return bad(e?.message || 'delete failed', 500);
+      } finally {
+        client.release();
+      }
     }
     case 'broadcast': {
       const text = String(body.text || '').trim();

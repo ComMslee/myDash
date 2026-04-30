@@ -5,12 +5,6 @@ export const dynamic = 'force-dynamic';
 
 const TG_HUB_URL = process.env.TELEGRAM_HUB_URL || 'http://telegram-hub:3000';
 
-// 카테고리는 hub의 categories.js 와 동기화 (현재 'car' 만).
-// 나중에 hub에 /categories 엔드포인트 추가하면 여기서 fetch 로 대체.
-const CATEGORIES = [
-  { key: 'car', label: '🚗 차', desc: '내 테슬라 상태/위치/충전' },
-];
-
 async function fetchHubHealth() {
   try {
     const r = await fetch(`${TG_HUB_URL}/health`, {
@@ -28,10 +22,11 @@ export async function GET() {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
 
-  // hub 자체가 안 떠 있으면 hub_users 테이블도 없을 수 있음 — try/catch.
+  // hub 자체가 안 떠 있으면 hub_* 테이블도 없을 수 있음 — try/catch.
   let users = [];
   let pending = [];
   let unmatched = [];
+  let categories = [];
   let dbError = null;
 
   try {
@@ -59,6 +54,17 @@ export async function GET() {
     dbError = e?.message || String(e);
   }
 
+  // hub_categories 는 hub 가 부팅 시 생성. 미존재 시 빈 배열로 폴백.
+  try {
+    const { rows } = await pool.query(
+      `SELECT key, label, description AS desc, sort_order
+       FROM hub_categories ORDER BY sort_order, key`,
+    );
+    categories = rows;
+  } catch {
+    categories = [];
+  }
+
   const hubHealth = await fetchHubHealth();
 
   return Response.json({
@@ -66,7 +72,7 @@ export async function GET() {
     users,
     pending,
     unmatched,
-    categories: CATEGORIES,
+    categories,
     dbError,
   });
 }

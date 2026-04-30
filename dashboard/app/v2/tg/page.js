@@ -197,6 +197,11 @@ export default function TgAdminPage() {
           )}
         </Section>
 
+        {/* 그룹(카테고리) 관리 */}
+        <Section title={`📂 그룹 관리 (${categories.length})`}>
+          <CategoriesAdmin categories={categories} action={action} busy={busy} />
+        </Section>
+
         {/* 미인식 입력 (학습 로그) */}
         <Section title={`🔍 못 알아들은 입력 ${unmatched.length ? `(${unmatched.length})` : ''}`}>
           {!unmatched.length ? (
@@ -299,6 +304,160 @@ function UnmatchedList({ items, action, busy }) {
             <span className="text-[10px] text-zinc-600 shrink-0">#{u.chat_id} · {fmtAgo(u.ts)}</span>
           </label>
         ))}
+      </div>
+    </div>
+  );
+}
+
+const SEED_KEYS = new Set(['car', 'common', 'sns']);
+
+function CategoriesAdmin({ categories, action, busy }) {
+  const [adding, setAdding] = useState(false);
+  const [editKey, setEditKey] = useState(null);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="text-[11px] text-zinc-500 leading-relaxed">
+        명령 핸들러는 코드에 묶여 있어요 — 새 그룹은 <b>방송 타깃</b> 또는 <b>새 명령용 슬롯</b> 용도.
+      </div>
+
+      {!categories.length ? (
+        <div className="text-[12px] text-zinc-500">등록된 그룹 없음</div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {categories.map((c) =>
+            editKey === c.key ? (
+              <CategoryEditRow
+                key={c.key}
+                cat={c}
+                busy={busy}
+                onCancel={() => setEditKey(null)}
+                onSave={async (patch) => {
+                  await action({ action: 'category_update', key: c.key, ...patch });
+                  setEditKey(null);
+                }}
+              />
+            ) : (
+              <div key={c.key} className="flex items-center gap-2 bg-white/[0.02] rounded-lg p-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-medium truncate">
+                    {c.label}
+                    <span className="text-[10px] text-zinc-500 ml-1.5">#{c.key}</span>
+                  </div>
+                  {c.desc && <div className="text-[11px] text-zinc-400 truncate">{c.desc}</div>}
+                </div>
+                <div className="flex gap-1.5 shrink-0">
+                  <button
+                    disabled={busy}
+                    onClick={() => setEditKey(c.key)}
+                    className="px-2 py-1 rounded bg-white/[0.05] text-zinc-300 text-[11px] hover:bg-white/[0.1] disabled:opacity-30"
+                  >
+                    편집
+                  </button>
+                  <button
+                    disabled={busy || SEED_KEYS.has(c.key)}
+                    onClick={() =>
+                      confirm(`'${c.label}' 그룹을 삭제할까요?\n해당 그룹의 모든 권한도 함께 제거됩니다.`) &&
+                      action({ action: 'category_delete', key: c.key })
+                    }
+                    className="px-2 py-1 rounded bg-rose-500/10 text-rose-300/80 text-[11px] hover:bg-rose-500/20 disabled:opacity-30"
+                    title={SEED_KEYS.has(c.key) ? '기본 그룹은 삭제 불가' : ''}
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+            ),
+          )}
+        </div>
+      )}
+
+      {adding ? (
+        <CategoryEditRow
+          isNew
+          busy={busy}
+          onCancel={() => setAdding(false)}
+          onSave={async (patch) => {
+            await action({ action: 'category_create', ...patch });
+            setAdding(false);
+          }}
+        />
+      ) : (
+        <button
+          disabled={busy}
+          onClick={() => setAdding(true)}
+          className="self-start px-3 py-1.5 rounded-lg bg-blue-500/15 text-blue-300 text-[12px] hover:bg-blue-500/25 disabled:opacity-30"
+        >
+          + 새 그룹
+        </button>
+      )}
+    </div>
+  );
+}
+
+function CategoryEditRow({ cat, isNew, busy, onSave, onCancel }) {
+  const [key, setKey] = useState(cat?.key || '');
+  const [label, setLabel] = useState(cat?.label || '');
+  const [desc, setDesc] = useState(cat?.desc || '');
+  const [sort, setSort] = useState(cat?.sort_order ?? 0);
+
+  const submit = () => {
+    if (!label.trim()) return alert('label 필수');
+    if (isNew && !/^[a-z][a-z0-9_]{0,31}$/.test(key.trim())) {
+      return alert('key: 영문 소문자/숫자/_ 1~32자 (첫 글자 영문)');
+    }
+    const patch = { label: label.trim(), desc: desc.trim(), sort_order: +sort };
+    if (isNew) patch.key = key.trim();
+    onSave(patch);
+  };
+
+  return (
+    <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-2.5 flex flex-col gap-1.5">
+      {isNew && (
+        <input
+          value={key}
+          onChange={(e) => setKey(e.target.value.toLowerCase())}
+          placeholder="key (예: sns, finance)"
+          className="bg-white/[0.04] border border-white/[0.06] rounded px-2 py-1 text-[12px] font-mono"
+          autoFocus
+        />
+      )}
+      <input
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        placeholder="label (예: 💬 SNS)"
+        className="bg-white/[0.04] border border-white/[0.06] rounded px-2 py-1 text-[12px]"
+        autoFocus={!isNew}
+      />
+      <input
+        value={desc}
+        onChange={(e) => setDesc(e.target.value)}
+        placeholder="설명 (선택)"
+        className="bg-white/[0.04] border border-white/[0.06] rounded px-2 py-1 text-[12px]"
+      />
+      <div className="flex items-center gap-2">
+        <label className="text-[11px] text-zinc-500">정렬</label>
+        <input
+          type="number"
+          value={sort}
+          onChange={(e) => setSort(e.target.value)}
+          className="bg-white/[0.04] border border-white/[0.06] rounded px-2 py-1 text-[12px] w-20"
+        />
+        <div className="flex-1" />
+        <button
+          disabled={busy}
+          onClick={onCancel}
+          className="px-2.5 py-1 rounded bg-white/[0.05] text-zinc-300 text-[11px] hover:bg-white/[0.1]"
+        >
+          취소
+        </button>
+        <button
+          disabled={busy}
+          onClick={submit}
+          className="px-3 py-1 rounded bg-emerald-500/20 text-emerald-200 text-[11px] hover:bg-emerald-500/30 disabled:opacity-30"
+        >
+          {isNew ? '만들기' : '저장'}
+        </button>
       </div>
     </div>
   );
