@@ -88,8 +88,8 @@ export async function GET() {
          to_char(w_start, 'MM/DD')      AS label,
          sessions,
          days,
-         CASE WHEN days > 0 AND $1 > 0
-              THEN ROUND(sessions::numeric / ($1 * days * 48) * 100, 1)
+         CASE WHEN days > 0 AND $1::int > 0
+              THEN ROUND(sessions::numeric / ($1::int * days * 48) * 100, 1)
               ELSE 0 END AS occupancy_pct
        FROM w ORDER BY w_start`,
       [totalChargers]
@@ -194,8 +194,8 @@ export async function GET() {
          FROM charger_usage_daily
          GROUP BY date, hour
        )
-       SELECT COUNT(*)::int                                                 AS total_hours,
-              COUNT(*) FILTER (WHERE sessions >= $1 * $2 * 2.0)::int        AS peak_hours
+       SELECT COUNT(*)::int                                                       AS total_hours,
+              COUNT(*) FILTER (WHERE sessions >= $1::float * $2::int * 2.0)::int  AS peak_hours
        FROM per_hour`,
       [PEAK_THRESHOLD, totalChargers || 1]
     );
