@@ -69,22 +69,30 @@ async function cmdToday(chatId) {
   const carId = await getCarId();
   if (!carId) return sendMessage('차량 정보 없음', chatId);
 
-  const dayStart = `(NOW() AT TIME ZONE 'Asia/Seoul')::date AT TIME ZONE 'Asia/Seoul'`;
+  // KST 자정의 UTC 시각 — TeslaMate start_date 가 timestamp(no tz, UTC 값) 이라
+  // 세션 타임존에 의존하지 않게 JS 에서 계산해서 파라미터로 전달.
+  const KST_OFFSET_MS = 9 * 3600 * 1000;
+  const nowKst = new Date(Date.now() + KST_OFFSET_MS);
+  const todayStart = new Date(Date.UTC(
+    nowKst.getUTCFullYear(),
+    nowKst.getUTCMonth(),
+    nowKst.getUTCDate(),
+  ) - KST_OFFSET_MS);
 
   const { rows: dr } = await pool.query(
     `SELECT COUNT(*)::int AS n,
             COALESCE(SUM(distance), 0)::float AS km,
             COALESCE(SUM(duration_min), 0)::int AS dur
      FROM drives
-     WHERE car_id = $1 AND start_date >= ${dayStart}`,
-    [carId],
+     WHERE car_id = $1 AND start_date >= $2`,
+    [carId, todayStart],
   );
   const { rows: ch } = await pool.query(
     `SELECT COUNT(*)::int AS n,
             COALESCE(SUM(charge_energy_added), 0)::float AS kwh
      FROM charging_processes
-     WHERE car_id = $1 AND start_date >= ${dayStart}`,
-    [carId],
+     WHERE car_id = $1 AND start_date >= $2`,
+    [carId, todayStart],
   );
   const d = dr[0];
   const c = ch[0];
