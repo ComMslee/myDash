@@ -9,6 +9,7 @@ import {
 } from './auth.js';
 import { getCategories, categoryByKey, labelOf } from './categories.js';
 import { listUserGroups, applyUserGroup } from './user_groups.js';
+import { dashGet } from './dash.js';
 
 // ── 명령 카탈로그 ─────────────────────────────────────
 // open: 누구나 (등록 안 된 사람도 가능)
@@ -21,6 +22,11 @@ const COMMANDS = {
   '/categories':{ open: true,     handler: cmdCategories },
   '/soc':       { feature: 'car', handler: cmdSoc },
   '/today':     { feature: 'car', handler: cmdToday },
+  '/yesterday': { feature: 'car', handler: cmdYesterday },
+  '/week':      { feature: 'car', handler: cmdWeek },
+  '/range':     { feature: 'car', handler: cmdRange },
+  '/parked':    { feature: 'car', handler: cmdParked },
+  '/charge':    { feature: 'car', handler: cmdCharge },
   '/where':     { feature: 'car', handler: cmdWhere },
   // 운영 — 모바일에서 빠르게 처리할 최소 셋. 나머지(/users, /grant, /revoke,
   // /unmatched, /topnope, /resolve, /broadcast)는 /v2/tg 웹에서.
@@ -32,19 +38,49 @@ const COMMANDS = {
 // ── 자연어 라우팅 (feature 태그 포함) ─────────────────
 // 첫 매칭 승. 위에서 아래로 검사. 의도가 모호한 표현은 더 명확한 패턴이 위로.
 const NL_PATTERNS = [
-  // /soc — 배터리/충전 상태
+  // /charge — 충전 진행 상세 (속도·경과·ETA). /soc 보다 먼저 매칭되어야 함.
   {
     feature: 'car',
-    re: /(배터리|soc|몇\s*[%％]|얼마나.*(남|차)|남은\s*(배터리|km|거리|전기)|잔량|퍼센트|충전중|충전\s*(상태|됐|됨|끝|중\?)|지금.*충전|몇\s*프로)/i,
+    re: /(충전\s*(속도|진행|얼마나\s*(됐|남|걸려)|ETA|마저|언제.*끝)|언제\s*(끝|완료|다\s*돼)|얼마나.*충전(됐|돼|됨)|충전.*\bkw\b|\bkw\s*들어)/i,
+    handler: cmdCharge,
+  },
+  // /range — 주행가능거리. /soc 보다 먼저 (남은 km/거리 선점).
+  {
+    feature: 'car',
+    re: /(주행\s*가능|남은\s*(km|거리)|얼마나\s*갈|몇\s*km\s*남|주행거리|\brange\b)/i,
+    handler: cmdRange,
+  },
+  // /soc — 배터리 % + 충전 중 여부 (단순). km/거리/충전속도는 위에서 처리됨.
+  {
+    feature: 'car',
+    re: /(배터리|\bsoc\b|몇\s*[%％]|남은\s*(배터리|전기)|잔량|퍼센트|몇\s*프로|충전\s*(중|됐|됨)\??)/i,
     handler: cmdSoc,
   },
-  // /today — 오늘 활동
+  // /yesterday — 어제 (KST). /today 보다 먼저.
   {
     feature: 'car',
-    re: /(오늘|today|얼마나.*(달렸|달려|달리|뛰었|뛰)|오늘.*(주행|충전|km|거리|효율)|운행\s*기록|일일\s*요약|오늘\s*뭐|일주.*기록)/i,
+    re: /(어제|어젯|yesterday)/i,
+    handler: cmdYesterday,
+  },
+  // /week — 지난 7일.
+  {
+    feature: 'car',
+    re: /(이번\s*주|지난\s*주|일주일|7일|주간|this\s*week|past\s*week|\bweek\b)/i,
+    handler: cmdWeek,
+  },
+  // /today — 오늘 활동.
+  {
+    feature: 'car',
+    re: /(오늘|today|얼마나.*(달렸|달려|달리|뛰었|뛰)|오늘.*(주행|충전|km|거리|효율)|운행\s*기록|일일\s*요약|오늘\s*뭐)/i,
     handler: cmdToday,
   },
-  // /where — 현재 위치
+  // /parked — 마지막 주차 장소·경과. /where 보다 먼저 (특수성).
+  {
+    feature: 'car',
+    re: /(마지막\s*주차|주차한\s*지|얼마나\s*(세웠|세워)|세워둔\s*지|언제\s*주차|parked\s*(when|how))/i,
+    handler: cmdParked,
+  },
+  // /where — 현재 위치 좌표/지도.
   {
     feature: 'car',
     re: /(어디|위치|where.*(car|는|있)|지도|location|어디야|어디에|주차.*어디|차.*어디|내\s*차|현재\s*위치|navigate|map.*me)/i,
@@ -197,9 +233,14 @@ async function cmdStart({ chatId }) {
 // 카테고리별 명령 카탈로그 — /help 표시용.
 const CATEGORY_COMMANDS = {
   car: [
-    { cmd: '/soc',   desc: '배터리 % + 충전 여부' },
-    { cmd: '/today', desc: '오늘 (KST) 주행/충전' },
-    { cmd: '/where', desc: '현재 위치' },
+    { cmd: '/soc',       desc: '배터리 % + 충전 여부' },
+    { cmd: '/range',     desc: '남은 주행거리' },
+    { cmd: '/charge',    desc: '충전 진행 상세 (속도·경과)' },
+    { cmd: '/today',     desc: '오늘 (KST) 주행/충전' },
+    { cmd: '/yesterday', desc: '어제 (KST) 주행/충전' },
+    { cmd: '/week',      desc: '지난 7일 요약' },
+    { cmd: '/parked',    desc: '마지막 주차 장소·경과' },
+    { cmd: '/where',     desc: '현재 위치' },
   ],
   // 새 카테고리 추가 시 여기에 명령 목록.
 };
@@ -368,6 +409,96 @@ async function cmdWhere({ chatId }) {
     chatId,
   );
   return sendLocation(p.lat, p.lng, chatId);
+}
+
+// 새 핸들러는 dashboard API 호출만 — TeslaMate DB 직접 쿼리는 dashboard 가 책임.
+// 기존 /soc /today /where 도 같은 패턴으로 점진 마이그 (후속 PR).
+
+function fmtElapsed(min) {
+  if (!Number.isFinite(min) || min < 0) return '?';
+  return min >= 60
+    ? `${Math.floor(min / 60)}시간 ${min % 60}분`
+    : `${min}분`;
+}
+
+async function cmdYesterday({ chatId }) {
+  const j = await dashGet('/api/summary?range=yesterday');
+  if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
+  const d = j.drives || {}; const c = j.charges || {};
+  return sendMessage([
+    '<b>어제 (KST)</b>',
+    d.n > 0 ? `🚗 ${d.n}회 주행 · ${Number(d.km).toFixed(1)} km · ${d.dur}분` : '🚗 주행 없음',
+    c.n > 0 ? `⚡ ${c.n}회 충전 · ${Number(c.kwh).toFixed(2)} kWh` : '⚡ 충전 없음',
+  ].join('\n'), chatId);
+}
+
+async function cmdWeek({ chatId }) {
+  const j = await dashGet('/api/summary?range=week');
+  if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
+  const d = j.drives || {}; const c = j.charges || {};
+  return sendMessage([
+    '<b>지난 7일 (KST)</b>',
+    d.n > 0 ? `🚗 ${d.n}회 · ${Number(d.km).toFixed(1)} km · ${d.dur}분` : '🚗 주행 없음',
+    c.n > 0 ? `⚡ ${c.n}회 · ${Number(c.kwh).toFixed(2)} kWh` : '⚡ 충전 없음',
+  ].join('\n'), chatId);
+}
+
+async function cmdRange({ chatId }) {
+  const j = await dashGet('/api/car');
+  if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
+  if (j.rated_battery_range == null) return sendMessage('주행거리 데이터 없음', chatId);
+  const rated = j.rated_battery_range;
+  const est = j.est_battery_range;
+  const lines = [`🛣 <b>${rated} km</b> 남음 (${j.battery_level ?? '-'}%)`];
+  if (est && est !== rated) lines.push(`<i>예상 ${est} km</i>`);
+  if (j.last_seen) lines.push(`<i>업데이트: ${formatKst(j.last_seen)} KST</i>`);
+  return sendMessage(lines.join('\n'), chatId);
+}
+
+async function cmdParked({ chatId }) {
+  const j = await dashGet('/api/parked');
+  if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
+  if (j.driving) {
+    return sendMessage(`🚗 주행 중 — 시작 ${formatKst(j.drive_started_at)} KST`, chatId);
+  }
+  if (!j.parked) return sendMessage('주행 기록 없음', chatId);
+  const p = j.parked;
+  const place = p.place || '?';
+  return sendMessage([
+    `🅿️ <b>${escapeHtml(place)}</b>`,
+    `정차: ${formatKst(p.end_date)} KST (${fmtElapsed(p.elapsed_min)} 전)`,
+  ].join('\n'), chatId);
+}
+
+async function cmdCharge({ chatId }) {
+  const j = await dashGet('/api/charging-status');
+  if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
+
+  if (!j.charging) {
+    // 충전 기록 자체는 /api/car last_charge 로.
+    const car = await dashGet('/api/car');
+    const last = car?.last_charge;
+    if (!last) return sendMessage('⚡ 현재 충전 중 아님 — 충전 기록 없음', chatId);
+    return sendMessage([
+      '⚡ 현재 충전 중 아님',
+      `<i>마지막: ${formatKst(last.end_date)} KST · ${last.soc_start ?? '?'}% → ${last.soc_end ?? '?'}%</i>`,
+    ].join('\n'), chatId);
+  }
+
+  const power = j.charger_power != null ? Number(j.charger_power).toFixed(1) : null;
+  const kwh = Number(j.charge_energy_added || 0).toFixed(2);
+  const startSoc = j.start_battery_level ?? '?';
+  const curSoc = j.battery_level ?? '?';
+  const elapsedMin = j.start_date
+    ? Math.floor((Date.now() - new Date(j.start_date).getTime()) / 60000)
+    : null;
+  const lines = [
+    '⚡ <b>충전 중</b>' + (j.fallback ? ' <i>(폴백 감지)</i>' : ''),
+    `🔋 ${startSoc}% → <b>${curSoc}%</b>`,
+    `📥 ${kwh} kWh${power ? ` · 현재 ${power} kW` : ''}`,
+  ];
+  if (j.start_date) lines.push(`⏱ 시작 ${formatKst(j.start_date)} KST (${fmtElapsed(elapsedMin)} 경과)`);
+  return sendMessage(lines.join('\n'), chatId);
 }
 
 // ── 운영 명령 (root) ─────────────────────────────────

@@ -6,21 +6,32 @@
 
 - **알림(out)**: TeslaMate DB 변동 감지 → 권한 보유자에게 Telegram 메시지
   - 충전 시작 / 충전 완료 / 주행 종료(>=0.5 km)
-- **명령(in)**: Telegram에서 사용자가 보낸 메시지 → DB 조회 → 응답
+- **명령(in)**: Telegram에서 사용자가 보낸 메시지 → **dashboard API 호출** → 텔레그램 응답으로 포맷
   - `/cmd` 스타일 + 자연어 키워드 일부 인식
 - **운영**: 가입 신청 / 승인 / 권한 부여 / 자연어 학습 루프
+
+> **아키텍처 원칙**: TeslaMate DB 직접 쿼리는 **dashboard 가 전적으로 책임**.
+> hub 는 dashboard `/api/*` 를 호출해 결과를 텔레그램 메시지로 포맷만 함.
+> 비즈니스 로직 단일 진실원, 스키마 함정 한 번만 처리, 컬럼 변경 자동 전파.
+> 새 봇 명령 추가 시: ① 필요한 dashboard API 가 없으면 만들고 ② hub 핸들러는 `dashGet()` 호출.
+> 예외: RBAC/가입/권한 등 hub 자체 데이터(`hub_*` 테이블) 는 hub 가 직접 관리.
 
 ## 2. 아키텍처 (현재)
 
 ```
-TeslaMate DB ──┬──► telegram-hub (Node 20, ~80MB RAM)
-               │     ├─ 5초마다 charging_processes/drives 폴링 → 신규 이벤트 알림
-               │     ├─ Telegram getUpdates long-poll 25초
-               │     ├─ Express 없이 http 서버 :3000 — POST /notify (외부용)
-               │     └─ /data 볼륨에 state.json (이벤트 baseline + getUpdates offset)
+TeslaMate DB ──┬──► dashboard (Next.js)
+               │     └─ /api/* — 단일 진실원. SOC/주행/충전/주차/요약 등
                │
-               └──► dashboard (기존)
-                     └─ /api/server-status 가 hub /health 호출 → api-status 페이지에 표시
+               └──► telegram-hub (Node 20, ~80MB RAM)
+                     ├─ 5초마다 charging_processes/drives 폴링 → 신규 이벤트 알림 (DB 직접)
+                     ├─ Telegram getUpdates long-poll 25초
+                     ├─ 사용자 명령 → dashGet('/api/...') → 메시지 포맷 (DB 직접 X)
+                     ├─ http 서버 :3000 — POST /notify (외부용)
+                     └─ /data 볼륨에 state.json (이벤트 baseline + getUpdates offset)
+
+dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
+  - dashboard → hub: /health 호출
+  - hub → dashboard: 봇 명령 응답용 /api/* 호출 (쿠키 인증 우회)
 ```
 
 - **컨테이너 외부 노출 없음** (long-polling이라 inbound 불필요)
@@ -38,7 +49,8 @@ TeslaMate DB ──┬──► telegram-hub (Node 20, ~80MB RAM)
 | `TELEGRAM_CHAT_ID` | ✅ | root chat_id (부팅 시 자동으로 role=root 부여) |
 | `HUB_SHARED_SECRET` | 선택 | `/notify` 외부 호출용 Bearer secret. 비워두면 인증 생략 |
 | `TG_HUB_DB_POLL_MS` | 선택 | 기본 5000(5초). 이벤트 감지 주기 |
-| `TELEGRAM_HUB_URL` | 선택 | dashboard에서 hub /health 호출 URL. 기본 `http://telegram-hub:3000` |
+| `TELEGRAM_HUB_URL` | 선택 | dashboard → hub `/health` 호출 URL. 기본 `http://telegram-hub:3000` |
+| `DASHBOARD_URL` | 선택 | hub → dashboard `/api/*` 호출 URL. 기본 `http://dashboard:5000` |
 
 **root 부트스트랩**: 컨테이너 부팅 시 `TELEGRAM_CHAT_ID`를 `hub_users` 에 `role=root` + `car` 권한으로 강제 upsert. dashboard 가 처음 `/v2/tg` 로딩 시 `group_key='root'` 도 자동 매핑.
 
@@ -111,11 +123,16 @@ TeslaMate DB ──┬──► telegram-hub (Node 20, ~80MB RAM)
 
 ### 데이터 (`car` 권한 필요)
 
-| 명령 | 설명 |
-|---|---|
-| `/soc` | 현재 배터리 % + 충전 여부 |
-| `/today` | 오늘(KST) 주행 횟수/거리/시간 + 충전 횟수/kWh |
-| `/where` | 현재 위치 (지도 링크 + 핀) |
+| 명령 | 설명 | 호출 API |
+|---|---|---|
+| `/soc` | 현재 배터리 % + 충전 여부 | (DB 직접 — 마이그 예정) |
+| `/range` | 남은 주행거리 (rated/est) | `/api/car` |
+| `/charge` | 충전 진행 상세 (속도·경과·시작 SOC→현재) | `/api/charging-status` |
+| `/today` | 오늘(KST) 주행/충전 요약 | (DB 직접 — 마이그 예정) |
+| `/yesterday` | 어제(KST) 주행/충전 요약 | `/api/summary?range=yesterday` |
+| `/week` | 지난 7일 주행/충전 요약 | `/api/summary?range=week` |
+| `/parked` | 마지막 주차 장소·경과 (또는 주행 중 표시) | `/api/parked` |
+| `/where` | 현재 위치 (지도 링크 + 핀) | (DB 직접 — 마이그 예정) |
 
 ### 공통 (누구나)
 

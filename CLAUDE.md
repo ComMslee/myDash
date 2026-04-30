@@ -49,6 +49,26 @@ docker compose build dashboard && docker compose up -d dashboard
 - 커밋: `<type>: <설명>` (`feat`, `fix`, `refactor`, `tune`, `ci`, `docs`, `chore`)
 - **함정 표시 파일 수정 전**: 파일 상단에 `⚠️  수정 전 필독: /CLAUDE.md "알려진 함정 …"` 주석이 있으면 아래 [알려진 함정](#알려진-함정) 섹션의 해당 항목을 먼저 읽고 작업.
 
+## 아키텍처 원칙 — 데이터 경로
+
+**소비자(봇·UI)는 API 만 호출. 외부 데이터 소스(DB·외부 서비스) 직접 접근 금지.**
+
+각 서비스가 자기 데이터의 단일 진실원이 되고, 소비자(텔레그램 봇, 대시보드 UI, 다른 대시보드 등) 는 API 만 호출:
+- `dashboard ← TeslaMate DB` (대시보드 API 가 단독으로 책임)
+- `telegram-hub → dashboard /api/*` (봇 명령 응답은 dashGet 호출 후 포맷만)
+- `dashboard UI → dashboard /api/*` (이미 그렇게 됨)
+
+**왜**:
+- 비즈니스 로직 단일 진실원 (예: charging 폴백 감지, charges 컬럼 부재 함정)
+- 스키마/컬럼 변경이 소비자 전체에 자동 전파
+- 같은 데이터를 여러 소비자가 서로 다른 쿼리로 조회 → 결과 불일치 방지
+
+**예외**:
+- 서비스 자체 데이터 (예: hub 의 `hub_*` 테이블 — RBAC, 가입자, 학습 로그) 는 그 서비스가 직접 관리
+- 변동 감지용 폴링 (예: hub 가 TeslaMate `charging_processes`/`drives` 5초 폴링) 은 직접 DB 가 효율적 — 알림 트리거 한정
+
+**새 봇 명령/소비자 추가 시**: 필요한 dashboard API 가 없으면 **먼저 만들고**, 봇은 `dashGet()` 호출 → 응답 포맷만. DB 직접 쿼리 금지.
+
 세부 규칙은 [`docs/CODE_CONVENTIONS.md`](./docs/CODE_CONVENTIONS.md) 참고.
 
 ## 디버깅

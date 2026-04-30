@@ -79,6 +79,7 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - HUB_SHARED_SECRET=${HUB_SHARED_SECRET:-}
+      - DASHBOARD_URL=${DASHBOARD_URL:-http://dashboard:5000}
       - DB_POLL_MS=${TG_HUB_DB_POLL_MS:-5000}
     volumes:
       - telegram-hub-data:/data
