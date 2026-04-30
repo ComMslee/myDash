@@ -61,52 +61,65 @@ function Header({ meta }) {
 }
 
 function KpiGrid({ kpi }) {
-  const cells = [
-    {
-      label: '주평균',
-      value: kpi.weekly_avg_pct != null ? kpi.weekly_avg_pct.toFixed(1) : '—',
-      unit: '%',
-      color: 'text-emerald-400',
-      hint: '최근 7일',
-    },
-    {
-      label: '평균 가동률',
-      value: kpi.avg_occupancy_pct.toFixed(1),
-      unit: '%',
-      color: 'text-emerald-400',
-      hint: '관측 전체',
-    },
-    {
-      label: '피크 빈도',
-      value: kpi.peak_freq_pct.toFixed(1),
-      unit: '%',
-      color: 'text-amber-400',
-      hint: `점유 ${kpi.peak_freq_threshold_pct}%↑`,
-    },
-    {
-      label: '6개월 추세',
-      value: kpi.trend_6m_delta_pp == null
-        ? '—'
-        : (kpi.trend_6m_delta_pp >= 0 ? '+' : '') + kpi.trend_6m_delta_pp.toFixed(1),
-      unit: '%p',
-      color: kpi.trend_6m_delta_pp == null
-        ? 'text-zinc-500'
-        : (kpi.trend_6m_delta_pp >= 0 ? 'text-blue-400' : 'text-rose-400'),
-      hint: '6달 평균차',
-    },
-  ];
+  const fmt = (v) => v == null ? '—' : v.toFixed(1);
+  const trend = kpi.trend_6m_delta_pp;
+  const trendStr = trend == null
+    ? '—'
+    : (trend >= 0 ? '+' : '') + trend.toFixed(1);
+  const trendColor = trend == null
+    ? 'text-zinc-500'
+    : (trend >= 0 ? 'text-blue-400' : 'text-rose-400');
+  const trendLabel = trend == null
+    ? '변화 없음'
+    : (trend > 0 ? '↑ 증가' : trend < 0 ? '↓ 감소' : '→ 유지');
+
   return (
-    <div className="grid grid-cols-4 gap-1.5">
-      {cells.map((c) => (
-        <div key={c.label} className="bg-black/20 rounded-lg p-2 text-center">
-          <div className="text-[9px] text-zinc-500 tracking-wider uppercase truncate">{c.label}</div>
-          <div className="mt-0.5 leading-tight">
-            <span className={`text-lg font-black tabular-nums ${c.color}`}>{c.value}</span>
-            <span className="text-[9px] text-zinc-600 ml-0.5">{c.unit}</span>
-          </div>
-          <div className="text-[8px] text-zinc-600 mt-0.5">{c.hint}</div>
+    <div className="space-y-2">
+      {/* 1. 전체 가동률 — 큰 카드 */}
+      <div className="bg-black/20 rounded-lg p-3 text-center">
+        <div className="text-[10px] text-zinc-500 tracking-wider uppercase">전체 가동률</div>
+        <div className="mt-1 leading-none">
+          <span className="text-3xl font-black tabular-nums text-emerald-400">{fmt(kpi.overall_pct)}</span>
+          <span className="text-xs text-zinc-600 ml-1">%</span>
         </div>
-      ))}
+        <div className="text-[9px] text-zinc-600 mt-1">관측 전체 기간 평균</div>
+      </div>
+
+      {/* 2. 단위별 평균/피크 — 헤더 row + 일/주/월 row */}
+      <div className="bg-black/20 rounded-lg overflow-hidden">
+        <div className="grid grid-cols-3 px-3 py-1 text-[9px] text-zinc-500 tracking-wider uppercase border-b border-white/[0.04]">
+          <span></span>
+          <span className="text-right">평균</span>
+          <span className="text-right">피크</span>
+        </div>
+        {[
+          { label: '일간', avg: kpi.daily_avg_pct,   peak: kpi.daily_peak_pct,   hint: '일별' },
+          { label: '주간', avg: kpi.weekly_avg_pct,  peak: kpi.weekly_peak_pct,  hint: '주별' },
+          { label: '월간', avg: kpi.monthly_avg_pct, peak: kpi.monthly_peak_pct, hint: '월별' },
+        ].map((row) => (
+          <div key={row.label} className="grid grid-cols-3 px-3 py-1.5 items-baseline border-b border-white/[0.03] last:border-0">
+            <span className="text-[11px] font-bold text-zinc-300">{row.label}</span>
+            <span className="text-right tabular-nums">
+              <span className="text-base font-black text-emerald-400">{fmt(row.avg)}</span>
+              <span className="text-[9px] text-zinc-600 ml-0.5">%</span>
+            </span>
+            <span className="text-right tabular-nums">
+              <span className="text-base font-black text-amber-400">{fmt(row.peak)}</span>
+              <span className="text-[9px] text-zinc-600 ml-0.5">%</span>
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* 3. 추세 (증감) */}
+      <div className="bg-black/20 rounded-lg p-3 flex items-center justify-between">
+        <span className="text-[10px] text-zinc-500 tracking-wider uppercase">6개월 추세</span>
+        <span className="text-right">
+          <span className={`text-xl font-black tabular-nums ${trendColor}`}>{trendStr}</span>
+          <span className="text-[9px] text-zinc-600 ml-1">%p</span>
+          <span className={`text-[10px] ml-2 ${trendColor}`}>{trendLabel}</span>
+        </span>
+      </div>
     </div>
   );
 }

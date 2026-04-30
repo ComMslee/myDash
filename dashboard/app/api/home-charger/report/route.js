@@ -143,6 +143,50 @@ export async function GET() {
       ? parseFloat((weekRow.sessions / (totalChargers * weekRow.days * 48) * 100).toFixed(1))
       : null;
 
+    // 일/주/월 평균 + 피크 — 각 단위로 가동률 산출 후 AVG / MAX.
+    //   * 분모: totalChargers × 단위 슬롯수 (일=48, 주=336, 월=1488)
+    const dayUnitRes = await pool.query(
+      `WITH d AS (
+         SELECT date, SUM(count)::float / NULLIF($1 * 48.0, 0) * 100 AS pct
+         FROM charger_usage_daily
+         GROUP BY date
+       )
+       SELECT ROUND(AVG(pct)::numeric, 1) AS avg_pct,
+              ROUND(MAX(pct)::numeric, 1) AS peak_pct
+       FROM d`,
+      [totalChargers || 1]
+    );
+    const weekUnitRes = await pool.query(
+      `WITH w AS (
+         SELECT date_trunc('week', date)::date AS w_start,
+                COUNT(DISTINCT date)::int      AS days,
+                SUM(count)::float              AS sessions
+         FROM charger_usage_daily
+         GROUP BY date_trunc('week', date)
+       )
+       SELECT ROUND(AVG(sessions / NULLIF($1 * days * 48.0, 0) * 100)::numeric, 1) AS avg_pct,
+              ROUND(MAX(sessions / NULLIF($1 * days * 48.0, 0) * 100)::numeric, 1) AS peak_pct
+       FROM w`,
+      [totalChargers || 1]
+    );
+    const monthUnitRes = await pool.query(
+      `WITH m AS (
+         SELECT date_trunc('month', date)::date AS m_start,
+                COUNT(DISTINCT date)::int       AS days,
+                SUM(count)::float               AS sessions
+         FROM charger_usage_daily
+         GROUP BY date_trunc('month', date)
+       )
+       SELECT ROUND(AVG(sessions / NULLIF($1 * days * 48.0, 0) * 100)::numeric, 1) AS avg_pct,
+              ROUND(MAX(sessions / NULLIF($1 * days * 48.0, 0) * 100)::numeric, 1) AS peak_pct
+       FROM m`,
+      [totalChargers || 1]
+    );
+
+    const dayUnit   = dayUnitRes.rows[0];
+    const weekUnit  = weekUnitRes.rows[0];
+    const monthUnit = monthUnitRes.rows[0];
+
     // 피크 빈도 — 시간당 점유율 ≥ 70% 발생 시간이 전체 시간의 몇 %.
     //   시간당 점유 = SUM(count for that hour) / (totalChargers × 2)
     //   분모는 등록 충전기 전체 수 — '시간 슬롯 내 unique 충전기' 가 아님 (예전 분모는 0~%↑ 부풀려짐).
@@ -167,15 +211,23 @@ export async function GET() {
       total_sessions: totalSessions,
       days_observed: daysObserved,
       total_chargers: totalChargers,
-      daily_avg_sessions: parseFloat((totalSessions / daysObserved).toFixed(1)),
+      // 전체 가동률
+      overall_pct: parseFloat((totalSessions / (totalChargers * daysObserved * TOTAL_SLOTS_PER_DAY) * 100).toFixed(1)),
+      // 일/주/월 평균 + 피크
+      daily_avg_pct:    dayUnit.avg_pct  != null ? parseFloat(dayUnit.avg_pct)    : null,
+      daily_peak_pct:   dayUnit.peak_pct != null ? parseFloat(dayUnit.peak_pct)   : null,
+      weekly_avg_pct:   weekUnit.avg_pct  != null ? parseFloat(weekUnit.avg_pct)  : null,
+      weekly_peak_pct:  weekUnit.peak_pct != null ? parseFloat(weekUnit.peak_pct) : null,
+      monthly_avg_pct:  monthUnit.avg_pct  != null ? parseFloat(monthUnit.avg_pct)  : null,
+      monthly_peak_pct: monthUnit.peak_pct != null ? parseFloat(monthUnit.peak_pct) : null,
+      // 추세 (6달 평균 차)
+      trend_6m_delta_pp: trend6mDelta,
+      // (deprecated 호환용 — 추후 제거 가능)
       avg_occupancy_pct: parseFloat((totalSessions / (totalChargers * daysObserved * TOTAL_SLOTS_PER_DAY) * 100).toFixed(1)),
-      weekly_avg_pct: weeklyAvgPct,
       peak_freq_pct: peakFreqPct,
       peak_freq_threshold_pct: PEAK_THRESHOLD * 100,
       peak_dow:  peak?.dow ?? null,
       peak_hour: peak?.hour ?? null,
-      peak_avg_count: peak ? parseFloat((peak.total / peak.days).toFixed(1)) : null,
-      trend_6m_delta_pp: trend6mDelta,
     };
 
     // 3) 동별 가동률 — constants.js 동별 매핑으로 (stat_id, chger_id) 그룹.
