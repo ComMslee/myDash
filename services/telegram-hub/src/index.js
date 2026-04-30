@@ -5,6 +5,7 @@ import { startTelegramPoller } from './tg_poller.js';
 import { bootstrapRoot, grantPermission, syncMissingNames } from './auth.js';
 import { ensureCategoriesSchema } from './categories.js';
 import { ensureUserGroupsSchema } from './user_groups.js';
+import { syncUserMenu } from './commands.js';
 
 const required = ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'TM_DB_USER', 'TM_DB_PASS'];
 const missing = required.filter((k) => !process.env[k]);
@@ -26,6 +27,10 @@ try {
   syncMissingNames()
     .then((n) => n && console.log('[boot] syncMissingNames checked', n, 'user(s)'))
     .catch((e) => console.error('[boot] syncMissingNames failed', e.message));
+  // root 의 텔레그램 [/] 메뉴 등록 — 그룹·권한 변동 후 항상 최신.
+  syncUserMenu(rootChatId)
+    .then(() => console.log('[boot] root menu synced'))
+    .catch((e) => console.error('[boot] syncUserMenu failed', e.message));
   console.log('[boot] root chat_id =', rootChatId);
 } catch (e) {
   console.error('[boot] auth bootstrap failed', e.message);

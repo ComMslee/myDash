@@ -1,5 +1,5 @@
 import { pool } from './db.js';
-import { sendMessage, sendLocation, escapeHtml } from './telegram.js';
+import { sendMessage, sendLocation, escapeHtml, setMyCommands } from './telegram.js';
 import { formatKst } from './format.js';
 import {
   ensureAuthSchema,
@@ -153,7 +153,7 @@ async function cmdStart({ chatId }) {
   return cmdHelp({ chatId });
 }
 
-// 카테고리별 명령 카탈로그 — /help 표시용.
+// 카테고리별 명령 카탈로그 — /help 표시 + setMyCommands + reply 키보드 공통 소스.
 const CATEGORY_COMMANDS = {
   car: [
     { cmd: '/soc',       desc: '배터리 % + 충전 여부' },
@@ -167,6 +167,69 @@ const CATEGORY_COMMANDS = {
   ],
   // 새 카테고리 추가 시 여기에 명령 목록.
 };
+
+const COMMON_COMMANDS = [
+  { cmd: '/help',       desc: '도움말' },
+  { cmd: '/whoami',     desc: '내 권한·정보' },
+  { cmd: '/categories', desc: '카테고리' },
+];
+
+const ADMIN_COMMANDS = [
+  { cmd: '/pending',  desc: '가입 대기자 보기' },
+  { cmd: '/setgroup', desc: '가입승인·그룹변경' },
+  { cmd: '/deny',     desc: '차단/탈퇴' },
+];
+
+// 사용자 권한 기반 슬래시 명령 목록 — Telegram [/] 메뉴 + Reply 키보드 공통.
+async function buildUserCommands(chatId, role) {
+  const list = [...COMMON_COMMANDS];
+  const cats = await getCategories();
+  for (const cat of cats) {
+    if (!(await hasPermission(chatId, cat.key))) continue;
+    list.push(...(CATEGORY_COMMANDS[cat.key] || []));
+  }
+  if (role === 'root') list.push(...ADMIN_COMMANDS);
+  return list;
+}
+
+// Telegram 입력창 [/] 메뉴 자동완성을 사용자 권한에 맞게 갱신.
+// 가입 승인 / 그룹 변경 시점에 호출.
+export async function syncUserMenu(chatId) {
+  const u = await getUser(chatId);
+  if (!u || u.role === 'denied' || u.role === 'pending') {
+    // pending/denied 는 메뉴 비움.
+    return setMyCommands([], chatId);
+  }
+  const list = await buildUserCommands(chatId, u.role);
+  const cmds = list.map((c) => ({
+    command: c.cmd.replace(/^\//, ''),
+    description: c.desc,
+  }));
+  return setMyCommands(cmds, chatId);
+}
+
+// /help 응답에 동봉할 Reply 키보드 — 자주 쓰는 데이터 명령 위주.
+// 권한 없으면 null 반환 (키보드 생략).
+async function buildReplyKeyboard(chatId) {
+  const cats = await getCategories();
+  const dataButtons = [];
+  for (const cat of cats) {
+    if (!(await hasPermission(chatId, cat.key))) continue;
+    const cmds = CATEGORY_COMMANDS[cat.key] || [];
+    for (const c of cmds) dataButtons.push({ text: c.cmd });
+  }
+  if (!dataButtons.length) return null;
+  // 3열 그리드.
+  const rows = [];
+  for (let i = 0; i < dataButtons.length; i += 3) {
+    rows.push(dataButtons.slice(i, i + 3));
+  }
+  return {
+    keyboard: rows,
+    resize_keyboard: true,
+    is_persistent: true,
+  };
+}
 
 async function cmdHelp({ chatId, user }) {
   const u = user || await getUser(chatId);
@@ -200,7 +263,8 @@ async function cmdHelp({ chatId, user }) {
     lines.push('');
     lines.push('<i>권한·방송·로그 관리는 /v2/tg 웹에서</i>');
   }
-  return sendMessage(lines.join('\n'), chatId);
+  const kb = await buildReplyKeyboard(chatId);
+  return sendMessage(lines.join('\n'), chatId, kb ? { reply_markup: kb } : {});
 }
 
 async function cmdCategories({ chatId }) {
@@ -417,6 +481,8 @@ async function cmdSetGroup({ chatId, args, user }) {
   if (!r.ok) return sendMessage(`❌ ${r.error}`, chatId);
   const label = groups.find((g) => g.key === groupKey)?.label || groupKey;
   await sendMessage(`✅ #${target} → ${label} (role=${r.role})`, chatId);
+  // 대상자 [/] 메뉴 갱신 + 도움말 안내.
+  try { await syncUserMenu(target); } catch (e) { console.error('[setgroup] syncUserMenu', e?.message); }
   try {
     await sendMessage(`✅ '${label}' 그룹이 적용됐어요. /help 확인.`, target);
   } catch {}
@@ -427,5 +493,7 @@ async function cmdDeny({ chatId, args, user }) {
   if (!/^\d+$/.test(target)) return sendMessage('사용법: /deny &lt;chat_id&gt;', chatId);
   const ok = await setRole(target, 'denied', user.chat_id);
   if (!ok) return sendMessage(`#${target} 없음`, chatId);
+  // 차단된 사용자 [/] 메뉴 비우기.
+  try { await syncUserMenu(target); } catch (e) { console.error('[deny] syncUserMenu', e?.message); }
   return sendMessage(`🚫 #${target} 차단됨`, chatId);
 }

@@ -63,6 +63,31 @@ export async function getChat(chatId) {
   }
 }
 
+// 사용자별 텔레그램 입력창 [/] 메뉴 자동완성 갱신.
+// commands: [{ command:'soc', description:'배터리 % + 충전 여부' }, ...] (앞에 / 없이)
+// chatId 미지정 시 봇 전역 default 갱신.
+export async function setMyCommands(commands, chatId = null, languageCode = 'ko') {
+  if (!API) return null;
+  const body = { commands, language_code: languageCode };
+  if (chatId) body.scope = { type: 'chat', chat_id: Number(chatId) };
+  try {
+    const r = await fetch(`${API}/setMyCommands`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(() => '');
+      console.error('[telegram] setMyCommands', r.status, t);
+      return null;
+    }
+    return await r.json();
+  } catch (e) {
+    console.error('[telegram] setMyCommands threw', e?.message);
+    return null;
+  }
+}
+
 export async function getUpdates(offset, timeoutSec = 25) {
   if (!API) return [];
   try {

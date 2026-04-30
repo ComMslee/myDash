@@ -157,9 +157,23 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 
 ## 6. 자연어 라우팅 — 미지원
 
-현재 봇은 **슬래시 명령만** 인식. 자연어 키워드 매칭(`NL_PATTERNS`)은 정확도 부족으로 제거됨.
+현재 봇은 **슬래시 명령만** 인식. 자연어 키워드 매칭은 정확도 부족으로 제거됨. 슬래시 외 입력은 `hub_unmatched_inputs` 에 적재 + "잘 모르겠어요 / /help 보기" 응답.
 
-슬래시 외 입력은 모두 `hub_unmatched_inputs` 에 적재됨 + 사용자에겐 "잘 모르겠어요 / /help 보기" 응답. `/v2/tg` "알림" 탭 학습 로그에서 누적 분포 확인 가능 — 추후 자연어 재도입(LLM 라우팅 또는 DB 패턴) 결정 자료.
+대신 슬래시 진입 부담을 두 가지 UI 로 낮춤:
+
+### 6-1. 텔레그램 [/] 자동완성 메뉴 (`setMyCommands`)
+
+- 가입 승인 / 그룹 변경 / `/deny` 시점에 `syncUserMenu(chatId)` 호출 → 해당 사용자의 [/] 메뉴를 권한 기반으로 갱신
+- 부팅 시 root 한 번 등록
+- pending/denied 사용자는 메뉴 비움
+- scope=`chat` 라 사용자별 다른 명령 노출 — guest 는 root 명령 안 보임
+
+### 6-2. Reply 키보드 (`/help` 응답)
+
+- `/help` 응답에 `reply_markup.keyboard` 동봉 — 채팅창 하단에 권한 보유한 데이터 명령들이 3열 그리드로 깔림 (`is_persistent: true`)
+- 누르면 슬래시 텍스트 자동 전송 → 슬래시 외울 필요 없음
+
+명령 카탈로그 단일 소스: `commands.js` 의 `CATEGORY_COMMANDS` / `COMMON_COMMANDS` / `ADMIN_COMMANDS` — `/help` 본문, [/] 메뉴, Reply 키보드가 같은 정의를 공유.
 
 ## 7. `/notify` HTTP 엔드포인트 (외부 서비스용)
 
