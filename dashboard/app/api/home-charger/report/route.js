@@ -120,29 +120,6 @@ export async function GET() {
     );
     const peak = peakRes.rows[0] || null;
 
-    // 6개월 추세 — 최근 6개월 평균 vs 직전 6개월 평균 (occupancy_pct 차이).
-    let trend6mDelta = null;
-    if (monthly.length >= 4) {
-      const last6  = monthly.slice(-6);
-      const prev6  = monthly.slice(-12, -6);
-      const avg = (arr) => arr.length
-        ? arr.reduce((s, r) => s + r.occupancy_pct, 0) / arr.length : null;
-      const a = avg(last6), b = avg(prev6);
-      if (a != null && b != null) trend6mDelta = parseFloat((a - b).toFixed(1));
-    }
-
-    // 주평균 — 최근 7일 가동률. 분모 = totalChargers × 일수 × 48.
-    const weekRes = await pool.query(
-      `SELECT SUM(count)::int     AS sessions,
-              COUNT(DISTINCT date)::int AS days
-       FROM charger_usage_daily
-       WHERE date >= CURRENT_DATE - INTERVAL '7 days'`
-    );
-    const weekRow = weekRes.rows[0];
-    const weeklyAvgPct = (totalChargers > 0 && weekRow.days > 0)
-      ? parseFloat((weekRow.sessions / (totalChargers * weekRow.days * 48) * 100).toFixed(1))
-      : null;
-
     // 일/주/월 평균 + 피크 — 단순 row 데이터를 SQL 로 가져와 JS 에서 계산.
     //   분모: totalChargers × 단위 일수 × 48
     const denomChargers = Math.max(1, totalChargers);
@@ -192,6 +169,20 @@ export async function GET() {
     };
     const weekUnit  = aggUnitPerRow(weekRowsRes.rows, 48);
     const monthUnit = aggUnitPerRow(monthRowsRes.rows, 48);
+
+    // 6개월 추세 — 월별 가동률 최근 6개월 평균 vs 직전 6개월 평균 (%p 차이).
+    let trend6mDelta = null;
+    const monthPcts = monthRowsRes.rows.map((r) =>
+      Number(r.sessions) / (denomChargers * Number(r.days) * 48) * 100
+    );
+    if (monthPcts.length >= 4) {
+      const last6 = monthPcts.slice(-6);
+      const prev6 = monthPcts.slice(-12, -6);
+      const avg = (arr) => arr.length
+        ? arr.reduce((s, p) => s + p, 0) / arr.length : null;
+      const a = avg(last6), b = avg(prev6);
+      if (a != null && b != null) trend6mDelta = parseFloat((a - b).toFixed(1));
+    }
 
     // 피크 빈도 — 시간당 점유율 ≥ 70% 발생 시간이 전체 시간의 몇 %.
     //   시간당 점유 = SUM(count for that hour) / (totalChargers × 2)
