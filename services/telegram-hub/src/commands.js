@@ -7,6 +7,7 @@ import {
   listPending, listAllUsers, getRoots,
   hasPermission, grantPermission, revokePermission,
 } from './auth.js';
+import { CATEGORIES, categoryByKey, labelOf } from './categories.js';
 
 // ── 명령 카탈로그 ─────────────────────────────────────
 // open: 누구나 (등록 안 된 사람도 가능)
@@ -16,6 +17,7 @@ const COMMANDS = {
   '/help':      { open: true,     handler: cmdHelp },
   '/start':     { open: true,     handler: cmdStart },
   '/whoami':    { open: true,     handler: cmdWhoami },
+  '/categories':{ open: true,     handler: cmdCategories },
   '/soc':       { feature: 'car', handler: cmdSoc },
   '/today':     { feature: 'car', handler: cmdToday },
   '/where':     { feature: 'car', handler: cmdWhere },
@@ -148,21 +150,36 @@ async function cmdStart({ chatId }) {
   return cmdHelp({ chatId });
 }
 
+// 카테고리별 명령 카탈로그 — /help 표시용.
+const CATEGORY_COMMANDS = {
+  car: [
+    { cmd: '/soc',   desc: '배터리 % + 충전 여부' },
+    { cmd: '/today', desc: '오늘 (KST) 주행/충전' },
+    { cmd: '/where', desc: '현재 위치' },
+  ],
+  // 새 카테고리 추가 시 여기에 명령 목록.
+};
+
 async function cmdHelp({ chatId, user }) {
   const u = user || await getUser(chatId);
-  const role = u?.role || 'pending';
-  const isRoot = role === 'root';
+  const isRoot = u?.role === 'root';
   const lines = ['<b>Ye\'s Home 봇</b>', ''];
-  if (await hasPermission(chatId, 'car')) {
-    lines.push('<b>차</b>');
-    lines.push('/soc — 배터리 % + 충전 여부');
-    lines.push('/today — 오늘 (KST) 주행/충전');
-    lines.push('/where — 현재 위치');
+
+  // 본인이 가진 카테고리만 표시
+  for (const cat of CATEGORIES) {
+    if (!(await hasPermission(chatId, cat.key))) continue;
+    const cmds = CATEGORY_COMMANDS[cat.key] || [];
+    if (!cmds.length) continue;
+    lines.push(`<b>${cat.label}</b>`);
+    for (const c of cmds) lines.push(`${c.cmd} — ${c.desc}`);
     lines.push('');
   }
+
   lines.push('<b>공통</b>');
   lines.push('/whoami — 내 권한');
+  lines.push('/categories — 전체 카테고리');
   lines.push('/help — 이 도움말');
+
   if (isRoot) {
     lines.push('');
     lines.push('<b>관리자</b>');
@@ -174,6 +191,18 @@ async function cmdHelp({ chatId, user }) {
   return sendMessage(lines.join('\n'), chatId);
 }
 
+async function cmdCategories({ chatId }) {
+  const lines = ['<b>📂 카테고리</b>'];
+  for (const cat of CATEGORIES) {
+    const have = await hasPermission(chatId, cat.key);
+    lines.push(`${have ? '✅' : '⬜'} ${cat.label} — <i>${escapeHtml(cat.desc)}</i>`);
+  }
+  if (CATEGORIES.length === 0) {
+    lines.push('<i>등록된 카테고리 없음</i>');
+  }
+  return sendMessage(lines.join('\n'), chatId);
+}
+
 async function cmdWhoami({ chatId, user }) {
   const u = user || await getUser(chatId);
   if (!u) return sendMessage('등록 안 됨', chatId);
@@ -181,7 +210,7 @@ async function cmdWhoami({ chatId, user }) {
     "SELECT feature FROM hub_permissions WHERE chat_id = $1 ORDER BY feature",
     [chatId],
   );
-  const feats = rows.map((r) => r.feature).join(', ') || '없음';
+  const feats = rows.map((r) => labelOf(r.feature)).join(' ') || '없음';
   return sendMessage([
     `<b>내 정보</b>`,
     `chat_id: <code>${chatId}</code>`,
@@ -324,13 +353,16 @@ async function cmdDeny({ chatId, args, user }) {
 async function cmdGrant({ chatId, args, user }) {
   const [target, feature] = (args || '').split(/\s+/);
   if (!/^\d+$/.test(target) || !feature) {
-    return sendMessage('사용법: /grant <chat_id> <feature>\n예: /grant 1234567890 car', chatId);
+    const known = CATEGORIES.map((c) => c.key).join(', ') || '(없음)';
+    return sendMessage(`사용법: /grant <chat_id> <feature>\n예: /grant 1234567890 car\n등록된 카테고리: ${known}`, chatId);
   }
+  const known = !!categoryByKey(feature);
   const ok = await grantPermission(target, feature, user.chat_id);
   if (!ok) return sendMessage(`#${target} 없거나 승인 안 됨`, chatId);
-  await sendMessage(`✅ #${target} 에게 '${feature}' 권한 부여`, chatId);
+  const labelStr = known ? labelOf(feature) : `${feature} <i>(미등록 카테고리)</i>`;
+  await sendMessage(`✅ #${target} 에게 ${labelStr} 권한 부여`, chatId);
   try {
-    await sendMessage(`🎁 '${feature}' 권한이 부여됐어요. /help 확인.`, target);
+    await sendMessage(`🎁 ${labelStr} 권한이 부여됐어요. /help 확인.`, target);
   } catch {}
 }
 
@@ -348,7 +380,7 @@ async function cmdUsers({ chatId }) {
   if (!rows.length) return sendMessage('사용자 없음', chatId);
   const lines = ['<b>👥 사용자</b>'];
   for (const r of rows) {
-    const feats = r.features.length ? r.features.join(',') : '-';
+    const feats = r.features.length ? r.features.map(labelOf).join(' ') : '-';
     lines.push(`[${r.role}] #${r.chat_id} ${escapeHtml(r.name || '-')} · ${feats}`);
   }
   return sendMessage(lines.join('\n'), chatId);
