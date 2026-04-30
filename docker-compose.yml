@@ -57,6 +57,8 @@ services:
       - EV_CHARGER_API_KEY=${EV_CHARGER_API_KEY}
       - HOME_CHARGER_STAT_ID=${HOME_CHARGER_STAT_ID:-PI795111}
       - HOME_CHARGER_STAT_IDS=${HOME_CHARGER_STAT_IDS:-PI795111,PI313299,PIH01089}
+      - TELEGRAM_HUB_URL=${TELEGRAM_HUB_URL:-http://telegram-hub:3000}
+      - HUB_SHARED_SECRET=${HUB_SHARED_SECRET:-}
     volumes:
       - dashboard-data:/data
       - /var/run/docker.sock:/var/run/docker.sock:ro  # 컨테이너별 stats 조회용 (api-status 페이지)
@@ -66,8 +68,26 @@ services:
     depends_on:
       - database
 
+  telegram-hub:
+    build: ./services/telegram-hub
+    restart: always
+    environment:
+      - TM_DB_USER=${TM_DB_USER}
+      - TM_DB_PASS=${TM_DB_PASS}
+      - TM_DB_NAME=${TM_DB_NAME}
+      - DB_HOST=database
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - HUB_SHARED_SECRET=${HUB_SHARED_SECRET:-}
+      - DB_POLL_MS=${TG_HUB_DB_POLL_MS:-5000}
+    volumes:
+      - telegram-hub-data:/data
+    depends_on:
+      - database
+
 volumes:
   teslamate-db:
   mosquitto-conf:
   mosquitto-data:
   dashboard-data:
+  telegram-hub-data:
