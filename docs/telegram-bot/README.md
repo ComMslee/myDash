@@ -127,14 +127,13 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 
 | 명령 | 설명 | 호출 API |
 |---|---|---|
-| `/soc` | 현재 배터리 % + 충전 여부 | `/api/car` + `/api/charging-status` |
+| `/soc` | 배터리 % + 충전 상세 (충전 중이면 시작SOC→현재·kWh·kW·경과 / 아니면 마지막 충전 기록) | `/api/car` + `/api/charging-status` |
 | `/range` | 남은 주행거리 (rated/est) | `/api/car` |
-| `/charge` | 충전 진행 상세 (속도·경과·시작 SOC→현재) | `/api/charging-status` (+ `/api/car` for last_charge) |
 | `/today` | 오늘(KST) 주행/충전 요약 | `/api/summary?range=today` |
 | `/period` | 이번주·지난주·이번달 한 번에 (퀵뷰) | `/api/summary?range=multi` |
 | `/where` | 현재 위치 — 정차/주행 통합 (지도 링크 + 핀) | `/api/parked` + `/api/location` |
-| `/chargers` | 즐겨찾기 충전기 가용/사용중 요약 | `/api/home-charger` |
-| `/yesterday` `/week` `/parked` | (alias — 각각 `/period`, `/period`, `/where` 호출) | — |
+| `/chargers` | 즐겨찾기 충전기 가용/사용중 요약 (대시보드 캐시 우선) | `/api/home-charger` |
+| `/charge` `/yesterday` `/week` `/parked` | alias — `/charge→/soc`, `/yesterday`·`/week`→`/period`, `/parked`→`/where` | — |
 
 **퀵뷰 컨셉**: 봇은 한 화면에 들어오는 짧은 요약. 상세 통계·내역은 대시보드 `/v2/*` 에서.
 
