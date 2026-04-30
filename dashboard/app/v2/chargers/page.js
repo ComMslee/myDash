@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import HomeChargerCard from '@/app/v2/battery/HomeChargerCard';
 import { RankRow, HeatmapChart } from '@/app/v2/battery/home-charger/FleetStatsCharts';
 import { formatEntry } from '@/app/v2/battery/home-charger/fleet-stats-utils';
+import ReportPanel from './_parts/ReportPanel';
 
 const DOW_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -207,21 +208,11 @@ export default function V2ChargersPage() {
         {/* 집충전기 실시간 현황 (P1/그 외 + 상태 배지) */}
         <HomeChargerCard showFavLabel />
 
-        {/* 활용도 리포트 진입 — 외부 근거자료용 라이브 페이지 */}
-        <a
-          href="/v2/chargers/report"
-          className="bg-[#161618] border border-white/[0.06] rounded-xl px-4 py-3 flex items-center justify-between hover:bg-white/[0.02] active:bg-white/[0.04]"
-        >
-          <span className="flex items-center gap-2">
-            <span className="text-base">📊</span>
-            <span className="text-sm font-bold">활용도 리포트</span>
-            <span className="text-[10px] text-zinc-500">월별 추이 · 시간대 패턴</span>
-          </span>
-          <span className="text-zinc-500 text-sm">→</span>
-        </a>
-
         {/* 집충전기 누적 사용 — Top 10 + 시간×요일 히트맵 (구 팝업 → 패널) */}
         <FleetStatsPanel />
+
+        {/* 활용도 리포트 — 외부 근거자료용 라이브 패널 (KPI + 월별 추이 + 시간대×요일) */}
+        <ReportPanel />
       </div>
     </main>
   );
