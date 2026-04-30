@@ -133,8 +133,8 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 | `/today` | 오늘(KST) 주행/충전 요약 | `/api/summary?range=today` |
 | `/yesterday` | 어제(KST) 주행/충전 요약 | `/api/summary?range=yesterday` |
 | `/week` | 지난 7일 주행/충전 요약 | `/api/summary?range=week` |
-| `/parked` | 마지막 주차 장소·경과 (또는 주행 중 표시) | `/api/parked` |
-| `/where` | 현재 위치 (지도 링크 + 핀) | `/api/location` |
+| `/where` | 현재 위치 — 정차 중이면 장소·경과, 주행 중이면 시작 시각 + 현재 좌표 (지도 링크 + 핀) | `/api/parked` + `/api/location` |
+| `/parked` | (alias — `/where` 와 동일) | — |
 
 ### 가족 (`family` 권한 필요) — mock
 

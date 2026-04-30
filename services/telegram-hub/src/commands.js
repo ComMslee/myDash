@@ -29,7 +29,7 @@ const COMMANDS = {
   '/yesterday': { feature: 'car', handler: cmdYesterday },
   '/week':      { feature: 'car', handler: cmdWeek },
   '/range':     { feature: 'car', handler: cmdRange },
-  '/parked':    { feature: 'car', handler: cmdParked },
+  '/parked':    { feature: 'car', handler: cmdWhere }, // alias — /where 와 통합. 옛 슬래시 호환.
   '/charge':    { feature: 'car', handler: cmdCharge },
   '/where':     { feature: 'car', handler: cmdWhere },
   // family — mock. 인터페이스 검증용 placeholder.
@@ -189,7 +189,7 @@ export async function handleMessage(message) {
 const CB_ROUTES = {
   soc: cmdSoc, range: cmdRange, charge: cmdCharge,
   today: cmdToday, yesterday: cmdYesterday, week: cmdWeek,
-  parked: cmdParked, where: cmdWhere,
+  where: cmdWhere, // /parked 와 통합됨.
 };
 
 export async function handleCallback(cb) {
@@ -391,8 +391,7 @@ const CATEGORY_COMMANDS = {
     { cmd: '/today',     desc: '오늘 (KST) 주행/충전',       btn: '📊 오늘' },
     { cmd: '/yesterday', desc: '어제 (KST) 주행/충전',       btn: '📅 어제' },
     { cmd: '/week',      desc: '지난 7일 요약',              btn: '📆 주간' },
-    { cmd: '/parked',    desc: '마지막 주차 장소·경과',     btn: '🅿️ 주차' },
-    { cmd: '/where',     desc: '현재 위치',                  btn: '📍 위치' },
+    { cmd: '/where',     desc: '현재 위치 (정차/주행 통합)', btn: '📍 위치' },
   ],
   family: [
     { cmd: '/weather',   desc: '오늘 날씨 (mock)',           btn: '🌤 오늘 날씨' },
@@ -413,16 +412,17 @@ for (const arr of Object.values(CATEGORY_COMMANDS)) {
 }
 
 // 데이터 명령 응답 끝에 동봉할 inline 후속 액션 (1행 3버튼).
-// callback_data 포맷: 'cmd:<name>' — 같은 명령 재실행(=새로고침) 또는 인접 명령.
+// 첫 칸은 항상 🔄 새로고침 (같은 명령 재실행).
+// 나머지 2칸은 응답 컨텍스트와 연관성 높은 후속 명령.
+// callback_data 포맷: 'cmd:<name>'.
 const FOLLOWUP = {
-  soc:       [['🔄', 'cmd:soc'], ['⚡ 충전', 'cmd:charge'], ['🛣 거리', 'cmd:range']],
-  range:     [['🔄', 'cmd:range'], ['🔋 SOC', 'cmd:soc'], ['📍 위치', 'cmd:where']],
-  charge:    [['🔄', 'cmd:charge'], ['🔋 SOC', 'cmd:soc'], ['📍 위치', 'cmd:where']],
-  parked:    [['🔄', 'cmd:parked'], ['📍 위치', 'cmd:where'], ['📅 오늘', 'cmd:today']],
-  where:     [['🔄', 'cmd:where'], ['🅿️ 주차', 'cmd:parked'], ['🛣 거리', 'cmd:range']],
+  soc:       [['🔄', 'cmd:soc'],   ['🛣 거리', 'cmd:range'],  ['⚡ 충전', 'cmd:charge']],
+  range:     [['🔄', 'cmd:range'], ['🔋 배터리', 'cmd:soc'],  ['📊 오늘', 'cmd:today']],
+  charge:    [['🔄', 'cmd:charge'],['📍 위치', 'cmd:where'],  ['🔋 배터리', 'cmd:soc']],
+  where:     [['🔄', 'cmd:where'], ['📊 오늘', 'cmd:today'],  ['🛣 거리', 'cmd:range']],
   today:     [['🔄', 'cmd:today'], ['📅 어제', 'cmd:yesterday'], ['📆 주간', 'cmd:week']],
-  yesterday: [['🔄', 'cmd:yesterday'], ['📅 오늘', 'cmd:today'], ['📆 주간', 'cmd:week']],
-  week:      [['🔄', 'cmd:week'], ['📅 오늘', 'cmd:today'], ['📅 어제', 'cmd:yesterday']],
+  yesterday: [['🔄', 'cmd:yesterday'], ['📊 오늘', 'cmd:today'], ['📆 주간', 'cmd:week']],
+  week:      [['🔄', 'cmd:week'], ['📊 오늘', 'cmd:today'],   ['📅 어제', 'cmd:yesterday']],
 };
 
 function followUp(cmdKey) {
@@ -590,20 +590,41 @@ async function cmdToday({ chatId }) {
   ].join('\n'), chatId, followUp('today'));
 }
 
+// /parked 와 /where 통합 — 정차 중이면 장소·경과, 주행 중이면 시작 시각 + 현재 좌표 + 핀.
 async function cmdWhere({ chatId }) {
-  const j = await dashGet('/api/location');
-  if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
-  if (j.lat == null) return sendMessage('위치 데이터 없음', chatId);
+  const [park, loc] = await Promise.all([
+    dashGet('/api/parked'),
+    dashGet('/api/location'),
+  ]);
+  const parkErr = !park || park.error;
+  const locErr  = !loc  || loc.error;
+  if (parkErr && locErr) return sendMessage('데이터를 가져오지 못했어요', chatId);
 
-  const lat = Number(j.lat).toFixed(6);
-  const lng = Number(j.lng).toFixed(6);
-  const url = `https://maps.google.com/?q=${lat},${lng}`;
-  await sendMessage(
-    `📍 <a href="${url}">현재 위치 (${lat}, ${lng})</a>\n<i>업데이트: ${formatKst(j.date)} KST</i>`,
-    chatId,
-    followUp('where'),
-  );
-  return sendLocation(j.lat, j.lng, chatId);
+  const lines = [];
+  if (!parkErr && park.driving) {
+    lines.push('🚗 <b>주행 중</b>');
+    if (park.drive_started_at) lines.push(`<i>시작: ${formatKst(park.drive_started_at)} KST</i>`);
+  } else if (!parkErr && park.parked) {
+    const p = park.parked;
+    lines.push(`🅿️ <b>${escapeHtml(p.place || '?')}</b>`);
+    lines.push(`<i>정차: ${formatKst(p.end_date)} KST (${fmtElapsed(p.elapsed_min)} 전)</i>`);
+  }
+
+  let lat = null, lng = null;
+  if (!locErr && loc.lat != null) {
+    lat = Number(loc.lat); lng = Number(loc.lng);
+    const latS = lat.toFixed(6);
+    const lngS = lng.toFixed(6);
+    const url = `https://maps.google.com/?q=${latS},${lngS}`;
+    if (lines.length) lines.push('');
+    lines.push(`📍 <a href="${url}">${latS}, ${lngS}</a>`);
+    lines.push(`<i>업데이트: ${formatKst(loc.date)} KST</i>`);
+  }
+
+  if (!lines.length) return sendMessage('위치 데이터 없음', chatId, followUp('where'));
+
+  await sendMessage(lines.join('\n'), chatId, followUp('where'));
+  if (lat != null && lng != null) return sendLocation(lat, lng, chatId);
 }
 
 // 새 핸들러는 dashboard API 호출만 — TeslaMate DB 직접 쿼리는 dashboard 가 책임.
@@ -648,21 +669,6 @@ async function cmdRange({ chatId }) {
   if (est && est !== rated) lines.push(`<i>예상 ${est} km</i>`);
   if (j.last_seen) lines.push(`<i>업데이트: ${formatKst(j.last_seen)} KST</i>`);
   return sendMessage(lines.join('\n'), chatId, followUp('range'));
-}
-
-async function cmdParked({ chatId }) {
-  const j = await dashGet('/api/parked');
-  if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
-  if (j.driving) {
-    return sendMessage(`🚗 주행 중 — 시작 ${formatKst(j.drive_started_at)} KST`, chatId, followUp('parked'));
-  }
-  if (!j.parked) return sendMessage('주행 기록 없음', chatId);
-  const p = j.parked;
-  const place = p.place || '?';
-  return sendMessage([
-    `🅿️ <b>${escapeHtml(place)}</b>`,
-    `정차: ${formatKst(p.end_date)} KST (${fmtElapsed(p.elapsed_min)} 전)`,
-  ].join('\n'), chatId, followUp('parked'));
 }
 
 async function cmdCharge({ chatId }) {
