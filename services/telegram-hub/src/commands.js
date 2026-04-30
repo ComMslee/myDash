@@ -143,23 +143,22 @@ export async function handleMessage(message) {
 
     if (!meta.open) {
       if (meta.rootOnly && user.role !== 'root') {
-        return sendMessage('🔒 관리자 전용 명령입니다.', chatId);
+        // 관리자 명령은 존재 자체를 숨김 — 알 수 없는 명령으로 폴백.
+        return logAndPunt(chatId, t, head);
       }
       if (meta.feature && !(await hasPermission(chatId, meta.feature))) {
-        return sendMessage(`🔒 이 명령은 '${meta.feature}' 권한이 필요해요.\n관리자에게 요청하세요.`, chatId);
+        // 권한 없는 feature 명령은 존재 숨김 — 오타와 구분 불가.
+        return logAndPunt(chatId, t, head);
       }
     }
     return meta.handler({ chatId, args, user });
   }
 
-  // 2) NL 패턴
+  // 2) NL 패턴 — 권한 없는 feature 매칭은 존재 숨김 위해 조용히 폴스루.
   for (const p of NL_PATTERNS) {
-    if (p.re.test(t)) {
-      if (p.feature && !(await hasPermission(chatId, p.feature))) {
-        return sendMessage(`🔒 '${p.feature}' 권한이 필요해요.`, chatId);
-      }
-      return p.handler({ chatId, args: '', user });
-    }
+    if (!p.re.test(t)) continue;
+    if (p.feature && !(await hasPermission(chatId, p.feature))) continue;
+    return p.handler({ chatId, args: '', user });
   }
 
   // 3) 미해결 — 로그 + 폴백
@@ -243,14 +242,17 @@ async function cmdHelp({ chatId, user }) {
 }
 
 async function cmdCategories({ chatId }) {
+  // 권한 있는 카테고리만 노출 — 미보유 카테고리 존재는 숨김.
   const cats = await getCategories();
   const lines = ['<b>📂 카테고리</b>'];
+  let shown = 0;
   for (const cat of cats) {
-    const have = await hasPermission(chatId, cat.key);
-    lines.push(`${have ? '✅' : '⬜'} ${cat.label} — <i>${escapeHtml(cat.desc)}</i>`);
+    if (!(await hasPermission(chatId, cat.key))) continue;
+    lines.push(`✅ ${cat.label} — <i>${escapeHtml(cat.desc)}</i>`);
+    shown++;
   }
-  if (cats.length === 0) {
-    lines.push('<i>등록된 카테고리 없음</i>');
+  if (shown === 0) {
+    lines.push('<i>이용 가능한 카테고리가 없어요. 관리자에게 권한을 요청하세요.</i>');
   }
   return sendMessage(lines.join('\n'), chatId);
 }

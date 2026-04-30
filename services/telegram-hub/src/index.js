@@ -2,7 +2,7 @@ import { loadState } from './state.js';
 import { startHttpServer } from './notify.js';
 import { startDbPoller } from './poller.js';
 import { startTelegramPoller } from './tg_poller.js';
-import { bootstrapRoot, grantPermission } from './auth.js';
+import { bootstrapRoot, grantPermission, syncMissingNames } from './auth.js';
 import { ensureCategoriesSchema } from './categories.js';
 import { ensureUserGroupsSchema } from './user_groups.js';
 
@@ -22,6 +22,10 @@ try {
   await bootstrapRoot(rootChatId);
   await grantPermission(rootChatId, 'car');
   await ensureUserGroupsSchema();
+  // name=NULL 사용자(특히 env 부트스트랩 root) 텔레그램에서 이름 가져와 채움.
+  syncMissingNames()
+    .then((n) => n && console.log('[boot] syncMissingNames checked', n, 'user(s)'))
+    .catch((e) => console.error('[boot] syncMissingNames failed', e.message));
   console.log('[boot] root chat_id =', rootChatId);
 } catch (e) {
   console.error('[boot] auth bootstrap failed', e.message);

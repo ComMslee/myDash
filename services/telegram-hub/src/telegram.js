@@ -47,6 +47,22 @@ export async function sendLocation(lat, lng, chatId = DEFAULT_CHAT) {
   }
 }
 
+// chat_id 만으로 텔레그램에서 first_name/last_name/username 조회.
+// private chat 이면 first_name 보장. 봇이 한 번도 인터랙션 안 한 사용자엔 실패할 수 있음.
+export async function getChat(chatId) {
+  if (!API || !chatId) return null;
+  try {
+    const r = await fetch(`${API}/getChat?chat_id=${encodeURIComponent(chatId)}`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j.result || null;
+  } catch (e) {
+    return null;
+  }
+}
+
 export async function getUpdates(offset, timeoutSec = 25) {
   if (!API) return [];
   try {

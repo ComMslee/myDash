@@ -1,4 +1,5 @@
 import { pool } from './db.js';
+import { getChat } from './telegram.js';
 
 // 사용자/권한 스키마 — 부팅 시 idempotent 생성.
 let _schemaReady = false;
@@ -40,6 +41,23 @@ export async function bootstrapRoot(rootChatId) {
     `UPDATE hub_users SET name = NULL WHERE chat_id = $1 AND name = 'root'`,
     [rootChatId],
   );
+}
+
+// name 이 비어 있는 사용자(특히 env 부트스트랩 root) 들을 텔레그램 getChat 으로 일괄 채움.
+// 부팅 시 호출. getChat 이 실패하면 그 사용자만 건너뛰고 계속 진행.
+export async function syncMissingNames() {
+  await ensureAuthSchema();
+  const { rows } = await pool.query(
+    "SELECT chat_id::text FROM hub_users WHERE name IS NULL OR name = ''",
+  );
+  for (const { chat_id } of rows) {
+    const chat = await getChat(chat_id);
+    if (!chat) continue;
+    const name = [chat.first_name, chat.last_name].filter(Boolean).join(' ') || chat.username || null;
+    if (!name) continue;
+    await pool.query('UPDATE hub_users SET name = $2 WHERE chat_id = $1', [chat_id, name]);
+  }
+  return rows.length;
 }
 
 export async function getUser(chatId) {
