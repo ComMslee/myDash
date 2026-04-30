@@ -2,30 +2,100 @@ import { pool, getCarId } from './db.js';
 import { sendMessage, sendLocation, escapeHtml } from './telegram.js';
 import { formatKst } from './format.js';
 
+// ── 자연어 라우팅 패턴 ─────────────────────────────────
+// 첫 매칭 승. /cmd 보다 후순위.
+const NL_PATTERNS = [
+  { name: 'soc',   re: /(배터리|충전.*상태|soc|몇\s*%|얼마나.*남|남은|잔량)/i,                      handler: cmdSoc   },
+  { name: 'today', re: /(오늘|today|얼마나.*달렸|오늘.*주행|오늘.*충전|운행.*기록)/i,             handler: cmdToday },
+  { name: 'where', re: /(어디|위치|where|지도|location|어디야|어디에)/i,                            handler: cmdWhere },
+  { name: 'help',  re: /(도움말|help|뭐\s*할|어떻게.*써|명령.*뭐|기능.*뭐)/i,                         handler: cmdHelp  },
+];
+
+// hub_unmatched_inputs 스키마 idempotent 생성 (첫 호출 시).
+let _schemaReady = false;
+async function ensureSchema() {
+  if (_schemaReady) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS hub_unmatched_inputs (
+      id               SERIAL PRIMARY KEY,
+      ts               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      chat_id          BIGINT NOT NULL,
+      text             TEXT NOT NULL,
+      resolved         BOOLEAN NOT NULL DEFAULT false,
+      resolved_pattern TEXT,
+      resolved_at      TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS idx_hub_unmatched_resolved_ts
+      ON hub_unmatched_inputs (resolved, ts DESC);
+  `);
+  _schemaReady = true;
+}
+
 export async function handleCommand(text, chatId) {
-  const cmd = text.trim().split(/\s+/)[0].toLowerCase().split('@')[0];
-  switch (cmd) {
-    case '/start':
-    case '/help':
-      return cmdHelp(chatId);
-    case '/soc':
-      return cmdSoc(chatId);
-    case '/today':
-      return cmdToday(chatId);
-    case '/where':
-      return cmdWhere(chatId);
-    default:
-      return sendMessage(`알 수 없는 명령: ${escapeHtml(cmd)}\n/help 입력해 사용 가능 명령 확인`, chatId);
+  const t = (text || '').trim();
+  if (!t) return;
+
+  // 1) /cmd
+  if (t.startsWith('/')) {
+    const head = t.split(/\s+/)[0].toLowerCase().split('@')[0];
+    const args = t.slice(head.length).trim();
+    switch (head) {
+      case '/start':
+      case '/help':       return cmdHelp(chatId);
+      case '/soc':        return cmdSoc(chatId);
+      case '/today':      return cmdToday(chatId);
+      case '/where':      return cmdWhere(chatId);
+      case '/unmatched':  return cmdUnmatched(chatId);
+      case '/topnope':    return cmdTopNope(chatId);
+      case '/resolve':    return cmdResolve(args, chatId);
+      default:
+        return logAndPunt(t, chatId, head);
+    }
   }
+
+  // 2) NL 패턴
+  for (const p of NL_PATTERNS) {
+    if (p.re.test(t)) return p.handler(chatId);
+  }
+
+  // 3) 미해결 — 로그 + 폴백
+  return logAndPunt(t, chatId, null);
+}
+
+async function logAndPunt(text, chatId, slashHead) {
+  try {
+    await ensureSchema();
+    await pool.query(
+      `INSERT INTO hub_unmatched_inputs (chat_id, text) VALUES ($1, $2)`,
+      [chatId, text],
+    );
+  } catch (e) {
+    console.error('[commands] unmatched log failed', e.message);
+  }
+  const head = slashHead
+    ? `알 수 없는 명령: ${escapeHtml(slashHead)}`
+    : '잘 모르겠어요.';
+  return sendMessage(
+    `${head}\n/help 보기 · /unmatched 로 누적 표현 확인`,
+    chatId,
+  );
 }
 
 async function cmdHelp(chatId) {
   return sendMessage([
-    '<b>myDash 봇 명령</b>',
+    '<b>Ye\'s Home 봇</b>',
+    '',
+    '<b>데이터</b>',
     '/soc — 현재 배터리 % + 충전 여부',
     '/today — 오늘 (KST) 주행/충전 요약',
     '/where — 현재 위치 (지도 핀)',
-    '/help — 이 도움말',
+    '',
+    '<b>운영</b>',
+    '/unmatched — 미해결 입력 누적',
+    '/topnope — 자주 못 알아들은 표현 TOP 5',
+    '/resolve 1,2,3 — 해당 ID 해결 처리',
+    '',
+    '<i>자연어도 일부 지원</i> (예: "오늘 얼마나 달렸어?", "배터리 얼마나 남았어?")',
   ].join('\n'), chatId);
 }
 
@@ -124,4 +194,61 @@ async function cmdWhere(chatId) {
     chatId,
   );
   return sendLocation(p.lat, p.lng, chatId);
+}
+
+async function cmdUnmatched(chatId) {
+  await ensureSchema();
+  const { rows } = await pool.query(
+    `SELECT id, ts, text FROM hub_unmatched_inputs
+     WHERE resolved = false
+     ORDER BY ts DESC LIMIT 20`,
+  );
+  if (!rows.length) {
+    return sendMessage('미해결 입력 없음 ✨', chatId);
+  }
+  const lines = ['<b>📋 미해결 (최근 20)</b>'];
+  for (const r of rows) {
+    lines.push(`#${r.id} · ${formatKst(r.ts)} · ${escapeHtml(r.text).slice(0, 60)}`);
+  }
+  lines.push('');
+  lines.push('<i>패턴 추가 후 /resolve 1,2,3 으로 정리</i>');
+  return sendMessage(lines.join('\n'), chatId);
+}
+
+async function cmdTopNope(chatId) {
+  await ensureSchema();
+  const { rows } = await pool.query(
+    `SELECT lower(trim(text)) AS norm, COUNT(*)::int AS n
+     FROM hub_unmatched_inputs
+     WHERE resolved = false
+     GROUP BY norm
+     ORDER BY n DESC, MAX(ts) DESC
+     LIMIT 5`,
+  );
+  if (!rows.length) {
+    return sendMessage('미해결 입력 없음 ✨', chatId);
+  }
+  const lines = ['<b>🔝 자주 못 알아들은 표현 TOP 5</b>'];
+  for (const r of rows) {
+    lines.push(`× ${r.n}  ${escapeHtml(r.norm).slice(0, 60)}`);
+  }
+  return sendMessage(lines.join('\n'), chatId);
+}
+
+async function cmdResolve(args, chatId) {
+  await ensureSchema();
+  const ids = String(args || '')
+    .split(/[\s,]+/)
+    .map((s) => parseInt(s, 10))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (!ids.length) {
+    return sendMessage('사용법: /resolve 1,2,3', chatId);
+  }
+  const { rowCount } = await pool.query(
+    `UPDATE hub_unmatched_inputs
+     SET resolved=true, resolved_at=NOW()
+     WHERE id = ANY($1::int[]) AND resolved = false`,
+    [ids],
+  );
+  return sendMessage(`✅ ${rowCount}건 해결 처리`, chatId);
 }
