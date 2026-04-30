@@ -217,6 +217,15 @@ export async function handleCallback(cb) {
     return handleSnsCallback(chatId, data.slice(4), user);
   }
 
+  // places:<freq|dwell> — 가는 곳 종류 분기.
+  if (data.startsWith('places:')) {
+    if (!(await hasPermission(chatId, 'car'))) return;
+    const kind = data.slice(7);
+    if (kind === 'freq')  return showFreqPlaces(chatId);
+    if (kind === 'dwell') return showDwellPlaces(chatId);
+    return;
+  }
+
   // cmd:<name> — 데이터 명령 후속 액션.
   const m = data.match(/^cmd:([a-z]+)$/);
   if (!m) return;
@@ -718,7 +727,7 @@ async function cmdChargers({ chatId }) {
   // 즐겨찾기 — 한 줄씩 상세
   for (const g of fav) {
     const icon = g.available > 0 ? '🟢' : (g.using > 0 ? '🔴' : '⚫');
-    let line = `${icon} ⭐ <b>${g.title}</b>  가용 ${g.available} · 충전중 ${g.using} / ${g.total}`;
+    let line = `${icon} <b>${g.title}</b>  가용 ${g.available} · 충전중 ${g.using} / ${g.total}`;
     const extra = [];
     if (g.offline) extra.push(`오프라인 ${g.offline}`);
     if (g.maintain) extra.push(`점검 ${g.maintain}`);
@@ -749,51 +758,69 @@ function fmtSecHm(sec) {
   return `${m}분`;
 }
 
+// /places — 분기 진입 화면. 자주/오래 각각 10개를 inline 버튼으로 분리.
 async function cmdPlaces({ chatId }) {
-  const [freqJ, dwellJ] = await Promise.all([
-    dashGet('/api/frequent-places'),
-    dashGet('/api/long-stay-places'),
-  ]);
-  const freqOk = freqJ && !freqJ.error;
-  const dwellOk = dwellJ && !dwellJ.error;
-  if (!freqOk && !dwellOk) {
-    return sendMessage('데이터를 가져오지 못했어요', chatId, followUp('places'));
-  }
+  return sendMessage(
+    [
+      '🗺 <b>가는 곳</b> <i>(집·회사 제외)</i>',
+      '',
+      '어떤 기준으로 볼까요?',
+    ].join('\n'),
+    chatId,
+    {
+      reply_markup: {
+        inline_keyboard: [[
+          { text: '📍 자주가는 곳 TOP 10',  callback_data: 'places:freq' },
+          { text: '⏱ 오래머문 곳 TOP 10', callback_data: 'places:dwell' },
+        ]],
+      },
+    },
+  );
+}
 
-  const freqTop = freqOk
-    ? (freqJ.places || []).filter((p) => !PINNED_PLACES.has(p.geofence_name)).slice(0, 3)
-    : [];
-  const dwellTop = dwellOk
-    ? (dwellJ.places || []).filter((p) => !PINNED_PLACES.has(p.geofence_name)).slice(0, 3)
-    : [];
-
-  const cap = (s) => escapeHtml(String(s || '?').slice(0, 25));
-
-  const lines = ['🗺 <b>가는 곳</b> <i>(집·회사 제외)</i>', ''];
-
-  lines.push('<b>자주</b>');
-  if (freqTop.length) {
-    freqTop.forEach((p, i) => {
-      lines.push(`${i + 1}. ${cap(p.label)} · ${p.visit_count}회`);
-    });
-  } else {
-    lines.push('-');
-  }
-
-  lines.push('');
-
-  lines.push('<b>오래 머문</b>');
-  if (dwellTop.length) {
-    dwellTop.forEach((p, i) => {
-      lines.push(`${i + 1}. ${cap(p.label)} · ${fmtSecHm(p.total_dwell_sec || p.max_dwell_sec || 0)}`);
-    });
-  } else {
-    lines.push('-');
-  }
-
+// places:freq | places:dwell — 각각 10개 리스트 + 다른 종류로 전환 버튼.
+async function showFreqPlaces(chatId) {
+  const j = await dashGet('/api/frequent-places');
+  if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId, placesNavKb('freq'));
+  const top = (j.places || []).filter((p) => !PINNED_PLACES.has(p.geofence_name)).slice(0, 10);
+  const cap = (s) => escapeHtml(String(s || '?').slice(0, 28));
+  const lines = ['📍 <b>자주가는 곳 TOP 10</b> <i>(집·회사 제외)</i>', ''];
+  if (!top.length) lines.push('<i>데이터 없음</i>');
+  top.forEach((p, i) => {
+    lines.push(`${String(i + 1).padStart(2, ' ')}. ${cap(p.label)} · ${p.visit_count}회`);
+  });
   lines.push('');
   lines.push('<i>상세는 대시보드 /v2 에서</i>');
-  return sendMessage(lines.join('\n'), chatId, followUp('places'));
+  return sendMessage(lines.join('\n'), chatId, placesNavKb('freq'));
+}
+
+async function showDwellPlaces(chatId) {
+  const j = await dashGet('/api/long-stay-places');
+  if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId, placesNavKb('dwell'));
+  const top = (j.places || []).filter((p) => !PINNED_PLACES.has(p.geofence_name)).slice(0, 10);
+  const cap = (s) => escapeHtml(String(s || '?').slice(0, 28));
+  const lines = ['⏱ <b>오래머문 곳 TOP 10</b> <i>(집·회사 제외)</i>', ''];
+  if (!top.length) lines.push('<i>데이터 없음</i>');
+  top.forEach((p, i) => {
+    lines.push(`${String(i + 1).padStart(2, ' ')}. ${cap(p.label)} · ${fmtSecHm(p.total_dwell_sec || p.max_dwell_sec || 0)}`);
+  });
+  lines.push('');
+  lines.push('<i>상세는 대시보드 /v2 에서</i>');
+  return sendMessage(lines.join('\n'), chatId, placesNavKb('dwell'));
+}
+
+// current = 현재 보고 있는 종류. 🔄 = 같은 종류 재실행, 다른 버튼 = 반대 종류.
+function placesNavKb(current) {
+  const other = current === 'freq' ? 'dwell' : 'freq';
+  const otherLabel = other === 'freq' ? '📍 자주가는 곳' : '⏱ 오래머문 곳';
+  return {
+    reply_markup: {
+      inline_keyboard: [[
+        { text: '🔄',          callback_data: `places:${current}` },
+        { text: otherLabel,    callback_data: `places:${other}` },
+      ]],
+    },
+  };
 }
 
 // ── family (mock) ────────────────────────────────────

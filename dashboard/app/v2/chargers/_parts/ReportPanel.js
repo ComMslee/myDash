@@ -64,9 +64,27 @@ function Header({ meta }) {
 
 function KpiGrid({ kpi }) {
   const cells = [
-    { label: '누적 세션',     value: kpi.total_sessions.toLocaleString(),  unit: '회',  color: 'text-blue-400' },
-    { label: '일평균',        value: kpi.daily_avg_sessions.toFixed(1),    unit: '회',  color: 'text-blue-400' },
-    { label: '평균 가동률',   value: kpi.avg_occupancy_pct.toFixed(1),     unit: '%',   color: 'text-emerald-400' },
+    {
+      label: '주평균',
+      value: kpi.weekly_avg_pct != null ? kpi.weekly_avg_pct.toFixed(1) : '—',
+      unit: '%',
+      color: 'text-emerald-400',
+      hint: '최근 7일',
+    },
+    {
+      label: '평균 가동률',
+      value: kpi.avg_occupancy_pct.toFixed(1),
+      unit: '%',
+      color: 'text-emerald-400',
+      hint: '관측 전체',
+    },
+    {
+      label: '피크 빈도',
+      value: kpi.peak_freq_pct.toFixed(1),
+      unit: '%',
+      color: 'text-amber-400',
+      hint: `점유 ${kpi.peak_freq_threshold_pct}%↑`,
+    },
     {
       label: '6개월 추세',
       value: kpi.trend_6m_delta_pp == null
@@ -75,7 +93,8 @@ function KpiGrid({ kpi }) {
       unit: '%p',
       color: kpi.trend_6m_delta_pp == null
         ? 'text-zinc-500'
-        : (kpi.trend_6m_delta_pp >= 0 ? 'text-amber-400' : 'text-rose-400'),
+        : (kpi.trend_6m_delta_pp >= 0 ? 'text-blue-400' : 'text-rose-400'),
+      hint: '6달 평균차',
     },
   ];
   return (
@@ -87,6 +106,7 @@ function KpiGrid({ kpi }) {
             <span className={`text-lg font-black tabular-nums ${c.color}`}>{c.value}</span>
             <span className="text-[9px] text-zinc-600 ml-0.5">{c.unit}</span>
           </div>
+          <div className="text-[8px] text-zinc-600 mt-0.5">{c.hint}</div>
         </div>
       ))}
     </div>
@@ -97,12 +117,13 @@ function MonthlyLine({ monthly }) {
   if (!monthly?.length) {
     return <div className="bg-black/20 rounded-lg p-3 text-zinc-500 text-xs text-center">월별 데이터 부족</div>;
   }
-  const W = 600, H = 140;
-  const PAD_L = 28, PAD_R = 8, PAD_T = 12, PAD_B = 20;
+  const W = 600, H = 170;
+  const PAD_L = 32, PAD_R = 12, PAD_T = 22, PAD_B = 24;
   const innerW = W - PAD_L - PAD_R;
   const innerH = H - PAD_T - PAD_B;
 
-  const occMax = Math.max(10, ...monthly.map(m => m.occupancy_pct));
+  // y축은 0~100% 고정 — 점유율 척도 일관성 + 면 색칠 영역 안전.
+  const occMax = 100;
   const sesMax = Math.max(1, ...monthly.map(m => m.sessions));
   const stepX = monthly.length === 1 ? 0 : innerW / (monthly.length - 1);
 
@@ -112,31 +133,35 @@ function MonthlyLine({ monthly }) {
     return [x, y, m];
   });
   const linePath = linePts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
-  const barW = Math.max(4, stepX * 0.55);
+  const barW = Math.max(4, stepX * 0.5);
+  // 막대 높이 — innerH 의 50% 이내 (라인과 시각적 분리).
+  const barMaxH = innerH * 0.5;
 
   return (
     <div className="bg-black/20 rounded-lg p-2.5">
       <div className="flex items-baseline justify-between mb-1 px-1">
         <span className="text-[10px] font-bold tracking-wider uppercase text-zinc-400">월별 점유율 추이</span>
         <span className="text-[9px] text-zinc-600">
-          <span className="text-emerald-400">●</span> 점유율 ·
+          <span className="text-emerald-400">●</span> 점유율(%) ·
           <span className="text-blue-400/60 ml-1">▮</span> 세션
         </span>
       </div>
-      <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="overflow-visible block">
-        {[0, occMax / 2, occMax].map((v, i) => {
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="block">
+        {/* 그리드: 0/25/50/75/100 */}
+        {[0, 25, 50, 75, 100].map((v) => {
           const y = PAD_T + innerH - (v / occMax) * innerH;
           return (
-            <g key={i}>
+            <g key={v}>
               <line x1={PAD_L} x2={W - PAD_R} y1={y} y2={y} stroke="#27272a" strokeDasharray="2,3" />
-              <text x={PAD_L - 4} y={y + 3} textAnchor="end" fontSize="9" fill="#52525b" className="tabular-nums">
-                {v.toFixed(0)}%
+              <text x={PAD_L - 5} y={y + 3} textAnchor="end" fontSize="9" fill="#52525b" className="tabular-nums">
+                {v}%
               </text>
             </g>
           );
         })}
+        {/* 막대 (세션) — y는 항상 차트 영역 안 */}
         {linePts.map(([x, , m], i) => {
-          const h = (m.sessions / sesMax) * innerH * 0.75;
+          const h = (m.sessions / sesMax) * barMaxH;
           return (
             <rect
               key={`bar-${i}`}
@@ -149,17 +174,24 @@ function MonthlyLine({ monthly }) {
             />
           );
         })}
+        {/* 라인 + 점 */}
         <path d={linePath} fill="none" stroke="#34d399" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
         {linePts.map(([x, y, m], i) => (
           <g key={`pt-${i}`}>
             <circle cx={x} cy={y} r="2.5" fill="#34d399" />
-            {(i === 0 || i === linePts.length - 1) && (
-              <text x={x} y={y - 5} fontSize="9" textAnchor="middle" fill="#a3e6c4" className="tabular-nums">
-                {m.occupancy_pct.toFixed(1)}%
-              </text>
-            )}
+            {/* 첫·마지막만 라벨 — 점이 차트 위쪽에 가까우면 점 아래로 표시 */}
+            {(i === 0 || i === linePts.length - 1) && (() => {
+              const above = y - PAD_T > 14;
+              const ly = above ? y - 6 : y + 12;
+              return (
+                <text x={x} y={ly} fontSize="9" textAnchor="middle" fill="#a3e6c4" className="tabular-nums">
+                  {m.occupancy_pct.toFixed(1)}%
+                </text>
+              );
+            })()}
           </g>
         ))}
+        {/* x축 월 라벨 */}
         {linePts.map(([x, , m], i) => {
           const showAll = monthly.length <= 8;
           const skip = showAll ? 1 : Math.ceil(monthly.length / 8);
@@ -169,7 +201,7 @@ function MonthlyLine({ monthly }) {
             <text
               key={`xl-${i}`}
               x={x}
-              y={H - 4}
+              y={H - 6}
               fontSize="9"
               textAnchor="middle"
               fill="#71717a"
@@ -186,17 +218,18 @@ function MonthlyLine({ monthly }) {
 
 function Heatmap({ grid, kpi }) {
   if (!grid) return null;
-  const max = Math.max(1, ...grid.flat());
+  const flat = grid.flat();
+  const max = Math.max(1, ...flat);
   const cellW = 13, cellH = 12, gap = 2, labelW = 22, labelH = 12;
   const order = [1, 2, 3, 4, 5, 6, 0]; // 월~일
 
   return (
     <div className="bg-black/20 rounded-lg p-2.5">
       <div className="flex items-baseline justify-between mb-1 px-1">
-        <span className="text-[10px] font-bold tracking-wider uppercase text-zinc-400">시간대 × 요일 점유</span>
+        <span className="text-[10px] font-bold tracking-wider uppercase text-zinc-400">요일·시간대 점유율</span>
         {kpi.peak_dow != null && (
           <span className="text-[9px] text-zinc-600">
-            피크: {DOW_KO[kpi.peak_dow]}요일 {kpi.peak_hour}시
+            피크: {DOW_KO[kpi.peak_dow]} {kpi.peak_hour}시 (가장 진한 셀)
           </span>
         )}
       </div>
@@ -204,7 +237,7 @@ function Heatmap({ grid, kpi }) {
         width="100%"
         viewBox={`0 0 ${labelW + 24 * (cellW + gap)} ${labelH + 7 * (cellH + gap)}`}
         preserveAspectRatio="none"
-        className="overflow-visible block"
+        className="block"
       >
         {[0, 6, 12, 18].map((h) => (
           <text
@@ -216,7 +249,7 @@ function Heatmap({ grid, kpi }) {
             fill="#71717a"
             className="tabular-nums"
           >
-            {h}
+            {h}시
           </text>
         ))}
         {order.map((dow, rowIdx) => (
@@ -233,24 +266,41 @@ function Heatmap({ grid, kpi }) {
             {grid[dow].map((v, h) => {
               const intensity = v / max;
               const op = 0.05 + intensity * 0.95;
+              const isPeak = (dow === kpi.peak_dow && h === kpi.peak_hour);
               return (
-                <rect
-                  key={h}
-                  x={labelW + h * (cellW + gap)}
-                  y={labelH + rowIdx * (cellH + gap)}
-                  width={cellW}
-                  height={cellH}
-                  fill="#3b82f6"
-                  opacity={op}
-                  rx="1.5"
-                >
-                  <title>{`${DOW_KO[dow]} ${h}시 — ${v.toFixed(1)}%`}</title>
-                </rect>
+                <g key={h}>
+                  <rect
+                    x={labelW + h * (cellW + gap)}
+                    y={labelH + rowIdx * (cellH + gap)}
+                    width={cellW}
+                    height={cellH}
+                    fill="#3b82f6"
+                    opacity={op}
+                    rx="1.5"
+                  >
+                    <title>{`${DOW_KO[dow]} ${h}시 — 평균 ${v.toFixed(1)}% 점유`}</title>
+                  </rect>
+                  {isPeak && (
+                    <rect
+                      x={labelW + h * (cellW + gap)}
+                      y={labelH + rowIdx * (cellH + gap)}
+                      width={cellW}
+                      height={cellH}
+                      fill="none"
+                      stroke="#fbbf24"
+                      strokeWidth="1.2"
+                      rx="1.5"
+                    />
+                  )}
+                </g>
               );
             })}
           </g>
         ))}
       </svg>
+      <div className="text-[9px] text-zinc-600 mt-1.5 leading-relaxed px-0.5">
+        한 셀 = 그 요일·시간대의 평균 점유율(%). 진할수록 사용 많음 · 노란 외곽선이 피크.
+      </div>
     </div>
   );
 }

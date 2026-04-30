@@ -97,16 +97,62 @@ export async function GET() {
       if (a != null && b != null) trend6mDelta = parseFloat((a - b).toFixed(1));
     }
 
+    // 주평균 — 최근 7일 가동률.
+    const weekRes = await pool.query(
+      `WITH w AS (
+         SELECT SUM(count)::int                            AS sessions,
+                COUNT(DISTINCT date)::int                  AS days,
+                COUNT(DISTINCT (stat_id, chger_id))::int   AS chargers
+         FROM charger_usage_daily
+         WHERE date >= CURRENT_DATE - INTERVAL '7 days'
+       )
+       SELECT CASE WHEN chargers > 0 AND days > 0
+                   THEN ROUND(sessions::numeric / (chargers * days * 48) * 100, 1)
+                   ELSE NULL END AS pct,
+              sessions
+       FROM w`
+    );
+    const weeklyAvgPct = weekRes.rows[0].pct != null
+      ? parseFloat(weekRes.rows[0].pct) : null;
+
+    // 피크 빈도 — 시간당 점유율 ≥ 70% 발생 시간이 전체 시간의 몇 %.
+    //   시간당 점유 = SUM(count for that hour) / (chargers × 2)
+    const PEAK_THRESHOLD = 0.70;
+    const peakFreqRes = await pool.query(
+      `WITH per_hour AS (
+         SELECT date, hour,
+                SUM(count)::float AS sessions,
+                COUNT(DISTINCT (stat_id, chger_id))::int AS chargers
+         FROM charger_usage_daily
+         GROUP BY date, hour
+       ), classified AS (
+         SELECT CASE WHEN chargers > 0
+                     THEN sessions / (chargers * 2.0) ELSE 0 END AS pct
+         FROM per_hour
+       )
+       SELECT COUNT(*)::int                                  AS total_hours,
+              COUNT(*) FILTER (WHERE pct >= $1)::int         AS peak_hours
+       FROM classified`,
+      [PEAK_THRESHOLD]
+    );
+    const peakFreq = peakFreqRes.rows[0];
+    const peakFreqPct = peakFreq.total_hours > 0
+      ? parseFloat((peakFreq.peak_hours / peakFreq.total_hours * 100).toFixed(1))
+      : 0;
+
     const kpi = {
       total_sessions: totalSessions,
       days_observed: daysObserved,
       total_chargers: totalChargers,
       daily_avg_sessions: parseFloat((totalSessions / daysObserved).toFixed(1)),
       avg_occupancy_pct: parseFloat((totalSessions / (totalChargers * daysObserved * TOTAL_SLOTS_PER_DAY) * 100).toFixed(1)),
-      peak_dow:  peak?.dow ?? null,    // 0=일, 1=월, ..., 6=토
+      weekly_avg_pct: weeklyAvgPct,
+      peak_freq_pct: peakFreqPct,
+      peak_freq_threshold_pct: PEAK_THRESHOLD * 100,
+      peak_dow:  peak?.dow ?? null,
       peak_hour: peak?.hour ?? null,
       peak_avg_count: peak ? parseFloat((peak.total / peak.days).toFixed(1)) : null,
-      trend_6m_delta_pp: trend6mDelta, // %p (점유율 변화)
+      trend_6m_delta_pp: trend6mDelta,
     };
 
     // 3) 시간대 × 요일 히트맵 — 7×24, 평균 점유율 (30분 정규화 평균 → 0~100%).
