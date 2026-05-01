@@ -85,7 +85,10 @@ myDash/
     │   │   │   ├── DriveListView.js  # 리스트 뷰
     │   │   │   └── useDriveData.js   # 주행 데이터 훅
     │   │   ├── chargers/
-    │   │   │   └── page.js           # 주변 충전소 지도 검색
+    │   │   │   ├── page.js               # 집충전기 실시간 + Top 순위 + 활용도 리포트 인라인
+    │   │   │   ├── _parts/ReportPanel.js # 활용도 라이브 리포트 컴포넌트 (KPI · 주별 추이 · 동별)
+    │   │   │   └── report/page.js        # 활용도 리포트 단독 페이지 (외부 캡처/공유)
+    │   │   ├── tg/page.js            # 텔레그램 봇 관리 (권한·방송·학습로그·가이드)
     │   │   └── dev/                  # 개발/진단 도구 (하단 탭·헤더 미노출, URL 직접)
     │   │       └── api-status/
     │   │           └── page.js       # 22개 라우트 가용성 체크 + 서버/충전/폴링 진단 통합
@@ -107,9 +110,15 @@ myDash/
     │       ├── route-map/route.js        # 특정 주행의 GPS 경로
     │       ├── heatmap/route.js          # 히트맵 데이터
     │       ├── year-heatmap/route.js     # 연간 히트맵 데이터
-    │       ├── home-charger/route.js          # 집충전기 실시간 (환경공단 EvCharger API + 시간대별 캐시)
+    │       ├── home-charger/route.js              # 집충전기 실시간 (환경공단 EvCharger API + 시간대별 캐시)
     │       ├── home-charger/fleet-stats/route.js  # 집충전기 단지 통계
+    │       ├── home-charger/groups/route.js       # 동별 그룹 카운트 (constants.js 매핑) — 봇 /chargers
+    │       ├── home-charger/report/route.js       # 활용도 리포트 (KPI·주별·동별) — /v2/chargers/report 페이지
     │       ├── home-charger/poll-log/route.js     # 폴링 로그 조회
+    │       ├── summary/route.js                   # drives+charges 일자 집계 (range=multi 등) — 봇 /period
+    │       ├── parked/route.js                    # 마지막 주차/주행중 — 봇 /where
+    │       ├── location/route.js                  # 최신 좌표 — 봇 /where
+    │       ├── sns/blog/route.js                  # 네이버 블로그 발행 mock (POST) — 봇 /post 채널 검증
     │       ├── find-nearby-chargers/route.js  # 좌표 기반 주변 충전소 검색
     │       ├── debug/charging/route.js        # 충전 디버그 정보
     │       └── server-status/route.js         # 호스트(/proc/meminfo · statfs) + 컨테이너(docker.sock) + DB 로그(server_health_log) + 24h 피크/한산 — /v2/dev/api-status 4열 대시보드용
@@ -123,5 +132,7 @@ myDash/
 | `/v2/drives` | 주행 통계 + 지도 + 이력 | 주행 |
 | `/v2/battery` | 건강 점수 + 대기 소모 + 집충전기 + 충전 습관 + 급속/완속 기록 | 배터리 |
 | `/v2/history` | 주행 이력 목록 + 경로 지도 | 이력 |
-| `/v2/chargers` | 주변 충전소 지도 검색 | 충전소 |
+| `/v2/chargers` | 집충전기 실시간 + Top 순위 + 활용도 리포트 (인라인) | 충전소 |
+| `/v2/chargers/report` | 활용도 리포트 단독 페이지 (외부 캡처/공유) | — (URL 직접) |
+| `/v2/tg` | 텔레그램 봇 관리 (권한 · 방송 · 학습로그 · 가이드) | — (URL 직접) |
 | `/v2/dev/api-status` | API 가용성 + 서버/진단 (개발자용, URL 직접) | — (헤더·탭 미노출) |

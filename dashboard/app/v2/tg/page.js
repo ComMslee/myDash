@@ -684,46 +684,105 @@ function UnmatchedList({ items, action, busy }) {
 
 function GuidePane() {
   return (
-    <div className="text-[12px] text-zinc-300 space-y-3 leading-relaxed">
+    <div className="text-[12px] text-zinc-300 space-y-4 leading-relaxed">
       <div>
-        <div className="font-medium mb-1">시작하는 방법</div>
+        <div className="font-medium mb-1">1. 시작하는 방법</div>
         <div className="text-zinc-400">
-          Telegram 앱에서 <code className="text-blue-300">@liam_mydash_bot</code> 검색 → "Start" 누르기 → 관리자 승인 대기 → 승인되면 사용 가능
+          Telegram 앱에서 <code className="text-blue-300">@liam_mydash_bot</code> 검색 → "Start" 누르기 → 관리자 승인 대기 → 승인되면 사용 가능 (`/help` 자동 표시).
         </div>
       </div>
+
       <div>
-        <div className="font-medium mb-1">차량 명령 (car 권한 필요)</div>
+        <div className="font-medium mb-1">2. 메뉴 사용법 — 슬래시 외울 필요 없음</div>
+        <div className="text-zinc-400 mb-1">
+          채팅창 하단에 한글 키보드가 자동으로 깔립니다. 누르면 슬래시 명령으로 변환되어 전송.
+        </div>
+        <div className="bg-black/30 rounded p-2 text-[11px] text-zinc-300 font-mono leading-relaxed">
+          {`[🚗 차량]  [🏠 가족]  [📝 SNS]      ← 메인
+        ↓ 카테고리 누르면
+[🔋 배터리]  [🛣 주행거리]  [📍 위치]
+[📊 요약]    [🔌 충전기]    [🗺 가는 곳]
+[⬅️ 메인]                                ← 메인 복귀`}
+        </div>
+        <div className="text-zinc-500 text-[11px] mt-1">
+          텔레그램 입력창 좌측 [/] 메뉴는 <b>비활성</b> — 본 봇은 Reply 키보드만 사용.
+        </div>
+      </div>
+
+      <div>
+        <div className="font-medium mb-1">3. 차량 명령 (car 권한)</div>
         <ul className="text-zinc-400 list-disc list-inside space-y-0.5">
-          <li><code className="text-blue-300">/soc</code> — 배터리 % + 충전 여부</li>
-          <li><code className="text-blue-300">/range</code> — 남은 주행거리 (km)</li>
-          <li><code className="text-blue-300">/charge</code> — 충전 진행 상세 (속도·경과)</li>
-          <li><code className="text-blue-300">/today</code> — 오늘(KST) 주행/충전 요약</li>
-          <li><code className="text-blue-300">/yesterday</code> — 어제(KST) 주행/충전 요약</li>
-          <li><code className="text-blue-300">/week</code> — 지난 7일 요약</li>
-          <li><code className="text-blue-300">/parked</code> — 마지막 주차 장소·경과</li>
-          <li><code className="text-blue-300">/where</code> — 현재 위치 (지도 핀)</li>
+          <li><b>🔋 배터리</b> <code className="text-blue-300">/soc</code> — % + 거리 + 충전 상세 통합</li>
+          <li><b>🛣 주행거리</b> <code className="text-blue-300">/range</code> — 남은 거리 (alias)</li>
+          <li><b>📊 요약</b> <code className="text-blue-300">/period</code> — 오늘·이번주·저번주·최근4주·직전4주 (km · 전비)</li>
+          <li><b>📍 위치</b> <code className="text-blue-300">/where</code> — 정차/주행 통합 (지도 핀 포함)</li>
+          <li><b>🔌 충전기</b> <code className="text-blue-300">/chargers</code> — 즐겨찾기 동별 가용/충전중</li>
+          <li><b>🗺 가는 곳</b> <code className="text-blue-300">/places</code> — 자주가는 곳 / 오래머문 곳 TOP 10 (분기)</li>
+        </ul>
+        <div className="text-zinc-500 text-[11px] mt-1">
+          이전 명령은 alias 로 살아있음: /charge → /soc, /yesterday /week → /period, /parked → /where.
+        </div>
+      </div>
+
+      <div>
+        <div className="font-medium mb-1">4. 가족 명령 (family 권한 · mock)</div>
+        <ul className="text-zinc-400 list-disc list-inside space-y-0.5">
+          <li><b>🌤 오늘 날씨</b> <code className="text-blue-300">/weather</code> — 기상청 단기예보 (예정)</li>
+          <li><b>🌧 강수 예보</b> <code className="text-blue-300">/forecast</code> — 비/눈 사전 알림 (예정)</li>
+          <li><b>📅 일정</b> <code className="text-blue-300">/event</code> — 등록·조회·반복 + 알림 (예정)</li>
+          <li><b>📝 메모</b> <code className="text-blue-300">/memo</code> — 가족 공유 메모 (예정)</li>
+        </ul>
+        <div className="text-zinc-500 text-[11px] mt-1">
+          현재는 placeholder 응답. 실제 구현은 후속 PR.
+        </div>
+      </div>
+
+      <div>
+        <div className="font-medium mb-1">5. SNS 명령 (sns 권한 · mock)</div>
+        <ul className="text-zinc-400 list-disc list-inside space-y-0.5">
+          <li><b>📝 글쓰기</b> <code className="text-blue-300">/post</code> — 네이버 블로그 (mock 채널 검증)</li>
+        </ul>
+        <div className="text-zinc-400 mt-1 text-[11px]">
+          누르면 "본문/사진 보내주세요" 안내 → 텍스트/사진/사진+캡션 입력 → 미리보기 표시 → [✅ 발행] 누르면 dashboard 로 전달 확인. 5분 안에 입력 안 하면 자동 취소.
+        </div>
+      </div>
+
+      <div>
+        <div className="font-medium mb-1">6. 응답 후속 액션</div>
+        <div className="text-zinc-400 text-[11px]">
+          데이터 명령 응답 끝에 inline 버튼 자동 동봉:
+          <span className="ml-1 px-1.5 py-0.5 bg-zinc-800 rounded">🔄</span> (새로고침),
+          <span className="ml-1 px-1.5 py-0.5 bg-zinc-800 rounded">🛣 거리</span>,
+          <span className="ml-1 px-1.5 py-0.5 bg-zinc-800 rounded">🔌 충전기</span> 등 — 컨텍스트 기반 인접 명령.
+        </div>
+      </div>
+
+      <div>
+        <div className="font-medium mb-1">7. 공통 명령 (누구나)</div>
+        <ul className="text-zinc-400 list-disc list-inside space-y-0.5">
+          <li><code className="text-blue-300">/help</code> — 본인 권한 기준 도움말 + Reply 키보드</li>
+          <li><code className="text-blue-300">/whoami</code> — 이름·역할·권한 (root 만 chat_id)</li>
+          <li><code className="text-blue-300">/categories</code> — 보유 카테고리 목록</li>
         </ul>
       </div>
+
       <div>
-        <div className="font-medium mb-1">공통 명령 (누구나)</div>
-        <ul className="text-zinc-400 list-disc list-inside space-y-0.5">
-          <li><code className="text-blue-300">/help</code> — 본인 권한 기준 도움말</li>
-          <li><code className="text-blue-300">/whoami</code> — 내 권한 확인</li>
-          <li><code className="text-blue-300">/categories</code> — 이용 가능한 카테고리</li>
-        </ul>
+        <div className="font-medium mb-1">8. 자연어 — 미지원</div>
+        <div className="text-zinc-400 text-[11px]">
+          정규식 기반 자연어 매칭은 정확도 부족으로 제거. 슬래시 명령 또는 키보드 버튼만 동작.
+          잘못된 입력은 친근한 안내로 폴백 + 학습 로그(<code className="text-blue-300">hub_unmatched_inputs</code>) 적재.
+        </div>
       </div>
+
       <div>
-        <div className="font-medium mb-1">자연어도 일부 가능</div>
-        <ul className="text-zinc-400 list-disc list-inside space-y-0.5">
-          <li>"오늘 얼마나 달렸어?" / "이번 주는?" / "어제 충전했어?"</li>
-          <li>"배터리 얼마나 남았어?" / "지금 몇 % 야?"</li>
-          <li>"몇 km 갈 수 있어?" / "주행가능거리"</li>
-          <li>"지금 충전 얼마나 됐어?" / "언제 끝나?"</li>
-          <li>"지금 어디?" / "주차한 지 얼마나 됐어?"</li>
-        </ul>
+        <div className="font-medium mb-1">9. 활용도 리포트 (대시보드)</div>
+        <div className="text-zinc-400 text-[11px]">
+          <code className="text-blue-300">/v2/chargers</code> 하단의 라이브 패널 — 단지 충전기 활용도 한 화면 요약 (외부 근거자료용). KPI · 주별 추이 · 동별 가동률.
+        </div>
       </div>
-      <div className="text-[11px] text-zinc-500">
-        권한 없는 명령은 "알 수 없는 명령" 으로 표시 — 기능 존재 자체가 노출되지 않아요.
+
+      <div className="text-[11px] text-zinc-500 border-t border-white/[0.04] pt-2">
+        권한 없는 명령은 "이 기능은 아직 권한이 없어요" 안내. 관리자 명령(/pending /setgroup /deny)은 root 만 보임.
       </div>
     </div>
   );
