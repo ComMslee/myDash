@@ -322,7 +322,7 @@ POST /api/sns/blog → ✅ 서버 전달 확인됨 (mock)
 # 같은 box (docker network):
 curl -X POST http://telegram-hub:3000/notify \
   -H "Content-Type: application/json" \
-  -d '{"text":"빌드 실패 — main.go:42","chat_id":"8704087232"}'
+  -d '{"text":"빌드 실패 — main.go:42","chat_id":"<YOUR_CHAT_ID>"}'
 
 # Authorization: Bearer 헤더 필요 (HUB_SHARED_SECRET 설정 시)
 ```
