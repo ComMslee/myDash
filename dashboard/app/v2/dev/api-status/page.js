@@ -37,6 +37,11 @@ const ROUTES = [
   { path: '/api/year-heatmap',     label: '연간 히트맵',    desc: '최근 1년 일별 주행/충전 집계 (캘린더 셀)', category: '주행' },
   { path: '/api/monthly-history',  label: '월간 이력',      desc: '월별 주행거리/충전량/효율 집계', category: '주행' },
   { path: '/api/frequent-places',  label: '자주 가는 곳',   desc: '지오펜스 도착 빈도 + 카카오 reverse geocode (집/회사 우선 핀)', category: '주행' },
+  { path: '/api/resolve-address',  label: '좌표→주소',      desc: 'lat/lng → 한국어 라벨 (Kakao 역지오코딩, DB 캐시) — 봇 알림 주소 폴백', category: '주행',
+    params: [
+      { key: 'lat', required: true, sample: '37.5665' },
+      { key: 'lng', required: true, sample: '126.9780' },
+    ] },
   { path: '/api/long-stay-places', label: '오래 머문 곳',   desc: '체류 시간(다음 주행 시작-종료 갭) 누적 — 10분 미만 노이즈 필터', category: '주행' },
   { path: '/api/rankings',         label: '랭킹',           desc: '주행/일자별 TOP N (type=거리·시간·평속·효율)', category: '주행',
     params: [
