@@ -72,9 +72,18 @@ const ROUTES = [
       { key: 'addr',   sample: '' },
       { key: 'name',   sample: '' },
     ] },
+
+  // 가족
+  { path: '/api/family/festivals', label: '축제',           desc: '한국관광공사 TourAPI(searchFestival2) 래핑 — 봇 /festivals (가족)', category: '가족',
+    params: [
+      { key: 'from',     sample: '' },
+      { key: 'to',       sample: '' },
+      { key: 'areaCode', sample: '' },
+      { key: 'size',     sample: '' },
+    ] },
 ];
 
-const CATEGORIES = ['차량', '주행', '배터리', '집충전기'];
+const CATEGORIES = ['차량', '주행', '배터리', '집충전기', '가족'];
 
 const SLOW_MS = 1500;
 

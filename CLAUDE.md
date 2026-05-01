@@ -1,6 +1,6 @@
 # TeslaMate Custom Dashboard
 
-TeslaMate PostgreSQL 데이터를 시각화하는 Next.js 14 기반 모바일 우선 대시보드.
+TeslaMate PostgreSQL 데이터를 시각화하는 Next.js 14 기반 모바일 우선 대시보드. 가족 텔레그램 봇용 API gateway 역할 겸함 — `/api/family/*`, `/api/sns/*` 가 차량 외 외부 API(축제·SNS 등) 래핑/저장 단일 진실원.
 
 ## 기술 스택
 
@@ -31,6 +31,7 @@ docker compose build dashboard && docker compose up -d dashboard
 | [`docs/CACHING.md`](./docs/CACHING.md) | DB·캐시 흐름도 · 서버/클라 캐시 정책 · API↔테이블↔캐시 매핑 |
 | [`docs/CODE_CONVENTIONS.md`](./docs/CODE_CONVENTIONS.md) | UI/데이터/컴포넌트 규칙 · 파일 분할 기준 · 커밋 스타일 |
 | [`docs/EV_CHARGER_API.md`](./docs/EV_CHARGER_API.md) | 환경공단 전기차 충전소 API 사용법 |
+| [`docs/TOUR_API.md`](./docs/TOUR_API.md) | 한국관광공사 TourAPI 사용법 (축제 정보) |
 | [`docs/DEPLOY.md`](./docs/DEPLOY.md) | CI/CD (GitHub Actions → Lightsail SSH) |
 | [`docs/OPERATIONS.md`](./docs/OPERATIONS.md) | 재부팅/서비스/모니터링/비용 |
 | [`docs/BACKUP.md`](./docs/BACKUP.md) | 스냅샷·DB 백업·인스턴스 정리 |
