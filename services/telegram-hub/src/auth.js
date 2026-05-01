@@ -21,8 +21,28 @@ export async function ensureAuthSchema() {
       granted_by BIGINT,
       PRIMARY KEY (chat_id, feature)
     );
+    ALTER TABLE hub_users
+      ADD COLUMN IF NOT EXISTS default_area_code TEXT;
   `);
   _schemaReady = true;
+}
+
+export async function getDefaultAreaCode(chatId) {
+  await ensureAuthSchema();
+  const { rows } = await pool.query(
+    'SELECT default_area_code FROM hub_users WHERE chat_id = $1',
+    [chatId],
+  );
+  return rows[0]?.default_area_code || null;
+}
+
+export async function setDefaultAreaCode(chatId, areaCode) {
+  await ensureAuthSchema();
+  const { rowCount } = await pool.query(
+    'UPDATE hub_users SET default_area_code = $2 WHERE chat_id = $1',
+    [chatId, areaCode || null],
+  );
+  return rowCount > 0;
 }
 
 // .env 의 TELEGRAM_CHAT_ID 를 root 로 강제. 매 부팅마다 멱등.
