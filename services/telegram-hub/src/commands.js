@@ -1,7 +1,7 @@
 import { pool } from './db.js';
 import {
   sendMessage, sendLocation, escapeHtml,
-  deleteMyCommands, answerCallbackQuery, editMessageText,
+  deleteMyCommands, answerCallbackQuery,
 } from './telegram.js';
 import { formatKst } from './format.js';
 import {
@@ -11,7 +11,7 @@ import {
   hasPermission,
   getDefaultAreaCode, setDefaultAreaCode,
 } from './auth.js';
-import { getCategories, categoryByKey, labelOf } from './categories.js';
+import { getCategories, labelOf } from './categories.js';
 import { listUserGroups, applyUserGroup } from './user_groups.js';
 import { dashGet, dashPost } from './dash.js';
 import { setPending, getPending, clearPending } from './pending.js';

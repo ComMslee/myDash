@@ -91,7 +91,7 @@ myDash/
     │   │   ├── tg/page.js            # 텔레그램 봇 관리 (권한·방송·학습로그·가이드)
     │   │   └── dev/                  # 개발/진단 도구 (하단 탭·헤더 미노출, URL 직접)
     │   │       └── api-status/
-    │   │           └── page.js       # 22개 라우트 가용성 체크 + 서버/충전/폴링 진단 통합
+    │   │           └── page.js       # 29개 라우트 가용성 체크 + 서버/충전/폴링 진단 통합
     │   └── api/                  # 서버사이드 API 라우트 (모두 GET, force-dynamic)
     │       ├── car/route.js              # 차량 기본 정보 + 배터리 + 상태
     │       ├── charging-status/route.js  # 현재 충전 상태
