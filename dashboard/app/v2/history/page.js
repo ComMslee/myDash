@@ -480,7 +480,7 @@ function HistoryInner() {
                             nodes.push(
                               <div key={`gap-${r.id}`} className="flex items-center gap-2 px-3 py-1 bg-black/20">
                                 <div className="flex-1 h-px bg-white/[0.05]" />
-                                <span className="text-[10px] text-zinc-500 tabular-nums">정차 {formatDuration(gapMin)}</span>
+                                <span className="text-[10px] text-zinc-500 tabular-nums">{formatDuration(gapMin)}</span>
                                 <div className="flex-1 h-px bg-white/[0.05]" />
                               </div>
                             );
