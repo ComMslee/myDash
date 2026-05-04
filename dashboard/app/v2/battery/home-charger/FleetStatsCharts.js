@@ -64,33 +64,26 @@ export function RankRow({ icon, label, count, max, isPeak = false, delta = null,
 }
 
 // 7×24 시간×요일 히트맵 — 한 셀 = (DOW, hour) 누적 활성 카운트.
-// thermal palette: 회색(미사용) → 파랑(일반) → 노랑(주목) → 주황(피크).
-// 파랑은 단일 그라데이션, 노랑/주황은 통계 임계 충족 시만 표시.
-// 평탄 분포(max < mean × 1.3) 에선 노랑·주황 모두 OFF — 의미 없는 강조 방지.
+// max 대비 비율 r = v/max 기반 5단계:
+//   0~60%  옅은 파랑    60~80% 중간 파랑    80~90% 진한 파랑
+//   90~95% 노랑(톤다운) 95~100% 주황
+// 평탄 분포(max < mean × 1.3) 시 노랑/주황 자동 OFF — 의미 없는 강조 방지.
 function makeHeatColor(flat) {
   const max = Math.max(1, ...flat);
   const active = flat.filter(v => v > 0);
   const n = active.length;
   const mean = n ? active.reduce((s, v) => s + v, 0) / n : 0;
-  // 활성 없거나 평탄 — 모든 활성 셀을 파랑 그라데이션으로.
-  if (n === 0 || max < mean * 1.3) {
-    return (v) => v === 0
-      ? 'rgba(63,63,70,0.3)'
-      : `rgba(59,130,246,${(0.30 + (v / max) * 0.40).toFixed(2)})`;
-  }
-  const std = Math.sqrt(active.reduce((s, v) => s + (v - mean) ** 2, 0) / n);
-  const sorted = active.slice().sort((a, b) => a - b);
-  const at = (p) => sorted[Math.min(n - 1, Math.floor(n * p))];
-  // 피크(주황) — 상위 ~5% AND mean + 1.5σ 이상 (이전 1σ → 1.5σ 로 빡세게).
-  const peakThr = Math.max(at(0.95), mean + 1.5 * std);
-  // 주목(노랑) — 상위 ~20% AND mean + 0.5σ 이상.
-  const midThr  = Math.max(at(0.80), mean + 0.5 * std);
+  const isFlat = n === 0 || max < mean * 1.3;
   return (v) => {
     if (v === 0) return 'rgba(63,63,70,0.3)';
     const r = v / max;
-    if (v >= peakThr) return `rgba(245,158,11,${(0.75 + r * 0.20).toFixed(2)})`;   // amber
-    if (v >= midThr)  return `rgba(250,204,21,${(0.60 + r * 0.25).toFixed(2)})`;   // yellow
-    return `rgba(59,130,246,${(0.30 + r * 0.30).toFixed(2)})`;                     // blue
+    if (!isFlat) {
+      if (r > 0.95) return 'rgba(245,158,11,0.95)';   // 주황 (피크)
+      if (r > 0.90) return 'rgba(202,138,4,0.85)';    // 노랑 톤다운 (yellow-600, 주목)
+    }
+    if (r > 0.80) return 'rgba(59,130,246,0.80)';     // 파랑 강
+    if (r > 0.60) return 'rgba(59,130,246,0.55)';     // 파랑 중
+    return 'rgba(59,130,246,0.30)';                    // 파랑 약
   };
 }
 
@@ -124,9 +117,11 @@ export function HeatmapChart({ heatmap }) {
       </div>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1.5 text-[10px] text-zinc-500">
         <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(63,63,70,0.3)' }}/>미사용</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(59,130,246,0.5)' }}/>활성</span>
-        <span className="flex items-center gap-1" title="상위 ~20% AND 평균+0.5σ 이상"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(250,204,21,0.80)' }}/>주목</span>
-        <span className="flex items-center gap-1" title="상위 ~5% AND 평균+1.5σ 이상 — 평탄 분포(max < 평균×1.3) 시 자동 비활성"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(245,158,11,0.95)' }}/>피크</span>
+        <span className="flex items-center gap-1" title="0~60%"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(59,130,246,0.30)' }}/>약</span>
+        <span className="flex items-center gap-1" title="60~80%"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(59,130,246,0.55)' }}/>중</span>
+        <span className="flex items-center gap-1" title="80~90%"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(59,130,246,0.80)' }}/>강</span>
+        <span className="flex items-center gap-1" title="90~95% — 평탄 분포 시 자동 비활성"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(202,138,4,0.85)' }}/>주목</span>
+        <span className="flex items-center gap-1" title="95~100% — 평탄 분포 시 자동 비활성"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(245,158,11,0.95)' }}/>피크</span>
         <span className="ml-auto tabular-nums" title={`${total}회`}>총 {compact(total)}회 · 데드 {deadCells}/168</span>
       </div>
     </div>
