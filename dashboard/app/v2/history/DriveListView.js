@@ -20,12 +20,12 @@ function formatMonthLabel(mk) {
   return `${yLabel}${parseInt(m)}월`;
 }
 
-// 04~24h 막대 — 새벽(00~04)은 거의 안 쓰는 시간이라 윈도우 밖. 그 시간대 운행이
+// 06~24h 막대 — 새벽(00~06)은 거의 안 쓰는 시간이라 윈도우 밖. 그 시간대 운행이
 // 있으면 막대 좌측 외부에 작은 점으로 신호 (정확한 시각은 메타라인 🌙 prefix 로).
 function DayTimelineBar({ items, dayStart }) {
   const visible = items.filter(d => !d.absorbed && d.start_date);
   if (!visible.length) return null;
-  const dayMs = 20 * 3600000; // 04:00 ~ 24:00
+  const dayMs = 18 * 3600000; // 06:00 ~ 24:00
   const hasEarly = visible.some(d => new Date(d.start_date) - dayStart < 0);
   return (
     <div className="flex items-center gap-1">
@@ -144,8 +144,8 @@ export default function DriveListView({
       }
     }
     const dayStart = new Date(g.firstDate);
-    dayStart.setHours(4, 0, 0, 0); // 막대 윈도우 시작 = 04:00 (00~04 새벽은 점 indicator)
-    const isEarly = new Date(first.start_date).getHours() < 4;
+    dayStart.setHours(6, 0, 0, 0); // 막대 윈도우 시작 = 06:00 (00~06 새벽은 점 indicator)
+    const isEarly = new Date(first.start_date).getHours() < 6;
     return (
       <button
         key={g.key}
