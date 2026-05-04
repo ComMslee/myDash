@@ -233,93 +233,140 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
               }
             }
 
-            // === 이동주차 ≥2건 → 한 줄 요약 (펼치면 개별 행) ===
+            // === 이동주차 ≥2건 → 좌측 zinc bar + [상세보기 | 펼치기] 헤더 ===
             if (chunk.kind === 'stash' && chunk.drives.length >= 2) {
               const expanded = expandedChunks.has(chunk.key);
               const totalKm = chunk.drives.reduce((s, x) => s + (parseFloat(x.distance) || 0), 0);
-              const oldestDt = new Date(chunk.drives[chunk.drives.length - 1].start_date);
+              const totalUsedPct = chunk.drives.reduce((s, x) => {
+                if (x.start_battery_level != null && x.end_battery_level != null) {
+                  return s + Math.max(0, x.start_battery_level - x.end_battery_level);
+                }
+                return s;
+              }, 0);
+              const firstStash = chunk.drives[chunk.drives.length - 1];
+              const oldestDt = new Date(firstStash.start_date);
               const fmt = (dt) => `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
               return (
                 <Fragment key={chunk.key}>
-                  <button
-                    type="button"
-                    onClick={() => toggleChunk(chunk.key)}
-                    className="w-full text-left grid grid-cols-[44px_1fr_auto] items-center gap-2 px-3 py-2 border-b border-white/[0.04] hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
-                  >
-                    <div className="text-xs text-zinc-600 tabular-nums">{fmt(oldestDt)}</div>
-                    <p className="text-sm text-zinc-500 truncate">
-                      이동주차 {chunk.drives.length}건
-                      {totalKm > 0 && (
-                        <span className="text-zinc-600 text-xs ml-2 tabular-nums">· {totalKm.toFixed(1)}km</span>
-                      )}
-                    </p>
-                    <span className="text-xs text-zinc-600">{expanded ? '▾' : '▸'}</span>
-                  </button>
-                  {expanded && (
-                    <div className="border-l-2 border-zinc-700/50">
-                      {chunk.drives.map(d => (
-                        <Fragment key={d.id}>{renderRow(d, { indent: true })}</Fragment>
-                      ))}
+                  <div className="border-l-2 border-zinc-700/50">
+                    <div className="flex items-stretch">
+                      <button
+                        type="button"
+                        onClick={() => onDriveClick(firstStash)}
+                        className="flex-1 min-w-0 text-left grid grid-cols-[44px_1fr] items-center gap-2 pl-3 pr-2 py-2 border-b border-white/[0.04] hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
+                      >
+                        <div className="text-xs text-zinc-600 tabular-nums">{fmt(oldestDt)}</div>
+                        <p className="text-sm text-zinc-500 truncate">
+                          이동주차 {chunk.drives.length}건
+                          {totalKm > 0 && (
+                            <span className="text-zinc-600 text-xs ml-2 tabular-nums">· {totalKm.toFixed(1)}km</span>
+                          )}
+                          {totalUsedPct > 0 && (
+                            <span className="text-zinc-600 text-xs ml-1.5 tabular-nums">({totalUsedPct}%)</span>
+                          )}
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleChunk(chunk.key)}
+                        className="px-3 flex items-center text-xs text-zinc-500 border-l border-white/[0.06] border-b border-white/[0.04] hover:bg-white/[0.05] active:bg-white/[0.08] transition-colors"
+                        title={expanded ? '접기' : '펼치기'}
+                      >
+                        {expanded ? '▾' : '▸'}
+                      </button>
                     </div>
-                  )}
+                    {expanded && chunk.drives.map(d => (
+                      <Fragment key={d.id}>{renderRow(d, { indent: true })}</Fragment>
+                    ))}
+                  </div>
                   {chunkGap && renderGap(chunkGap, chunk.key + '-cgap')}
                 </Fragment>
               );
             }
 
-            // === 외출 chain → 한 줄 요약 (펼치면 leg 들 amber bar 묶음) ===
+            // === 외출 chain → 좌측 amber bar + [상세보기 | 펼치기] 헤더 + S→a→b→E path ===
             if (chunk.kind === 'chain') {
               const drives = chunk.drives;
               const expanded = expandedChunks.has(chunk.key);
-              const firstLeg = drives[drives.length - 1]; // 시간상 처음 출발
-              const lastLeg = drives[0];                  // 시간상 마지막 도착
+              const firstLeg = drives[drives.length - 1]; // 시간상 처음 출발 (S)
+              const lastLeg = drives[0];                  // 시간상 마지막 도착 (E)
               const totalKm = drives.reduce((s, x) => s + (parseFloat(x.distance) || 0), 0);
               const totalMin = drives.reduce((s, x) => s + (parseFloat(x.duration_min) || 0), 0);
+              const totalUsedPct = drives.reduce((s, x) => {
+                if (x.start_battery_level != null && x.end_battery_level != null) {
+                  return s + Math.max(0, x.start_battery_level - x.end_battery_level);
+                }
+                return s;
+              }, 0);
+              const totalKwh = drives.reduce((s, x) => {
+                if (x.start_rated_range_km && x.end_rated_range_km) {
+                  const u = parseFloat(x.start_rated_range_km) - parseFloat(x.end_rated_range_km);
+                  if (u > 0) return s + u * KWH_PER_KM;
+                }
+                return s;
+              }, 0);
               const firstDt = new Date(firstLeg.start_date);
               const lastDt = new Date(lastLeg.end_date || lastLeg.start_date);
               const fmt = (dt) => `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+              // 시간순 path: S → 경유1 → 경유2 → ... → E (= leg[0].start, leg[0].end, leg[1].end, ...)
+              const ascDrives = [...drives].reverse();
+              const pathLabels = [
+                shortAddr(ascDrives[0].start_address) || '?',
+                ...ascDrives.map(d => shortAddr(d.end_address) || '?'),
+              ];
               return (
                 <Fragment key={chunk.key}>
-                  <button
-                    type="button"
-                    onClick={() => toggleChunk(chunk.key)}
-                    className="w-full text-left grid grid-cols-[44px_1fr_auto] items-center gap-2 px-3 py-3 border-b border-white/[0.04] hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
-                  >
-                    <div className="text-xs text-zinc-500 tabular-nums leading-tight">
-                      <p>{fmt(firstDt)}</p>
-                      <p className="text-zinc-600">{fmt(lastDt)}</p>
+                  <div className="border-l-2 border-amber-500/30">
+                    <div className="flex items-stretch">
+                      <button
+                        type="button"
+                        onClick={() => onDriveClick(firstLeg)}
+                        className="flex-1 min-w-0 text-left grid grid-cols-[44px_1fr_auto] items-center gap-2 pl-3 pr-2 py-3 border-b border-white/[0.04] hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
+                      >
+                        <div className="text-xs text-zinc-500 tabular-nums leading-tight">
+                          <p>{fmt(firstDt)}</p>
+                          <p className="text-zinc-600">{fmt(lastDt)}</p>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm text-zinc-300 truncate">{pathLabels.join(' → ')}</p>
+                          <p className="text-xs text-zinc-600 tabular-nums mt-0.5">
+                            {drives.length}회 · {formatDuration(Math.round(totalMin))}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-blue-400 tabular-nums">{totalKm.toFixed(1)}<span className="text-xs font-medium text-zinc-600 ml-0.5">km</span></p>
+                          {totalKwh > 0 && (
+                            <p className="text-xs text-green-400/80 tabular-nums">
+                              {totalKwh.toFixed(1)}<span className="ml-0.5">kWh</span>
+                              {totalUsedPct > 0 && <span className="text-zinc-500 ml-1">({totalUsedPct}%)</span>}
+                            </p>
+                          )}
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleChunk(chunk.key)}
+                        className="px-3 flex items-center text-xs text-zinc-500 border-l border-white/[0.06] border-b border-white/[0.04] hover:bg-white/[0.05] active:bg-white/[0.08] transition-colors"
+                        title={expanded ? '접기' : '펼치기'}
+                      >
+                        {expanded ? '▾' : '▸'}
+                      </button>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm text-zinc-300 truncate">
-                        {shortAddr(firstLeg.start_address) || '?'}<span className="text-zinc-600 mx-1">→</span>{shortAddr(lastLeg.end_address) || '?'}
-                      </p>
-                      <p className="text-xs text-zinc-600 tabular-nums mt-0.5">
-                        {drives.length}회 경유 · {formatDuration(Math.round(totalMin))}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-blue-400 tabular-nums">{totalKm.toFixed(1)}<span className="text-xs font-medium text-zinc-600 ml-0.5">km</span></p>
-                      <p className="text-xs text-zinc-600">{expanded ? '▾' : '▸'}</p>
-                    </div>
-                  </button>
-                  {expanded && (
-                    <div className="border-l-2 border-amber-500/30">
-                      {drives.map((d, idx) => {
-                        const next = drives[idx + 1];
-                        let gapLabel = null;
-                        if (next && d.start_date && next.end_date) {
-                          const gapMs = new Date(d.start_date) - new Date(next.end_date);
-                          if (gapMs > 0) gapLabel = formatDuration(Math.round(gapMs / 60000));
-                        }
-                        return (
-                          <Fragment key={d.id}>
-                            {renderRow(d, { indent: true })}
-                            {gapLabel && renderGap(gapLabel, d.id + '-igap', { inChain: true })}
-                          </Fragment>
-                        );
-                      })}
-                    </div>
-                  )}
+                    {expanded && drives.map((d, idx) => {
+                      const next = drives[idx + 1];
+                      let gapLabel = null;
+                      if (next && d.start_date && next.end_date) {
+                        const gapMs = new Date(d.start_date) - new Date(next.end_date);
+                        if (gapMs > 0) gapLabel = formatDuration(Math.round(gapMs / 60000));
+                      }
+                      return (
+                        <Fragment key={d.id}>
+                          {renderRow(d, { indent: true })}
+                          {gapLabel && renderGap(gapLabel, d.id + '-igap', { inChain: true })}
+                        </Fragment>
+                      );
+                    })}
+                  </div>
                   {chunkGap && renderGap(chunkGap, chunk.key + '-cgap')}
                 </Fragment>
               );
@@ -358,30 +405,28 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
         const expanded = expandedMonths.has(mk);
         return (
           <Fragment key={mk}>
-            {/* 월 헤더 — chevron 토글(좌) + 상세보기 버튼(우) */}
+            {/* 월 헤더 — 큰 영역=상세보기 / 우측 chevron=펼치기 (주행 묶음과 동일 패턴) */}
             <div className="flex items-stretch border-t border-white/[0.10] bg-white/[0.04]">
               <button
-                onClick={() => toggleMonth(mk)}
+                onClick={() => (onMonthClick ? onMonthClick(mk) : toggleMonth(mk))}
                 className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-white/[0.05] active:bg-white/[0.08] transition-colors text-left min-w-0"
+                title={onMonthClick ? '이 달 전체 지도/순위 보기' : (expanded ? '접기' : '펼치기')}
               >
-                <svg className={`w-3 h-3 text-zinc-500 flex-shrink-0 transition-transform ${expanded ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
                 <span className="text-xs font-bold text-zinc-300 flex-shrink-0">{formatMonthLabel(mk)}</span>
                 <span className="text-[10px] text-zinc-600 tabular-nums truncate">
                   {m.driveCount}회 · {m.distance.toFixed(0)}km
                   {m.usedPct > 0 && <span className="text-zinc-700"> · {m.usedPct}%</span>}
                 </span>
               </button>
-              {onMonthClick && (
-                <button
-                  onClick={() => onMonthClick(mk)}
-                  className="px-3 flex items-center text-[11px] text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 border-l border-white/[0.06] transition-colors"
-                  title="이 달 전체 지도/순위 보기"
-                >
-                  상세보기
-                </button>
-              )}
+              <button
+                onClick={() => toggleMonth(mk)}
+                className="px-3 flex items-center text-zinc-500 border-l border-white/[0.06] hover:bg-white/[0.05] active:bg-white/[0.08] transition-colors"
+                title={expanded ? '접기' : '펼치기'}
+              >
+                <svg className={`w-3 h-3 transition-transform ${expanded ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
             </div>
             {expanded && m.days.flatMap((g, idx) => {
               const gi = m.dayIdx[idx];
