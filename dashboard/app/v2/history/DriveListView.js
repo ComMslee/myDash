@@ -63,7 +63,7 @@ function formatMonthLabel(mk) {
   return `${yLabel}${parseInt(m)}월`;
 }
 
-export default function DriveListView({ drives, loadingDrives, error, onDriveClick, onDayClick, onMonthClick, driveDayStr }) {
+export default function DriveListView({ drives, loadingDrives, error, onDriveClick, onDayClick, onMonthClick, onChainClick, driveDayStr }) {
   const [expandedMonths, setExpandedMonths] = useState(() => new Set([currentMonthKey()]));
   const [expandedChunks, setExpandedChunks] = useState(() => new Set());
   const toggleMonth = (mk) => setExpandedMonths(prev => {
@@ -325,7 +325,7 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
                     <div className="flex items-stretch">
                       <button
                         type="button"
-                        onClick={() => onDriveClick(firstLeg)}
+                        onClick={() => (onChainClick ? onChainClick(chunk.chainId) : onDriveClick(firstLeg))}
                         className="flex-1 min-w-0 text-left grid grid-cols-[44px_1fr_auto] items-center gap-2 pl-3 pr-2 py-3 border-b border-white/[0.04] hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
                       >
                         <div className="text-xs text-zinc-500 tabular-nums leading-tight">

@@ -54,9 +54,12 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
   const [dayRoutes, setDayRoutes] = useState([]);
   const [monthMode, setMonthMode] = useState(null); // 'YYYY-MM' or null
   const [monthRoutes, setMonthRoutes] = useState([]);
+  const [chainMode, setChainMode] = useState(null); // chain_id (number) or null — 외출 묶음 상세
+  const [chainRoutes, setChainRoutes] = useState([]);
   const abortRef = useRef(null);
   const dayAbortRef = useRef(null);
   const monthAbortRef = useRef(null);
+  const chainAbortRef = useRef(null);
 
   // 진입 쿼리(id/date)에 맞는 주행을 선택 — id > date > 첫 항목
   const pickPreselect = (list) => {
@@ -105,7 +108,7 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
 
   // 단일 주행 경로 로드
   useEffect(() => {
-    if (dayMode || monthMode) return; // 일/월 모드에서는 단일 경로 미로딩
+    if (dayMode || monthMode || chainMode) return; // 일/월/외출 모드에서는 단일 경로 미로딩
     if (!selectedDrive) return;
     if (isMock) {
       setPositions(MOCK_DATA.routePositions);
@@ -147,7 +150,7 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
       setLoadingRoute(false);
     })();
     return () => { controller.abort(); };
-  }, [selectedDrive?.id, isMock, refreshSignal, dayMode, monthMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedDrive?.id, isMock, refreshSignal, dayMode, monthMode, chainMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 일 모드 — 해당 일의 모든 주행 경로 병렬 로드
   useEffect(() => {
@@ -179,6 +182,36 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
     });
     return () => { dayAbortRef.current?.abort(); };
   }, [dayMode, isMock, drives]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 외출 모드 — 같은 chain_id 인 외출 leg 경로 병렬 로드 (dayMode 와 동일 패턴, chain_id 필터)
+  useEffect(() => {
+    if (chainMode == null || isMock || drives.length === 0) { setChainRoutes([]); return; }
+    const chainDrives = drives
+      .filter(d => d.chain_id === chainMode && d.tag === '외출')
+      .slice()
+      .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+    if (chainDrives.length === 0) { setChainRoutes([]); return; }
+    setLoadingRoute(true);
+    if (chainAbortRef.current) chainAbortRef.current.abort();
+    chainAbortRef.current = new AbortController();
+    const palette = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7', '#84cc16', '#f43f5e'];
+    fetchInChunks(chainDrives, (d, idx) =>
+      fetch(`/api/route-map?driveId=${d.id}`, { signal: chainAbortRef.current.signal })
+        .then(r => r.json())
+        .then(data => ({
+          positions: data.positions || [],
+          color: palette[idx % palette.length],
+          id: d.id,
+          startDate: d.start_date,
+        }))
+        .catch(() => null)
+    , 6).then(results => {
+      const valid = results.filter(r => r && r.positions.length >= 2);
+      setChainRoutes(valid);
+      setLoadingRoute(false);
+    });
+    return () => { chainAbortRef.current?.abort(); };
+  }, [chainMode, isMock, drives]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 월 모드 — 해당 월의 모든 주행 경로 병렬 로드
   useEffect(() => {
@@ -221,6 +254,8 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
     dayRoutes,
     monthMode, setMonthMode,
     monthRoutes,
+    chainMode, setChainMode,
+    chainRoutes,
     loadingDrives, loadingRoute,
     error,
   };
