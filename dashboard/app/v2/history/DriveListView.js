@@ -4,6 +4,23 @@ import { useState, Fragment } from 'react';
 import { KWH_PER_KM } from '@/lib/constants';
 import { formatDuration, shortAddr } from '@/lib/format';
 
+// 분류 태그 배지 — PoC 검토용 prefix. /api/drives 의 d.tag 사용.
+const TAG_STYLE = {
+  '이동주차': 'bg-zinc-700/50 text-zinc-400',
+  '일반':    'bg-blue-500/15 text-blue-300',
+  '외출':    'bg-amber-500/20 text-amber-300',
+};
+function TagBadge({ tag, legs }) {
+  if (!tag) return null;
+  const cls = TAG_STYLE[tag] || 'bg-zinc-800 text-zinc-400';
+  const label = tag === '외출' && legs ? `${tag}·${legs}` : tag;
+  return (
+    <span className={`inline-flex items-center px-1.5 py-px mr-1.5 rounded text-[10px] font-medium tabular-nums ${cls}`}>
+      {label}
+    </span>
+  );
+}
+
 function efficiency(d) {
   if (!d.start_rated_range_km || !d.end_rated_range_km || !d.distance) return null;
   const dist = parseFloat(d.distance);
@@ -161,6 +178,7 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm text-zinc-300 truncate">
+                      <TagBadge tag={d.tag} legs={d.chain_legs} />
                       {shortAddr(d.start_address) || '?'}<span className="text-zinc-600 mx-1">→</span>{shortAddr(d.end_address) || '?'}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
