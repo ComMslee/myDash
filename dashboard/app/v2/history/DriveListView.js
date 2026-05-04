@@ -63,18 +63,13 @@ function formatMonthLabel(mk) {
   return `${yLabel}${parseInt(m)}월`;
 }
 
-// 0~24h 막대 — drive 블록을 tag 색상으로 표시 (외출=amber, 이동주차=zinc, 일반=blue).
+// 0~24h 막대 — 주행 블록은 일관된 파란색 (tag 구분 없음 — 주행은 모두 동일 의미).
 function DayTimelineBar({ items, dayStart }) {
   const visible = items.filter(d => !d.absorbed && d.start_date);
   if (!visible.length) return null;
   const dayMs = 86400000;
-  const colorOf = (tag) => {
-    if (tag === '외출') return 'bg-amber-400/70';
-    if (tag === '이동주차') return 'bg-zinc-500/40';
-    return 'bg-blue-400/70';
-  };
   return (
-    <div className="relative h-1.5 bg-white/[0.04] rounded-sm overflow-hidden">
+    <div className="relative h-2.5 bg-white/[0.04] rounded overflow-hidden">
       {visible.map(d => {
         const s = new Date(d.start_date) - dayStart;
         const eMs = d.end_date ? (new Date(d.end_date) - dayStart) : (s + 60000);
@@ -84,7 +79,7 @@ function DayTimelineBar({ items, dayStart }) {
         return (
           <div
             key={d.id}
-            className={`absolute inset-y-0 ${colorOf(d.tag)}`}
+            className="absolute inset-y-0 bg-blue-400/80"
             style={{ left: `${left}%`, width: `${width}%` }}
           />
         );
@@ -386,21 +381,18 @@ export default function DriveListView({
     m.driveCount += g.items.filter(d => !d.absorbed).length;
   });
 
-  // 일 카드 — 24h 막대 + 시간 범위/머문시간/총량.
+  // 일 카드 — 24h 막대 + 시간 범위/운전·정차 시간/총량.
   const renderDayCard = (g) => {
     const weekday = WEEKDAY_KO[g.firstDate.getDay()];
     const visible = g.items.filter(d => !d.absorbed);
     if (!visible.length) return null;
     const driveCount = visible.length;
-    const chainIds = new Set();
-    visible.forEach(d => { if (d.tag === '외출' && d.chain_id != null) chainIds.add(d.chain_id); });
-    const chainCount = chainIds.size;
-    const stashCount = visible.filter(d => d.tag === '이동주차').length;
     const sortedAsc = [...visible].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
     const first = sortedAsc[0];
     const last = sortedAsc[sortedAsc.length - 1];
     const fmt = (s) => { const dt = new Date(s); return `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`; };
-    // 머문시간 = drive 사이 gap 합 (양수만)
+    const driveTotalMin = visible.reduce((s, d) => s + (parseFloat(d.duration_min) || 0), 0);
+    // 정차시간 = drive 사이 gap 합 (양수만)
     let stayMin = 0;
     for (let i = 1; i < sortedAsc.length; i++) {
       const prev = sortedAsc[i - 1];
@@ -420,18 +412,10 @@ export default function DriveListView({
         className="w-full text-left flex flex-col gap-2 px-3 py-3 border-b border-white/[0.04] last:border-0 hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
       >
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-sm font-bold text-zinc-200 tabular-nums flex-shrink-0">
-              {g.firstDate.getMonth() + 1}/{g.firstDate.getDate()}
-              <span className="text-[10px] text-zinc-600 font-normal ml-0.5">({weekday})</span>
-            </span>
-            {chainCount > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 flex-shrink-0">외출 {chainCount}</span>
-            )}
-            {stashCount > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-700/40 text-zinc-400 flex-shrink-0">이동주차 {stashCount}</span>
-            )}
-          </div>
+          <span className="text-sm font-bold text-zinc-200 tabular-nums flex-shrink-0">
+            {g.firstDate.getMonth() + 1}/{g.firstDate.getDate()}
+            <span className="text-[10px] text-zinc-600 font-normal ml-0.5">({weekday})</span>
+          </span>
           <div className="text-right tabular-nums flex-shrink-0">
             <span className="text-sm font-bold text-blue-400">{g.distance.toFixed(0)}<span className="text-[10px] text-zinc-600 ml-0.5">km</span></span>
             {g.kwh > 0 && (
@@ -447,14 +431,36 @@ export default function DriveListView({
           <span>{fmt(first.start_date)} → {fmt(last.end_date || last.start_date)}</span>
           <span className="text-zinc-700">·</span>
           <span>주행 {driveCount}회</span>
+          {driveTotalMin > 0 && (
+            <>
+              <span className="text-zinc-700">·</span>
+              <span>운전 {formatDuration(Math.round(driveTotalMin))}</span>
+            </>
+          )}
           {stayMin > 0 && (
             <>
               <span className="text-zinc-700">·</span>
-              <span>머문 {formatDuration(Math.round(stayMin))}</span>
+              <span>정차 {formatDuration(Math.round(stayMin))}</span>
             </>
           )}
         </div>
       </button>
+    );
+  };
+
+  // 일 카드 사이 gap — 이전 일 첫 출발 - 다음 일 마지막 도착 (drives 는 reverse-chronological).
+  const renderCrossDayGap = (curG, nextG, key) => {
+    const curOldest = curG.items[curG.items.length - 1];   // 시간상 그날 첫 주행
+    const nextNewest = nextG.items[0];                      // 시간상 다음(=과거) 일 마지막 주행
+    if (!curOldest?.start_date || !nextNewest?.end_date) return null;
+    const ms = new Date(curOldest.start_date) - new Date(nextNewest.end_date);
+    if (ms <= 0) return null;
+    return (
+      <div key={key} className="flex items-center gap-2 px-3 py-1 bg-black/40 border-y border-white/[0.06]">
+        <div className="flex-1 h-px bg-white/[0.06]" />
+        <span className="text-[10px] text-zinc-600 tabular-nums">{formatDuration(Math.round(ms / 60000))}</span>
+        <div className="flex-1 h-px bg-white/[0.06]" />
+      </div>
     );
   };
 
@@ -488,7 +494,15 @@ export default function DriveListView({
                 </svg>
               </button>
             </div>
-            {expanded && m.days.map(g => renderDayCard(g))}
+            {expanded && m.days.flatMap((g, idx) => {
+              const nextDay = idx + 1 < m.days.length ? m.days[idx + 1] : null;
+              const nodes = [renderDayCard(g)];
+              if (nextDay) {
+                const gapNode = renderCrossDayGap(g, nextDay, g.key + '-xgap');
+                if (gapNode) nodes.push(gapNode);
+              }
+              return nodes;
+            })}
           </Fragment>
         );
       })}

@@ -466,7 +466,7 @@ function HistoryInner() {
             ) : null}
             {dayMode ? (
               <div className="flex-1 min-h-0 overflow-y-auto">
-                <div className="aspect-[4/3] p-2 flex-shrink-0">
+                <div className="h-[32dvh] min-h-[200px] max-h-[420px] p-2 flex-shrink-0">
                   <DriveMap
                     positions={positions}
                     routes={dayRoutes}
