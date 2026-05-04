@@ -285,7 +285,10 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
             }
 
             // === 외출 chain → 좌측 amber bar + [상세보기 | 펼치기] 헤더 + S→a→b→E path ===
-            if (chunk.kind === 'chain') {
+            // chunkItems 는 items 배열의 *연속* 외출만 묶는다. chain leg 사이에 stash 가
+            // 끼면 같은 chain_id 가 두 청크로 쪼개져 1-leg chain bundle 이 만들어짐 →
+            // 이때는 묶음 의미가 없으니 single 행으로 폴백.
+            if (chunk.kind === 'chain' && chunk.drives.length >= 2) {
               const drives = chunk.drives;
               const expanded = expandedChunks.has(chunk.key);
               const firstLeg = drives[drives.length - 1]; // 시간상 처음 출발 (S)
