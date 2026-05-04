@@ -8,6 +8,14 @@ export function formatDuration(minutes) {
   return h === 0 ? `${m}분` : `${h}시간 ${m}분`;
 }
 
+/** 분 → "Xh Ym" 또는 "Ym" (h/m 단축 표기) */
+export function formatHm(minutes) {
+  if (!minutes) return '—';
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes % 60);
+  return h === 0 ? `${m}m` : `${h}h ${m}m`;
+}
+
 /** 시간(소수 가능) → "X시간 Y분" 또는 "Y분" (1시간 미만은 분 단위) */
 export function formatHours(hours) {
   if (hours == null) return '—';

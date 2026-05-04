@@ -2,7 +2,7 @@
 
 import { useState, Fragment } from 'react';
 import { KWH_PER_KM } from '@/lib/constants';
-import { formatDuration } from '@/lib/format';
+import { formatDuration, formatHm } from '@/lib/format';
 
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -178,17 +178,17 @@ export default function DriveListView({
         <div className="flex items-center gap-2 text-[11px] text-zinc-500 tabular-nums flex-wrap">
           <span>{isEarly && <span className="mr-0.5">🌙</span>}{fmt(first.start_date)} → {fmt(last.end_date || last.start_date)}{isLateEnd && <span className="ml-0.5">🌙</span>}</span>
           <span className="text-zinc-700">·</span>
-          <span>주행 {driveCount}회</span>
+          <span title="주행"><span className="mr-0.5">🚗</span>{driveCount}회</span>
           {driveTotalMin > 0 && (
             <>
               <span className="text-zinc-700">·</span>
-              <span>운전 {formatDuration(Math.round(driveTotalMin))}</span>
+              <span title="운전"><span className="mr-0.5">🛣️</span>{formatHm(Math.round(driveTotalMin))}</span>
             </>
           )}
           {stayMin > 0 && (
             <>
               <span className="text-zinc-700">·</span>
-              <span>정차 {formatDuration(Math.round(stayMin))}</span>
+              <span title="정차"><span className="mr-0.5">🅿️</span>{formatHm(Math.round(stayMin))}</span>
             </>
           )}
         </div>
