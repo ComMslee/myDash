@@ -2,6 +2,7 @@
 // 시드(root, guest)도 양쪽에서 ON CONFLICT DO NOTHING 으로 안전.
 // /setgroup 명령에서 사용.
 import { pool } from './db.js';
+import { clearPending } from './pending.js';
 
 let _schemaReady = false;
 
@@ -91,10 +92,14 @@ export async function applyUserGroup(targetChatId, groupKey, byChatId) {
       );
     }
     await client.query('COMMIT');
+    // 권한 재할당 시 진행 중이던 in-memory pending(다단계 입력) 제거 — 이전 role 로
+    // 시작된 SNS publish 등이 새 role 검사 우회로 발행되는 race 방지.
+    clearPending(targetChatId);
     return { ok: true, role: newRole };
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
-    return { ok: false, error: e.message };
+    console.error('[user_groups] applyUserGroup', targetChatId, groupKey, e?.message);
+    return { ok: false, error: 'internal error' };
   } finally {
     client.release();
   }

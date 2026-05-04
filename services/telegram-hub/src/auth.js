@@ -1,5 +1,6 @@
 import { pool } from './db.js';
 import { getChat } from './telegram.js';
+import { clearPending } from './pending.js';
 
 // 사용자/권한 스키마 — 부팅 시 idempotent 생성.
 let _schemaReady = false;
@@ -109,6 +110,9 @@ export async function setRole(chatId, role, byChatId) {
      WHERE chat_id = $1`,
     [chatId, role, byChatId || null],
   );
+  // 권한 변경 시 진행 중이던 in-memory pending 제거 — 이전 role 로 시작된 publish 등
+  // 다단계 액션이 새 role 우회로 진행되는 race 방지.
+  if (rowCount > 0) clearPending(chatId);
   return rowCount > 0;
 }
 

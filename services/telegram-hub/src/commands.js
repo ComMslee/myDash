@@ -1115,11 +1115,20 @@ async function cmdPending({ chatId }) {
   return sendMessage(lines.join('\n'), chatId);
 }
 
+// chat_id 후보 검증 — 빈문자/비숫자/길이초과/safe-int 범위 외는 거부.
+// 길이 19 는 BIGINT 양수 최대(9223372036854775807) 자릿수. SQL BIGINT overflow 시
+// 트랜잭션이 raw 에러 메시지를 root 에 반환하던 경로 차단.
+function isValidChatId(s) {
+  if (typeof s !== 'string' || !/^\d{1,19}$/.test(s)) return false;
+  const n = Number(s);
+  return Number.isSafeInteger(n) && n > 0;
+}
+
 async function cmdSetGroup({ chatId, args, user }) {
   const [target, groupKey] = (args || '').split(/\s+/);
   const groups = await listUserGroups();
 
-  if (!/^\d+$/.test(target) || !groupKey) {
+  if (!isValidChatId(target) || !groupKey) {
     const list = groups.length
       ? groups.map((g) => `  • <code>${g.key}</code> ${g.label}${g.is_root ? ' [root]' : ''}`).join('\n')
       : '  (없음)';
@@ -1157,7 +1166,7 @@ async function cmdSetGroup({ chatId, args, user }) {
 
 async function cmdDeny({ chatId, args, user }) {
   const target = (args || '').split(/\s+/)[0];
-  if (!/^\d+$/.test(target)) return sendMessage('사용법: /deny &lt;chat_id&gt;', chatId);
+  if (!isValidChatId(target)) return sendMessage('사용법: /deny &lt;chat_id&gt;', chatId);
   const ok = await setRole(target, 'denied', user.chat_id);
   if (!ok) return sendMessage(`#${target} 없음`, chatId);
   // 차단된 사용자 [/] 메뉴 비우기.
