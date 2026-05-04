@@ -1,0 +1,25 @@
+# TeslaMate UI 게이트
+# - 외부 :4000 으로 들어오는 요청을 dashboard PIN 쿠키로 검증한 뒤
+#   teslamate(Phoenix LiveView, 내부 :4000) 로 프록시.
+# - 미인증 시 dashboard /api/auth/verify 가 302 로 /login?next=... 을 돌려준다.
+# - dashboard(:80) 는 Caddy 를 거치지 않고 호스트에서 직접 노출되므로
+#   여기엔 그 라우팅이 없다.
+
+{
+	auto_https off
+	admin off
+}
+
+:4000 {
+	forward_auth dashboard:5000 {
+		uri /api/auth/verify
+	}
+
+	reverse_proxy teslamate:4000 {
+		# Phoenix LiveView WebSocket 업그레이드는 Caddy 가 자동으로 처리.
+		header_up Host {upstream_hostport}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
