@@ -165,7 +165,7 @@ function HistoryInner() {
       <div className="max-w-2xl mx-auto flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 57px - 58px - env(safe-area-inset-bottom, 0px))' }}>
 
       {/* 자주 가는 곳 / 오래 머문 곳 — 탭 토글로 메트릭 전환 */}
-      {(places.length > 0 || longStayPlaces.length > 0) && (() => {
+      {viewMode === 'list' && (places.length > 0 || longStayPlaces.length > 0) && (() => {
         const isLong = placesMode === 'long-stay';
         const displayPlaces = isLong ? longStayPlaces : places;
         if (displayPlaces.length === 0) return null;
@@ -426,64 +426,76 @@ function HistoryInner() {
                 )}
               </div>
             ) : null}
-            {dayMode ? (
-              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y">
-                <div className="h-[26dvh] min-h-[180px] max-h-[300px] p-2 flex-shrink-0">
-                  <DriveMap
-                    positions={positions}
-                    routes={dayRoutes}
-                    loading={loadingRoute}
-                    placeMarker={selectedPlace}
-                    visible={viewMode === 'map'}
-                    highlightLatLng={highlightLatLng}
-                    highlightRouteId={selectedDayDriveId}
-                  />
-                </div>
-                {sparkRoutes.length > 0 && !selectedPlace && (
-                  <RouteSparklines routes={sparkRoutes} selectedIdx={selectedPosIdx} onSelect={setSelectedPosIdx} />
-                )}
-                {dayRoutes.length > 0 && (
-                  <div className="border-t border-white/[0.06]">
-                    <div className="px-3 py-1 text-[10px] text-zinc-500 font-semibold tracking-wider bg-white/[0.02] flex items-center justify-between">
-                      <span>그날의 주행 {dayRoutes.length}회</span>
-                      {selectedDayDriveId != null && (
-                        <button onClick={() => setSelectedDayDriveId(null)} className="text-[10px] text-zinc-400 hover:text-white">전체 보기</button>
-                      )}
-                    </div>
-                    {dayRoutes.map((r, idx) => {
-                      const drive = drives.find(d => d.id === r.id);
-                      if (!drive) return null;
-                      const label = idx === 0 ? 'S' : idx === dayRoutes.length - 1 ? 'E' : String(idx);
-                      const dt = new Date(drive.start_date);
-                      const time = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
-                      const isSelected = selectedDayDriveId === r.id;
-                      return (
-                        <button
-                          key={r.id}
-                          type="button"
-                          onClick={() => setSelectedDayDriveId(prev => prev === r.id ? null : r.id)}
-                          className={`w-full text-left flex items-center gap-2 px-3 py-1.5 border-b border-white/[0.04] last:border-0 transition-colors ${
-                            isSelected ? 'bg-blue-500/15' : 'hover:bg-white/[0.025] active:bg-blue-500/10'
-                          }`}
-                        >
-                          <span
-                            className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-                            style={{ backgroundColor: r.color }}
-                          >{label}</span>
-                          <span className="text-[11px] text-zinc-500 tabular-nums flex-shrink-0">{time}</span>
-                          <span className="flex-1 text-xs text-zinc-300 truncate">
-                            {shortAddr(drive.start_address) || '?'}<span className="text-zinc-600 mx-1">→</span>{shortAddr(drive.end_address) || '?'}
-                          </span>
-                          <span className="text-xs font-bold text-blue-400 tabular-nums flex-shrink-0">
-                            {drive.distance}<span className="text-[10px] text-zinc-600 ml-0.5">km</span>
-                          </span>
-                        </button>
-                      );
-                    })}
+            {dayMode ? (() => {
+              // 리스트 영역 — 4개 분량 고정 / 5~8개 늘어남 / 9개+ 스크롤. 지도는 남은 공간 flex-1.
+              const ITEM_PX = 32; // py-1.5 + 배지 w-5(20px) → 32px
+              const HEADER_PX = 24;
+              const MIN_ROWS = 4;
+              const MAX_ROWS = 8;
+              const rows = Math.min(MAX_ROWS, Math.max(MIN_ROWS, dayRoutes.length));
+              const listH = dayRoutes.length > 0 ? HEADER_PX + rows * ITEM_PX : 0;
+              const scrollable = dayRoutes.length > MAX_ROWS;
+              return (
+                <div className="flex-1 min-h-0 flex flex-col">
+                  <div className="flex-1 min-h-0 p-2">
+                    <DriveMap
+                      positions={positions}
+                      routes={dayRoutes}
+                      loading={loadingRoute}
+                      placeMarker={selectedPlace}
+                      visible={viewMode === 'map'}
+                      highlightLatLng={highlightLatLng}
+                      highlightRouteId={selectedDayDriveId}
+                    />
                   </div>
-                )}
-              </div>
-            ) : (
+                  {sparkRoutes.length > 0 && !selectedPlace && (
+                    <RouteSparklines routes={sparkRoutes} selectedIdx={selectedPosIdx} onSelect={setSelectedPosIdx} />
+                  )}
+                  {dayRoutes.length > 0 && (
+                    <div className="flex-shrink-0 border-t border-white/[0.06] flex flex-col" style={{ height: `${listH}px` }}>
+                      <div className="px-3 py-1 text-[10px] text-zinc-500 font-semibold tracking-wider bg-white/[0.02] flex items-center justify-between flex-shrink-0">
+                        <span>그날의 주행 {dayRoutes.length}회</span>
+                        {selectedDayDriveId != null && (
+                          <button onClick={() => setSelectedDayDriveId(null)} className="text-[10px] text-zinc-400 hover:text-white">전체 보기</button>
+                        )}
+                      </div>
+                      <div className={`flex-1 min-h-0 ${scrollable ? 'overflow-y-auto overscroll-contain' : ''}`}>
+                        {dayRoutes.map((r, idx) => {
+                          const drive = drives.find(d => d.id === r.id);
+                          if (!drive) return null;
+                          const label = idx === 0 ? 'S' : idx === dayRoutes.length - 1 ? 'E' : String(idx);
+                          const dt = new Date(drive.start_date);
+                          const time = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+                          const isSelected = selectedDayDriveId === r.id;
+                          return (
+                            <button
+                              key={r.id}
+                              type="button"
+                              onClick={() => setSelectedDayDriveId(prev => prev === r.id ? null : r.id)}
+                              className={`w-full text-left flex items-center gap-2 px-3 py-1.5 border-b border-white/[0.04] last:border-0 transition-colors ${
+                                isSelected ? 'bg-blue-500/15' : 'hover:bg-white/[0.025] active:bg-blue-500/10'
+                              }`}
+                            >
+                              <span
+                                className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                                style={{ backgroundColor: r.color }}
+                              >{label}</span>
+                              <span className="text-[11px] text-zinc-500 tabular-nums flex-shrink-0">{time}</span>
+                              <span className="flex-1 text-xs text-zinc-300 truncate">
+                                {shortAddr(drive.start_address) || '?'}<span className="text-zinc-600 mx-1">→</span>{shortAddr(drive.end_address) || '?'}
+                              </span>
+                              <span className="text-xs font-bold text-blue-400 tabular-nums flex-shrink-0">
+                                {drive.distance}<span className="text-[10px] text-zinc-600 ml-0.5">km</span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })() : (
               <>
                 <div className="flex-1 p-2">
                   <DriveMap
