@@ -311,7 +311,7 @@ function HistoryInner() {
             )}
           </div>
 
-          <div className="flex-1 min-h-0 flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden mb-20">
+          <div className="flex-1 min-h-0 flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden mb-4">
             {monthMode ? (() => {
               const mDrives = drives.filter(d => driveDayStr(d).slice(0, 7) === monthMode).slice().sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
               if (mDrives.length === 0) return null;
@@ -465,8 +465,8 @@ function HistoryInner() {
               </div>
             ) : null}
             {dayMode ? (
-              <div className="flex-1 min-h-0 overflow-y-auto">
-                <div className="h-[32dvh] min-h-[200px] max-h-[420px] p-2 flex-shrink-0">
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y">
+                <div className="h-[26dvh] min-h-[180px] max-h-[300px] p-2 flex-shrink-0">
                   <DriveMap
                     positions={positions}
                     routes={dayRoutes}
