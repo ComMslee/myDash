@@ -20,13 +20,14 @@ function formatMonthLabel(mk) {
   return `${yLabel}${parseInt(m)}월`;
 }
 
-// 06~24h 막대 — 새벽(00~06)은 거의 안 쓰는 시간이라 윈도우 밖. 그 시간대 운행이
-// 있으면 막대 좌측 외부에 작은 점으로 신호 (정확한 시각은 메타라인 🌙 prefix 로).
+// 06~24h 막대 — 새벽(00~06)은 거의 안 쓰는 시간이라 윈도우 밖.
+// 좌측 점: 06시 이전 시작 운행 존재 / 우측 점: 자정 넘김 운행 존재. 정확한 시각은 메타라인.
 function DayTimelineBar({ items, dayStart }) {
   const visible = items.filter(d => !d.absorbed && d.start_date);
   if (!visible.length) return null;
   const dayMs = 18 * 3600000; // 06:00 ~ 24:00
   const hasEarly = visible.some(d => new Date(d.start_date) - dayStart < 0);
+  const hasLate = visible.some(d => d.end_date && new Date(d.end_date) - dayStart > dayMs);
   return (
     <div className="flex items-center gap-1">
       <div className="w-1 flex-shrink-0 flex justify-center">
@@ -48,6 +49,9 @@ function DayTimelineBar({ items, dayStart }) {
             />
           );
         })}
+      </div>
+      <div className="w-1 flex-shrink-0 flex justify-center">
+        {hasLate && <div className="w-1 h-1 rounded-full bg-blue-400/70" />}
       </div>
     </div>
   );
@@ -145,7 +149,9 @@ export default function DriveListView({
     }
     const dayStart = new Date(g.firstDate);
     dayStart.setHours(6, 0, 0, 0); // 막대 윈도우 시작 = 06:00 (00~06 새벽은 점 indicator)
+    const dayMs = 18 * 3600000;
     const isEarly = new Date(first.start_date).getHours() < 6;
+    const isLateEnd = last.end_date && (new Date(last.end_date) - dayStart) > dayMs; // 자정 넘김 종료
     return (
       <button
         key={g.key}
@@ -170,7 +176,7 @@ export default function DriveListView({
         </div>
         <DayTimelineBar items={visible} dayStart={dayStart} />
         <div className="flex items-center gap-2 text-[11px] text-zinc-500 tabular-nums flex-wrap">
-          <span>{isEarly && <span className="mr-0.5">🌙</span>}{fmt(first.start_date)} → {fmt(last.end_date || last.start_date)}</span>
+          <span>{isEarly && <span className="mr-0.5">🌙</span>}{fmt(first.start_date)} → {fmt(last.end_date || last.start_date)}{isLateEnd && <span className="ml-0.5">🌙</span>}</span>
           <span className="text-zinc-700">·</span>
           <span>주행 {driveCount}회</span>
           {driveTotalMin > 0 && (
