@@ -20,27 +20,35 @@ function formatMonthLabel(mk) {
   return `${yLabel}${parseInt(m)}월`;
 }
 
-// 0~24h 막대 — 주행 블록을 단색 파랑 (tag 구분 없음, 모두 동일 의미).
+// 04~24h 막대 — 새벽(00~04)은 거의 안 쓰는 시간이라 윈도우 밖. 그 시간대 운행이
+// 있으면 막대 좌측 외부에 작은 점으로 신호 (정확한 시각은 메타라인 🌙 prefix 로).
 function DayTimelineBar({ items, dayStart }) {
   const visible = items.filter(d => !d.absorbed && d.start_date);
   if (!visible.length) return null;
-  const dayMs = 86400000;
+  const dayMs = 20 * 3600000; // 04:00 ~ 24:00
+  const hasEarly = visible.some(d => new Date(d.start_date) - dayStart < 0);
   return (
-    <div className="relative h-2.5 bg-white/[0.04] rounded overflow-hidden">
-      {visible.map(d => {
-        const s = new Date(d.start_date) - dayStart;
-        const eMs = d.end_date ? (new Date(d.end_date) - dayStart) : (s + 60000);
-        const left = Math.max(0, Math.min(100, (s / dayMs) * 100));
-        const right = Math.max(0, Math.min(100, (eMs / dayMs) * 100));
-        const width = Math.max(0.4, right - left);
-        return (
-          <div
-            key={d.id}
-            className="absolute inset-y-0 bg-blue-400/80"
-            style={{ left: `${left}%`, width: `${width}%` }}
-          />
-        );
-      })}
+    <div className="flex items-center gap-1">
+      <div className="w-1 flex-shrink-0 flex justify-center">
+        {hasEarly && <div className="w-1 h-1 rounded-full bg-blue-400/70" />}
+      </div>
+      <div className="relative h-2.5 flex-1 bg-white/[0.04] rounded overflow-hidden">
+        {visible.map(d => {
+          const s = new Date(d.start_date) - dayStart;
+          const eMs = d.end_date ? (new Date(d.end_date) - dayStart) : (s + 60000);
+          if (eMs <= 0) return null; // 윈도우 밖(새벽만)
+          const left = Math.max(0, Math.min(100, (s / dayMs) * 100));
+          const right = Math.max(0, Math.min(100, (eMs / dayMs) * 100));
+          const width = Math.max(0.4, right - left);
+          return (
+            <div
+              key={d.id}
+              className="absolute inset-y-0 bg-blue-400/80"
+              style={{ left: `${left}%`, width: `${width}%` }}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -136,7 +144,8 @@ export default function DriveListView({
       }
     }
     const dayStart = new Date(g.firstDate);
-    dayStart.setHours(0, 0, 0, 0);
+    dayStart.setHours(4, 0, 0, 0); // 막대 윈도우 시작 = 04:00 (00~04 새벽은 점 indicator)
+    const isEarly = new Date(first.start_date).getHours() < 4;
     return (
       <button
         key={g.key}
@@ -161,7 +170,7 @@ export default function DriveListView({
         </div>
         <DayTimelineBar items={visible} dayStart={dayStart} />
         <div className="flex items-center gap-2 text-[11px] text-zinc-500 tabular-nums flex-wrap">
-          <span>{fmt(first.start_date)} → {fmt(last.end_date || last.start_date)}</span>
+          <span>{isEarly && <span className="mr-0.5">🌙</span>}{fmt(first.start_date)} → {fmt(last.end_date || last.start_date)}</span>
           <span className="text-zinc-700">·</span>
           <span>주행 {driveCount}회</span>
           {driveTotalMin > 0 && (
