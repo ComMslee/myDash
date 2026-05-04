@@ -428,12 +428,15 @@ function HistoryInner() {
             ) : null}
             {dayMode ? (() => {
               // 리스트 영역 — 4개 분량 고정 / 5~8개 늘어남 / 9개+ 스크롤. 지도는 남은 공간 flex-1.
+              // 항목 사이 gap 행(이전 도착 → 다음 출발 시간)도 listH 에 포함.
               const ITEM_PX = 32; // py-1.5 + 배지 w-5(20px) → 32px
+              const GAP_PX = 22;  // gap 행: py-1 + text-[10px]
               const HEADER_PX = 24;
               const MIN_ROWS = 4;
               const MAX_ROWS = 8;
               const rows = Math.min(MAX_ROWS, Math.max(MIN_ROWS, dayRoutes.length));
-              const listH = dayRoutes.length > 0 ? HEADER_PX + rows * ITEM_PX : 0;
+              const gaps = Math.max(0, rows - 1);
+              const listH = dayRoutes.length > 0 ? HEADER_PX + rows * ITEM_PX + gaps * GAP_PX : 0;
               const scrollable = dayRoutes.length > MAX_ROWS;
               return (
                 <div className="flex-1 min-h-0 flex flex-col">
@@ -460,14 +463,29 @@ function HistoryInner() {
                         )}
                       </div>
                       <div className={`flex-1 min-h-0 ${scrollable ? 'overflow-y-auto overscroll-contain' : ''}`}>
-                        {dayRoutes.map((r, idx) => {
+                        {dayRoutes.flatMap((r, idx) => {
                           const drive = drives.find(d => d.id === r.id);
-                          if (!drive) return null;
+                          if (!drive) return [];
+                          const prevR = idx > 0 ? dayRoutes[idx - 1] : null;
+                          const prevDrive = prevR ? drives.find(d => d.id === prevR.id) : null;
+                          const gapMin = (prevDrive?.end_date && drive.start_date)
+                            ? Math.round((new Date(drive.start_date) - new Date(prevDrive.end_date)) / 60000)
+                            : 0;
                           const label = idx === 0 ? 'S' : idx === dayRoutes.length - 1 ? 'E' : String(idx);
                           const dt = new Date(drive.start_date);
                           const time = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
                           const isSelected = selectedDayDriveId === r.id;
-                          return (
+                          const nodes = [];
+                          if (gapMin > 0) {
+                            nodes.push(
+                              <div key={`gap-${r.id}`} className="flex items-center gap-2 px-3 py-1 bg-black/20">
+                                <div className="flex-1 h-px bg-white/[0.05]" />
+                                <span className="text-[10px] text-zinc-500 tabular-nums">정차 {formatDuration(gapMin)}</span>
+                                <div className="flex-1 h-px bg-white/[0.05]" />
+                              </div>
+                            );
+                          }
+                          nodes.push(
                             <button
                               key={r.id}
                               type="button"
@@ -489,6 +507,7 @@ function HistoryInner() {
                               </span>
                             </button>
                           );
+                          return nodes;
                         })}
                       </div>
                     </div>
