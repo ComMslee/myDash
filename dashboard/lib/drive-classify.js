@@ -1,5 +1,5 @@
-// 주행 분류 — chain 식별 + tag (이동주차 / 일반 / 외출).
-// /api/drives 응답의 recent_drives 에 tag/chain_id/chain_legs 부착.
+// 주행 분류 — chain 식별 + tag (이동주차 / 일반 / 외출) + 도착 후 stash 흡수.
+// /api/drives 응답의 recent_drives 에 tag/chain_id/chain_legs/absorbed 부착.
 //
 // 분류 룰:
 //   chain 식별 — gap < 10분 → 같은 chain (= 끊김 없는 연속 주행, hop-off 한정).
@@ -10,11 +10,18 @@
 //     km < 1.0 AND 분 < 5 AND start≈end      → '이동주차'
 //     그 외                                  → '일반'
 //   start≈end 판정: geofence 이름 일치 OR 좌표 ≤ 100m
+//
+// 도착 후 stash 흡수 (absorbed):
+//   "도착 → 잠깐조정 → 최종 P" 패턴을 한 도착 이벤트로 취급.
+//   stash 의 직전 비-stash 주행이 같은 위치에서 끝났고 gap ≤ 30분이면 absorbed=true.
+//   UI 는 absorbed 인 stash 를 list 에서 숨김 (= 부모 drive 안으로 흡수).
+//   효과: chain leg 사이에 끼인 stash 가 제거되어 외출 chain 이 끊기지 않음.
 
 const SAME_LOC_M = 100;
 const CHAIN_GAP_MAX_MIN = 10;
 const MIN_DRIVE_KM = 0.5;
 const MIN_DRIVE_MIN = 5;
+const ABSORB_GAP_MAX_MIN = 30;
 
 function distanceMeters(lat1, lng1, lat2, lng2) {
   if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return Infinity;
@@ -86,12 +93,33 @@ export function classifyDrives(rows) {
     const cid = chainOf.get(d.id);
     const legs = legCount.get(cid);
     if (stashIds.has(d.id)) {
-      out.set(d.id, { tag: '이동주차', chain_id: cid, chain_legs: legs });
+      out.set(d.id, { tag: '이동주차', chain_id: cid, chain_legs: legs, absorbed: false, absorbed_by: null });
     } else if (legs >= 2) {
-      out.set(d.id, { tag: '외출', chain_id: cid, chain_legs: legs });
+      out.set(d.id, { tag: '외출', chain_id: cid, chain_legs: legs, absorbed: false, absorbed_by: null });
     } else {
-      out.set(d.id, { tag: '일반', chain_id: cid, chain_legs: legs });
+      out.set(d.id, { tag: '일반', chain_id: cid, chain_legs: legs, absorbed: false, absorbed_by: null });
     }
   }
+
+  // 5) 도착 후 stash 흡수 — 직전 비-stash 주행과 sameLoc + gap ≤ 30분 → absorbed.
+  //    여러 stash 가 연속이면 모두 같은 부모 (가장 최근 비-stash) 에 귀속.
+  for (let idx = 0; idx < asc.length; idx++) {
+    const d = asc[idx];
+    if (!stashIds.has(d.id)) continue;
+    let prevIdx = idx - 1;
+    while (prevIdx >= 0 && stashIds.has(asc[prevIdx].id)) prevIdx--;
+    if (prevIdx < 0) continue;
+    const prev = asc[prevIdx];
+    const gapMin = (new Date(d.start_date).getTime() - new Date(prev.end_date).getTime()) / 60000;
+    if (gapMin < 0 || gapMin > ABSORB_GAP_MAX_MIN) continue;
+    const sameLoc = (prev.end_geofence_name && d.start_geofence_name
+                    && prev.end_geofence_name === d.start_geofence_name)
+                 || distanceMeters(prev.end_lat, prev.end_lng, d.start_lat, d.start_lng) <= SAME_LOC_M;
+    if (!sameLoc) continue;
+    const tagInfo = out.get(d.id);
+    tagInfo.absorbed = true;
+    tagInfo.absorbed_by = prev.id;
+  }
+
   return out;
 }

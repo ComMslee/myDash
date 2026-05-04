@@ -131,6 +131,8 @@ export async function GET(request) {
           tag:        t?.tag        ?? null,
           chain_id:   t?.chain_id   ?? null,
           chain_legs: t?.chain_legs ?? null,
+          absorbed:    t?.absorbed    ?? false,
+          absorbed_by: t?.absorbed_by ?? null,
         };
       }),
     });

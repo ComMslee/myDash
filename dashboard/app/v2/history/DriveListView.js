@@ -9,7 +9,9 @@ import { formatDuration, shortAddr } from '@/lib/format';
 //   chain  — 같은 chain_id 인 '외출' leg 들 (≥2건 collapse, 펼치면 leg 들 amber bar 묶음)
 //   single — 그 외 (일반 1행)
 // items 는 reverse-chronological (최신 → 오래된) 순.
-function chunkItems(items) {
+// absorbed 인 stash (도착 후 흡수된 것) 는 list 에서 제거 → 부모 drive 안으로 흡수.
+function chunkItems(rawItems) {
+  const items = rawItems.filter(d => !d.absorbed);
   const chunks = [];
   let i = 0;
   while (i < items.length) {
