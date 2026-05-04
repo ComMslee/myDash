@@ -64,32 +64,33 @@ export function RankRow({ icon, label, count, max, isPeak = false, delta = null,
 }
 
 // 7×24 시간×요일 히트맵 — 한 셀 = (DOW, hour) 누적 활성 카운트.
-// 색 구간(통계적): 회색=미사용, 옅은 파랑=일반, 진한 파랑=상위~30%, 주황=실제 피크.
-// 평탄 분포(max < mean × 1.3) 에선 주황을 자동으로 끔 — 의미 없는 강조 방지.
+// thermal palette: 회색(미사용) → 파랑(일반) → 노랑(주목) → 주황(피크).
+// 파랑은 단일 그라데이션, 노랑/주황은 통계 임계 충족 시만 표시.
+// 평탄 분포(max < mean × 1.3) 에선 노랑·주황 모두 OFF — 의미 없는 강조 방지.
 function makeHeatColor(flat) {
   const max = Math.max(1, ...flat);
   const active = flat.filter(v => v > 0);
   const n = active.length;
-  // 활성 셀 없거나 평탄 — 피크 없는 화면. 옅은 파랑 그라데이션만.
   const mean = n ? active.reduce((s, v) => s + v, 0) / n : 0;
+  // 활성 없거나 평탄 — 모든 활성 셀을 파랑 그라데이션으로.
   if (n === 0 || max < mean * 1.3) {
     return (v) => v === 0
       ? 'rgba(63,63,70,0.3)'
-      : `rgba(59,130,246,${(0.3 + (v / max) * 0.4).toFixed(2)})`;
+      : `rgba(59,130,246,${(0.30 + (v / max) * 0.40).toFixed(2)})`;
   }
   const std = Math.sqrt(active.reduce((s, v) => s + (v - mean) ** 2, 0) / n);
   const sorted = active.slice().sort((a, b) => a - b);
   const at = (p) => sorted[Math.min(n - 1, Math.floor(n * p))];
-  // 피크 — 상위 ~10% AND 평균 + 1·std 이상 (둘 중 큰 값). 분포 평탄할수록 std 작아져 max 만 통과.
-  const peakThr = Math.max(at(0.90), mean + std);
-  // 중간 — 상위 ~30% AND 평균 + 0.3·std 이상.
-  const midThr  = Math.max(at(0.70), mean + 0.3 * std);
+  // 피크(주황) — 상위 ~5% AND mean + 1.5σ 이상 (이전 1σ → 1.5σ 로 빡세게).
+  const peakThr = Math.max(at(0.95), mean + 1.5 * std);
+  // 주목(노랑) — 상위 ~20% AND mean + 0.5σ 이상.
+  const midThr  = Math.max(at(0.80), mean + 0.5 * std);
   return (v) => {
     if (v === 0) return 'rgba(63,63,70,0.3)';
     const r = v / max;
-    if (v >= peakThr) return `rgba(245,158,11,${(0.65 + r * 0.30).toFixed(2)})`;
-    if (v >= midThr)  return `rgba(59,130,246,${(0.50 + r * 0.30).toFixed(2)})`;
-    return `rgba(59,130,246,${(0.25 + r * 0.25).toFixed(2)})`;
+    if (v >= peakThr) return `rgba(245,158,11,${(0.75 + r * 0.20).toFixed(2)})`;   // amber
+    if (v >= midThr)  return `rgba(250,204,21,${(0.60 + r * 0.25).toFixed(2)})`;   // yellow
+    return `rgba(59,130,246,${(0.30 + r * 0.30).toFixed(2)})`;                     // blue
   };
 }
 
@@ -123,9 +124,9 @@ export function HeatmapChart({ heatmap }) {
       </div>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1.5 text-[10px] text-zinc-500">
         <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(63,63,70,0.3)' }}/>미사용</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(59,130,246,0.4)' }}/>일반</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(59,130,246,0.75)' }}/>상위~30%</span>
-        <span className="flex items-center gap-1" title="상위 ~10% AND 평균+1σ 이상 — 평탄 분포(max < 평균×1.3) 시 자동 비활성"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(245,158,11,0.95)' }}/>피크</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(59,130,246,0.5)' }}/>활성</span>
+        <span className="flex items-center gap-1" title="상위 ~20% AND 평균+0.5σ 이상"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(250,204,21,0.80)' }}/>주목</span>
+        <span className="flex items-center gap-1" title="상위 ~5% AND 평균+1.5σ 이상 — 평탄 분포(max < 평균×1.3) 시 자동 비활성"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(245,158,11,0.95)' }}/>피크</span>
         <span className="ml-auto tabular-nums" title={`${total}회`}>총 {compact(total)}회 · 데드 {deadCells}/168</span>
       </div>
     </div>
