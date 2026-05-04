@@ -672,8 +672,7 @@ async function cmdWhere({ chatId }) {
   if (lat != null && lng != null) return sendLocation(lat, lng, chatId);
 }
 
-// 새 핸들러는 dashboard API 호출만 — TeslaMate DB 직접 쿼리는 dashboard 가 책임.
-// 기존 /soc /today /where 도 같은 패턴으로 점진 마이그 (후속 PR).
+// 모든 핸들러는 dashboard API 호출만 — TeslaMate DB 직접 쿼리는 dashboard 가 책임.
 
 function fmtElapsed(min) {
   if (!Number.isFinite(min) || min < 0) return '?';
@@ -936,7 +935,6 @@ function fmtFestivalDates(start, end) {
 function festivalsFollowUp(range, areaCode) {
   const otherRange = range === 'weekend' ? 'month' : 'weekend';
   const otherLabel = otherRange === 'weekend' ? '🗓 이번 주말' : '🗓 한 달';
-  const areaToggleCode = areaCode ? '' : ''; // toggle implemented as 전국↔내지역 below
   // 내 지역(or 빈) ↔ 전국 토글. areaCode 가 비면 "내 지역" 버튼 무의미 → 비활성 표시.
   return {
     reply_markup: {
