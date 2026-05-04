@@ -4,26 +4,9 @@ import { useState, Fragment } from 'react';
 import { KWH_PER_KM } from '@/lib/constants';
 import { formatDuration, shortAddr } from '@/lib/format';
 
-// 분류 태그 배지 — PoC 검토용 prefix. /api/drives 의 d.tag 사용.
-const TAG_STYLE = {
-  '이동주차': 'bg-zinc-700/50 text-zinc-400',
-  '일반':    'bg-blue-500/15 text-blue-300',
-  '외출':    'bg-amber-500/20 text-amber-300',
-};
-function TagBadge({ tag, legs }) {
-  if (!tag) return null;
-  const cls = TAG_STYLE[tag] || 'bg-zinc-800 text-zinc-400';
-  const label = tag === '외출' && legs ? `${tag}·${legs}` : tag;
-  return (
-    <span className={`inline-flex items-center px-1.5 py-px mr-1.5 rounded text-[10px] font-medium tabular-nums ${cls}`}>
-      {label}
-    </span>
-  );
-}
-
 // 일별 g.items 를 시각적 묶음 단위(청크)로 분리.
 //   stash  — 연속된 '이동주차' (≥2건이면 collapse, 1건이면 single 처리)
-//   chain  — 같은 chain_id 인 '외출' leg 들 (좌측 amber bar 묶음)
+//   chain  — 같은 chain_id 인 '외출' leg 들 (≥2건 collapse, 펼치면 leg 들 amber bar 묶음)
 //   single — 그 외 (일반 1행)
 // items 는 reverse-chronological (최신 → 오래된) 순.
 function chunkItems(items) {
@@ -80,25 +63,22 @@ function formatMonthLabel(mk) {
 
 export default function DriveListView({ drives, loadingDrives, error, onDriveClick, onDayClick, onMonthClick, driveDayStr }) {
   const [expandedMonths, setExpandedMonths] = useState(() => new Set([currentMonthKey()]));
-  const [expandedStashes, setExpandedStashes] = useState(() => new Set());
+  const [expandedChunks, setExpandedChunks] = useState(() => new Set());
   const toggleMonth = (mk) => setExpandedMonths(prev => {
     const next = new Set(prev);
     if (next.has(mk)) next.delete(mk); else next.add(mk);
     return next;
   });
-  const toggleStash = (key) => setExpandedStashes(prev => {
+  const toggleChunk = (key) => setExpandedChunks(prev => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);
     return next;
   });
 
-  // 단일 주행 행 — single / stash-펼침 / chain leg 가 공유.
-  // 옵션:
-  //   showChainBadge — chain 의 첫 leg 에 '외출·N' prefix
-  //   suppressTag    — chain 의 비-첫 leg 는 prefix 생략 (chain bar 로 묶음 표현)
-  //   indent         — chain wrapper 안에서 좌측 padding 살짝 증가 (amber bar 와 간격)
+  // 단일 주행 행 — single / stash-펼침 / chain-펼침 leg 모두 공유.
+  // indent: 펼침 wrapper 안에서 좌측 padding 살짝 증가 (좌측 bar 와 간격).
   const renderRow = (d, opts = {}) => {
-    const { showChainBadge, chainLegs, suppressTag, indent } = opts;
+    const { indent } = opts;
     const eff = efficiency(d);
     const dt = new Date(d.start_date);
     const timeLabel = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
@@ -108,9 +88,6 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
     const startPct = d.start_battery_level ?? null;
     const endPct = d.end_battery_level ?? null;
     const usedPct = (startPct != null && endPct != null) ? Math.max(0, startPct - endPct) : 0;
-    const tagEl = showChainBadge
-      ? <TagBadge tag="외출" legs={chainLegs} />
-      : suppressTag ? null : <TagBadge tag={d.tag} legs={d.chain_legs} />;
     return (
       <button
         onClick={() => onDriveClick(d)}
@@ -122,7 +99,6 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
         </div>
         <div className="min-w-0">
           <p className="text-sm text-zinc-300 truncate">
-            {tagEl}
             {shortAddr(d.start_address) || '?'}<span className="text-zinc-600 mx-1">→</span>{shortAddr(d.end_address) || '?'}
           </p>
           <div className="flex items-center gap-2 mt-0.5">
@@ -257,35 +233,27 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
               }
             }
 
-            // === 이동주차 ≥2건 → collapse 헤더 (펼치면 개별 행) ===
+            // === 이동주차 ≥2건 → 한 줄 요약 (펼치면 개별 행) ===
             if (chunk.kind === 'stash' && chunk.drives.length >= 2) {
-              const expanded = expandedStashes.has(chunk.key);
+              const expanded = expandedChunks.has(chunk.key);
               const totalKm = chunk.drives.reduce((s, x) => s + (parseFloat(x.distance) || 0), 0);
-              const totalMin = chunk.drives.reduce((s, x) => s + (parseFloat(x.duration_min) || 0), 0);
               const oldestDt = new Date(chunk.drives[chunk.drives.length - 1].start_date);
-              const newestDt = new Date(chunk.drives[0].end_date || chunk.drives[0].start_date);
               const fmt = (dt) => `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
               return (
                 <Fragment key={chunk.key}>
                   <button
                     type="button"
-                    onClick={() => toggleStash(chunk.key)}
-                    className="w-full text-left grid grid-cols-[44px_1fr_auto] items-center gap-2 px-3 py-2.5 border-b border-white/[0.04] hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
+                    onClick={() => toggleChunk(chunk.key)}
+                    className="w-full text-left grid grid-cols-[44px_1fr_auto] items-center gap-2 px-3 py-2 border-b border-white/[0.04] hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
                   >
-                    <div className="text-xs text-zinc-500 tabular-nums leading-tight">
-                      <p>{fmt(oldestDt)}</p>
-                      <p className="text-zinc-600">{fmt(newestDt)}</p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm text-zinc-400 truncate">
-                        <TagBadge tag="이동주차" />
-                        <span className="text-zinc-500">{chunk.drives.length}건 묶음</span>
-                      </p>
-                      <p className="text-xs text-zinc-600 tabular-nums mt-0.5">{totalKm.toFixed(1)}km · {Math.round(totalMin)}분</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs text-zinc-600">{expanded ? '▾' : '▸'}</span>
-                    </div>
+                    <div className="text-xs text-zinc-600 tabular-nums">{fmt(oldestDt)}</div>
+                    <p className="text-sm text-zinc-500 truncate">
+                      이동주차 {chunk.drives.length}건
+                      {totalKm > 0 && (
+                        <span className="text-zinc-600 text-xs ml-2 tabular-nums">· {totalKm.toFixed(1)}km</span>
+                      )}
+                    </p>
+                    <span className="text-xs text-zinc-600">{expanded ? '▾' : '▸'}</span>
                   </button>
                   {expanded && (
                     <div className="border-l-2 border-zinc-700/50">
@@ -299,32 +267,59 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
               );
             }
 
-            // === 외출 N → 좌측 amber bar 로 묶음 (첫 leg 만 외출·N 배지) ===
+            // === 외출 chain → 한 줄 요약 (펼치면 leg 들 amber bar 묶음) ===
             if (chunk.kind === 'chain') {
               const drives = chunk.drives;
+              const expanded = expandedChunks.has(chunk.key);
+              const firstLeg = drives[drives.length - 1]; // 시간상 처음 출발
+              const lastLeg = drives[0];                  // 시간상 마지막 도착
+              const totalKm = drives.reduce((s, x) => s + (parseFloat(x.distance) || 0), 0);
+              const totalMin = drives.reduce((s, x) => s + (parseFloat(x.duration_min) || 0), 0);
+              const firstDt = new Date(firstLeg.start_date);
+              const lastDt = new Date(lastLeg.end_date || lastLeg.start_date);
+              const fmt = (dt) => `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
               return (
                 <Fragment key={chunk.key}>
-                  <div className="border-l-2 border-amber-500/30">
-                    {drives.map((d, idx) => {
-                      const next = drives[idx + 1];
-                      let gapLabel = null;
-                      if (next && d.start_date && next.end_date) {
-                        const gapMs = new Date(d.start_date) - new Date(next.end_date);
-                        if (gapMs > 0) gapLabel = formatDuration(Math.round(gapMs / 60000));
-                      }
-                      return (
-                        <Fragment key={d.id}>
-                          {renderRow(d, {
-                            showChainBadge: idx === 0,
-                            chainLegs: drives.length,
-                            suppressTag: idx > 0,
-                            indent: true,
-                          })}
-                          {gapLabel && renderGap(gapLabel, d.id + '-igap', { inChain: true })}
-                        </Fragment>
-                      );
-                    })}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleChunk(chunk.key)}
+                    className="w-full text-left grid grid-cols-[44px_1fr_auto] items-center gap-2 px-3 py-3 border-b border-white/[0.04] hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
+                  >
+                    <div className="text-xs text-zinc-500 tabular-nums leading-tight">
+                      <p>{fmt(firstDt)}</p>
+                      <p className="text-zinc-600">{fmt(lastDt)}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm text-zinc-300 truncate">
+                        {shortAddr(firstLeg.start_address) || '?'}<span className="text-zinc-600 mx-1">→</span>{shortAddr(lastLeg.end_address) || '?'}
+                      </p>
+                      <p className="text-xs text-zinc-600 tabular-nums mt-0.5">
+                        {drives.length}회 경유 · {formatDuration(Math.round(totalMin))}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-blue-400 tabular-nums">{totalKm.toFixed(1)}<span className="text-xs font-medium text-zinc-600 ml-0.5">km</span></p>
+                      <p className="text-xs text-zinc-600">{expanded ? '▾' : '▸'}</p>
+                    </div>
+                  </button>
+                  {expanded && (
+                    <div className="border-l-2 border-amber-500/30">
+                      {drives.map((d, idx) => {
+                        const next = drives[idx + 1];
+                        let gapLabel = null;
+                        if (next && d.start_date && next.end_date) {
+                          const gapMs = new Date(d.start_date) - new Date(next.end_date);
+                          if (gapMs > 0) gapLabel = formatDuration(Math.round(gapMs / 60000));
+                        }
+                        return (
+                          <Fragment key={d.id}>
+                            {renderRow(d, { indent: true })}
+                            {gapLabel && renderGap(gapLabel, d.id + '-igap', { inChain: true })}
+                          </Fragment>
+                        );
+                      })}
+                    </div>
+                  )}
                   {chunkGap && renderGap(chunkGap, chunk.key + '-cgap')}
                 </Fragment>
               );
