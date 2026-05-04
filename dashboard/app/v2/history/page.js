@@ -464,18 +464,52 @@ function HistoryInner() {
                 )}
               </div>
             ) : null}
-            <div className="flex-1 p-2">
-              <DriveMap
-                positions={monthMode || chainMode != null ? [] : positions}
-                routes={monthMode ? monthRoutes : chainMode != null ? chainRoutes : dayMode ? dayRoutes : undefined}
-                loading={loadingRoute}
-                placeMarker={selectedPlace}
-                visible={viewMode === 'map'}
-                highlightLatLng={highlightLatLng}
-              />
-            </div>
-            {sparkRoutes.length > 0 && !selectedPlace && (
-              <RouteSparklines routes={sparkRoutes} selectedIdx={selectedPosIdx} onSelect={setSelectedPosIdx} />
+            {dayMode ? (
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                <div className="aspect-[4/3] p-2 flex-shrink-0">
+                  <DriveMap
+                    positions={positions}
+                    routes={dayRoutes}
+                    loading={loadingRoute}
+                    placeMarker={selectedPlace}
+                    visible={viewMode === 'map'}
+                    highlightLatLng={highlightLatLng}
+                  />
+                </div>
+                {sparkRoutes.length > 0 && !selectedPlace && (
+                  <RouteSparklines routes={sparkRoutes} selectedIdx={selectedPosIdx} onSelect={setSelectedPosIdx} />
+                )}
+                <div className="border-t border-white/[0.06]">
+                  <div className="px-3 py-1.5 text-[10px] text-zinc-500 font-semibold tracking-wider bg-white/[0.02]">그날의 주행</div>
+                  <DriveListView
+                    drives={drives}
+                    loadingDrives={loadingDrives}
+                    error={error}
+                    onDriveClick={goToDrive}
+                    onDayClick={goToDay}
+                    onMonthClick={goToMonth}
+                    onChainClick={goToChain}
+                    driveDayStr={driveDayStr}
+                    filterDate={dayMode}
+                  />
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex-1 p-2">
+                  <DriveMap
+                    positions={monthMode || chainMode != null ? [] : positions}
+                    routes={monthMode ? monthRoutes : chainMode != null ? chainRoutes : undefined}
+                    loading={loadingRoute}
+                    placeMarker={selectedPlace}
+                    visible={viewMode === 'map'}
+                    highlightLatLng={highlightLatLng}
+                  />
+                </div>
+                {sparkRoutes.length > 0 && !selectedPlace && (
+                  <RouteSparklines routes={sparkRoutes} selectedIdx={selectedPosIdx} onSelect={setSelectedPosIdx} />
+                )}
+              </>
             )}
           </div>
         </div>
