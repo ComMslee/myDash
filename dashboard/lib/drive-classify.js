@@ -28,7 +28,30 @@ function distanceMeters(lat1, lng1, lat2, lng2) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-// rows: { id, start_date, end_date, distance, duration_min, start_lat, start_lng, end_lat, end_lng }
+// 같은 위치 판정 — geofence 이름 일치 OR 좌표 거리 ≤ SAME_LOC_M.
+// "집→집" 같이 같은 geofence 안에서 0.8km 이동도 sameLoc 으로 인식.
+function sameLocOf(d) {
+  if (d.start_geofence_name && d.end_geofence_name
+      && d.start_geofence_name === d.end_geofence_name) return true;
+  return distanceMeters(d.start_lat, d.start_lng, d.end_lat, d.end_lng) <= SAME_LOC_M;
+}
+function locsClose(prevEnd, nextStart, prevD, nextD) {
+  if (prevD?.end_geofence_name && nextD?.start_geofence_name
+      && prevD.end_geofence_name === nextD.start_geofence_name) return true;
+  return distanceMeters(prevEnd[0], prevEnd[1], nextStart[0], nextStart[1]) <= SAME_LOC_M;
+}
+
+function isStash(d) {
+  const km = Number(d.distance) || 0;
+  const min = Number(d.duration_min) || 0;
+  if (!sameLocOf(d)) return false;
+  if (km < MIN_DRIVE_KM) return true;
+  if (km < 1.0 && min < MIN_DRIVE_MIN) return true;
+  return false;
+}
+
+// rows: { id, start_date, end_date, distance, duration_min, start_lat, start_lng, end_lat, end_lng,
+//         start_geofence_name, end_geofence_name }
 // returns: Map<id, { tag, chain_id, chain_legs }>
 export function classifyDrives(rows) {
   if (!Array.isArray(rows) || rows.length === 0) return new Map();
@@ -36,43 +59,47 @@ export function classifyDrives(rows) {
     (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
   );
 
-  // 1) chain 식별
+  // 1) 이동주차 후보 — chain 합류 자격 박탈 (단독 처리).
+  //    chain 묶기 전에 먼저 분리해야 "외출 끝 + 한참 후 차 옮김" 케이스가
+  //    chain 의 leg 로 잘못 흡수되지 않음.
+  const stashIds = new Set();
+  for (const d of asc) if (isStash(d)) stashIds.add(d.id);
+
+  // 2) 이동주차 외 drives 끼리만 chain 식별.
+  const normals = asc.filter((d) => !stashIds.has(d.id));
   const chainOf = new Map();
   let cur = 0;
-  for (let i = 0; i < asc.length; i++) {
-    if (i === 0) { chainOf.set(asc[i].id, cur); continue; }
-    const prev = asc[i - 1];
-    const here = asc[i];
+  for (let i = 0; i < normals.length; i++) {
+    if (i === 0) { chainOf.set(normals[i].id, cur); continue; }
+    const prev = normals[i - 1];
+    const here = normals[i];
     const gapMin = (new Date(here.start_date).getTime() - new Date(prev.end_date).getTime()) / 60000;
-    const dM = distanceMeters(prev.end_lat, prev.end_lng, here.start_lat, here.start_lng);
     let same = false;
     if (gapMin < CHAIN_GAP_SHORT_MIN) same = true;
-    else if (gapMin < CHAIN_GAP_LONG_MIN && dM <= SAME_LOC_M) same = true;
+    else if (gapMin < CHAIN_GAP_LONG_MIN
+        && locsClose([prev.end_lat, prev.end_lng], [here.start_lat, here.start_lng], prev, here)) same = true;
     if (same) chainOf.set(here.id, cur);
     else { cur += 1; chainOf.set(here.id, cur); }
   }
+  // 이동주차도 각자 별도 chain id (single).
+  for (const id of stashIds) chainOf.set(id, ++cur);
 
-  // 2) chain → leg 수
+  // 3) chain → leg 수
   const legCount = new Map();
   for (const cid of chainOf.values()) legCount.set(cid, (legCount.get(cid) || 0) + 1);
 
-  // 3) tag
+  // 4) tag
   const out = new Map();
   for (const d of asc) {
     const cid = chainOf.get(d.id);
     const legs = legCount.get(cid);
-    if (legs >= 2) {
+    if (stashIds.has(d.id)) {
+      out.set(d.id, { tag: '이동주차', chain_id: cid, chain_legs: legs });
+    } else if (legs >= 2) {
       out.set(d.id, { tag: '외출', chain_id: cid, chain_legs: legs });
-      continue;
+    } else {
+      out.set(d.id, { tag: '일반', chain_id: cid, chain_legs: legs });
     }
-    const km = Number(d.distance) || 0;
-    const min = Number(d.duration_min) || 0;
-    const startEndDist = distanceMeters(d.start_lat, d.start_lng, d.end_lat, d.end_lng);
-    const sameLoc = startEndDist <= SAME_LOC_M;
-    let tag = '일반';
-    if (km < MIN_DRIVE_KM && sameLoc) tag = '이동주차';
-    else if (km < 1.0 && min < MIN_DRIVE_MIN && sameLoc) tag = '이동주차';
-    out.set(d.id, { tag, chain_id: cid, chain_legs: legs });
   }
   return out;
 }
