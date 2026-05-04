@@ -1,17 +1,18 @@
 // 주행 분류 — chain 식별 + tag (이동주차 / 일반 / 외출).
-// PoC: /api/drives 응답의 recent_drives 에 tag/chain_id/chain_legs 부착.
+// /api/drives 응답의 recent_drives 에 tag/chain_id/chain_legs 부착.
 //
 // 분류 룰:
-//   chain 식별 — gap < 30분 OR (gap < 4시간 AND 위치 ≤ 100m) → 같은 chain
-//   chain leg ≥ 2  → '외출' (각 leg = 경유 후보)
+//   chain 식별 — gap < 10분 → 같은 chain (= 끊김 없는 연속 주행, hop-off 한정).
+//                10분 이상 머무름 = 별개 외출 (휴게소·식사·충전 모두 분리).
+//   chain leg ≥ 2  → '외출' (각 leg = 경유)
 //   chain leg = 1
 //     km < 0.5 AND start≈end                 → '이동주차'
 //     km < 1.0 AND 분 < 5 AND start≈end      → '이동주차'
 //     그 외                                  → '일반'
+//   start≈end 판정: geofence 이름 일치 OR 좌표 ≤ 100m
 
 const SAME_LOC_M = 100;
-const CHAIN_GAP_SHORT_MIN = 30;
-const CHAIN_GAP_LONG_MIN = 240;
+const CHAIN_GAP_MAX_MIN = 10;
 const MIN_DRIVE_KM = 0.5;
 const MIN_DRIVE_MIN = 5;
 
@@ -34,11 +35,6 @@ function sameLocOf(d) {
   if (d.start_geofence_name && d.end_geofence_name
       && d.start_geofence_name === d.end_geofence_name) return true;
   return distanceMeters(d.start_lat, d.start_lng, d.end_lat, d.end_lng) <= SAME_LOC_M;
-}
-function locsClose(prevEnd, nextStart, prevD, nextD) {
-  if (prevD?.end_geofence_name && nextD?.start_geofence_name
-      && prevD.end_geofence_name === nextD.start_geofence_name) return true;
-  return distanceMeters(prevEnd[0], prevEnd[1], nextStart[0], nextStart[1]) <= SAME_LOC_M;
 }
 
 function isStash(d) {
@@ -65,7 +61,7 @@ export function classifyDrives(rows) {
   const stashIds = new Set();
   for (const d of asc) if (isStash(d)) stashIds.add(d.id);
 
-  // 2) 이동주차 외 drives 끼리만 chain 식별.
+  // 2) 이동주차 외 drives 끼리만 chain 식별 — gap < 10분 (= hop-off) 만 같은 chain.
   const normals = asc.filter((d) => !stashIds.has(d.id));
   const chainOf = new Map();
   let cur = 0;
@@ -74,11 +70,7 @@ export function classifyDrives(rows) {
     const prev = normals[i - 1];
     const here = normals[i];
     const gapMin = (new Date(here.start_date).getTime() - new Date(prev.end_date).getTime()) / 60000;
-    let same = false;
-    if (gapMin < CHAIN_GAP_SHORT_MIN) same = true;
-    else if (gapMin < CHAIN_GAP_LONG_MIN
-        && locsClose([prev.end_lat, prev.end_lng], [here.start_lat, here.start_lng], prev, here)) same = true;
-    if (same) chainOf.set(here.id, cur);
+    if (gapMin < CHAIN_GAP_MAX_MIN) chainOf.set(here.id, cur);
     else { cur += 1; chainOf.set(here.id, cur); }
   }
   // 이동주차도 각자 별도 chain id (single).
