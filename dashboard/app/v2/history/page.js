@@ -427,17 +427,14 @@ function HistoryInner() {
               </div>
             ) : null}
             {dayMode ? (() => {
-              // 리스트 영역 — 4개 분량 고정 / 5~8개 늘어남 / 9개+ 스크롤. 지도는 남은 공간 flex-1.
-              // 항목 사이 gap 행(이전 도착 → 다음 출발 시간)도 listH 에 포함.
+              // 리스트 영역 — 운행 5개 분량으로 고정(1~5회는 동일 height, 6회+는 내부 스크롤).
+              // 5운행 + 4정차갭 분량 = HEADER + 5*ITEM + 4*GAP. 지도는 남은 공간 flex-1.
               const ITEM_PX = 32; // py-1.5 + 배지 w-5(20px) → 32px
-              const GAP_PX = 22;  // gap 행: py-1 + text-[10px]
+              const GAP_PX = 22;  // 정차 gap 행: py-1 + text-[10px]
               const HEADER_PX = 24;
-              const MIN_ROWS = 4;
-              const MAX_ROWS = 8;
-              const rows = Math.min(MAX_ROWS, Math.max(MIN_ROWS, dayRoutes.length));
-              const gaps = Math.max(0, rows - 1);
-              const listH = dayRoutes.length > 0 ? HEADER_PX + rows * ITEM_PX + gaps * GAP_PX : 0;
-              const scrollable = dayRoutes.length > MAX_ROWS;
+              const FIXED_ROWS = 5;
+              const listH = dayRoutes.length > 0 ? HEADER_PX + FIXED_ROWS * ITEM_PX + (FIXED_ROWS - 1) * GAP_PX : 0;
+              const scrollable = dayRoutes.length > FIXED_ROWS;
               return (
                 <div className="flex-1 min-h-0 flex flex-col">
                   <div className="flex-1 min-h-0 p-2">
