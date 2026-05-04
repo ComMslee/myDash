@@ -124,7 +124,8 @@ async function checkChargeEnd(carId) {
   );
   for (const r of rows) {
     const where = await resolveLabel(r.geo_name, r.addr_name, r.lat, r.lng);
-    const kwh = Number(r.charge_energy_added || 0).toFixed(2);
+    const kwhNum = Number(r.charge_energy_added);
+    const kwh = Number.isFinite(kwhNum) ? kwhNum.toFixed(2) : '0.00';
     const dur = formatDur(r.duration_min);
     const socPart = (r.start_battery_level != null && r.end_battery_level != null)
       ? ` ${r.start_battery_level}% → ${r.end_battery_level}%`

@@ -611,8 +611,11 @@ async function cmdSoc({ chatId }) {
   lines.push(''); // 충전 정보 사이 빈 줄
 
   if (ch?.charging) {
-    const power = ch.charger_power != null ? Number(ch.charger_power).toFixed(1) : null;
-    const kwh = Number(ch.charge_energy_added || 0).toFixed(2);
+    // pg 가 NUMERIC 을 string 으로 줄 수 있어 Number 캐스트 후 NaN 가드 (CLAUDE.md 함정).
+    const powerNum = ch.charger_power != null ? Number(ch.charger_power) : NaN;
+    const power = Number.isFinite(powerNum) ? powerNum.toFixed(1) : null;
+    const kwhNum = Number(ch.charge_energy_added);
+    const kwh = Number.isFinite(kwhNum) ? kwhNum.toFixed(2) : '0.00';
     const startSoc = ch.start_battery_level ?? '?';
     const elapsedMin = ch.start_date
       ? Math.floor((Date.now() - new Date(ch.start_date).getTime()) / 60000)
@@ -693,10 +696,10 @@ async function cmdPeriod({ chatId }) {
     const r = j[key];
     if (!r) return `<b>${label}</b>  -`;
     const d = r.drives || {};
-    const km = Number(d.km || 0);
-    if (km <= 0) return `<b>${label}</b>  -`;
-    const eff = Number(d.eff_wh_km || 0);
-    const effStr = eff > 0 ? ` · ${eff} Wh/km` : '';
+    const km = Number(d.km);
+    if (!Number.isFinite(km) || km <= 0) return `<b>${label}</b>  -`;
+    const eff = Number(d.eff_wh_km);
+    const effStr = Number.isFinite(eff) && eff > 0 ? ` · ${eff} Wh/km` : '';
     return `<b>${label}</b>  ${km.toFixed(0)} km${effStr}`;
   };
 
