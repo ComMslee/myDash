@@ -17,7 +17,9 @@
 
 	reverse_proxy teslamate:4000 {
 		# Phoenix LiveView WebSocket 업그레이드는 Caddy 가 자동으로 처리.
-		header_up Host {upstream_hostport}
+		# Host 는 원본 그대로 (Caddy 기본 동작) — Phoenix LiveView 의 check_origin
+		# 이 클라이언트 Origin/Host 를 비교하므로 upstream 으로 덮어쓰면
+		# 지오펜스/설정 화면 LiveView 가 원격 명령 폼 제출 시 끊긴다.
 		header_up X-Real-IP {remote_host}
 		header_up X-Forwarded-For {remote_host}
 		header_up X-Forwarded-Proto {scheme}
