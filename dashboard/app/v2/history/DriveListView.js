@@ -328,7 +328,7 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
                           <p className="text-zinc-600">{fmt(lastDt)}</p>
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm text-zinc-300 truncate">{pathLabels.join(' → ')}</p>
+                          <p className="text-sm text-zinc-300 break-words">{pathLabels.join(' → ')}</p>
                           <p className="text-xs text-zinc-600 tabular-nums mt-0.5">
                             {drives.length}회 · {formatDuration(Math.round(totalMin))}
                           </p>
