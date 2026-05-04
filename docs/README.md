@@ -23,7 +23,7 @@ AWS Lightsail 기반 TeslaMate Dashboard 운영 문서.
 |---|---|---|
 | dashboard | 80 | Next.js 대시보드 (`80:5000` 매핑, 부가 `5000:5000`도 열림) |
 | teslamate | (내부) | 데이터 수집기 — 외부 노출 없음 |
-| teslamate-auth | 4000 | nginx basic-auth 프록시 → teslamate |
+| teslamate-auth | 4000 | Caddy forward_auth (dashboard PIN 공유) → teslamate |
 | database | (내부) | PostgreSQL 16 |
 | mosquitto | 1883 | MQTT 브로커 |
 

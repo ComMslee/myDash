@@ -4,10 +4,10 @@
 
 | 용도 | URL | 인증 |
 |---|---|---|
-| **Dashboard** | **http://<LIGHTSAIL_IP>/** | 없음 (공개) |
-| **TeslaMate 설정** | **http://<LIGHTSAIL_IP>:4000/** | nginx basic-auth (`admin:<htpasswd>`) |
+| **Dashboard** | **http://<LIGHTSAIL_IP>/** | dashboard PIN (6자리) |
+| **TeslaMate 설정** | **http://<LIGHTSAIL_IP>:4000/** | dashboard PIN 공유 (Caddy forward_auth) |
 
-TeslaMate 4000 포트는 `teslamate-auth`(nginx) 컨테이너가 `nginx-teslamate.htpasswd` 파일을 읽어 Basic 인증을 강제한다. 서버에 파일이 없으면 배포 스크립트가 임시 자격증명을 생성 후 Actions 로그에 출력한다 (`.github/workflows/deploy.yml` 참고).
+TeslaMate 4000 포트는 `teslamate-auth`(Caddy) 컨테이너가 dashboard 의 `/api/auth/verify` 로 forward_auth 요청을 보내 PIN 쿠키 (`myDash_auth`) 를 검증한다. 미인증 시 dashboard 의 `/login?next=...` 로 302 리다이렉트되며, 로그인 후 같은 도메인 쿠키 공유로 자동 통과한다 (별도 비밀번호 없음). LiveView WebSocket 도 Caddy 가 자동 업그레이드. 설정 파일: `Caddyfile`.
 
 ## SSH
 

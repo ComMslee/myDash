@@ -56,7 +56,7 @@ sudo docker exec -it myDash-tailscale-1 tailscale status
 
 로컬 브라우저에서:
 - `http://mydash-aws/` — Dashboard (호스트 80)
-- `http://mydash-aws:4000` — TeslaMate 관리 (nginx basic-auth)
+- `http://mydash-aws:4000` — TeslaMate 관리 (dashboard PIN 공유)
 
 또는 할당된 Tailscale IP(`100.x.x.x`) 사용:
 - `http://100.x.x.x/`

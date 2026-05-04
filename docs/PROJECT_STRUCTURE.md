@@ -3,10 +3,9 @@
 ```
 myDash/
 ├── CLAUDE.md                   # Claude 에이전트 지침 (요약)
-├── docker-compose.yml          # teslamate + teslamate-auth + database + mosquitto + dashboard
+├── docker-compose.yml          # teslamate + teslamate-auth(Caddy) + database + mosquitto + dashboard
 ├── docker-compose.tailscale.yml
-├── nginx-teslamate.conf        # teslamate-auth (4000번) basic-auth 프록시
-├── nginx-teslamate.htpasswd    # (gitignore) 배포 시 없으면 자동 생성
+├── Caddyfile                   # teslamate-auth (4000번) — dashboard PIN forward_auth → teslamate
 ├── .github/workflows/deploy.yml
 ├── docs/                       # 상세 문서
 └── dashboard/
