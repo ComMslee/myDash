@@ -141,10 +141,8 @@ function HistoryInner() {
     return null;
   }, [selectedPosIdx, sparkRoutes]);
 
-  const goToDrive = (d) => { setSelectedDrive(d); setSelectedPlace(null); setDayMode(null); setMonthMode(null); setChainMode(null); setMapEverShown(true); setViewMode('map'); };
   const goToDay = (dateStr) => { setDayMode(dateStr); setMonthMode(null); setChainMode(null); setSelectedPlace(null); setMapEverShown(true); setViewMode('map'); };
   const goToMonth = (monthStr) => { setMonthMode(monthStr); setDayMode(null); setChainMode(null); setSelectedDrive(null); setSelectedPlace(null); setPositions([]); setMapEverShown(true); setViewMode('map'); };
-  const goToChain = (chainId) => { setChainMode(chainId); setDayMode(null); setMonthMode(null); setSelectedDrive(null); setSelectedPlace(null); setPositions([]); setMapEverShown(true); setViewMode('map'); };
 
   const uniqueDays = useMemo(() => {
     if (!drives.length) return [];
@@ -553,10 +551,8 @@ function HistoryInner() {
                 drives={drives}
                 loadingDrives={loadingDrives}
                 error={error}
-                onDriveClick={goToDrive}
                 onDayClick={goToDay}
                 onMonthClick={goToMonth}
-                onChainClick={goToChain}
                 driveDayStr={driveDayStr}
               />
             </div>

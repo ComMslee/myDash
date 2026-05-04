@@ -49,7 +49,7 @@ myDash/
     │   │   ├── GlobalHeader.js   # 차량 상태/배터리/충전 상태 헤더 (sticky)
     │   │   ├── PageLayout.js     # Spinner 공유 컴포넌트
     │   │   ├── ChartWidgets.js   # HourlyHeatmap, WeekdayBars 차트
-    │   │   ├── DriveMap.js       # Leaflet 기반 주행 경로 지도 (highlightLatLng 포인트 하이라이트)
+    │   │   ├── DriveMap.js       # Leaflet 주행 경로 지도 — positions(단일) / routes(다중, 일 합계) / highlightLatLng(포인트) / highlightRouteId(다중 모드 한 구간 강조 + zoom)
     │   │   ├── RouteSparklines.js # 속도/고도/온도 3행 스파크라인 + 포인터 스크럽 선택
     │   │   └── YearHeatmap.js    # 연간 히트맵 (GitHub 스타일)
     │   ├── v2/                   # v2 앱 (현재 메인)
@@ -81,9 +81,9 @@ myDash/
     │   │   │   ├── CycleCard.js
     │   │   │   └── WeeklyCard.js
     │   │   ├── history/
-    │   │   │   ├── page.js           # 주행 이력 목록
-    │   │   │   ├── DriveListView.js  # 리스트 뷰
-    │   │   │   └── useDriveData.js   # 주행 데이터 훅
+    │   │   │   ├── page.js           # 이력 페이지 — 리스트(일 카드) / dayMode(지도 + 컴팩트 strip 하이라이트) / monthMode / chainMode / 단일 주행
+    │   │   │   ├── DriveListView.js  # 월 그룹 → 일 카드 (24h 막대 + 운전·정차·총량). 일 카드 탭 = onDayClick(dateStr)
+    │   │   │   └── useDriveData.js   # drives + dayRoutes/monthRoutes/chainRoutes 병렬 fetch (CLAUDE.md DriveMap 함정 5개 상주)
     │   │   ├── chargers/
     │   │   │   ├── page.js               # 집충전기 실시간 + Top 순위 + 활용도 리포트 인라인
     │   │   │   ├── _parts/ReportPanel.js # 활용도 라이브 리포트 컴포넌트 (KPI · 주별 추이 · 동별)
@@ -131,7 +131,7 @@ myDash/
 | `/` | `/v2/drives`로 리다이렉트 | — |
 | `/v2/drives` | 주행 통계 + 지도 + 이력 | 주행 |
 | `/v2/battery` | 건강 점수 + 대기 소모 + 집충전기 + 충전 습관 + 급속/완속 기록 | 배터리 |
-| `/v2/history` | 주행 이력 목록 + 경로 지도 | 이력 |
+| `/v2/history` | 일 카드 리스트 → 일 상세(지도 + 그날 주행 strip 하이라이트) / 월 / 외출 chain | 이력 |
 | `/v2/chargers` | 집충전기 실시간 + Top 순위 + 활용도 리포트 (인라인) | 충전소 |
 | `/v2/chargers/report` | 활용도 리포트 단독 페이지 (외부 캡처/공유) | — (URL 직접) |
 | `/v2/tg` | 텔레그램 봇 관리 (권한 · 방송 · 학습로그 · 가이드) | — (URL 직접) |
