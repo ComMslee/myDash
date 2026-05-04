@@ -311,7 +311,8 @@ function DongBars({ byDong }) {
           const fillColor = d.favorite ? 'bg-amber-400/70' : 'bg-blue-400/50';
           return (
             <div key={d.key} className="flex items-center gap-2">
-              <div className="w-[60px] text-[10px] text-zinc-300 truncate">
+              {/* 좌: ⭐(즐겨찾기) + "119동 앞" 까지 안 잘리게. 우: "100.0% (12기)" 까지 안 잘리게. */}
+              <div className="w-[88px] shrink-0 text-[10px] text-zinc-300 truncate" title={d.title}>
                 {d.favorite && <span className="text-amber-400 mr-0.5">⭐</span>}
                 {d.title}
               </div>
@@ -321,7 +322,7 @@ function DongBars({ byDong }) {
                   style={{ width: `${Math.max(2, w)}%` }}
                 />
               </div>
-              <div className="w-[64px] text-right text-[10px] tabular-nums text-zinc-300">
+              <div className="w-[88px] shrink-0 text-right text-[10px] tabular-nums text-zinc-300 whitespace-nowrap">
                 {d.occupancy_pct.toFixed(1)}% <span className="text-zinc-600">({d.total}기)</span>
               </div>
             </div>

@@ -25,19 +25,22 @@ function FleetStatsPanel() {
 
   useEffect(() => {
     let alive = true;
-    (async () => {
+    const load = async () => {
       try {
         const res = await fetch('/api/home-charger/fleet-stats', { cache: 'no-store' });
         const d = await res.json();
         if (!alive) return;
-        if (d.error) setError(d.error); else setData(d);
+        if (d.error) setError(d.error); else { setData(d); setError(null); }
       } catch (e) {
         if (alive) setError(e.message || '조회 실패');
       } finally {
         if (alive) setLoading(false);
       }
-    })();
-    return () => { alive = false; };
+    };
+    load();
+    // 페이지 머무는 동안 1분 주기로 자동 갱신 — 옆 패널들과 통일.
+    const t = setInterval(load, 60_000);
+    return () => { alive = false; clearInterval(t); };
   }, []);
 
   const TOP_VISIBLE = 15;
