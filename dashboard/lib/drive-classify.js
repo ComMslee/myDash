@@ -11,11 +11,14 @@
 //     그 외                                  → '일반'
 //   start≈end 판정: geofence 이름 일치 OR 좌표 ≤ 100m
 //
-// 도착 후 stash 흡수 (absorbed):
-//   "도착 → 잠깐조정 → 최종 P" 패턴을 한 도착 이벤트로 취급.
-//   stash 의 직전 비-stash 주행이 같은 위치에서 끝났고 gap ≤ 30분이면 absorbed=true.
-//   UI 는 absorbed 인 stash 를 list 에서 숨김 (= 부모 drive 안으로 흡수).
-//   효과: chain leg 사이에 끼인 stash 가 제거되어 외출 chain 이 끊기지 않음.
+// 인접 stash 흡수 (absorbed) — 양방향:
+//   "도착→잠깐조정→최종P" (arrival), "출발준비 stash→출발" (departure) 모두 한 이벤트로 취급.
+//   연속된 stash 들을 클러스터로 묶고, 클러스터 양 끝에서:
+//     - 직전 비-stash 주행이 sameLoc 에서 끝났고 gap ≤ 30분 → 도착 흡수
+//     - 직후 비-stash 주행이 sameLoc 에서 시작하고 gap ≤ 30분 → 출발 흡수
+//   둘 중 하나라도 매치되면 클러스터 전체 absorbed=true (부모 = 그 비-stash drive).
+//   UI 는 absorbed stash 를 list 에서 숨김 → 부모 drive 안으로 흡수.
+//   효과: chain leg 사이/시작/끝에 끼인 stash 가 사라져 외출 chain 이 정상적으로 묶임.
 
 const SAME_LOC_M = 100;
 const CHAIN_GAP_MAX_MIN = 10;
@@ -101,24 +104,51 @@ export function classifyDrives(rows) {
     }
   }
 
-  // 5) 도착 후 stash 흡수 — 직전 비-stash 주행과 sameLoc + gap ≤ 30분 → absorbed.
-  //    여러 stash 가 연속이면 모두 같은 부모 (가장 최근 비-stash) 에 귀속.
-  for (let idx = 0; idx < asc.length; idx++) {
-    const d = asc[idx];
-    if (!stashIds.has(d.id)) continue;
-    let prevIdx = idx - 1;
-    while (prevIdx >= 0 && stashIds.has(asc[prevIdx].id)) prevIdx--;
-    if (prevIdx < 0) continue;
-    const prev = asc[prevIdx];
-    const gapMin = (new Date(d.start_date).getTime() - new Date(prev.end_date).getTime()) / 60000;
-    if (gapMin < 0 || gapMin > ABSORB_GAP_MAX_MIN) continue;
-    const sameLoc = (prev.end_geofence_name && d.start_geofence_name
-                    && prev.end_geofence_name === d.start_geofence_name)
-                 || distanceMeters(prev.end_lat, prev.end_lng, d.start_lat, d.start_lng) <= SAME_LOC_M;
-    if (!sameLoc) continue;
-    const tagInfo = out.get(d.id);
-    tagInfo.absorbed = true;
-    tagInfo.absorbed_by = prev.id;
+  // 5) 인접 stash 흡수 (양방향 클러스터) — 직전 도착 또는 직후 출발 비-stash 와 sameLoc + gap ≤ 30분.
+  //    매치되면 클러스터 전체 absorbed=true.
+  const sameLocBetween = (aLat, aLng, aGeo, bLat, bLng, bGeo) =>
+    (aGeo && bGeo && aGeo === bGeo)
+    || distanceMeters(aLat, aLng, bLat, bLng) <= SAME_LOC_M;
+
+  let i2 = 0;
+  while (i2 < asc.length) {
+    if (!stashIds.has(asc[i2].id)) { i2++; continue; }
+    // 클러스터 [i2 .. endIdx]
+    let endIdx = i2;
+    while (endIdx + 1 < asc.length && stashIds.has(asc[endIdx + 1].id)) endIdx++;
+    const first = asc[i2];
+    const last = asc[endIdx];
+
+    let parent = null;
+    // 도착 흡수 — prev 비-stash 주행
+    const prevIdx = i2 - 1; // 클러스터 직전 = 항상 비-stash (또는 음수)
+    if (prevIdx >= 0) {
+      const prev = asc[prevIdx];
+      const gapMin = (new Date(first.start_date).getTime() - new Date(prev.end_date).getTime()) / 60000;
+      if (gapMin >= 0 && gapMin <= ABSORB_GAP_MAX_MIN
+          && sameLocBetween(prev.end_lat, prev.end_lng, prev.end_geofence_name,
+                            first.start_lat, first.start_lng, first.start_geofence_name)) {
+        parent = prev;
+      }
+    }
+    // 출발 흡수 — next 비-stash 주행
+    if (!parent && endIdx + 1 < asc.length) {
+      const next = asc[endIdx + 1];
+      const gapMin = (new Date(next.start_date).getTime() - new Date(last.end_date).getTime()) / 60000;
+      if (gapMin >= 0 && gapMin <= ABSORB_GAP_MAX_MIN
+          && sameLocBetween(next.start_lat, next.start_lng, next.start_geofence_name,
+                            last.end_lat, last.end_lng, last.end_geofence_name)) {
+        parent = next;
+      }
+    }
+    if (parent) {
+      for (let k = i2; k <= endIdx; k++) {
+        const tagInfo = out.get(asc[k].id);
+        tagInfo.absorbed = true;
+        tagInfo.absorbed_by = parent.id;
+      }
+    }
+    i2 = endIdx + 1;
   }
 
   return out;
