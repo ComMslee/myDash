@@ -2,18 +2,11 @@
 
 import { effColor } from '@/lib/effColor';
 
-function NewBadge() {
-  return (
-    <span className="text-[8px] font-bold px-1 py-px rounded bg-gradient-to-br from-blue-500 to-violet-500 text-white leading-none">NEW</span>
-  );
-}
-
 const PERIOD_DEFS = [
-  { label: '오늘',     kmKey: 'today_distance',      kwhKey: 'today_energy_kwh',      highlight: false },
-  { label: '이번주',   kmKey: 'week_distance',       kwhKey: 'week_energy_kwh',        highlight: false },
-  { label: '저번주',   kmKey: 'prev_week_distance',  kwhKey: 'prev_week_energy_kwh',   highlight: false },
-  { label: '최근 4주', kmKey: 'month_distance',      kwhKey: 'month_energy_kwh',       highlight: true  },
-  { label: '직전 4주', kmKey: 'prev_month_distance', kwhKey: 'prev_month_energy_kwh',  highlight: false },
+  { label: '오늘',     kmKey: 'today_distance',     kwhKey: 'today_energy_kwh',     highlight: false },
+  { label: '이번주',   kmKey: 'week_distance',      kwhKey: 'week_energy_kwh',      highlight: false },
+  { label: '저번주',   kmKey: 'prev_week_distance', kwhKey: 'prev_week_energy_kwh', highlight: false },
+  { label: '최근 4주', kmKey: 'month_distance',     kwhKey: 'month_energy_kwh',     highlight: true  },
 ];
 
 export default function VehicleKpiCard({ car, insights, drives }) {
@@ -67,7 +60,6 @@ export default function VehicleKpiCard({ car, insights, drives }) {
           >
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-bold text-zinc-400">{s.label}</span>
-              {s.highlight && <NewBadge />}
             </div>
             <div className="text-center">
               {isEmpty ? (
