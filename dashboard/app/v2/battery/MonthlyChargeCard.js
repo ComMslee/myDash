@@ -55,14 +55,14 @@ export default function MonthlyChargeCard() {
           </div>
         </div>
 
-        {/* 완속 / 급속 */}
+        {/* 완속 / 급속 — 집/외부와 분리하기 위해 sky/rose */}
         <div className="mb-4">
           <div className="flex justify-between text-xs mb-1.5">
-            <span className="text-emerald-400">완속 {data.slow_charges}회</span>
+            <span className="text-sky-400">완속 {data.slow_charges}회</span>
             <span className="text-rose-400">급속 {data.fast_charges}회</span>
           </div>
           <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden flex">
-            <div className="h-full bg-emerald-500 transition-all" style={{ width: `${slowRatio * 100}%` }} />
+            <div className="h-full bg-sky-500 transition-all" style={{ width: `${slowRatio * 100}%` }} />
             <div className="h-full bg-rose-500 transition-all" style={{ width: `${fastRatio * 100}%` }} />
           </div>
           <div className="flex justify-between text-xs text-zinc-600 mt-1">

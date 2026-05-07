@@ -32,7 +32,7 @@ export default function MonthInsightsCard({ insights }) {
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       <div className="px-3 py-2 border-b border-white/[0.06]">
-        <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">이번달 인사이트</span>
+        <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">최근 4주 인사이트</span>
       </div>
       {longBest && (
         <Row
