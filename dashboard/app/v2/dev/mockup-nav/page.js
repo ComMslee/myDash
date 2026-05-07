@@ -6,27 +6,33 @@ import Link from 'next/link';
 
 const VARIANTS = [
   {
+    key: 'd',
+    label: 'D. Grounded ⭐ (추천)',
+    desc: '무화려 보수안 — floating 0, 시트 0, 데코 0. 메인 4탭 + 앱 풀페이지',
+    color: 'text-fuchsia-400',
+  },
+  {
     key: 'a',
     label: 'A. Floating Dock',
-    desc: 'Mac Dock 스타일 — 하단 반투명 dock, 4 상시 + ⋯ 평면 그리드 펼침',
-    color: 'text-blue-400',
+    desc: 'Mac Dock 스타일 — 떠있는 알약 dock (장식 위주)',
+    color: 'text-zinc-500',
   },
   {
     key: 'b',
     label: 'B. Radial FAB',
-    desc: '우하단 + 버튼 → 9 도메인 부채꼴 폭발, 평상시 화면 점유 0%',
-    color: 'text-emerald-400',
+    desc: '우하단 + 부채꼴 폭발 (장식 위주)',
+    color: 'text-zinc-500',
   },
   {
     key: 'ab',
-    label: 'AB. Dock + Radial Overflow ⭐',
-    desc: 'A 의 dock + B 의 부채꼴 — 4 상시 + ⋯ 누르면 5개가 부채꼴로 폭발',
-    color: 'text-fuchsia-400',
+    label: 'AB. Dock + Radial Overflow',
+    desc: 'A + B 믹스 (장식 위주)',
+    color: 'text-zinc-500',
   },
   {
     key: 'c',
     label: 'C. Breadcrumb Top',
-    desc: '상단 "현재 도메인 ▾" 한 줄, 풀다운 (별로 평가됨)',
+    desc: '상단 풀다운 (별로 평가됨)',
     color: 'text-zinc-500',
   },
 ];
@@ -38,7 +44,6 @@ export default function MockupNavIndex() {
         <h1 className="text-2xl font-bold">Nav 패러다임 비교</h1>
         <p className="text-sm text-zinc-400 leading-relaxed">
           페이지 내부 카드/콘텐츠는 <span className="text-zinc-200">무수정</span> — 메뉴 이동법만.
-          가상 배터리 콘텐츠 위에 각 nav 가 어떻게 동작하는지 시각.
         </p>
 
         <div className="flex flex-col gap-3 mt-2">
@@ -55,8 +60,8 @@ export default function MockupNavIndex() {
         </div>
 
         <div className="mt-6 p-4 rounded-xl bg-zinc-900/40 border border-white/[0.04] text-xs text-zinc-500 leading-relaxed">
-          ※ 이전 Apple Maps peek sheet 안은 거부됨. 본 비교에서 제외.
-          <br />※ 9 도메인: 주행 / 이력 / 배터리 / 집충전소 / 음악 / 텔레그램 / API상태 / Spotify재인증 / 인증
+          ※ 사용자 피드백: floating/장식 자체가 거슬림 + 9 도메인이 너무 많음 → D 안 도출.
+          <br />※ A·B·AB·C 는 비교용 보존 (장식 위주라 폐기 후보).
         </div>
       </div>
     </main>
