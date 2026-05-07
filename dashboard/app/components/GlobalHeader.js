@@ -1,12 +1,57 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMock, MOCK_DATA } from '../context/mock';
 import { formatDuration } from '../../lib/format';
 
 // GlobalHeader를 숨길 경로 (서브/상세 페이지 + dev 도구 + 로그인/등록)
-const HIDDEN_ROUTES = ['/rankings', '/v1/rankings', '/dev', '/tg', '/spotify', '/login', '/setup'];
+const HIDDEN_ROUTES = ['/rankings', '/v1/rankings', '/dev', '/tg', '/login', '/setup'];
+
+// 우측 상단 ⚙️ 시트 메뉴 — 자주 안 쓰는 부속 화면 모음.
+const SETTINGS = [
+  {
+    href: '/tg',
+    label: '텔레그램',
+    desc: '봇 / 구독자 관리',
+    color: 'text-sky-400',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21.5 4.5L2.5 12.5l6 2 2 6 4-4 5 4z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/dev/api-status',
+    label: 'API 상태',
+    desc: '라우트 헬스 + 폴링 진단',
+    color: 'text-amber-400',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.5 4h9a3 3 0 013 3v10a3 3 0 01-3 3h-9a3 3 0 01-3-3V7a3 3 0 013-3z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/dev/auth',
+    label: '인증 설정',
+    desc: '로그인 비밀번호',
+    color: 'text-violet-400',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0-1.657 1.343-3 3-3s3 1.343 3 3v3a3 3 0 11-6 0v-3zM5 11h2v3a2 2 0 002 2h2v2H9a4 4 0 01-4-4v-3z" />
+      </svg>
+    ),
+  },
+];
+
+const GEAR_ICON = (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+  </svg>
+);
 
 function PercentBadge({ level, color, charging }) {
   return (
@@ -33,11 +78,23 @@ export default function GlobalHeader() {
   const [charging, setCharging] = useState(null);
   const [carFetchedAt, setCarFetchedAt] = useState(null);
   const [, setTick] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  // 라우트 변경 시 시트 자동 닫기
+  useEffect(() => { setSettingsOpen(false); }, [pathname]);
+
+  // ESC 로 닫기
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onKey = (e) => { if (e.key === 'Escape') setSettingsOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [settingsOpen]);
 
   const activeMockData = mockData || MOCK_DATA;
   const hidden = HIDDEN_ROUTES.some(p => pathname === p || pathname.startsWith(p + '/'));
@@ -108,6 +165,40 @@ export default function GlobalHeader() {
     : null;
 
   return (
+    <>
+    {/* ⚙️ 설정 시트 — 우측 상단 드롭다운, 텔레그램/API 상태/인증 모음 */}
+    {settingsOpen && (
+      <div
+        className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm animate-[fadeIn_120ms_ease-out]"
+        onClick={() => setSettingsOpen(false)}
+        role="dialog"
+        aria-modal="true"
+        aria-label="설정"
+      >
+        <div
+          className="absolute right-3 top-12 w-64 bg-[#0f0f0f] border border-white/[0.08] rounded-2xl py-1.5 shadow-2xl animate-[slideDown_160ms_ease-out]"
+          onClick={(e) => e.stopPropagation()}
+          style={{ marginTop: 'env(safe-area-inset-top, 0px)' }}
+        >
+          {SETTINGS.map(({ href, label, desc, color, icon }, i) => (
+            <Link
+              key={href}
+              href={href}
+              onClick={() => setSettingsOpen(false)}
+              className={`flex items-center gap-3 px-3.5 py-2.5 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors ${
+                i > 0 ? 'border-t border-white/[0.04]' : ''
+              }`}
+            >
+              <span className={`flex-shrink-0 ${color}`}>{icon}</span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-zinc-200">{label}</p>
+                <p className="text-[11px] text-zinc-500 mt-0.5 leading-snug">{desc}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    )}
     <header
       className="sticky top-0 z-50 bg-[#0f0f0f]/90 backdrop-blur border-b border-white/[0.06] relative overflow-hidden"
     >
@@ -267,6 +358,20 @@ export default function GlobalHeader() {
             </button>
           </>
         )}
+
+        <button
+          type="button"
+          onClick={() => setSettingsOpen(o => !o)}
+          aria-expanded={settingsOpen}
+          aria-haspopup="dialog"
+          className={`p-1.5 rounded-full transition-colors flex-shrink-0 ${
+            settingsOpen ? 'text-blue-400 bg-white/[0.06]' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
+          }`}
+          title="설정"
+        >
+          {GEAR_ICON}
+          <span className="sr-only">설정</span>
+        </button>
       </div>
 
       {/* 충전 진행 바 */}
@@ -280,5 +385,6 @@ export default function GlobalHeader() {
       )}
 
     </header>
+    </>
   );
 }

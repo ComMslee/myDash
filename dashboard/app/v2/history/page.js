@@ -9,7 +9,6 @@ import { formatTimeRange, kstDateStr } from '@/lib/kst';
 import DriveMap, { loadLeaflet } from '@/app/components/DriveMap';
 import RouteSparklines from '@/app/components/RouteSparklines';
 import DriveListView from '@/app/v2/history/DriveListView';
-import DriveDaySongs from '@/app/v2/history/DriveDaySongs';
 import { useDriveData } from '@/app/v2/history/useDriveData';
 
 // 체류 시간 포맷 — 초 단위 → 분/시간/일/주 자동 스케일.
@@ -453,7 +452,6 @@ function HistoryInner() {
                     )}
                   </p>
                 </div>
-                <DriveDaySongs key={dayMode} dayGroup={{ items: dayDrives }} />
                 </>
               );
             })() : selectedDrive ? (() => {

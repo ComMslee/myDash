@@ -87,25 +87,9 @@ const ROUTES = [
       { key: 'size',     sample: '' },
     ] },
 
-  // Spotify (env: SPOTIFY_CLIENT_ID/SECRET/REFRESH_TOKEN — scripts/spotify-bootstrap.mjs 1회 발급)
-  { path: '/api/spotify/now-playing', label: '재생 중',     desc: '/me/player — 현재 곡·진행률·디바이스 (차량 자동 감지)', category: 'Spotify' },
-  { path: '/api/spotify/devices',     label: '디바이스',    desc: '/me/player/devices — 활성 디바이스 목록 (Tesla=isVehicle)', category: 'Spotify' },
-  { path: '/api/spotify/recent',      label: '최근 재생',   desc: 'recently-played 최대 50곡 + 즐겨찾기 batch', category: 'Spotify',
-    params: [{ key: 'limit', sample: '10' }] },
-  { path: '/api/spotify/queue',       label: '대기열',      desc: '/me/player/queue — 다음 재생 예정 트랙', category: 'Spotify' },
-  { path: '/api/spotify/during-drive', label: '운전 매시업', desc: 'drives [start, end] × Spotify recently-played 시간 교집합 (50곡 캡)', category: 'Spotify',
-    params: [
-      { key: 'start', required: true, sample: '' },
-      { key: 'end',   required: true, sample: '' },
-    ] },
-  // POST 라우트 (api-status GET 으로 헬스체크 불가 — 참고 표시만)
-  { path: '/api/spotify/control',     label: '제어 (POST)',  desc: 'play|pause|next|previous — Premium 한정', category: 'Spotify', method: 'POST' },
-  { path: '/api/spotify/seek',        label: '시크 (POST)',  desc: 'positionMs 로 진행률 이동', category: 'Spotify', method: 'POST' },
-  { path: '/api/spotify/favorite',    label: '좋아요 (POST)', desc: 'trackId 즐겨찾기 토글', category: 'Spotify', method: 'POST' },
-  { path: '/api/spotify/play-track',  label: '재생 (POST)',  desc: 'spotify:track:* URI 즉시 재생', category: 'Spotify', method: 'POST' },
 ];
 
-const CATEGORIES = ['차량', '주행', '배터리', '집충전기', '가족', 'Spotify'];
+const CATEGORIES = ['차량', '주행', '배터리', '집충전기', '가족'];
 
 const SLOW_MS = 1500;
 

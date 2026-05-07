@@ -172,6 +172,5 @@ myDash/
 | `/v2/history` | 일 카드 리스트 → 일 상세(지도 + 그날 주행 strip 하이라이트) / 월 합계(monthMode) | 이력 |
 | `/v2/chargers` | 집충전기 실시간 + Top 순위 + 활용도 리포트 (인라인) | 충전소 |
 | `/v2/chargers/report` | 활용도 리포트 단독 페이지 (외부 캡처/공유) | — (URL 직접) |
-| `/v2/spotify` | Spotify Now Playing + 컨트롤 + ♥ + 최근 50곡/대기열 (Premium 한정 컨트롤). `lib/spotify/{tokens,client}.js` 통해 Web API 호출 — 차량 디바이스 자동 감지 (🚗) | 음악 |
 | `/v2/tg` | 텔레그램 봇 관리 (권한 · 방송 · 학습로그 · 가이드) | — (URL 직접) |
 | `/v2/dev/api-status` | API 가용성 + 서버/진단 (개발자용, URL 직접) | — (헤더·탭 미노출) |
