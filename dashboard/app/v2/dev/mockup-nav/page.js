@@ -1,7 +1,6 @@
 'use client';
 
 // Nav 패러다임 비교 인덱스 — 페이지 내부 무수정, nav 이동법만.
-// 이전 peek sheet 안은 사용자 거부 → 본 페이지는 A/B/C 진입 메뉴로 교체.
 
 import Link from 'next/link';
 
@@ -9,20 +8,26 @@ const VARIANTS = [
   {
     key: 'a',
     label: 'A. Floating Dock',
-    desc: 'Mac Dock 스타일 — 하단 반투명 dock, 4 상시 + ⋯ 펼침으로 5 추가',
+    desc: 'Mac Dock 스타일 — 하단 반투명 dock, 4 상시 + ⋯ 평면 그리드 펼침',
     color: 'text-blue-400',
   },
   {
     key: 'b',
     label: 'B. Radial FAB',
-    desc: '우하단 + 버튼 → 탭 시 9 도메인 부채꼴 폭발, 평상시 화면 점유 0%',
+    desc: '우하단 + 버튼 → 9 도메인 부채꼴 폭발, 평상시 화면 점유 0%',
     color: 'text-emerald-400',
+  },
+  {
+    key: 'ab',
+    label: 'AB. Dock + Radial Overflow ⭐',
+    desc: 'A 의 dock + B 의 부채꼴 — 4 상시 + ⋯ 누르면 5개가 부채꼴로 폭발',
+    color: 'text-fuchsia-400',
   },
   {
     key: 'c',
     label: 'C. Breadcrumb Top',
-    desc: '상단 "현재 도메인 ▾" 한 줄, 탭 시 9 풀다운 (그룹 라벨 차량/앱/관리)',
-    color: 'text-amber-400',
+    desc: '상단 "현재 도메인 ▾" 한 줄, 풀다운 (별로 평가됨)',
+    color: 'text-zinc-500',
   },
 ];
 
@@ -32,7 +37,7 @@ export default function MockupNavIndex() {
       <div className="max-w-2xl mx-auto px-4 py-8 flex flex-col gap-4">
         <h1 className="text-2xl font-bold">Nav 패러다임 비교</h1>
         <p className="text-sm text-zinc-400 leading-relaxed">
-          페이지 내부 카드/콘텐츠는 <span className="text-zinc-200">무수정</span> — 메뉴 이동법만 3안.
+          페이지 내부 카드/콘텐츠는 <span className="text-zinc-200">무수정</span> — 메뉴 이동법만.
           가상 배터리 콘텐츠 위에 각 nav 가 어떻게 동작하는지 시각.
         </p>
 
