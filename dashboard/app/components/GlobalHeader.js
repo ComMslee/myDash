@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useMock, MOCK_DATA } from '../context/mock';
 import { formatDuration } from '../../lib/format';
 
 // GlobalHeader를 숨길 경로 (서브/상세 페이지 + dev 도구 + 로그인/등록)
-const HIDDEN_ROUTES = ['/rankings', '/v1/rankings', '/v2/dev', '/v2/tg', '/login', '/setup'];
+const HIDDEN_ROUTES = ['/rankings', '/v1/rankings', '/dev', '/tg', '/spotify', '/login', '/setup'];
 
 function PercentBadge({ level, color, charging }) {
   return (
@@ -28,25 +28,11 @@ function PercentBadge({ level, color, charging }) {
 
 export default function GlobalHeader() {
   const pathname = usePathname();
-  const router = useRouter();
   const { isMock, toggleMock, isMockCharging, toggleMockCharging, lastRefresh, mockData } = useMock();
   const [car, setCar] = useState(null);
   const [charging, setCharging] = useState(null);
   const [carFetchedAt, setCarFetchedAt] = useState(null);
-  const [tapCount, setTapCount] = useState(0);
   const [, setTick] = useState(0);
-
-  // 10연타 → 진단 페이지로 이동 (2초 안에 안 터치하면 카운터 리셋)
-  useEffect(() => {
-    if (tapCount === 0) return;
-    if (tapCount >= 10) {
-      setTapCount(0);
-      router.push('/v2/dev/api-status');
-      return;
-    }
-    const t = setTimeout(() => setTapCount(0), 2000);
-    return () => clearTimeout(t);
-  }, [tapCount, router]);
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 60_000);
@@ -124,7 +110,6 @@ export default function GlobalHeader() {
   return (
     <header
       className="sticky top-0 z-50 bg-[#0f0f0f]/90 backdrop-blur border-b border-white/[0.06] relative overflow-hidden"
-      onClick={() => setTapCount(c => c + 1)}
     >
       {/* 배터리 게이지 — 헤더 배경 */}
       <div
@@ -294,12 +279,6 @@ export default function GlobalHeader() {
         </div>
       )}
 
-      {/* 10연타 카운터 힌트 — 5타 이상부터 표시, 10타에 /v2/dev/api-status 로 이동 */}
-      {tapCount >= 5 && (
-        <div className="bg-zinc-900/80 border-t border-white/5 px-3 py-0.5 text-[10px] text-zinc-500 text-center font-mono">
-          진단 {tapCount}/10
-        </div>
-      )}
     </header>
   );
 }

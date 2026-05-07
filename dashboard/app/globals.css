@@ -73,3 +73,7 @@ html, body {
 .charge-fill-pulse {
   animation: charge-fill-pulse 1.6s ease-in-out infinite;
 }
+
+/* 앱 런처 시트 — backdrop fade + 시트 slide-up */
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }

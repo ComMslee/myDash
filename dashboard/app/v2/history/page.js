@@ -9,6 +9,7 @@ import { formatTimeRange, kstDateStr } from '@/lib/kst';
 import DriveMap, { loadLeaflet } from '@/app/components/DriveMap';
 import RouteSparklines from '@/app/components/RouteSparklines';
 import DriveListView from '@/app/v2/history/DriveListView';
+import DriveDaySongs from '@/app/v2/history/DriveDaySongs';
 import { useDriveData } from '@/app/v2/history/useDriveData';
 
 // 체류 시간 포맷 — 초 단위 → 분/시간/일/주 자동 스케일.
@@ -409,6 +410,7 @@ function HistoryInner() {
                 }
               }
               return (
+                <>
                 <div className="px-4 py-1.5 border-b border-white/[0.06] flex flex-col gap-0.5 flex-shrink-0">
                   <p className="text-sm text-zinc-500 tabular-nums flex items-center gap-1.5 flex-wrap">
                     <span>{formatTimeRange(first.start_date, last.end_date)}</span>
@@ -451,6 +453,8 @@ function HistoryInner() {
                     )}
                   </p>
                 </div>
+                <DriveDaySongs key={dayMode} dayGroup={{ items: dayDrives }} />
+                </>
               );
             })() : selectedDrive ? (() => {
               const sp = selectedDrive.start_battery_level ?? null;

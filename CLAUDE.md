@@ -25,7 +25,7 @@ docker compose build dashboard && docker compose up -d dashboard
 ## 상세 문서
 
 코드/스키마 핵심:
-- [`docs/PROJECT_STRUCTURE.md`](./docs/PROJECT_STRUCTURE.md) — 파일 트리 + 페이지(4탭)
+- [`docs/PROJECT_STRUCTURE.md`](./docs/PROJECT_STRUCTURE.md) — 파일 트리 + 페이지(5탭)
 - [`docs/DATABASE.md`](./docs/DATABASE.md) — PostgreSQL 테이블 · 환경 변수 · 공용 상수/유틸
 - [`docs/CACHING.md`](./docs/CACHING.md) — DB·캐시 흐름도 · API↔테이블↔캐시 매핑
 - [`docs/CODE_CONVENTIONS.md`](./docs/CODE_CONVENTIONS.md) — UI/데이터/컴포넌트 규칙 · 커밋 스타일

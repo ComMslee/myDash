@@ -1,13 +1,51 @@
-# TeslaMate UI 게이트
-# - 외부 :4000 으로 들어오는 요청을 dashboard PIN 쿠키로 검증한 뒤
-#   teslamate(Phoenix LiveView, 내부 :4000) 로 프록시.
-# - 미인증 시 dashboard /api/auth/verify 가 302 로 /login?next=... 을 돌려준다.
-# - dashboard(:80) 는 Caddy 를 거치지 않고 호스트에서 직접 노출되므로
-#   여기엔 그 라우팅이 없다.
+# Caddy — dashboard 외부 진입점 + teslamate UI 게이트.
+#
+# 구성:
+#   :80                              — raw IP (43.202.133.239) HTTP 직접 접근. 캐시/북마크 호환.
+#                                      ACME HTTP-01 challenge 도 이 포트로 옴.
+#   43-202-133-239.sslip.io (:443)   — HTTPS, Let's Encrypt 자동 cert.
+#                                      Spotify OAuth redirect 처럼 HTTPS 요구하는 외부 서비스용.
+#                                      sslip.io: <ip>.sslip.io 가 자동으로 해당 IP 로 resolve (가입/DNS 설정 불필요).
+#   :4000                            — TeslaMate Phoenix UI 게이트. dashboard 쿠키 인증 통과해야 접속.
+#
+# auto_https disable_redirects: 명명 사이트(sslip.io) 의 cert 는 발급하되,
+#                                raw IP HTTP → HTTPS 자동 redirect 는 막음 (raw IP 엔 cert 없음).
 
 {
-	auto_https off
+	email noreply@43-202-133-239.sslip.io
 	admin off
+	auto_https disable_redirects
+}
+
+(dashboard_proxy) {
+	reverse_proxy dashboard:5000 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
+
+:80 {
+	import dashboard_proxy
+}
+
+# sslip.io HTTPS — Spotify 재인증 흐름만 노출 (전체 사이트는 raw IP HTTP 로 유지).
+# 외부 노출 면적 최소화: 이 도메인으론 OAuth 콜백 + 재인증 UI + 인증/정적 자산만 통과.
+43-202-133-239.sslip.io {
+	@allowed {
+		path /dev/spotify-relogin /dev/spotify-relogin/*
+		path /api/spotify/*
+		path /api/auth/*
+		path /login /login/*
+		path /_next/*
+		path /favicon.ico
+	}
+	handle @allowed {
+		import dashboard_proxy
+	}
+	handle {
+		respond "Not Found" 404
+	}
 }
 
 :4000 {

@@ -18,6 +18,8 @@ services:
     image: caddy:2-alpine
     restart: always
     ports:
+      - 80:80
+      - 443:443
       - 4000:4000
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
@@ -62,11 +64,17 @@ services:
       - HOME_CHARGER_STAT_IDS=${HOME_CHARGER_STAT_IDS:-PI795111,PI313299,PIH01089}
       - TELEGRAM_HUB_URL=${TELEGRAM_HUB_URL:-http://telegram-hub:3000}
       - HUB_SHARED_SECRET=${HUB_SHARED_SECRET:-}
+      # Spotify — refresh_token 1회 발급 후 영원히 자동 갱신.
+      # 발급: SPOTIFY_CLIENT_ID=xxx SPOTIFY_CLIENT_SECRET=yyy node scripts/spotify-bootstrap.mjs
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID:-}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET:-}
+      - SPOTIFY_REFRESH_TOKEN=${SPOTIFY_REFRESH_TOKEN:-}
     volumes:
       - dashboard-data:/data
       - /var/run/docker.sock:/var/run/docker.sock:ro  # 컨테이너별 stats 조회용 (api-status 페이지)
+    # 외부 80/443 은 teslamate-auth (Caddy) 가 담당. 내부 컨테이너 통신은 dashboard:5000.
+    # 5000 호스트 직접 노출은 디버그/우회용 (curl localhost:5000 으로 Caddy 우회 진단).
     ports:
-      - 80:5000
       - 5000:5000
     depends_on:
       - database
