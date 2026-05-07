@@ -6,15 +6,21 @@ import Link from 'next/link';
 
 const VARIANTS = [
   {
-    key: 'f',
-    label: 'F. Top Pills (지도앱 스타일) ⭐',
-    desc: '상단 카테고리 칩 가로 스크롤 — 지도앱 카테고리 패턴, 하단 탭 없음',
+    key: 'g',
+    label: 'G. Nav + Bottom Panel ⭐',
+    desc: '하단 5탭 + 그 위 라이브 차량 상태 패널 (Apple Music 미니플레이어 패턴)',
     color: 'text-fuchsia-400',
+  },
+  {
+    key: 'f',
+    label: 'F. Top Pills (지도앱 스타일)',
+    desc: '상단 카테고리 칩 가로 스크롤, 하단 탭 없음',
+    color: 'text-blue-400',
   },
   {
     key: 'd',
     label: 'D. Grounded',
-    desc: '무화려 보수안 — 평범한 하단 4탭 + 앱 풀페이지',
+    desc: '평범한 하단 4탭 + 앱 풀페이지',
     color: 'text-blue-400',
   },
   {
@@ -66,8 +72,8 @@ export default function MockupNavIndex() {
         </div>
 
         <div className="mt-6 p-4 rounded-xl bg-zinc-900/40 border border-white/[0.04] text-xs text-zinc-500 leading-relaxed">
-          ※ 사용자 피드백 누적: floating 자체 거슬림 + 9 도메인 너무 많음 + 데코 싫음.
-          <br />※ F (지도앱 스타일) 가 사용자 본인 제안 — 콘텐츠 우선, nav 가벼움.
+          ※ 사용자 피드백: floating 자체 거슬림 + 9 도메인 너무 많음 + 데코 싫음.
+          <br />※ G 의 라이브 패널은 데코 아닌 정보 (실시간 차량 상태) — Apple Music 미니플레이어 동등.
         </div>
       </div>
     </main>
