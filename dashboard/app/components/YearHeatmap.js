@@ -83,15 +83,6 @@ export default function YearHeatmap({
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-3">
-      <div className="flex items-center justify-end mb-2">
-        {title && <span className="text-xs font-bold text-zinc-400 mr-auto">{title}</span>}
-        <div className="flex items-center gap-2 text-[10px] text-zinc-500">
-          {latestLeft && <span className="text-zinc-600">최신 ←</span>}
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-sm" style={{ background: color }} />{legendLabel}
-          </span>
-        </div>
-      </div>
       {loading ? (
         <div className="h-24 flex items-center justify-center">
           <div className="w-5 h-5 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />

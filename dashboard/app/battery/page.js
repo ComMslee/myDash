@@ -6,9 +6,9 @@ import IdleDrainCard from './IdleDrainCard';
 import { LevelHabitCard } from './RecordsHabit';
 import MonthlyChargeCard from './MonthlyChargeCard';
 import FastChargeCard from './FastChargeCard';
-import { CapacityTrendCard, HabitTrendCard } from './BatteryTrendCard';
-import ChargeSummaryCard from './ChargeSummaryCard';
+import SlowChargeCard from './SlowChargeCard';
 import ChargeHeatmap from './ChargeHeatmap';
+import HomeChargerCard from './HomeChargerCard';
 import { Spinner } from '@/app/components/PageLayout';
 
 export default function BatteryPage() {
@@ -46,28 +46,29 @@ export default function BatteryPage() {
           </div>
         ) : data ? (
           <>
-            {/* 충전 현황 — 타임라인 */}
-            <ChargeSummaryCard />
+            {/* 배터리 건강 — 점수/평균SOC/추이 + SOC 체류 분포 */}
+            <HealthScoreCard data={data.health} trend={trend} />
 
-            {/* 배터리 상태 — 헬스 + 용량 트렌드 */}
-            <HealthScoreCard data={data.health} />
-            <CapacityTrendCard data={trend} />
+            {/* 현재 상태 — 집충전기 실시간 */}
+            <HomeChargerCard />
 
-            {/* 충전 습관 */}
+            {/* 배터리 건강 — 대기 소모 */}
+            <IdleDrainCard records={data.idle_drain} chargingSessions={data.charging_sessions} />
+
+            {/* 충전 습관 — SOC 시작/종료 분포 */}
             <LevelHabitCard histogram={data.histogram} />
-            <HabitTrendCard data={trend} />
 
-            {/* 충전 통계 */}
+            {/* 충전 습관 — 요약 */}
             <MonthlyChargeCard />
 
-            {/* 연간 충전 히트맵 (최신 왼쪽, 충전만) */}
+            {/* 충전 습관 — 연간 히트맵 */}
             <ChargeHeatmap />
 
-            {/* 급속 충전 */}
+            {/* 충전 상세 — 급속 */}
             <FastChargeCard />
 
-            {/* 대기 소모 */}
-            <IdleDrainCard records={data.idle_drain} />
+            {/* 충전 상세 — 완속 */}
+            <SlowChargeCard />
           </>
         ) : null}
       </div>

@@ -6,6 +6,6 @@
 export function effColor(wh) {
   if (wh == null) return '#3f3f46';
   if (wh < 220) return '#10b981';
-  if (wh < 260) return '#eab308';
+  if (wh < 260) return '#f59e0b';
   return '#f97316';
 }

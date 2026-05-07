@@ -60,7 +60,7 @@ export default function FastChargeCard() {
                   <span className="text-xs text-zinc-500 tabular-nums">{timeLabel}</span>
                   {r.duration_min && <span className="text-xs text-zinc-600 tabular-nums">{formatDuration(r.duration_min)}</span>}
                 </div>
-                <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 text-xs font-semibold">{brandLabel}</span>
+                <span className="px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-400 text-xs font-semibold">{brandLabel}</span>
               </div>
               <p className="text-xs text-zinc-500 truncate mb-1.5">{shortAddr(r.location)}</p>
               <div className="flex items-center gap-3 text-xs tabular-nums">

@@ -23,13 +23,36 @@ async function ensureTable() {
       updated_at TIMESTAMPTZ DEFAULT now()
     )
   `);
+  // 좌표 정밀도 변경(3→4자리)으로 구 키 포맷 일괄 삭제
+  await pool.query(
+    `DELETE FROM kakao_address_cache WHERE coord_key ~ '^-?[0-9]+\\.[0-9]{3},-?[0-9]+\\.[0-9]{3}$'`
+  );
+  // 스키마 버전 마커 — POI 도입(v2_poi) 1회성 전체 캐시 초기화
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS kakao_cache_meta (
+      key   TEXT PRIMARY KEY,
+      value TEXT
+    )
+  `);
+  const versionResult = await pool.query(
+    `SELECT value FROM kakao_cache_meta WHERE key = 'schema_version'`
+  );
+  const currentVersion = versionResult.rows[0]?.value;
+  if (currentVersion !== 'v2_poi') {
+    await pool.query(`TRUNCATE kakao_address_cache`);
+    await pool.query(
+      `INSERT INTO kakao_cache_meta (key, value) VALUES ('schema_version', 'v2_poi')
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`
+    );
+    console.log('[kakao-geo] cache truncated for schema v2_poi (keyword POI lookup)');
+  }
   tableReady = true;
 }
 
 /**
- * Kakao API 호출 → 한국어 주소 문자열 반환 (실패 시 null)
+ * coord2address — 좌표에서 한국어 주소 문자열 반환 (지번/도로명)
  */
-async function fetchFromKakao(lat, lng) {
+async function fetchAddressLabel(lat, lng) {
   if (!KAKAO_KEY) return null;
   try {
     const url = `https://dapi.kakao.com/v2/local/geo/coord2address.json?x=${lng}&y=${lat}&input_coord=WGS84`;
@@ -65,13 +88,45 @@ async function fetchFromKakao(lat, lng) {
 }
 
 /**
+ * search/keyword — 주소 문자열로 POI 검색, 첫 document의 place_name 반환
+ */
+async function fetchPoiByQuery(query) {
+  if (!KAKAO_KEY || !query) return null;
+  try {
+    const url = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query)}&size=1`;
+    const res = await fetch(url, {
+      headers: { Authorization: `KakaoAK ${KAKAO_KEY}` },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.documents?.[0]?.place_name || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Kakao API 호출 → 라벨 반환
+ * 1) coord2address로 주소 확보
+ * 2) keyword search로 해당 주소의 대표 POI(첫 결과) 시도
+ * 3) POI 없으면 주소 그대로
+ */
+async function fetchFromKakao(lat, lng) {
+  const address = await fetchAddressLabel(lat, lng);
+  if (!address) return null;
+  const poi = await fetchPoiByQuery(address);
+  return poi || address;
+}
+
+/**
  * 좌표 → 한국어 주소
  * DB 캐시 우선 조회, 오래됐으면 API 재조회 및 갱신
  */
 export async function reverseGeocode(lat, lng) {
   if (lat == null || lng == null) return null;
 
-  const coordKey = `${parseFloat(lat).toFixed(3)},${parseFloat(lng).toFixed(3)}`;
+  const coordKey = `${parseFloat(lat).toFixed(4)},${parseFloat(lng).toFixed(4)}`;
 
   try {
     await ensureTable();

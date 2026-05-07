@@ -1,125 +1,44 @@
 # TeslaMate Custom Dashboard
 
-TeslaMate 위에 올린 커스텀 Next.js 대시보드. 주행 기록, 배터리 현황, 월별 통계를 한국어 UI로 제공합니다.
+TeslaMate 위에 올린 Next.js 14 커스텀 대시보드. 주행·배터리·충전·집충전기 현황을 한국어 모바일 UI로 제공한다.
 
-## 구성
+## 페이지
 
-| 서비스 | 포트 | 설명 |
-|--------|------|------|
-| TeslaMate | 4000 | 차량 데이터 수집기 |
-| PostgreSQL 16 | — | 데이터 저장소 |
-| Mosquitto | 1883 | MQTT 브로커 |
-| Dashboard | 5000 | 커스텀 Next.js 대시보드 |
+- **주행 (`/drives`)** — 최근/주/월 통계, 자주 가는 곳 TOP, 주행 이력 + 경로 지도 (`/` → redirect)
+- **배터리 (`/battery`)** — 건강 점수, 대기 소모 24h 타임라인, 집충전기 25기 실시간(환경공단 API), 충전 습관, 급속·완속 기록
+- **로드트립 (`/roadtrips`)** — 장거리 주행 묶음, 목록/지도 모드, 속도별 5단계 색상
+- **랭킹 (`/rankings`)** — 거리·시간·속도 기준 주행 일 합계 TOP
 
-## 대시보드 페이지
+## 빠른 시작
 
-### 홈 (`/`)
-- 최근 주행 통계 (오늘/이번주/저번주/이번달) + 최근 3건 리스트
-- 최근 6개월 통합 — 주행 통계, 최고 기록, 월별 미니 바 차트
-- 충전 요약 — 집/외부, 완속/급속 비율 바
-- 시간대/요일별 주행·충전 패턴 히트맵
-
-### 주행 (`/drives`)
-- **목록 모드** — 날짜별 그룹핑, 컴팩트 리스트, 배터리 프로그래스바
-- **지도 모드** — 경로 속도별 5단계 색상 표시, 이전/다음 탐색
-- 자주 가는 곳 TOP5 — 첫/최근 방문일, 평균 이동거리/소요시간, 주요 출발지 TOP3
-- 주행 간 대기 시간 표시
-
-### 월별 (`/monthly`)
-- 달력 — 일별 주행거리, 주행/충전 횟수 표시
-- 연도별 월간 통계 — 거리 바 + 주행횟수 + 충전량·횟수 + 전비(Wh/km) 색상 표시
-- 이번 달은 달력에서만 표시, 하단 리스트에서 중복 제거
-
-### 배터리 (`/battery`)
-- 배터리 상태 — 건강 점수 게이지 + SOC 분포 히스토그램 + 용량 트렌드
-- 충전 통계 — 전체 충전 횟수/kWh, 집·외부 비율, 완속·급속 비율
-- 충전 습관 — SOC 체류 분포 + 습관 트렌드
-- 급속 충전 기록 — 날짜, 장소, 충전기 타입(SC/CCS), 최소/최대/평균 kW
-- 대기 소모 — 뱀파이어 드레인 기록
-
-## 초기 설정
-
-### 1. 환경 변수
-
-`.env` 파일을 프로젝트 루트에 생성합니다:
+`.env` 생성 후 docker compose 실행:
 
 ```env
 TM_DB_USER=teslamate
-TM_DB_PASS=your_password
+TM_DB_PASS=<password>
 TM_DB_NAME=teslamate
-ENCRYPTION_KEY=your_encryption_key
+ENCRYPTION_KEY=<openssl rand -hex 32>
+# 선택 — 없으면 일부 기능 비활성
+KAKAO_REST_API_KEY=...
+EV_CHARGER_API_KEY=...
+HOME_CHARGER_STAT_ID=PI795111
 ```
-
-암호화 키 생성:
-```bash
-openssl rand -hex 32
-```
-
-### 2. 실행
 
 ```bash
-docker compose -p teslamate up -d
+docker compose up -d
 ```
 
-### 3. TeslaMate 설정
+TeslaMate 초기 연동은 `http://localhost:4000` → Tesla 계정 로그인.
 
-브라우저에서 `http://localhost:4000` 접속 후 Tesla 계정 연동.
+## 배포
 
-## 재부팅 자동 시작
-
-모든 서비스는 `restart: always` 설정으로 Docker 재시작 시 자동 복구됩니다.
-
-| 항목 | 방식 |
-|------|------|
-| Docker Desktop | Windows 레지스트리 Run 키 (자동 설치됨) |
-| TeslaMate / DB / Mosquitto / Dashboard | `restart: always` |
-| Tailscale VPN | Windows 서비스 (자동 시작) |
-| GitHub Actions Runner | 시작프로그램 폴더 (자동 재시작 스크립트) |
-
-## CI/CD (GitHub Actions)
-
-`master` 브랜치에 push하면 자동으로 대시보드를 빌드·재시작합니다.
-
-```
-git push → GitHub Actions → self-hosted runner → docker compose build & up
-```
-
-### Self-hosted Runner 설정 (Windows)
-
-1. `C:\actions-runner`에 runner 설치 및 설정
-2. 로그인 시 자동 시작 + **runner 비정상 종료 시 자동 재시작**:
-   - `C:\actions-runner\restart-runner.ps1` — 무한 루프로 Runner.Listener.exe 관리
-   - 종료 코드별 대기 후 재시작 (정상/세션충돌 10초, 에러 15초, retryable 5초, 업데이트 30초)
-   - 재시작 이력은 `C:\actions-runner\auto-restart.log`에 기록
-   - `C:\Users\lg\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\GitHubActionsRunner.lnk`로 로그인 시 자동 실행
-
-   수동으로 다시 시작하려면:
-   ```powershell
-   Start-Process powershell.exe -ArgumentList '-NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\actions-runner\restart-runner.ps1' -WorkingDirectory 'C:\actions-runner'
-   ```
-
-### GitHub Secrets 설정
-
-| Secret | 내용 |
-|--------|------|
-| `TM_DB_USER` | DB 사용자명 |
-| `TM_DB_PASS` | DB 비밀번호 |
-| `TM_DB_NAME` | DB 이름 |
-| `ENCRYPTION_KEY` | TeslaMate 암호화 키 |
-
-## 대시보드 수동 배포
-
-```bash
-docker compose -p teslamate build dashboard && docker compose -p teslamate up -d dashboard
-```
+`master` push 시 GitHub Actions (GitHub-hosted `ubuntu-latest`)가 Lightsail로 SSH 접속해 자동 배포한다. 자세한 내용은 [`docs/DEPLOY.md`](./docs/DEPLOY.md).
 
 ## 기술 스택
 
-- **프레임워크**: Next.js 14 (App Router) — 포트 5000
-- **언어**: JavaScript (ESM)
-- **스타일링**: Tailwind CSS 3 — 다크 테마, 모바일 우선
-- **DB**: PostgreSQL 16 (TeslaMate 스키마) — `pg` 직접 쿼리
-- **지도**: Leaflet 1.9 (CDN, CartoDB Dark 타일, 속도별 경로 색상)
-- **컨테이너**: Docker (node:20-alpine)
-- **CI/CD**: GitHub Actions → self-hosted runner
-- **UI**: 한국어, 30초 자동 갱신, 개발용 Mock 시스템
+Next.js 14 · JavaScript(ESM) · Tailwind 3 · PostgreSQL 16(TeslaMate 스키마, `pg` 직접 쿼리) · Leaflet 1.9 · Docker(node:20-alpine) · AWS Lightsail
+
+## 문서
+
+- 개발 규칙/구조 — [`CLAUDE.md`](./CLAUDE.md)
+- 인프라·운영 — [`docs/`](./docs/README.md) (접속/배포/운영/백업/트러블슈팅/Tailscale/공공 API)

@@ -3,6 +3,9 @@ import { batchReverseGeocode } from '@/lib/kakao-geo';
 
 export const dynamic = 'force-dynamic';
 
+// 지오펜스 이름이 아래와 일치하면 "자주 가는 곳" 목록에서 분리해 상단 pin으로 표시
+const PINNED_GEOFENCE_NAMES = ['집', '회사', 'Home', 'Work'];
+
 export async function GET() {
   try {
     const carResult = await pool.query(`SELECT id FROM cars LIMIT 1`);
@@ -11,14 +14,14 @@ export async function GET() {
     }
     const carId = carResult.rows[0].id;
 
-    // 좌표 3자리 반올림으로 그룹핑 (~110m 반경), 이름은 그룹 내 최빈값
+    // 좌표 0.0005° bin (~55m)로 그룹핑, Kakao 질의는 그룹 내 실좌표 평균 사용
     const result = await pool.query(
       `SELECT * FROM (
          SELECT
-           ROUND(COALESCE(g.latitude, a.latitude)::numeric, 3)::text || ',' ||
-           ROUND(COALESCE(g.longitude, a.longitude)::numeric, 3)::text AS place_key,
-           ROUND(COALESCE(g.latitude, a.latitude)::numeric, 3)::float AS place_lat,
-           ROUND(COALESCE(g.longitude, a.longitude)::numeric, 3)::float AS place_lng,
+           FLOOR(COALESCE(g.latitude, a.latitude)::numeric * 2000)::text || ',' ||
+           FLOOR(COALESCE(g.longitude, a.longitude)::numeric * 2000)::text AS place_key,
+           AVG(COALESCE(g.latitude, a.latitude))::float AS place_lat,
+           AVG(COALESCE(g.longitude, a.longitude))::float AS place_lng,
            MODE() WITHIN GROUP (ORDER BY COALESCE(g.name, NULLIF(TRIM(CONCAT_WS(' ', a.road, a.house_number)), ''))) AS label,
            MODE() WITHIN GROUP (ORDER BY g.name) FILTER (WHERE g.name IS NOT NULL) AS geofence_name,
            MODE() WITHIN GROUP (ORDER BY a.city) AS city,
@@ -34,11 +37,11 @@ export async function GET() {
            AND (d.end_geofence_id IS NOT NULL OR d.end_address_id IS NOT NULL)
            AND COALESCE(g.latitude, a.latitude) IS NOT NULL
          GROUP BY
-           ROUND(COALESCE(g.latitude, a.latitude)::numeric, 3),
-           ROUND(COALESCE(g.longitude, a.longitude)::numeric, 3)
+           FLOOR(COALESCE(g.latitude, a.latitude)::numeric * 2000),
+           FLOOR(COALESCE(g.longitude, a.longitude)::numeric * 2000)
        ) sub
        ORDER BY visit_count DESC
-       LIMIT 12`,
+       LIMIT 100`,
       [carId]
     );
 
@@ -49,8 +52,8 @@ export async function GET() {
       const originResult = await pool.query(
         `SELECT place_key, start_label, start_geofence_name, start_lat, start_lng, cnt FROM (
            SELECT
-             ROUND(COALESCE(eg.latitude, ea.latitude)::numeric, 3)::text || ',' ||
-             ROUND(COALESCE(eg.longitude, ea.longitude)::numeric, 3)::text AS place_key,
+             FLOOR(COALESCE(eg.latitude, ea.latitude)::numeric * 2000)::text || ',' ||
+             FLOOR(COALESCE(eg.longitude, ea.longitude)::numeric * 2000)::text AS place_key,
              COALESCE(sg.name, NULLIF(TRIM(CONCAT_WS(' ', sa.road, sa.house_number)), '')) AS start_label,
              sg.name AS start_geofence_name,
              AVG(COALESCE(sg.latitude, sa.latitude))::float AS start_lat,
@@ -58,8 +61,8 @@ export async function GET() {
              COUNT(*) AS cnt,
              ROW_NUMBER() OVER (
                PARTITION BY
-                 ROUND(COALESCE(eg.latitude, ea.latitude)::numeric, 3)::text || ',' ||
-                 ROUND(COALESCE(eg.longitude, ea.longitude)::numeric, 3)::text
+                 FLOOR(COALESCE(eg.latitude, ea.latitude)::numeric * 2000)::text || ',' ||
+                 FLOOR(COALESCE(eg.longitude, ea.longitude)::numeric * 2000)::text
                ORDER BY COUNT(*) DESC
              ) AS rn
            FROM drives d
@@ -70,8 +73,8 @@ export async function GET() {
            WHERE d.car_id = $1
              AND COALESCE(eg.latitude, ea.latitude) IS NOT NULL
            GROUP BY
-             ROUND(COALESCE(eg.latitude, ea.latitude)::numeric, 3)::text || ',' ||
-             ROUND(COALESCE(eg.longitude, ea.longitude)::numeric, 3)::text,
+             FLOOR(COALESCE(eg.latitude, ea.latitude)::numeric * 2000)::text || ',' ||
+             FLOOR(COALESCE(eg.longitude, ea.longitude)::numeric * 2000)::text,
              COALESCE(sg.name, NULLIF(TRIM(CONCAT_WS(' ', sa.road, sa.house_number)), '')),
              sg.name
          ) sub WHERE rn <= 3`,
@@ -102,28 +105,44 @@ export async function GET() {
     }));
     const kakaoLabels = await batchReverseGeocode(coords);
 
-    return Response.json({
-      places: result.rows.map((p, i) => {
-        // 지오펜스 이름 > Kakao 한국어 주소 > DB 영어 주소 > 기본값
-        const geofenceName = p.geofence_name || null;
-        const kakaoLabel = kakaoLabels[i] || null;
-        const dbLabel = p.label || null;
-        const label = geofenceName || kakaoLabel || dbLabel || '알 수 없는 장소';
-        return {
-          id: p.place_key,
-          label,
-          city: p.city || null,
-          lat: p.place_lat ? parseFloat(p.place_lat) : null,
-          lng: p.place_lng ? parseFloat(p.place_lng) : null,
-          visit_count: parseInt(p.visit_count),
-          last_visit: p.last_visit || null,
-          first_visit: p.first_visit || null,
-          avg_distance: parseFloat(p.avg_distance.toFixed(1)),
-          avg_duration: Math.round(p.avg_duration),
-          origins: originMap[p.place_key] || [],
-        };
-      }),
+    const allPlaces = result.rows.map((p, i) => {
+      // 지오펜스 이름 > Kakao 한국어 주소 > DB 영어 주소 > 기본값
+      const geofenceName = p.geofence_name || null;
+      const kakaoLabel = kakaoLabels[i] || null;
+      const dbLabel = p.label || null;
+      const label = geofenceName || kakaoLabel || dbLabel || '알 수 없는 장소';
+      return {
+        id: p.place_key,
+        label,
+        geofence_name: geofenceName,
+        city: p.city || null,
+        lat: p.place_lat ? parseFloat(p.place_lat) : null,
+        lng: p.place_lng ? parseFloat(p.place_lng) : null,
+        visit_count: parseInt(p.visit_count),
+        last_visit: p.last_visit || null,
+        first_visit: p.first_visit || null,
+        avg_distance: parseFloat(p.avg_distance.toFixed(1)),
+        avg_duration: Math.round(p.avg_duration),
+        origins: originMap[p.place_key] || [],
+      };
     });
+
+    // 집/회사 지오펜스는 목록 맨 뒤로 이동 (visit_count가 커도 상위 노출 방지)
+    const pinned = [];
+    const normal = [];
+    for (const p of allPlaces) {
+      if (p.geofence_name && PINNED_GEOFENCE_NAMES.includes(p.geofence_name)) {
+        pinned.push(p);
+      } else {
+        normal.push(p);
+      }
+    }
+    pinned.sort((a, b) =>
+      PINNED_GEOFENCE_NAMES.indexOf(a.geofence_name) -
+      PINNED_GEOFENCE_NAMES.indexOf(b.geofence_name)
+    );
+
+    return Response.json({ places: [...normal, ...pinned] });
   } catch (err) {
     console.error('/api/frequent-places error:', err);
     return Response.json({ error: 'DB error', detail: err.message }, { status: 500 });

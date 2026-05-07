@@ -1,0 +1,22 @@
+name: Find Nearby Chargers (one-off)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run find-nearby-chargers on server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          timeout: 60s
+          command_timeout: 5m
+          script: |
+            cd ~/myDash
+            source .env 2>/dev/null || true
+            export $(grep -v '^#' .env | xargs) 2>/dev/null || true
+            node dashboard/scripts/find-nearby-chargers.js PI795111 1500 12

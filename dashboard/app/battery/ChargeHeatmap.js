@@ -20,7 +20,7 @@ export default function ChargeHeatmap() {
       loading={loading}
       title=""
       metric="kwh"
-      color="#22c55e"
+      color="#4ade80"
       legendLabel="충전"
       latestLeft
     />

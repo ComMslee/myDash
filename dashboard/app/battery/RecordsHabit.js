@@ -2,46 +2,6 @@
 import { useState } from 'react';
 import { formatKorDate } from '@/lib/format';
 
-function HistBar({ counts, color }) {
-  const total = counts.reduce((a, b) => a + b, 0);
-  const maxCount = Math.max(1, ...counts);
-  const maxH = 56;
-  const maxIdx = counts.indexOf(maxCount);
-
-  if (total === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-1.5 py-4 text-zinc-600">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M9 9h.01M15 9h.01" />
-          <path d="M9 15s1 1 3 1 3-1 3-1" />
-        </svg>
-        <span className="text-[10px]">충전 기록이 없어요</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-end gap-0.5" style={{ height: maxH }}>
-      {counts.map((cnt, i) => {
-        const h = maxCount > 0 ? Math.max(2, Math.round((cnt / maxCount) * maxH)) : 2;
-        const isModal = i === maxIdx && cnt > 0;
-        return (
-          <div key={i} className="flex-1 rounded-t-sm transition-all duration-500"
-            style={{
-              height: h,
-              background: isModal ? color : color,
-              opacity: cnt === 0 ? 0.12 : isModal ? 1 : 0.55,
-              outline: isModal ? `1.5px solid ${color}` : 'none',
-            }}
-            title={`${i * 10}–${i * 10 + 10}%: ${cnt}회`}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
 const PERIODS = [
   { key: 'all', label: '전체' },
   { key: 'six_month', label: '6개월' },
@@ -77,7 +37,7 @@ export function DailyRecordsCard({ records }) {
       data: r.min_charge,
       mainVal: r.min_charge ? `${r.min_charge.kwh} kWh` : null,
       subVal: r.min_charge ? `+${r.min_charge.charge_pct}%` : null,
-      valClass: 'text-emerald-300',
+      valClass: 'text-emerald-400',
       accentClass: 'bg-emerald-500',
     },
     {
@@ -86,7 +46,7 @@ export function DailyRecordsCard({ records }) {
       data: r.min_consume,
       mainVal: r.min_consume ? `${r.min_consume.consume_kwh} kWh` : null,
       subVal: r.min_consume ? `-${r.min_consume.consume_pct}%` : null,
-      valClass: 'text-blue-300',
+      valClass: 'text-blue-400',
       accentClass: 'bg-blue-500',
     },
   ];
@@ -134,7 +94,7 @@ export function DailyRecordsCard({ records }) {
               />
               <div className="flex items-center gap-1.5 mb-1.5">
                 <span className={`text-base ${!hasData ? 'grayscale' : ''}`}>{c.icon}</span>
-                <span className="text-[9px] uppercase tracking-wider text-zinc-600">{c.label}</span>
+                <span className="text-[10px] uppercase tracking-wider text-zinc-500">{c.label}</span>
               </div>
               {hasData ? (
                 <div className="flex items-baseline gap-1.5 flex-wrap">
@@ -153,82 +113,127 @@ export function DailyRecordsCard({ records }) {
   );
 }
 
+// 누적 분포에서 백분위수 구하기 (bin 단위 → %)
+function percentileFromHist(counts, bucketSize, total, pct) {
+  const target = total * pct;
+  let acc = 0;
+  for (let i = 0; i < counts.length; i++) {
+    acc += counts[i];
+    if (acc >= target) return i * bucketSize + bucketSize / 2;
+  }
+  return counts.length * bucketSize;
+}
+
+function Whisker({ p5, q1, median, q3, p95, color, total }) {
+  // VIEW: x축 0~100% 비율
+  return (
+    <div className="relative h-5">
+      {/* 축 배경 */}
+      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-white/[0.06]" />
+      {total > 0 && (
+        <>
+          {/* whisker — p5 ~ p95 */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 h-px"
+            style={{ left: `${p5}%`, width: `${p95 - p5}%`, background: color, opacity: 0.35 }}
+          />
+          {/* whisker end ticks */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 w-px h-2"
+            style={{ left: `${p5}%`, background: color, opacity: 0.5 }}
+          />
+          <div
+            className="absolute top-1/2 -translate-y-1/2 w-px h-2"
+            style={{ left: `${p95}%`, background: color, opacity: 0.5 }}
+          />
+          {/* IQR box q1~q3 */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 h-3 rounded-sm"
+            style={{ left: `${q1}%`, width: `${Math.max(0.5, q3 - q1)}%`, background: color, opacity: 0.5 }}
+          />
+          {/* median 점 */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full border border-white/60"
+            style={{ left: `calc(${median}% - 4px)`, background: color }}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
 export function LevelHabitCard({ histogram }) {
   const { start_level, end_level, start_modal_range, end_modal_range } = histogram;
-  const labels = ['0', '10', '20', '30', '40', '50', '60', '70', '80', '90', '100%'];
+  const bucketSize = 2;
 
   const startTotal = start_level.reduce((a, b) => a + b, 0);
   const endTotal = end_level.reduce((a, b) => a + b, 0);
 
-  const startMaxIdx = start_level.indexOf(Math.max(...start_level));
-  const endMaxIdx = end_level.indexOf(Math.max(...end_level));
+  const startStats = startTotal > 0 ? {
+    p5: percentileFromHist(start_level, bucketSize, startTotal, 0.05),
+    q1: percentileFromHist(start_level, bucketSize, startTotal, 0.25),
+    median: percentileFromHist(start_level, bucketSize, startTotal, 0.5),
+    q3: percentileFromHist(start_level, bucketSize, startTotal, 0.75),
+    p95: percentileFromHist(start_level, bucketSize, startTotal, 0.95),
+  } : { p5: 0, q1: 0, median: 0, q3: 0, p95: 0 };
+  const endStats = endTotal > 0 ? {
+    p5: percentileFromHist(end_level, bucketSize, endTotal, 0.05),
+    q1: percentileFromHist(end_level, bucketSize, endTotal, 0.25),
+    median: percentileFromHist(end_level, bucketSize, endTotal, 0.5),
+    q3: percentileFromHist(end_level, bucketSize, endTotal, 0.75),
+    p95: percentileFromHist(end_level, bucketSize, endTotal, 0.95),
+  } : { p5: 0, q1: 0, median: 0, q3: 0, p95: 0 };
 
   return (
-    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      <div className="px-4 py-3.5 border-b border-white/[0.06]">
-        <div className="flex items-center gap-1.5 mb-3">
-          <div className="w-2 h-2 rounded-full bg-red-400" />
-          <span className="text-[11px] font-semibold text-zinc-300">충전 시작 레벨</span>
-          {startTotal > 0 && (
-            <span className="ml-1 text-[10px] text-zinc-600">(총 {startTotal}회)</span>
-          )}
-        </div>
-        <HistBar counts={start_level} color="#f87171" />
-        {startTotal > 0 && (
-          <>
-            <div className="flex justify-between mt-1.5">
-              {labels.map((l, i) => (
-                <span
-                  key={i}
-                  className="text-[8px] tabular-nums"
-                  style={{
-                    color: i < 10 && i === startMaxIdx && start_level[i] > 0
-                      ? '#f87171'
-                      : '#3f3f46',
-                  }}
-                >
-                  {l}
-                </span>
-              ))}
-            </div>
-            <div className="mt-2 text-[10px] text-zinc-600">
-              주로 <span className="text-zinc-300 font-semibold">{start_modal_range}</span> 구간에서 충전 시작
-            </div>
-          </>
-        )}
+    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3.5">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[11px] font-semibold text-zinc-300">충전 시작 → 종료 분포</span>
+        {startTotal > 0 && <span className="text-[10px] text-zinc-600">{startTotal}회</span>}
       </div>
-      <div className="px-4 py-3.5">
-        <div className="flex items-center gap-1.5 mb-3">
-          <div className="w-2 h-2 rounded-full bg-emerald-400" />
-          <span className="text-[11px] font-semibold text-zinc-300">충전 종료 레벨</span>
-          {endTotal > 0 && (
-            <span className="ml-1 text-[10px] text-zinc-600">(총 {endTotal}회)</span>
-          )}
-        </div>
-        <HistBar counts={end_level} color="#34d399" />
-        {endTotal > 0 && (
-          <>
-            <div className="flex justify-between mt-1.5">
-              {labels.map((l, i) => (
-                <span
-                  key={i}
-                  className="text-[8px] tabular-nums"
-                  style={{
-                    color: i < 10 && i === endMaxIdx && end_level[i] > 0
-                      ? '#34d399'
-                      : '#3f3f46',
-                  }}
-                >
-                  {l}
-                </span>
-              ))}
+
+      {startTotal === 0 ? (
+        <p className="text-[10px] text-zinc-600 py-8 text-center">충전 기록이 없습니다</p>
+      ) : (
+        <>
+          <div className="flex flex-col gap-2.5">
+            {/* 시작 */}
+            <div className="flex items-center gap-2">
+              <span className="w-8 text-[10px] text-red-400 font-semibold flex-shrink-0">시작</span>
+              <div className="flex-1">
+                <Whisker {...startStats} color="#f87171" total={startTotal} />
+              </div>
+              <span className="w-10 text-[10px] text-zinc-400 tabular-nums text-right flex-shrink-0">
+                {Math.round(startStats.median)}%
+              </span>
             </div>
-            <div className="mt-2 text-[10px] text-zinc-600">
-              주로 <span className="text-zinc-300 font-semibold">{end_modal_range}</span> 구간에서 충전 종료
+            {/* 종료 */}
+            <div className="flex items-center gap-2">
+              <span className="w-8 text-[10px] text-emerald-400 font-semibold flex-shrink-0">종료</span>
+              <div className="flex-1">
+                <Whisker {...endStats} color="#34d399" total={endTotal} />
+              </div>
+              <span className="w-10 text-[10px] text-zinc-400 tabular-nums text-right flex-shrink-0">
+                {Math.round(endStats.median)}%
+              </span>
             </div>
-          </>
-        )}
-      </div>
+          </div>
+          {/* 공통 0-100 축 */}
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="w-8 flex-shrink-0" />
+            <div className="flex-1 flex justify-between text-[9px] text-zinc-600 tabular-nums">
+              <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
+            </div>
+            <span className="w-10 flex-shrink-0" />
+          </div>
+          {/* 요약 */}
+          <div className="mt-3 pt-2.5 border-t border-white/[0.04] text-[10px] text-zinc-500 flex items-center justify-center gap-1.5 tabular-nums">
+            주로 <span className="text-red-400 font-semibold">{start_modal_range}</span>
+            <span className="text-zinc-700">→</span>
+            <span className="text-emerald-400 font-semibold">{end_modal_range}</span>
+            <span className="text-zinc-700 ml-1">({Math.round(endStats.median - startStats.median)}%p)</span>
+          </div>
+        </>
+      )}
     </div>
   );
 }

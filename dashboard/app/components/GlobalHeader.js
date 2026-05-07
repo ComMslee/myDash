@@ -8,19 +8,6 @@ import { formatDuration } from '../../lib/format';
 // GlobalHeader를 숨길 경로 (서브/상세 페이지)
 const HIDDEN_ROUTES = ['/rankings'];
 
-function StateBadge({ state }) {
-  const map = {
-    driving:   { label: '주행 중',   cls: 'text-blue-400' },
-    parked:    { label: '주차 중',   cls: 'text-zinc-400' },
-    suspended: { label: '절전 중',   cls: 'text-indigo-400' },
-    online:    { label: '온라인',    cls: 'text-teal-400' },
-  };
-  if (!state || state === 'offline' || state === 'charging') return null;
-  const s = map[state];
-  if (!s) return null;
-  return <span className={`text-xs font-semibold ${s.cls}`}>{s.label}</span>;
-}
-
 function PercentBadge({ level, color, charging }) {
   return (
     <div
@@ -45,6 +32,12 @@ export default function GlobalHeader() {
   const [car, setCar] = useState(null);
   const [charging, setCharging] = useState(null);
   const [carFetchedAt, setCarFetchedAt] = useState(null);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const activeMockData = mockData || MOCK_DATA;
   const hidden = HIDDEN_ROUTES.some(p => pathname === p || pathname.startsWith(p + '/'));
@@ -75,19 +68,34 @@ export default function GlobalHeader() {
 
   const isCharging = !!charging || car?.state === 'charging';
   const effectiveState = (isMock && isMockCharging) ? 'charging' : car?.state;
-  const lvl = isCharging ? (charging.battery_level ?? car?.battery_level ?? 0) : (car?.battery_level ?? 0);
+  const lvl = isCharging ? (charging?.battery_level ?? car?.battery_level ?? 0) : (car?.battery_level ?? 0);
   const limitLvl = charging?.charge_limit_soc ?? null;
   const estRange = car?.est_battery_range ?? null;
-  const color = lvl > 50 ? '#22c55e' : lvl > 20 ? '#f59e0b' : '#ef4444';
+  // SOC 체류 분포와 토큰 통일: ideal/good=emerald, caution=amber, stress=red
+  const color = lvl > 50 ? '#10b981' : lvl > 20 ? '#f59e0b' : '#ef4444';
 
   const timeLabel = lastRefresh
-    ? lastRefresh.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    ? lastRefresh.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
     : carFetchedAt
-      ? carFetchedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+      ? carFetchedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
       : null;
 
   const lastSeenLabel = car?.last_seen
-    ? new Date(car.last_seen).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    ? new Date(car.last_seen).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+    : null;
+
+  // 확정 상태(주차/주행/충전)별 경과 시간 계산
+  // states 테이블이 아직 driving으로 전환 전이어도 진행중 drive(current_drive_start)가 있으면 주행
+  const isDriving = effectiveState === 'driving' || !!car?.current_drive_start;
+  const displayState = isCharging ? 'charging' : isDriving ? 'driving' : 'parked';
+
+  let elapsedSince = null;
+  if (displayState === 'charging') elapsedSince = charging?.start_date ?? null;
+  else if (displayState === 'driving') elapsedSince = car?.current_drive_start ?? null;
+  else if (displayState === 'parked') elapsedSince = car?.last_drive_end ?? null;
+
+  const elapsedMin = elapsedSince
+    ? Math.max(0, Math.floor((Date.now() - new Date(elapsedSince).getTime()) / 60000))
     : null;
 
   const remainMin = charging?.time_to_full_charge ? Math.round(charging.time_to_full_charge * 60) : null;
@@ -122,33 +130,61 @@ export default function GlobalHeader() {
 
         {/* 좌측: 아이콘 + 차량명 + 갱신시간 */}
         <div className="flex items-center gap-1.5 min-w-0">
-          <div
-            className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 border transition-colors ${
-              isCharging
-                ? 'bg-gradient-to-br from-green-500/25 to-green-600/10 border-green-500/40 charge-pulse'
-                : 'bg-gradient-to-br from-red-500/20 to-red-600/10 border-red-500/30'
-            }`}
-            title={isCharging ? '충전 중' : '주차 중'}
-            style={isCharging ? { color: '#34d399' } : undefined}
-          >
-            {isCharging ? (
-              <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 17h2v2a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-2zM3 17h2v2a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-2h1zm15-7l1.68 4h-15.36L6 10h12zm-14 6h16v-3h-16v3zm.5-5l2.5-5c.36-.72 1.09-1 1.83-1h8.34c.74 0 1.47.28 1.83 1l2.5 5h-17z"/>
-              </svg>
-            )}
-            <span className="sr-only">{isCharging ? '충전중' : '주차중'}</span>
-          </div>
-          <span className="font-semibold text-zinc-200 text-base truncate">
-            {car?.name || 'TeslaMate'}
-          </span>
-          {(lastSeenLabel || timeLabel) && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-zinc-800/80 border border-white/5 text-zinc-500 flex-shrink-0">
-              <span className="text-[11px] tabular-nums">{lastSeenLabel ?? timeLabel}</span>
-            </span>
+          {(() => {
+            if (!displayState) return null;
+            const MAP = {
+              charging: {
+                label: '충전 중',
+                cls: 'from-green-500/25 to-green-600/10 border-green-500/40 charge-pulse',
+                txt: 'text-green-400',
+                icon: <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />,
+              },
+              driving: {
+                label: '주행 중',
+                cls: 'from-blue-500/25 to-blue-600/10 border-blue-500/40',
+                txt: 'text-blue-400',
+                icon: <path d="M5 13h11.17l-4.88 4.88a.996.996 0 1 0 1.41 1.41l6.59-6.59a.996.996 0 0 0 0-1.41l-6.58-6.6a.996.996 0 1 0-1.41 1.41L16.17 11H5c-.55 0-1 .45-1 1s.45 1 1 1z" />,
+              },
+              parked: {
+                label: '주차 중',
+                cls: 'from-zinc-500/20 to-zinc-600/10 border-zinc-500/30',
+                txt: 'text-zinc-300',
+                icon: <path d="M13 3H6v18h4v-6h3a6 6 0 0 0 0-12zm.2 8H10V7h3.2a2 2 0 1 1 0 4z" />,
+              },
+            };
+            const conf = MAP[displayState];
+            return (
+              <div
+                className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 border transition-colors bg-gradient-to-br ${conf.cls}`}
+                title={conf.label}
+              >
+                <svg className={`w-4 h-4 ${conf.txt}`} fill="currentColor" viewBox="0 0 24 24">
+                  {conf.icon}
+                </svg>
+                <span className="sr-only">{conf.label}</span>
+              </div>
+            );
+          })()}
+          {(() => {
+            // 온라인으로 간주: driving/charging/online, 그리고 position이 최근(≤5분)일 때만
+            const STALE_MS = 5 * 60_000;
+            const lastSeenMs = car?.last_seen ? new Date(car.last_seen).getTime() : null;
+            const stale = !lastSeenMs || (Date.now() - lastSeenMs) > STALE_MS;
+            const liveStates = new Set(['driving', 'charging', 'online']);
+            const isOnline = liveStates.has(effectiveState) && !stale;
+            const isOffline = !isOnline;
+            const dotColor = isOffline ? 'bg-zinc-500' : 'bg-emerald-400';
+            const label = isOffline ? (lastSeenLabel ?? timeLabel ?? '오프라인') : '온라인';
+            if (!label) return null;
+            return (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-zinc-800/80 border border-white/5 text-zinc-500 flex-shrink-0">
+                <span className={`w-1.5 h-1.5 rounded-full ${dotColor} ${isOffline ? '' : 'animate-pulse'}`} aria-hidden="true" />
+                <span className="text-[11px] tabular-nums">{label}</span>
+              </span>
+            );
+          })()}
+          {elapsedMin != null && (
+            <span className="text-[11px] tabular-nums text-zinc-500 flex-shrink-0">{formatDuration(elapsedMin)}</span>
           )}
         </div>
 
@@ -160,7 +196,7 @@ export default function GlobalHeader() {
             <div className="flex items-center gap-1 flex-shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse flex-shrink-0" aria-hidden="true" />
               <span className="text-green-400 text-sm font-bold tabular-nums">
-                {charging.charger_power != null ? `${charging.charger_power}kW` : '충전 중'}
+                {charging?.charger_power != null ? `${charging.charger_power}kW` : '충전 중'}
               </span>
             </div>
             <PercentBadge level={lvl} color={color} charging />
@@ -171,10 +207,21 @@ export default function GlobalHeader() {
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            {effectiveState && <StateBadge state={effectiveState} />}
             {estRange && (
               <span className="text-zinc-400 text-xs tabular-nums">예측 {estRange}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
             )}
+            {(() => {
+              const ec = car?.estimated_charge;
+              if (!ec || ec.days_until == null) return null;
+              // 신뢰도 낮으면 숨김 (운행 데이터 부족)
+              if (ec.confidence === 'low') return null;
+              const days = ec.days_until;
+              // 3일 이상 여유면 노이즈라 숨김 (필요할 때만 표시)
+              if (days > 2) return null;
+              const label = days === 0 ? '오늘 충전 필요' : days === 1 ? '내일 충전' : '2일 뒤 충전';
+              const colorCls = days === 0 ? 'text-red-400' : days === 1 ? 'text-amber-400' : 'text-zinc-400';
+              return <span className={`text-xs tabular-nums font-bold ${colorCls}`}>⚡ {label}</span>;
+            })()}
             <PercentBadge level={lvl} color={color} charging={false} />
           </div>
         )}

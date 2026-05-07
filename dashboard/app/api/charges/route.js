@@ -1,4 +1,5 @@
 import pool from '@/lib/db';
+import { KST_OFFSET_MS } from '@/lib/kst';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,7 @@ export async function GET() {
 
     // Monthly cost (current month) — KST 기준 월 시작
     const now = new Date();
-    const KST = 9 * 60 * 60 * 1000;
+    const KST = KST_OFFSET_MS;
     const nowKST = new Date(now.getTime() + KST);
     const ky = nowKST.getUTCFullYear(), km = nowKST.getUTCMonth();
     const monthStart = new Date(Date.UTC(ky, km, 1) - KST);

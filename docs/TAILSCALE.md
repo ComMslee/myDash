@@ -5,7 +5,7 @@
 ## 왜 Tailscale?
 
 - Lightsail 방화벽은 SSH(22)만 허용
-- 5000/4000 포트를 퍼블릭에 노출하면 인증 없이 누구나 접근 가능
+- 80/4000 포트를 퍼블릭에 노출하면 인증 없이 누구나 접근 가능
 - Tailscale은 본인 기기끼리만 통하는 가상 네트워크 (Zero-trust, 무료)
 
 ## 사전 준비 (1회)
@@ -33,8 +33,8 @@
 로컬 Windows에서:
 
 ```bash
-cd C:\Users\lmskn\Downloads\myDash
-ssh -i lightsail-seoul.pem ubuntu@43.202.133.239
+cd C:\path\to\myDash
+ssh -i lightsail-seoul.pem ubuntu@<LIGHTSAIL_IP>
 ```
 
 서버 안에서:
@@ -55,11 +55,11 @@ sudo docker exec -it myDash-tailscale-1 tailscale status
 로그인 성공하면 [Tailscale Admin](https://login.tailscale.com/admin/machines)에 `mydash-aws` 기기가 추가됨.
 
 로컬 브라우저에서:
-- `http://mydash-aws:5000` — Dashboard
-- `http://mydash-aws:4000` — TeslaMate 관리
+- `http://mydash-aws/` — Dashboard (호스트 80)
+- `http://mydash-aws:4000` — TeslaMate 관리 (nginx basic-auth)
 
 또는 할당된 Tailscale IP(`100.x.x.x`) 사용:
-- `http://100.x.x.x:5000`
+- `http://100.x.x.x/`
 
 ## Tailscale SSH (옵션)
 
@@ -77,7 +77,7 @@ tailscale ssh ubuntu@mydash-aws
 ## 롤백 / 제거
 
 ```bash
-ssh -i lightsail-seoul.pem ubuntu@43.202.133.239
+ssh -i lightsail-seoul.pem ubuntu@<LIGHTSAIL_IP>
 cd ~/myDash
 sudo docker compose -f docker-compose.yml -f docker-compose.tailscale.yml down tailscale
 # .env에서 TS_AUTHKEY 라인 삭제

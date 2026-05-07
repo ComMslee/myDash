@@ -8,6 +8,15 @@ export function formatDuration(minutes) {
   return h === 0 ? `${m}분` : `${h}시간 ${m}분`;
 }
 
+/** 시간(소수 가능) → "X시간 Y분" 또는 "Y분" (1시간 미만은 분 단위) */
+export function formatHours(hours) {
+  if (hours == null) return '—';
+  if (hours < 1) return `${Math.round(hours * 60)}분`;
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return m > 0 ? `${h}시간 ${m}분` : `${h}시간`;
+}
+
 /** ISO 날짜 문자열 → "M월 D일 HH:MM" */
 export function formatDate(dateStr) {
   if (!dateStr) return '—';
