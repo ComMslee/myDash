@@ -1,14 +1,18 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
+import { getDefaultCar } from '@/lib/queries/car';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
-    const carResult = await pool.query(`SELECT id FROM cars LIMIT 1`);
-    if (carResult.rows.length === 0) {
+    const car = await getDefaultCar();
+    if (!car) {
       return Response.json({ positions: [] });
     }
-    const carId = carResult.rows[0].id;
+    const carId = car.id;
 
     const posResult = await pool.query(
       `SELECT latitude, longitude

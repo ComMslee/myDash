@@ -1,6 +1,10 @@
 'use client';
 
-import { useRef, useEffect, useCallback } from 'react';
+// ⚠️  수정 전 필독: /CLAUDE.md "알려진 함정 — DriveMap 첫 렌더 폴리라인" 섹션.
+//     setTimeout(150ms) → invalidateSize + drawContentRef, [drawContent] useEffect
+//     의 invalidateSize 선행, fitBounds animate:false 패턴은 회귀 방지를 위해 유지.
+
+import { useRef, useEffect, useCallback, useState } from 'react';
 
 // ── Leaflet Map (CDN) ─────────────────────────────────────────
 
@@ -36,6 +40,9 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
   const markersRef = useRef([]);
   const placeMarkerRef = useRef(null);
   const highlightRef = useRef(null);
+  // Leaflet 부팅 + 첫 invalidateSize/drawContent 완료 전까지 spinner 노출 게이트.
+  // 첫 클릭 시 회색 빈 컨테이너가 보이던 공백을 로딩 오버레이로 덮는다.
+  const [mapReady, setMapReady] = useState(false);
 
   const initMap = useCallback(() => {
     if (!containerRef.current || mapInstanceRef.current || !window.L) return;
@@ -96,7 +103,9 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
       });
       polyRef.current = group;
       if (allLatLngs.length >= 2) {
-        map.fitBounds(L.latLngBounds(allLatLngs), { padding: [50, 50] });
+        // animate:false — animate(default true) 진행 중 setPositions([]) 등에 의해
+        // cancel 되어 view 가 default(서울) 에 고정되던 race condition 제거
+        map.fitBounds(L.latLngBounds(allLatLngs), { padding: [50, 50], animate: false });
       }
       return;
     }
@@ -133,7 +142,9 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
     const mkStart = L.circleMarker(latlngs[0], { radius: 7, fillColor: '#22c55e', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
     const mkEnd = L.circleMarker(latlngs[latlngs.length - 1], { radius: 7, fillColor: '#ef4444', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
     markersRef.current = [mkStart, mkEnd];
-    map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50] });
+    // animate:false — animate(default true) 진행 중 setPositions([]) 등에 의해
+    // cancel 되어 view 가 default(서울) 에 고정되던 race condition 제거
+    map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50], animate: false });
   }, [positions, routes, placeMarker]);
 
   // Keep a ref to the latest drawContent so init callback always calls current version
@@ -151,6 +162,7 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
       setTimeout(() => {
         mapInstanceRef.current?.invalidateSize();
         drawContentRef.current?.();
+        setMapReady(true);
       }, 150);
     });
     return () => {
@@ -161,8 +173,13 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Redraw when positions / placeMarker change
+  // drawContent 직전에 invalidateSize 호출 — 데이터(positions/routes) 도착 시점에 컨테이너 layout
+  // 이 settled 되지 않은 상태이면 fitBounds 가 0-size 기준으로 잘못 계산되어 polyline 이 보이지
+  // 않고 default(서울) view 에 고정되던 회귀 보강. mount 시점의 setTimeout(150ms) 만으로는
+  // 데이터가 그 이후 도착하는 cold-cache 첫 진입을 못 잡음.
   useEffect(() => {
     if (!mapRef.current || !window.L) return;
+    mapRef.current.invalidateSize();
     drawContent();
   }, [drawContent]);
 
@@ -203,12 +220,12 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
         .leaflet-control-zoom a:hover { background: #2a2a2a !important; }
       `}</style>
       <div ref={containerRef} className="w-full h-full" />
-      {loading && (
+      {(loading || !mapReady) && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
           <div className="w-6 h-6 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
         </div>
       )}
-      {!loading && !placeMarker && (!routes || routes.length === 0) && (!positions || positions.length < 2) && (
+      {!loading && mapReady && !placeMarker && (!routes || routes.length === 0) && (!positions || positions.length < 2) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-300 pointer-events-none bg-black/60 rounded-xl">
           <svg className="w-12 h-12 mb-2 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}

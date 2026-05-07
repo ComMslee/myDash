@@ -4,10 +4,10 @@ import {
   MAIN_STATION_ID, POLL_INTERVAL_MS, CLOCK_INTERVAL_MS,
   P1_108_IDS, P1_107_IDS, P2_102_IDS, P2_104_IDS,
   PRIORITY_IDS, P3_GROUPS, P3_GROUPED_IDS, P3_115_IDS,
-  STATION_115_UNDERGROUND, STATION_CONFIG,
+  STATION_115_UNDERGROUND, STATION_119F, STATION_CONFIG,
 } from './home-charger/constants';
 import { computeRanks, buildTtlTooltip, timeAgoKo } from './home-charger/utils';
-import { TileBox, StatusBadges, MiniGrid } from './home-charger/ChargerTile';
+import { TileBox, StatusBadges, UnifiedCell } from './home-charger/ChargerTile';
 import PollLogPopup from './home-charger/PollLogPopup';
 
 // 브라우저 세션 동안 유지 — 탭 재진입 시 스피너 없이 즉시 이전 데이터 노출
@@ -108,9 +108,8 @@ export default function HomeChargerCard({ showFavLabel = false } = {}) {
     s.station.statId !== MAIN_STATION_ID &&
     s.station.statId !== STATION_115_UNDERGROUND
   );
+  // 102/104 가 P1 즐겨찾기로 격상 — P3 카운트에서 제외
   const p3AllChargers = [
-    ...cells102,
-    ...cells104,
     ...mainRest,
     ...cells115Under,
     ...refStations.flatMap(s => s.chargers),
@@ -179,21 +178,22 @@ export default function HomeChargerCard({ showFavLabel = false } = {}) {
       )}
 
       <div className="px-4 py-3 space-y-3">
-        {/* P1: 108 · 107 — 1줄 2열, 셀 넘치면 자동 개행 */}
+        {/* P1 즐겨찾기: 108·107(1행) + 102·104(2행) — 카드 헤더에 동번호 표시되므로 라벨에선 제거 */}
         <div className="space-y-1.5">
           {showFavLabel && (
             <div className="text-[11px] text-zinc-400 flex items-center gap-1.5">
               <span>⭐ 즐겨찾기</span>
-              <span className="text-zinc-600">· 108·107동</span>
             </div>
           )}
           <div className="grid grid-cols-2 gap-1.5">
-            <TileBox title="108" chargers={cells108} {...tileProps} />
-            <TileBox title="107" chargers={cells107} {...tileProps} />
+            <TileBox title="108" chargers={cells108} variant="favorite" {...tileProps} />
+            <TileBox title="107" chargers={cells107} variant="favorite" {...tileProps} />
+            <TileBox title="102" chargers={cells102} variant="favorite" {...tileProps} />
+            <TileBox title="104" chargers={cells104} variant="favorite" {...tileProps} />
           </div>
         </div>
 
-        {/* 더보기 (접힘) — 102 · 104 → 105 · 115 → 111 · 117 → 119 (전폭) */}
+        {/* 더보기 (접힘) — 105 → 115 → 111 → 117 → 인근 (모두 단일 컬럼) */}
         {p3AllChargers.length > 0 && (
           <div className="pt-1 border-t border-white/[0.04]">
             <button
@@ -209,46 +209,60 @@ export default function HomeChargerCard({ showFavLabel = false } = {}) {
               <span>{showP3 ? '접기 ▲' : '펼치기 ▼'}</span>
             </button>
             {showP3 && (
-              <div className="space-y-1.5 pt-2">
-                <div className="grid grid-cols-2 gap-1.5">
-                  <TileBox title="102" chargers={cells102} {...tileProps} />
-                  <TileBox title="104" chargers={cells104} {...tileProps} />
-                  {(() => {
-                    const g105 = p3GroupCells.find(g => g.title === '105');
-                    return g105 ? <TileBox title="105" chargers={g105.chargers} {...tileProps} /> : null;
-                  })()}
-                  {show115 && (
-                    <div className="bg-[#1a1a1c] border border-white/[0.06] rounded-lg p-2 flex items-center gap-2">
-                      <div className="text-[11px] text-zinc-300 font-medium shrink-0 flex flex-col items-center leading-none tabular-nums">
-                        {Array.from('115').map((d, i) => <span key={i}>{d}</span>)}
-                      </div>
-                      <div className="flex-1 min-w-0 space-y-1">
-                        {cells115Ground.length > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] text-zinc-500 w-6 shrink-0">지상</span>
-                            <MiniGrid chargers={cells115Ground} statId={MAIN_STATION_ID} ranks={ranks} usage={usage} now={now} className="flex-1 justify-center" />
-                          </div>
-                        )}
-                        {cells115Under.length > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] text-zinc-500 w-6 shrink-0">지하</span>
-                            <MiniGrid chargers={cells115Under} statId={STATION_115_UNDERGROUND} ranks={ranks} usage={usage} now={now} className="flex-1 justify-center" />
-                          </div>
-                        )}
-                      </div>
+              <div className="grid grid-cols-2 gap-1.5 pt-2">
+                {(() => {
+                  const g105 = p3GroupCells.find(g => g.title === '105');
+                  return g105 ? <TileBox title="105" chargers={g105.chargers} {...tileProps} /> : null;
+                })()}
+                {show115 && (
+                  <div className="bg-[#1c1d20] border border-white/[0.06] rounded-2xl p-3">
+                    <div className="text-[11px] text-zinc-400 font-semibold mb-2 px-0.5 tabular-nums">
+                      115
                     </div>
-                  )}
-                  {(() => {
-                    const g111 = p3GroupCells.find(g => g.title === '111');
-                    return g111 ? <TileBox title="111" chargers={g111.chargers} {...tileProps} /> : null;
-                  })()}
-                  {(() => {
-                    const g117 = p3GroupCells.find(g => g.title === '117');
-                    return g117 ? <TileBox title="117" chargers={g117.chargers} {...tileProps} /> : null;
-                  })()}
-                </div>
+                    <div className="flex flex-wrap gap-2">
+                      {cells115Ground.map(c => {
+                        const k = `${MAIN_STATION_ID}_${c.chgerId}`;
+                        const u = usage[k];
+                        return (
+                          <UnifiedCell
+                            key={`g-${c.chgerId}`}
+                            c={c}
+                            highlight={ranks.get(k) ?? null}
+                            count={u?.t ?? 0}
+                            hourly={u?.h ?? null}
+                            now={now}
+                          />
+                        );
+                      })}
+                      {cells115Under.map(c => {
+                        const k = `${STATION_115_UNDERGROUND}_${c.chgerId}`;
+                        const u = usage[k];
+                        return (
+                          <UnifiedCell
+                            key={`u-${c.chgerId}`}
+                            c={c}
+                            highlight={ranks.get(k) ?? null}
+                            count={u?.t ?? 0}
+                            hourly={u?.h ?? null}
+                            now={now}
+                            numberPrefix="B-"
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {(() => {
+                  const g111 = p3GroupCells.find(g => g.title === '111');
+                  return g111 ? <TileBox title="111" chargers={g111.chargers} {...tileProps} /> : null;
+                })()}
+                {(() => {
+                  const g117 = p3GroupCells.find(g => g.title === '117');
+                  return g117 ? <TileBox title="117" chargers={g117.chargers} {...tileProps} /> : null;
+                })()}
                 {refStations.map(s => {
                   const stationTitle = (STATION_CONFIG[s.station.statId]?.label || s.station.statId).replace(/\s*앞$/, '');
+                  const wide = s.station.statId === STATION_119F;
                   return (
                     <TileBox
                       key={s.station.statId}
@@ -258,6 +272,8 @@ export default function HomeChargerCard({ showFavLabel = false } = {}) {
                       usage={usage}
                       statId={s.station.statId}
                       now={now}
+                      variant="nearby"
+                      className={wide ? 'col-span-2' : ''}
                     />
                   );
                 })}

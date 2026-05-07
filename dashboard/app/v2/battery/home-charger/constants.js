@@ -7,6 +7,10 @@ export const MAIN_STATION_ID = 'PI795111';
 export const POLL_INTERVAL_MS = 60_000;   // 클라이언트 API 폴링
 export const CLOCK_INTERVAL_MS = 1_000;   // 경과시간 갱신용 tick
 
+// 충전 점유 경고 임계 — 14h 넘으면 비정상 점유(잊고 안 뽑음 / 세션 종료 미반영) 가능성.
+// 셀 fill/외곽선/하단시간 모두 amber 톤으로 전환.
+export const OVERDUE_THRESHOLD_H = 14;
+
 // 상태 배지 표시 순서 (대기 > 충전중 > 점검중 > 통신이상 > 운영중지 > 확인불가)
 export const STATUS_ORDER = ['2', '3', '5', '1', '4', '9'];
 
@@ -44,6 +48,9 @@ export const P3_GROUPED_IDS = new Set([
 // 115동 지하 스테이션 ID (지상과 묶어 한 타일로 표시)
 export const STATION_115_UNDERGROUND = 'PI313299';
 
+// 119동 앞 — 충전기 수가 많아 grid에서 2칸을 차지하도록 처리
+export const STATION_119F = 'PIH01089';
+
 export const COMPLEX_NAME = '망포늘푸른벽산아파트';
 
 export const STATION_CONFIG = {
@@ -53,11 +60,16 @@ export const STATION_CONFIG = {
 };
 
 // 환경공단 API 상태 코드별 UI 메타
+// dot/text: 헤더 상태 배지용 (saturated)
+// border:   셀 외곽선 (파스텔)
+// body:     셀 본체 bg (상태 색 옅게 — 비충전 셀 시각 강도 보강)
+// num:      셀 번호 색 (상태 색 — 충전중만 zinc-100, fill 위 가독성)
+// fill:     셀 inner fill (충전중에만, 지수 점근 곡선 — utils.chargingFillPct)
 export const STAT_META = {
-  '2': { label: '대기',     dot: 'bg-emerald-500', text: 'text-emerald-400', cellBg: 'bg-emerald-500/80', cellText: 'text-white' },
-  '3': { label: '충전중',   dot: 'bg-blue-500',    text: 'text-blue-400',    cellBg: 'bg-blue-500/80',    cellText: 'text-white' },
-  '4': { label: '운영중지', dot: 'bg-zinc-600',    text: 'text-zinc-400',    cellBg: 'bg-zinc-700/70',    cellText: 'text-zinc-300' },
-  '5': { label: '점검중',   dot: 'bg-amber-500',   text: 'text-amber-400',   cellBg: 'bg-amber-500/80',   cellText: 'text-white' },
-  '1': { label: '통신이상', dot: 'bg-rose-500',    text: 'text-rose-400',    cellBg: 'bg-rose-500/80',    cellText: 'text-white' },
-  '9': { label: '확인불가', dot: 'bg-zinc-700',    text: 'text-zinc-500',    cellBg: 'bg-zinc-800',       cellText: 'text-zinc-500' },
+  '2': { label: '대기',     dot: 'bg-emerald-500', text: 'text-emerald-400', border: 'border-emerald-300',     body: 'bg-emerald-300/15', num: 'text-emerald-300' },
+  '3': { label: '충전중',   dot: 'bg-blue-500',    text: 'text-blue-400',    border: 'border-sky-300',         body: 'bg-sky-300/[0.04]', num: 'text-zinc-100', fill: 'bg-sky-300/40' },
+  '4': { label: '운영중지', dot: 'bg-zinc-600',    text: 'text-zinc-400',    border: 'border-slate-400/40',    body: 'bg-slate-400/10',   num: 'text-slate-200' },
+  '5': { label: '점검중',   dot: 'bg-amber-500',   text: 'text-amber-400',   border: 'border-yellow-200',      body: 'bg-yellow-200/15',  num: 'text-yellow-200' },
+  '1': { label: '통신이상', dot: 'bg-rose-500',    text: 'text-rose-400',    border: 'border-rose-300',        body: 'bg-rose-300/15',    num: 'text-rose-300' },
+  '9': { label: '확인불가', dot: 'bg-zinc-700',    text: 'text-zinc-500',    border: 'border-slate-400/30',    body: 'bg-slate-400/[0.06]', num: 'text-slate-300' },
 };

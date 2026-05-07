@@ -1,3 +1,4 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { KWH_PER_KM, RATED_RANGE_MAX_KM } from '@/lib/constants';
 import { KST_OFFSET_MS } from '@/lib/kst';
@@ -16,6 +17,7 @@ import {
 } from '@/lib/queries/battery-health';
 import { queryAllDailyRecords } from '@/lib/queries/battery-records';
 import { queryIdleDrain, queryChargingSessions } from '@/lib/queries/battery-idle';
+import { getDefaultCar } from '@/lib/queries/car';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,10 +32,12 @@ function getISOWeekNumber(mondayUTC) {
 }
 
 export async function GET() {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
-    const carResult = await pool.query(`SELECT id FROM cars LIMIT 1`);
-    if (carResult.rows.length === 0) return Response.json({ error: 'No car found' }, { status: 404 });
-    const carId = carResult.rows[0].id;
+    const car = await getDefaultCar();
+    if (!car) return Response.json({ error: 'No car found' }, { status: 404 });
+    const carId = car.id;
 
     const KST = KST_OFFSET_MS;
     const now = new Date();

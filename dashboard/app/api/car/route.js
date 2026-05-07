@@ -1,4 +1,6 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
+import { getDefaultCar } from '@/lib/queries/car';
 import { toKstDate } from '@/lib/kst';
 
 export const dynamic = 'force-dynamic';
@@ -18,13 +20,13 @@ const CONFIDENCE_HIGH_DAYS = 7;        // 운행일 ≥ 이 수 = high
 const CONFIDENCE_MID_DAYS = 3;         // 운행일 ≥ 이 수 = medium, 미만 = low
 
 export async function GET() {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
-    const carResult = await pool.query(`SELECT id, name FROM cars LIMIT 1`);
-    if (carResult.rows.length === 0) {
+    const car = await getDefaultCar();
+    if (!car) {
       return Response.json({ error: 'No car found' }, { status: 404 });
     }
-
-    const car = carResult.rows[0];
     const carId = car.id;
 
     const [

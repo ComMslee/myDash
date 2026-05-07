@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useMock, MOCK_DATA } from '../context/mock';
 import { formatDuration } from '../../lib/format';
 
-// GlobalHeader를 숨길 경로 (서브/상세 페이지)
-const HIDDEN_ROUTES = ['/rankings', '/v1/rankings'];
+// GlobalHeader를 숨길 경로 (서브/상세 페이지 + dev 도구 + 로그인/등록)
+const HIDDEN_ROUTES = ['/rankings', '/v1/rankings', '/v2/dev', '/login', '/setup'];
 
 function PercentBadge({ level, color, charging }) {
   return (
@@ -28,26 +28,25 @@ function PercentBadge({ level, color, charging }) {
 
 export default function GlobalHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const { isMock, toggleMock, isMockCharging, toggleMockCharging, lastRefresh, mockData } = useMock();
   const [car, setCar] = useState(null);
   const [charging, setCharging] = useState(null);
   const [carFetchedAt, setCarFetchedAt] = useState(null);
-  const [rawChargingStatus, setRawChargingStatus] = useState(null);
-  const [debugOpen, setDebugOpen] = useState(false);
   const [tapCount, setTapCount] = useState(0);
   const [, setTick] = useState(0);
 
-  // 10연타로 디버그 바 토글 (2초 안에 안 터치하면 카운터 리셋)
+  // 10연타 → 진단 페이지로 이동 (2초 안에 안 터치하면 카운터 리셋)
   useEffect(() => {
     if (tapCount === 0) return;
     if (tapCount >= 10) {
-      setDebugOpen(v => !v);
       setTapCount(0);
+      router.push('/v2/dev/api-status');
       return;
     }
     const t = setTimeout(() => setTapCount(0), 2000);
     return () => clearTimeout(t);
-  }, [tapCount]);
+  }, [tapCount, router]);
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 60_000);
@@ -72,7 +71,6 @@ export default function GlobalHeader() {
       ]).then(([carData, chargingData]) => {
         if (carData) setCar(carData);
         setCharging(chargingData?.charging ? chargingData : null);
-        setRawChargingStatus(chargingData);
         setCarFetchedAt(new Date());
       });
     fetchData();
@@ -137,6 +135,18 @@ export default function GlobalHeader() {
         }}
         aria-hidden="true"
       />
+      {/* 투톤 게이지 — 시작 SOC → 현재 SOC 구간을 밝은 emerald 로 덧칠 (delta 가시화) */}
+      {isCharging && charging?.start_battery_level != null && charging.start_battery_level < lvl && (
+        <div
+          className="absolute inset-y-0 transition-all duration-700 pointer-events-none"
+          style={{
+            left: `${charging.start_battery_level}%`,
+            width: `${lvl - charging.start_battery_level}%`,
+            background: 'linear-gradient(90deg, rgba(110,231,183,0.30) 0%, rgba(110,231,183,0.55) 100%)',
+          }}
+          aria-hidden="true"
+        />
+      )}
       {/* 충전 목표 지점 세로선 */}
       {isCharging && limitLvl && limitLvl > lvl && (
         <div
@@ -284,30 +294,10 @@ export default function GlobalHeader() {
         </div>
       )}
 
-      {/* DEBUG: 충전 감지 진단 (헤더 10연타로 토글) */}
-      {debugOpen && (
-        <div className="bg-zinc-900/80 border-t border-white/5 px-3 py-1 text-[10px] tabular-nums text-zinc-400 flex flex-wrap gap-x-3 gap-y-0.5 font-mono">
-          <span>state=<span className="text-zinc-200">{car?.state ?? '—'}</span></span>
-          <span>charging={String(!!rawChargingStatus?.charging)}</span>
-          {rawChargingStatus?.fallback && (
-            <span className="text-amber-400">fb={rawChargingStatus.fallback_reason}</span>
-          )}
-          {rawChargingStatus?.debug && (
-            <>
-              <span>pwr=<span className="text-zinc-200">{rawChargingStatus.debug.latest_power ?? 'null'}</span></span>
-              <span>lvl=<span className="text-zinc-200">{rawChargingStatus.debug.recent_level ?? 'null'}→{rawChargingStatus.debug.older_level ?? 'null'}</span></span>
-              <span>pSig={String(rawChargingStatus.debug.power_signal)}</span>
-              <span>lSig={String(rawChargingStatus.debug.level_signal)}</span>
-            </>
-          )}
-          <span>isCharging={String(isCharging)}</span>
-          <span>display={displayState}</span>
-        </div>
-      )}
-      {/* 10연타 카운터 힌트 (5타 이상부터 표시) */}
-      {!debugOpen && tapCount >= 5 && (
+      {/* 10연타 카운터 힌트 — 5타 이상부터 표시, 10타에 /v2/dev/api-status 로 이동 */}
+      {tapCount >= 5 && (
         <div className="bg-zinc-900/80 border-t border-white/5 px-3 py-0.5 text-[10px] text-zinc-500 text-center font-mono">
-          디버그 {tapCount}/10
+          진단 {tapCount}/10
         </div>
       )}
     </header>

@@ -1,4 +1,6 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
+import { getDefaultCar } from '@/lib/queries/car';
 import { batchReverseGeocode } from '@/lib/kakao-geo';
 
 export const dynamic = 'force-dynamic';
@@ -7,12 +9,14 @@ export const dynamic = 'force-dynamic';
 const PINNED_GEOFENCE_NAMES = ['집', '회사', 'Home', 'Work'];
 
 export async function GET() {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
-    const carResult = await pool.query(`SELECT id FROM cars LIMIT 1`);
-    if (carResult.rows.length === 0) {
+    const car = await getDefaultCar();
+    if (!car) {
       return Response.json({ places: [] });
     }
-    const carId = carResult.rows[0].id;
+    const carId = car.id;
 
     // 좌표 0.0005° bin (~55m)로 그룹핑, Kakao 질의는 그룹 내 실좌표 평균 사용
     const result = await pool.query(

@@ -1,16 +1,20 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
+import { getDefaultCar } from '@/lib/queries/car';
 
 export const dynamic = 'force-dynamic';
 
 // 365일 GitHub 스타일 히트맵용 일별 집계
 // 응답: { days: { 'YYYY-MM-DD': { km, kwh, drives, charges } }, max_km, max_kwh }
 export async function GET() {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
-    const carResult = await pool.query(`SELECT id FROM cars LIMIT 1`);
-    if (carResult.rows.length === 0) {
+    const car = await getDefaultCar();
+    if (!car) {
       return Response.json({ error: 'No car found' }, { status: 404 });
     }
-    const carId = carResult.rows[0].id;
+    const carId = car.id;
 
     const [drivesResult, chargesResult] = await Promise.all([
       // 주행: KST(UTC+9) 기준 일별 합계

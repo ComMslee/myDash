@@ -12,7 +12,7 @@ import { kstDateStr, splitByKstMidnight } from '@/lib/kst';
  * @returns {object} { grouped, chargingByDay, stats }
  *   - grouped: [{ key: 'YYYY-MM-DD', items: [...] }, ...] 일자 역순
  *   - chargingByDay: { 'YYYY-MM-DD': [segment...] }
- *   - stats: { avgDrainPerDay, avgIdleHours, avgDrop, withDrainCount }
+ *   - stats: { avgDrainPerDay, avgIdleHours, totalRecords }
  */
 export function useIdleDrainDays(records, chargingSessions = []) {
   return useMemo(() => {
@@ -80,12 +80,10 @@ export function useIdleDrainDays(records, chargingSessions = []) {
     });
 
     // 요약 통계 (원본 records 기준 — 분할 전)
-    const withDrain = records.filter(r => r.soc_drop > 0);
     const totalIdleHours = records.reduce((s, r) => s + r.idle_hours, 0);
     const totalDrop = records.reduce((s, r) => s + r.soc_drop, 0);
     const avgDrainPerDay = totalIdleHours > 0 ? (totalDrop / totalIdleHours * 24).toFixed(1) : '0';
     const avgIdleHours = records.length > 0 ? totalIdleHours / records.length : 0;
-    const avgDrop = records.length > 0 ? (totalDrop / records.length).toFixed(1) : '0';
 
     // 일자별 그룹 — idle 기록 + 충전만 있는 날 포함
     const seen = {};
@@ -109,8 +107,6 @@ export function useIdleDrainDays(records, chargingSessions = []) {
       stats: {
         avgDrainPerDay,
         avgIdleHours,
-        avgDrop,
-        withDrainCount: withDrain.length,
         totalRecords: records.length,
       },
     };

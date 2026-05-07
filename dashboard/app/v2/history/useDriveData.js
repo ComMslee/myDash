@@ -1,5 +1,9 @@
 'use client';
 
+// ⚠️  수정 전 필독: /CLAUDE.md "알려진 함정 — DriveMap 첫 렌더 폴리라인" 섹션.
+//     단일 경로 fetch useEffect 에서 setPositions([]) 금지, /api/route-map 5xx
+//     1회 retry + r.ok 체크 패턴은 회귀 방지를 위해 유지.
+
 import { useState, useEffect, useRef } from 'react';
 import { MOCK_DATA } from '@/app/context/mock';
 
@@ -105,31 +109,39 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
       return;
     }
     setLoadingRoute(true);
-    setPositions([]);
-    setRouteData(null);
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
     abortRef.current = controller;
     const driveId = selectedDrive.id;
-    fetch(`/api/route-map?driveId=${driveId}`, { signal: controller.signal })
-      .then(r => r.json())
-      .then(data => {
-        if (controller.signal.aborted) return;
-        const pos = data.positions || [];
-        if (pos.length < 2) {
-          console.warn(`[route-map] driveId=${driveId} positions=${pos.length} — no route data`);
-        }
-        setPositions(pos);
-        setRouteData(data);
-        setLoadingRoute(false);
-      })
-      .catch(e => {
-        if (e.name !== 'AbortError') {
+
+    // 5xx transient 에러 회복용 1회 retry. r.ok 체크해서 HTTP 에러를 throw 로 명시 처리.
+    const fetchOnce = async () => {
+      const r = await fetch(`/api/route-map?driveId=${driveId}`, { signal: controller.signal });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    };
+    (async () => {
+      let data;
+      try {
+        data = await fetchOnce();
+      } catch (e1) {
+        if (e1.name === 'AbortError' || controller.signal.aborted) return;
+        try {
+          data = await fetchOnce();
+        } catch (e2) {
+          if (e2.name === 'AbortError' || controller.signal.aborted) return;
           setPositions([]);
           setRouteData(null);
           setLoadingRoute(false);
+          return;
         }
-      });
+      }
+      if (controller.signal.aborted) return;
+      const pos = data.positions || [];
+      setPositions(pos);
+      setRouteData(data);
+      setLoadingRoute(false);
+    })();
     return () => { controller.abort(); };
   }, [selectedDrive?.id, isMock, refreshSignal, dayMode, monthMode]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -1,7 +1,9 @@
+import { requireAuth } from '@/lib/auth-helper';
 // 집충전기 주변 스테이션 탐색 임시 API (1회성 조사용)
 // GET /api/find-nearby-chargers?base=PI795111&radius=1000&count=12
 
 import pool from '@/lib/db';
+import { haversineMeters } from '@/lib/geo';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,16 +18,6 @@ const BASE = 'https://apis.data.go.kr/B552584/EvCharger/getChargerInfo';
 const DEFAULT_ZCODE = '41';
 const MAX_PAGES = 10;
 const PAGE_SIZE = 9999;
-
-function haversineM(a, b) {
-  const R = 6371000;
-  const toRad = (d) => d * Math.PI / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const la1 = toRad(a.lat), la2 = toRad(b.lat);
-  const x = Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLng/2)**2;
-  return 2 * R * Math.asin(Math.sqrt(x));
-}
 
 function parseItems(xml) {
   const items = [];
@@ -71,6 +63,8 @@ async function fetchPage(pageNo, key, { zcode, zscode }) {
 }
 
 export async function GET(req) {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   const key = process.env.EV_CHARGER_API_KEY;
   if (!key) return jsonUtf8({ error: 'EV_CHARGER_API_KEY 미설정' }, { status: 503 });
 
@@ -191,7 +185,7 @@ export async function GET(req) {
       // 반경/필터 기반 후보
       if (!s.lat || !s.lng) continue;
       if (!passesFilter(s)) continue;
-      const d = haversineM(base, s);
+      const d = haversineMeters(base, s);
       if (d <= radiusM) {
         candidates.push({
           statId: s.statId,

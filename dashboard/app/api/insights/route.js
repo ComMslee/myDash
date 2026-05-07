@@ -1,19 +1,25 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
+import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
-    const car = await pool.query(`SELECT id FROM cars LIMIT 1`);
-    if (car.rows.length === 0) {
+    const car = await getDefaultCar();
+    if (!car) {
       return Response.json({ error: 'No car found' }, { status: 404 });
     }
-    const carId = car.rows[0].id;
+    const carId = car.id;
 
     const now = new Date();
     const nextStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const twelveMonthStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = nextStart;
 
     const iso = (d) => d.toISOString();
 
@@ -63,7 +69,8 @@ export async function GET() {
     // 12개월 각 월 통계 + 패턴 쿼리 동시 실행 (패턴은 전체 기간)
     const [
       twelveMonthBreakdown, driveHourDowQ, chargeHourDowQ,
-      allTimeDrive, allTimeCharge, dayMaxResult,
+      allTimeDrive, allTimeCharge, dayMaxResult, driveMinEffResult,
+      monthBestLongResult, monthBestEffResult,
     ] = await Promise.all([
       Promise.all(
         Array.from({ length: 12 }, (_, i) => {
@@ -133,11 +140,12 @@ export async function GET() {
          ) sub`,
         [carId]
       ),
-      // 전체 기간 일별 최대 거리/시간
+      // 전체 기간 일별 최대 거리/시간 + 최저 효율(=가장 좋은 효율)
       pool.query(
         `SELECT MAX(day_distance)::float AS max_day_distance,
                 MAX(day_duration)::int AS max_day_duration,
-                MAX(day_avg_speed)::float AS max_day_avg_speed
+                MAX(day_avg_speed)::float AS max_day_avg_speed,
+                MIN(day_eff)::float AS min_day_eff_wh_km
          FROM (
            SELECT DATE(start_date + INTERVAL '9 hours')::text AS day,
                   SUM(distance)::float AS day_distance,
@@ -145,12 +153,57 @@ export async function GET() {
                   CASE WHEN SUM(distance) >= 10 AND SUM(duration_min) > 0
                        THEN SUM(distance) / SUM(duration_min) * 60
                        ELSE NULL
-                  END AS day_avg_speed
+                  END AS day_avg_speed,
+                  CASE WHEN SUM(distance) >= 10
+                            AND SUM(CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
+                                         THEN (start_rated_range_km - end_rated_range_km) ELSE 0 END) > 0
+                       THEN SUM(CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
+                                     THEN (start_rated_range_km - end_rated_range_km) ELSE 0 END)
+                            * ${KWH_PER_KM} / SUM(distance) * 1000
+                       ELSE NULL
+                  END AS day_eff
            FROM drives
            WHERE car_id = $1
            GROUP BY day
          ) sub`,
         [carId]
+      ),
+      // 단일 주행 최저 효율(=가장 좋은 효율) — 노이즈 제거를 위해 distance >= 10km
+      pool.query(
+        `SELECT MIN(
+           (start_rated_range_km - end_rated_range_km) * ${KWH_PER_KM} / NULLIF(distance, 0) * 1000
+         )::float AS min_eff_wh_km
+         FROM drives
+         WHERE car_id = $1
+           AND distance >= 10
+           AND start_rated_range_km IS NOT NULL
+           AND end_rated_range_km IS NOT NULL
+           AND (start_rated_range_km - end_rated_range_km) > 0`,
+        [carId]
+      ),
+      // 이번달 최장 주행 (단일 row)
+      pool.query(
+        `SELECT id, start_date, distance::float AS distance
+         FROM drives
+         WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
+           AND distance IS NOT NULL
+         ORDER BY distance DESC NULLS LAST
+         LIMIT 1`,
+        [carId, iso(monthStart), iso(monthEnd)]
+      ),
+      // 이번달 최고 효율 주행 (단일 row, 노이즈 제거 distance >= 10km)
+      pool.query(
+        `SELECT id, start_date, distance::float AS distance,
+                ((start_rated_range_km - end_rated_range_km) * ${KWH_PER_KM} / NULLIF(distance, 0) * 1000)::float AS eff_wh_km
+         FROM drives
+         WHERE car_id = $1 AND start_date >= $2 AND start_date < $3
+           AND distance >= 10
+           AND start_rated_range_km IS NOT NULL
+           AND end_rated_range_km IS NOT NULL
+           AND (start_rated_range_km - end_rated_range_km) > 0
+         ORDER BY ((start_rated_range_km - end_rated_range_km) * ${KWH_PER_KM} / NULLIF(distance, 0) * 1000) ASC
+         LIMIT 1`,
+        [carId, iso(monthStart), iso(monthEnd)]
       ),
     ]);
 
@@ -225,7 +278,16 @@ export async function GET() {
       max_day_distance: dayMax.max_day_distance != null ? parseFloat(parseFloat(dayMax.max_day_distance).toFixed(1)) : 0,
       max_day_duration: dayMax.max_day_duration != null ? parseInt(dayMax.max_day_duration) : 0,
       max_day_avg_speed: dayMax.max_day_avg_speed != null ? parseFloat(parseFloat(dayMax.max_day_avg_speed).toFixed(1)) : null,
+      min_eff_wh_km: driveMinEffResult.rows[0]?.min_eff_wh_km != null
+        ? Math.round(parseFloat(driveMinEffResult.rows[0].min_eff_wh_km))
+        : null,
+      min_day_eff_wh_km: dayMax.min_day_eff_wh_km != null
+        ? Math.round(parseFloat(dayMax.min_day_eff_wh_km))
+        : null,
     };
+
+    const bestLongRow = monthBestLongResult.rows[0];
+    const bestEffRow = monthBestEffResult.rows[0];
 
     return Response.json({
       current: {
@@ -241,6 +303,17 @@ export async function GET() {
         max_duration: current.max_duration,
         max_speed: current.max_speed,
         efficiency_wh_km: parseFloat(effCur.toFixed(0)),
+        best_drive_long: bestLongRow ? {
+          id: bestLongRow.id,
+          start_date: bestLongRow.start_date,
+          distance: parseFloat(parseFloat(bestLongRow.distance).toFixed(1)),
+        } : null,
+        best_drive_eff: bestEffRow ? {
+          id: bestEffRow.id,
+          start_date: bestEffRow.start_date,
+          distance: parseFloat(parseFloat(bestEffRow.distance).toFixed(1)),
+          eff_wh_km: Math.round(parseFloat(bestEffRow.eff_wh_km)),
+        } : null,
       },
       previous: {
         distance: parseFloat(previous.distance.toFixed(1)),

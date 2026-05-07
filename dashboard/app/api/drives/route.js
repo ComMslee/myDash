@@ -1,4 +1,6 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
+import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
 import { KST_OFFSET_MS } from '@/lib/kst';
 import { batchReverseGeocode } from '@/lib/kakao-geo';
@@ -6,16 +8,18 @@ import { batchReverseGeocode } from '@/lib/kakao-geo';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
     const { searchParams } = new URL(request.url);
     const from = searchParams.get('from'); // 선택: YYYY-MM-DD 형식 시작일
     const to   = searchParams.get('to');   // 선택: YYYY-MM-DD 형식 종료일 (exclusive)
 
-    const carResult = await pool.query(`SELECT id FROM cars LIMIT 1`);
-    if (carResult.rows.length === 0) {
+    const car = await getDefaultCar();
+    if (!car) {
       return Response.json({ error: 'No car found' }, { status: 404 });
     }
-    const carId = carResult.rows[0].id;
+    const carId = car.id;
 
     const now = new Date();
     // KST(UTC+9) 기준 자정 계산

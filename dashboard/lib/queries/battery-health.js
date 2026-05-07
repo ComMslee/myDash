@@ -117,7 +117,6 @@ export function computeHealth(socRows, { isLFP = true } = {}) {
   const tips = [];
   if (isLFP) {
     if (avgSoc < 50) tips.push('LFP는 100% 충전 권장, SOC를 높이세요');
-    if (avgSoc >= 50 && avgSoc <= 80) tips.push('주기적 100% 충전으로 BMS 캘리브레이션');
     if (avgSoc > 80) tips.push('이상적인 관리! 20% 이하 방전만 주의');
     if (avgSoc < 20) tips.push('20% 이하 방전은 셀 스트레스 증가');
   } else {

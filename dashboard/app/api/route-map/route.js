@@ -1,6 +1,13 @@
+import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
+import { getDefaultCar } from '@/lib/queries/car';
+import { haversineMeters } from '@/lib/geo';
 
 export const dynamic = 'force-dynamic';
+
+// ⚠️  수정 전 필독: /CLAUDE.md "알려진 함정 — /api/route-map LRU 캐시 변수명" 섹션.
+//     cacheSet 의 eviction 조건은 반드시 `cache.size > CACHE_CAPACITY` (변수명 오타시
+//     eviction 미작동 → unbounded → 5xx).
 
 // ── 모듈 스코프 LRU 캐시 ───────────────────────────────────
 // drive는 종료 후 positions가 불변이므로 영구 캐시 가능. 메모리 보호용 LRU만 적용.
@@ -18,7 +25,7 @@ function cacheGet(key) {
 function cacheSet(key, value) {
   if (cache.has(key)) cache.delete(key);
   cache.set(key, value);
-  while (cache.size > CAPACITY) {
+  while (cache.size > CACHE_CAPACITY) {
     const oldest = cache.keys().next().value;
     cache.delete(oldest);
   }
@@ -26,22 +33,13 @@ function cacheSet(key, value) {
 
 // ── 거리 기반 thinning (light 모드) ──────────────────────
 // 직전 보존 점에서 minMeters 이상 떨어진 점만 유지. 시작/끝점 보장.
-function haversineMeters(lat1, lng1, lat2, lng2) {
-  const R = 6371000;
-  const toRad = (d) => d * Math.PI / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
 function thinPositions(positions, minMeters = 5) {
   if (positions.length < 3) return positions;
   const out = [positions[0]];
   let lastLat = positions[0].lat, lastLng = positions[0].lng;
   for (let i = 1; i < positions.length - 1; i++) {
     const p = positions[i];
-    if (haversineMeters(lastLat, lastLng, p.lat, p.lng) >= minMeters) {
+    if (haversineMeters({ lat: lastLat, lng: lastLng }, { lat: p.lat, lng: p.lng }) >= minMeters) {
       out.push(p);
       lastLat = p.lat;
       lastLng = p.lng;
@@ -52,6 +50,8 @@ function thinPositions(positions, minMeters = 5) {
 }
 
 export async function GET(request) {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   try {
     const { searchParams } = new URL(request.url);
     const raw = searchParams.get('driveId');
@@ -66,11 +66,11 @@ export async function GET(request) {
     }
 
     if (driveId == null) {
-      const carResult = await pool.query(`SELECT id FROM cars LIMIT 1`);
-      if (carResult.rows.length === 0) {
+      const carResult = await getDefaultCar();
+      if (!carResult) {
         return Response.json({ positions: [] });
       }
-      const carId = carResult.rows[0].id;
+      const carId = carResult.id;
 
       const lastDrive = await pool.query(
         `SELECT id FROM drives WHERE car_id = $1 ORDER BY start_date DESC LIMIT 1`,

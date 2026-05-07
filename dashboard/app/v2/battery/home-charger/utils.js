@@ -1,8 +1,8 @@
 // 집충전기 카드 순수 함수 — 랭크 계산, 시각 포맷, 툴팁 빌더
 
-// 순위 기반 링크 등급: 1~3위 → 'top3' (뱃지+글로우), 4~10위 → 'top10' (얇은 링)
+// 순위 기반 링크 등급: 1위 → 'top1', 2~3위 → 'top3', 4~10위 → 'top10'
 // 11위 이후 → null. 동점은 같은 rank 번호를 공유.
-// 반환: Map<id, { tier: 'top3'|'top10', rank: number }>
+// 반환: Map<id, { tier: 'top1'|'top3'|'top10', rank: number }>
 export function computeRanks(usage) {
   const entries = Object.entries(usage)
     .map(([id, d]) => ({ id, t: d.t }))
@@ -18,7 +18,7 @@ export function computeRanks(usage) {
     if (prevT === null || e.t !== prevT) displayRank = i + 1;
     prevT = e.t;
     if (displayRank > 10) break;
-    const tier = displayRank <= 3 ? 'top3' : 'top10';
+    const tier = displayRank === 1 ? 'top1' : displayRank <= 3 ? 'top3' : 'top10';
     ranks.set(e.id, { tier, rank: displayRank });
   }
   return ranks;
@@ -67,12 +67,28 @@ export function parseKstDt(s) {
   return Date.UTC(y, mo, d, h - 9, mi, se);
 }
 
-// 충전중 셀의 경과 시간 라벨 ("32m" / "1h23")
+// 충전중 셀의 경과 시간 라벨 (hh:mm — "0:32" / "1:23" / "12:05")
 export function elapsedLabel(c, now) {
   if (c.stat !== '3') return '';
   const startMs = parseKstDt(c.lastTsdt || c.statUpdDt);
   if (!startMs) return '';
   const m = Math.max(0, Math.floor((now - startMs) / 60000));
-  if (m < 60) return `${m}m`;
-  return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`;
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+}
+
+// 충전 시작 후 경과 시간 (h, 소수점). 비충전 셀은 0.
+export function chargingHours(c, now) {
+  if (c.stat !== '3') return 0;
+  const startMs = parseKstDt(c.lastTsdt || c.statUpdDt);
+  if (!startMs) return 0;
+  return Math.max(0, (now - startMs) / 3_600_000);
+}
+
+// 충전중 셀의 fill 비율 (0~100). 거듭제곱 곡선 — (h/14)^0.73 * 100.
+// 두 앵커 동시 만족: 4h=40%, 14h=100%. 4h 미만 절반 이하, 이상부터 가속해 14h 만수.
+// 참고값: 1h=13%, 2h=22%, 4h=40%, 6h=54%, 8h=67%, 10h=80%, 12h=90%, 14h=100%.
+export function chargingFillPct(c, now) {
+  const h = chargingHours(c, now);
+  if (!h) return 0;
+  return Math.min(Math.pow(h / 14, 0.73), 1) * 100;
 }

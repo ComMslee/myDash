@@ -1,3 +1,4 @@
+import { requireAuth } from '@/lib/auth-helper';
 import {
   fetchUsageDb,
   getCache,
@@ -17,6 +18,8 @@ import {
 export const dynamic = 'force-dynamic';
 
 export async function GET(req) {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
   const key = process.env.EV_CHARGER_API_KEY;
   if (!key) {
     return Response.json({ error: 'EV_CHARGER_API_KEY 미설정' }, { status: 503 });
