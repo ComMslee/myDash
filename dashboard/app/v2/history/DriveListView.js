@@ -2,17 +2,7 @@
 
 import { useState, Fragment } from 'react';
 import { KWH_PER_KM } from '@/lib/constants';
-import { formatDuration, shortAddr } from '@/lib/format';
-
-function efficiency(d) {
-  if (!d.start_rated_range_km || !d.end_rated_range_km || !d.distance) return null;
-  const dist = parseFloat(d.distance);
-  const usedKm = parseFloat(d.start_rated_range_km) - parseFloat(d.end_rated_range_km);
-  if (usedKm <= 0 || !dist || dist === 0) return null;
-  const kwh = (usedKm * KWH_PER_KM).toFixed(1);
-  const perKm = ((usedKm * KWH_PER_KM * 1000) / dist).toFixed(0);
-  return { kwh, perKm };
-}
+import { formatDuration, formatHm } from '@/lib/format';
 
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -30,7 +20,53 @@ function formatMonthLabel(mk) {
   return `${yLabel}${parseInt(m)}월`;
 }
 
-export default function DriveListView({ drives, loadingDrives, error, onDriveClick, onDayClick, onMonthClick, driveDayStr }) {
+// 06~24h 막대 — 새벽(00~06)은 거의 안 쓰는 시간이라 윈도우 밖.
+// 좌측 점: 06시 이전 시작 운행 존재 / 우측 점: 자정 넘김 운행 존재. 정확한 시각은 메타라인.
+function DayTimelineBar({ items, dayStart }) {
+  const visible = items.filter(d => !d.absorbed && d.start_date);
+  if (!visible.length) return null;
+  const dayMs = 18 * 3600000; // 06:00 ~ 24:00
+  const hasEarly = visible.some(d => new Date(d.start_date) - dayStart < 0);
+  const hasLate = visible.some(d => d.end_date && new Date(d.end_date) - dayStart > dayMs);
+  return (
+    <div className="flex items-center gap-1">
+      <div className="w-1 flex-shrink-0 flex justify-center">
+        {hasEarly && <div className="w-1 h-1 rounded-full bg-blue-400/70" />}
+      </div>
+      <div className="relative h-2.5 flex-1 bg-white/[0.04] rounded overflow-hidden">
+        {visible.map(d => {
+          const s = new Date(d.start_date) - dayStart;
+          const eMs = d.end_date ? (new Date(d.end_date) - dayStart) : (s + 60000);
+          if (eMs <= 0) return null; // 윈도우 밖(새벽만)
+          const left = Math.max(0, Math.min(100, (s / dayMs) * 100));
+          const right = Math.max(0, Math.min(100, (eMs / dayMs) * 100));
+          const width = Math.max(0.4, right - left);
+          return (
+            <div
+              key={d.id}
+              className="absolute inset-y-0 bg-blue-400/80"
+              style={{ left: `${left}%`, width: `${width}%` }}
+            />
+          );
+        })}
+      </div>
+      <div className="w-1 flex-shrink-0 flex justify-center">
+        {hasLate && <div className="w-1 h-1 rounded-full bg-blue-400/70" />}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 월 그룹 → 일 카드 (스캔용 상단 리스트).
+ * 일 카드 탭 → onDayClick(dateStr) — page.js 가 dayMode 진입 (지도+컴팩트 strip).
+ * 월 헤더 탭 → onMonthClick(mk) (있으면 monthMode 진입), 우측 chevron 은 펼침 토글.
+ */
+export default function DriveListView({
+  drives, loadingDrives, error,
+  onDayClick, onMonthClick,
+  driveDayStr,
+}) {
   const [expandedMonths, setExpandedMonths] = useState(() => new Set([currentMonthKey()]));
   const toggleMonth = (mk) => setExpandedMonths(prev => {
     const next = new Set(prev);
@@ -60,148 +96,120 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
     }
     const g = groups[groups.length - 1];
     g.items.push(d);
-    g.distance += parseFloat(d.distance) || 0;
-    if (d.start_rated_range_km && d.end_rated_range_km) {
-      const usedKm = parseFloat(d.start_rated_range_km) - parseFloat(d.end_rated_range_km);
-      if (usedKm > 0) g.kwh += usedKm * KWH_PER_KM;
-    }
-    if (d.start_battery_level != null && d.end_battery_level != null) {
-      g.usedPct += Math.max(0, d.start_battery_level - d.end_battery_level);
+    if (!d.absorbed) {
+      g.distance += parseFloat(d.distance) || 0;
+      if (d.start_rated_range_km && d.end_rated_range_km) {
+        const usedKm = parseFloat(d.start_rated_range_km) - parseFloat(d.end_rated_range_km);
+        if (usedKm > 0) g.kwh += usedKm * KWH_PER_KM;
+      }
+      if (d.start_battery_level != null && d.end_battery_level != null) {
+        g.usedPct += Math.max(0, d.start_battery_level - d.end_battery_level);
+      }
     }
   });
 
   // 월별 묶음 (순서 보존)
   const monthOrder = [];
   const monthMap = new Map();
-  groups.forEach((g, gi) => {
+  groups.forEach(g => {
     const mk = g.dateStr.slice(0, 7);
     let m = monthMap.get(mk);
     if (!m) {
-      m = { mk, days: [], dayIdx: [], distance: 0, kwh: 0, usedPct: 0, driveCount: 0 };
+      m = { mk, days: [], distance: 0, kwh: 0, usedPct: 0, driveCount: 0 };
       monthMap.set(mk, m);
       monthOrder.push(mk);
     }
     m.days.push(g);
-    m.dayIdx.push(gi);
     m.distance += g.distance;
     m.kwh += g.kwh;
     m.usedPct += g.usedPct;
-    m.driveCount += g.items.length;
+    m.driveCount += g.items.filter(d => !d.absorbed).length;
   });
 
-  // 일별 그룹 노드 렌더링 (기존 로직 — gi는 전체 groups 인덱스, crossGap은 같은 달 내에서만)
-  const renderDay = (g, gi, sameMonthNext) => {
+  // 일 카드 — 24h 막대 + 시간 범위/운전·정차 시간/총량.
+  const renderDayCard = (g) => {
     const weekday = WEEKDAY_KO[g.firstDate.getDay()];
-    const multi = g.items.length > 1;
-
-    let crossGap = null;
-    if (sameMonthNext) {
-      const curOldest = g.items[g.items.length - 1];
-      const nextNewest = sameMonthNext.items[0];
-      if (curOldest?.start_date && nextNewest?.end_date) {
-        const ms = new Date(curOldest.start_date) - new Date(nextNewest.end_date);
-        if (ms > 0) crossGap = formatDuration(Math.round(ms / 60000));
+    const visible = g.items.filter(d => !d.absorbed);
+    if (!visible.length) return null;
+    const driveCount = visible.length;
+    const sortedAsc = [...visible].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+    const first = sortedAsc[0];
+    const last = sortedAsc[sortedAsc.length - 1];
+    const fmt = (s) => { const dt = new Date(s); return `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`; };
+    const driveTotalMin = visible.reduce((s, d) => s + (parseFloat(d.duration_min) || 0), 0);
+    // 정차시간 = drive 사이 gap 합 (양수만)
+    let stayMin = 0;
+    for (let i = 1; i < sortedAsc.length; i++) {
+      const prev = sortedAsc[i - 1];
+      const cur = sortedAsc[i];
+      if (prev.end_date && cur.start_date) {
+        const gap = (new Date(cur.start_date) - new Date(prev.end_date)) / 60000;
+        if (gap > 0) stayMin += gap;
       }
     }
-
-    const groupNode = (
-      <div key={g.key} className="flex">
-        {/* 좌측 날짜 박스 — 일 합계 탭 */}
-        <button
-          type="button"
-          onClick={() => onDayClick(g.dateStr)}
-          className="flex-shrink-0 w-[72px] bg-white/[0.02] hover:bg-white/[0.05] active:bg-blue-500/10 border-r border-white/[0.06] flex flex-col items-center justify-center py-2.5 tabular-nums transition-colors"
-        >
-          <span className="text-sm font-bold text-zinc-300 leading-none">
+    const dayStart = new Date(g.firstDate);
+    dayStart.setHours(6, 0, 0, 0); // 막대 윈도우 시작 = 06:00 (00~06 새벽은 점 indicator)
+    const dayMs = 18 * 3600000;
+    const isEarly = new Date(first.start_date).getHours() < 6;
+    const isLateEnd = last.end_date && (new Date(last.end_date) - dayStart) > dayMs; // 자정 넘김 종료
+    return (
+      <button
+        key={g.key}
+        type="button"
+        onClick={() => onDayClick(g.dateStr)}
+        className="w-full text-left flex flex-col gap-2 px-3 py-3 border-b border-white/[0.04] last:border-0 hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-bold text-zinc-200 tabular-nums flex-shrink-0">
             {g.firstDate.getMonth() + 1}/{g.firstDate.getDate()}
             <span className="text-[10px] text-zinc-600 font-normal ml-0.5">({weekday})</span>
           </span>
-          {multi && (
-            <>
-              <span aria-hidden="true" className="block h-3" />
-              <span className="text-[11px] font-bold text-blue-400 leading-none">
-                {g.distance.toFixed(0)}<span className="text-zinc-600 font-normal ml-0.5">km</span>
+          <div className="text-right tabular-nums flex-shrink-0">
+            <span className="text-sm font-bold text-blue-400">{g.distance.toFixed(0)}<span className="text-[10px] text-zinc-600 ml-0.5">km</span></span>
+            {g.kwh > 0 && (
+              <span className="text-xs text-green-400/80 ml-2">
+                {g.kwh.toFixed(1)}<span className="ml-0.5">kWh</span>
+                {g.usedPct > 0 && <span className="text-zinc-500 ml-1">({g.usedPct}%)</span>}
               </span>
-              {g.usedPct > 0 && (
-                <span className="text-[10px] text-zinc-500 leading-none mt-1">{g.usedPct}%</span>
-              )}
+            )}
+          </div>
+        </div>
+        <DayTimelineBar items={visible} dayStart={dayStart} />
+        <div className="flex items-center gap-2 text-[11px] text-zinc-500 tabular-nums flex-wrap">
+          <span>{isEarly && <span className="mr-0.5">🌙</span>}{fmt(first.start_date)} → {fmt(last.end_date || last.start_date)}{isLateEnd && <span className="ml-0.5">🌙</span>}</span>
+          <span className="text-zinc-700">·</span>
+          <span title="주행"><span className="mr-0.5">🚗</span>{driveCount}회</span>
+          {driveTotalMin > 0 && (
+            <>
+              <span className="text-zinc-700">·</span>
+              <span title="운전"><span className="mr-0.5">🛣️</span>{formatHm(Math.round(driveTotalMin))}</span>
             </>
           )}
-        </button>
-
-        {/* 우측 주행 목록 */}
-        <div className="flex-1 min-w-0">
-          {g.items.map((d, iidx) => {
-            const eff = efficiency(d);
-            const dt = new Date(d.start_date);
-            const timeLabel = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
-            const endTime = d.end_date
-              ? `${String(new Date(d.end_date).getHours()).padStart(2, '0')}:${String(new Date(d.end_date).getMinutes()).padStart(2, '0')}`
-              : null;
-            const startPct = d.start_battery_level ?? null;
-            const endPct = d.end_battery_level ?? null;
-            const usedPct = (startPct != null && endPct != null) ? Math.max(0, startPct - endPct) : 0;
-
-            const next = g.items[iidx + 1];
-            let gapLabel = null;
-            if (next && d.start_date && next.end_date) {
-              const gapMs = new Date(d.start_date) - new Date(next.end_date);
-              if (gapMs > 0) gapLabel = formatDuration(Math.round(gapMs / 60000));
-            }
-
-            return (
-              <div key={d.id}>
-                <button
-                  onClick={() => onDriveClick(d)}
-                  className="w-full text-left grid grid-cols-[44px_1fr_auto] items-center gap-2 px-3 py-3 border-b border-white/[0.04] last:border-0 hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
-                >
-                  <div className="text-xs text-zinc-500 tabular-nums leading-tight">
-                    <p>{timeLabel}</p>
-                    {endTime && <p className="text-zinc-600">{endTime}</p>}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm text-zinc-300 truncate">
-                      {shortAddr(d.start_address) || '?'}<span className="text-zinc-600 mx-1">→</span>{shortAddr(d.end_address) || '?'}
-                    </p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-zinc-600 tabular-nums">{formatDuration(d.duration_min)}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-blue-400 tabular-nums">{d.distance}<span className="text-xs font-medium text-zinc-600 ml-0.5">km</span></p>
-                    {eff && (
-                      <p className="text-xs text-green-400/80 tabular-nums">
-                        {eff.kwh}<span className="ml-0.5">kWh</span>
-                        {usedPct > 0 && <span className="text-zinc-500 ml-1">({usedPct}%)</span>}
-                      </p>
-                    )}
-                  </div>
-                </button>
-                {gapLabel && (
-                  <div className="flex items-center gap-2 px-3 py-0.5 bg-[#111]">
-                    <div className="flex-1 h-px bg-white/[0.04]" />
-                    <span className="text-xs text-zinc-600 tabular-nums">{gapLabel}</span>
-                    <div className="flex-1 h-px bg-white/[0.04]" />
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {stayMin > 0 && (
+            <>
+              <span className="text-zinc-700">·</span>
+              <span title="정차"><span className="mr-0.5">🅿️</span>{formatHm(Math.round(stayMin))}</span>
+            </>
+          )}
         </div>
+      </button>
+    );
+  };
+
+  // 일 카드 사이 gap — 이전 일 첫 출발 - 다음 일 마지막 도착 (drives 는 reverse-chronological).
+  const renderCrossDayGap = (curG, nextG, key) => {
+    const curOldest = curG.items[curG.items.length - 1];
+    const nextNewest = nextG.items[0];
+    if (!curOldest?.start_date || !nextNewest?.end_date) return null;
+    const ms = new Date(curOldest.start_date) - new Date(nextNewest.end_date);
+    if (ms <= 0) return null;
+    return (
+      <div key={key} className="flex items-center gap-2 px-3 py-1 bg-black/40 border-y border-white/[0.06]">
+        <div className="flex-1 h-px bg-white/[0.06]" />
+        <span className="text-[10px] text-zinc-600 tabular-nums">{formatDuration(Math.round(ms / 60000))}</span>
+        <div className="flex-1 h-px bg-white/[0.06]" />
       </div>
     );
-
-    const nodes = [groupNode];
-    if (crossGap) {
-      nodes.push(
-        <div key={g.key + '-xgap'} className="flex items-center gap-2 px-3 py-1 bg-black/40 border-y border-white/[0.08]">
-          <div className="flex-1 h-px bg-white/[0.06]" />
-          <span className="text-[10px] text-zinc-600 tabular-nums">{crossGap}</span>
-          <div className="flex-1 h-px bg-white/[0.06]" />
-        </div>
-      );
-    }
-    return nodes;
   };
 
   return (
@@ -211,35 +219,37 @@ export default function DriveListView({ drives, loadingDrives, error, onDriveCli
         const expanded = expandedMonths.has(mk);
         return (
           <Fragment key={mk}>
-            {/* 월 헤더 — chevron 토글(좌) + 상세보기 버튼(우) */}
+            {/* 월 헤더 — 큰 영역=상세보기 / 우측 chevron=펼치기 */}
             <div className="flex items-stretch border-t border-white/[0.10] bg-white/[0.04]">
               <button
-                onClick={() => toggleMonth(mk)}
+                onClick={() => (onMonthClick ? onMonthClick(mk) : toggleMonth(mk))}
                 className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-white/[0.05] active:bg-white/[0.08] transition-colors text-left min-w-0"
+                title={onMonthClick ? '이 달 전체 지도/순위 보기' : (expanded ? '접기' : '펼치기')}
               >
-                <svg className={`w-3 h-3 text-zinc-500 flex-shrink-0 transition-transform ${expanded ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
                 <span className="text-xs font-bold text-zinc-300 flex-shrink-0">{formatMonthLabel(mk)}</span>
                 <span className="text-[10px] text-zinc-600 tabular-nums truncate">
                   {m.driveCount}회 · {m.distance.toFixed(0)}km
                   {m.usedPct > 0 && <span className="text-zinc-700"> · {m.usedPct}%</span>}
                 </span>
               </button>
-              {onMonthClick && (
-                <button
-                  onClick={() => onMonthClick(mk)}
-                  className="px-3 flex items-center text-[11px] text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 border-l border-white/[0.06] transition-colors"
-                  title="이 달 전체 지도/순위 보기"
-                >
-                  상세보기
-                </button>
-              )}
+              <button
+                onClick={() => toggleMonth(mk)}
+                className="px-3 flex items-center text-zinc-500 border-l border-white/[0.06] hover:bg-white/[0.05] active:bg-white/[0.08] transition-colors"
+                title={expanded ? '접기' : '펼치기'}
+              >
+                <svg className={`w-3 h-3 transition-transform ${expanded ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
             </div>
             {expanded && m.days.flatMap((g, idx) => {
-              const gi = m.dayIdx[idx];
-              const sameMonthNext = idx + 1 < m.days.length ? m.days[idx + 1] : null;
-              return renderDay(g, gi, sameMonthNext);
+              const nextDay = idx + 1 < m.days.length ? m.days[idx + 1] : null;
+              const nodes = [renderDayCard(g)];
+              if (nextDay) {
+                const gapNode = renderCrossDayGap(g, nextDay, g.key + '-xgap');
+                if (gapNode) nodes.push(gapNode);
+              }
+              return nodes;
             })}
           </Fragment>
         );

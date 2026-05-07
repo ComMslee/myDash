@@ -4,6 +4,7 @@ import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
 import { KST_OFFSET_MS } from '@/lib/kst';
 import { batchReverseGeocode } from '@/lib/kakao-geo';
+import { classifyDrives } from '@/lib/drive-classify';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,10 @@ export async function GET(request) {
     const weekStart     = new Date(todayStart.getTime() - 7  * 86400000);
     const prevWeekEnd   = new Date(weekStart);
     const prevWeekStart = new Date(todayStart.getTime() - 14 * 86400000);
-    const monthStart    = new Date(Date.UTC(ky, km, 1) - KST);
+    // 캘린더 '이번달' 은 월초 며칠은 빈약 → '최근 4주(28일)' 롤링 윈도로 보강.
+    const last4wStart   = new Date(todayStart.getTime() - 28 * 86400000);
+    const prev4wStart   = new Date(todayStart.getTime() - 56 * 86400000);
+    const prev4wEnd     = last4wStart;
 
     // 날짜 범위 WHERE 절 동적 구성 (recent_drives 용)
     let rangeClause = '';
@@ -53,11 +57,12 @@ export async function GET(request) {
     };
 
     // DB 레벨 SUM으로 각 기간 집계 (LIMIT 없이 정확한 값 보장)
-    const [todayResult, weekResult, prevWeekResult, monthResult, drivesResult] = await Promise.all([
+    const [todayResult, weekResult, prevWeekResult, last4wResult, prev4wResult, drivesResult] = await Promise.all([
       aggQuery(todayStart),
       aggQuery(weekStart),
       aggQuery(prevWeekStart, prevWeekEnd),
-      aggQuery(monthStart),
+      aggQuery(last4wStart),
+      aggQuery(prev4wStart, prev4wEnd),
       pool.query(
         `SELECT d.id, d.start_date, d.end_date, d.distance, d.duration_min,
                 d.start_rated_range_km, d.end_rated_range_km,
@@ -94,6 +99,9 @@ export async function GET(request) {
       batchReverseGeocode(endCoords),
     ]);
 
+    // chain 식별 + tag (이동주차 / 일반 / 외출). UI 가 검토용 prefix 배지로 사용.
+    const tagsById = classifyDrives(drives);
+
     return Response.json({
       today_distance:       parseFloat(todayResult.rows[0].distance.toFixed(1)),
       today_energy_kwh:     toKwh(todayResult.rows[0].range_used),
@@ -101,21 +109,32 @@ export async function GET(request) {
       week_energy_kwh:      toKwh(weekResult.rows[0].range_used),
       prev_week_distance:   parseFloat(prevWeekResult.rows[0].distance.toFixed(1)),
       prev_week_energy_kwh: toKwh(prevWeekResult.rows[0].range_used),
-      month_distance:       parseFloat(monthResult.rows[0].distance.toFixed(1)),
-      month_energy_kwh:     toKwh(monthResult.rows[0].range_used),
-      recent_drives: drives.map((d, i) => ({
-        id: d.id,
-        start_date: d.start_date,
-        end_date:   d.end_date,
-        distance:   d.distance ? parseFloat(parseFloat(d.distance).toFixed(1)) : 0,
-        duration_min: d.duration_min ? Math.round(parseFloat(d.duration_min)) : null,
-        start_address: d.start_geofence_name || kakaoStarts[i] || d.start_osm || null,
-        end_address:   d.end_geofence_name   || kakaoEnds[i]   || d.end_osm   || null,
-        start_rated_range_km: d.start_rated_range_km ? parseFloat(parseFloat(d.start_rated_range_km).toFixed(1)) : null,
-        end_rated_range_km:   d.end_rated_range_km   ? parseFloat(parseFloat(d.end_rated_range_km).toFixed(1))   : null,
-        start_battery_level: d.start_battery_level ?? null,
-        end_battery_level:   d.end_battery_level   ?? null,
-      })),
+      // '이번달' 은 캘린더가 아닌 최근 4주(28일) 롤링.
+      month_distance:       parseFloat(last4wResult.rows[0].distance.toFixed(1)),
+      month_energy_kwh:     toKwh(last4wResult.rows[0].range_used),
+      prev_month_distance:   parseFloat(prev4wResult.rows[0].distance.toFixed(1)),
+      prev_month_energy_kwh: toKwh(prev4wResult.rows[0].range_used),
+      recent_drives: drives.map((d, i) => {
+        const t = tagsById.get(d.id) || null;
+        return {
+          id: d.id,
+          start_date: d.start_date,
+          end_date:   d.end_date,
+          distance:   d.distance ? parseFloat(parseFloat(d.distance).toFixed(1)) : 0,
+          duration_min: d.duration_min ? Math.round(parseFloat(d.duration_min)) : null,
+          start_address: d.start_geofence_name || kakaoStarts[i] || d.start_osm || null,
+          end_address:   d.end_geofence_name   || kakaoEnds[i]   || d.end_osm   || null,
+          start_rated_range_km: d.start_rated_range_km ? parseFloat(parseFloat(d.start_rated_range_km).toFixed(1)) : null,
+          end_rated_range_km:   d.end_rated_range_km   ? parseFloat(parseFloat(d.end_rated_range_km).toFixed(1))   : null,
+          start_battery_level: d.start_battery_level ?? null,
+          end_battery_level:   d.end_battery_level   ?? null,
+          tag:        t?.tag        ?? null,
+          chain_id:   t?.chain_id   ?? null,
+          chain_legs: t?.chain_legs ?? null,
+          absorbed:    t?.absorbed    ?? false,
+          absorbed_by: t?.absorbed_by ?? null,
+        };
+      }),
     });
   } catch (err) {
     console.error('/api/drives error:', err);

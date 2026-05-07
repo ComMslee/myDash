@@ -1,6 +1,8 @@
 export function formatKst(d) {
-  const t = new Date(d).getTime() + 9 * 3600 * 1000;
-  const x = new Date(t);
+  // invalid input 가드 — `new Date(undefined).getTime()` 은 NaN → "NaN/NaN NaN:NaN" 출력 회귀.
+  const base = new Date(d).getTime();
+  if (!Number.isFinite(base)) return '?';
+  const x = new Date(base + 9 * 3600 * 1000);
   const M = String(x.getUTCMonth() + 1).padStart(2, '0');
   const D = String(x.getUTCDate()).padStart(2, '0');
   const h = String(x.getUTCHours()).padStart(2, '0');

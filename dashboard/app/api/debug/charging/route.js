@@ -83,6 +83,7 @@ export async function GET() {
       latest_charges: latestCharges.rows,
     });
   } catch (err) {
-    return Response.json({ error: err.message, stack: err.stack }, { status: 500 });
+    console.error('[debug/charging]', err);
+    return Response.json({ error: 'internal_error' }, { status: 500 });
   }
 }

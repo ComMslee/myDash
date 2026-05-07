@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { readAuth, writeAuth } from '@/lib/auth-store';
-import { COOKIE, MAX_AGE } from '@/lib/auth-helper';
+import { COOKIE, MAX_AGE, assertSameOrigin } from '@/lib/auth-helper';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function POST(req) {
+  const csrf = assertSameOrigin(req);
+  if (csrf) return csrf;
   const existing = await readAuth();
   if (existing) {
     return NextResponse.json({ error: 'ALREADY_SETUP' }, { status: 409 });

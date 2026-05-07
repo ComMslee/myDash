@@ -98,7 +98,7 @@ export default function V2DrivesPage() {
 
         {/* 2. 기간별 통계 (이번달 포함) */}
         {loading.drives || loading.history ? <Spinner /> : (
-          <PeriodStats drives={drives} monthlyHistory={monthlyHistory} />
+          <PeriodStats drives={drives} />
         )}
 
         {/* 3. 이번달 인사이트 */}

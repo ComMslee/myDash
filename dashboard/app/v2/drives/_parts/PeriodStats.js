@@ -6,23 +6,15 @@ function NewBadge() {
   );
 }
 
-export default function PeriodStats({ drives, monthlyHistory }) {
-  const months = monthlyHistory?.months || [];
-  const now = new Date();
-  const curY = now.getFullYear();
-  const curM = now.getMonth() + 1;
-  const thisMon = months.find(m => m.year === curY && m.month === curM);
-
+// '이번달' 은 캘린더 1일~말일이라 월초 며칠은 빈약 → 의미 부족.
+// 대신 drives.month_*(최근 4주 롤링) + drives.prev_month_*(직전 4주) 사용.
+export default function PeriodStats({ drives }) {
   const stats = [
-    { label: '오늘',     km: drives?.today_distance ?? 0,      kwh: drives?.today_energy_kwh ?? 0, highlight: false },
-    { label: '이번주',   km: drives?.week_distance ?? 0,       kwh: drives?.week_energy_kwh ?? 0,  highlight: false },
-    { label: '저번주',   km: drives?.prev_week_distance ?? 0,  kwh: drives?.prev_week_energy_kwh ?? 0, highlight: false },
-    {
-      label: '이번달',
-      km: thisMon ? Number(thisMon.total_distance_km) : 0,
-      kwh: thisMon ? Number(thisMon.total_energy_kwh) : 0,
-      highlight: true,
-    },
+    { label: '오늘',     km: drives?.today_distance ?? 0,      kwh: drives?.today_energy_kwh ?? 0,      highlight: false },
+    { label: '이번주',   km: drives?.week_distance ?? 0,       kwh: drives?.week_energy_kwh ?? 0,        highlight: false },
+    { label: '저번주',   km: drives?.prev_week_distance ?? 0,  kwh: drives?.prev_week_energy_kwh ?? 0,   highlight: false },
+    { label: '최근 4주', km: drives?.month_distance ?? 0,      kwh: drives?.month_energy_kwh ?? 0,       highlight: true  },
+    { label: '직전 4주', km: drives?.prev_month_distance ?? 0, kwh: drives?.prev_month_energy_kwh ?? 0,  highlight: false },
   ];
 
   return (

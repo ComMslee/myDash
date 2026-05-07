@@ -32,7 +32,7 @@ export function loadLeaflet(cb) {
   document.head.appendChild(script);
 }
 
-export default function DriveMap({ positions, routes, loading, placeMarker, visible, highlightLatLng }) {
+export default function DriveMap({ positions, routes, loading, placeMarker, visible, highlightLatLng, highlightRouteId }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -82,30 +82,37 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
         iconSize: [22, 22],
         iconAnchor: [11, 11],
       });
+      const hl = highlightRouteId;
+      const hasHl = hl != null && routes.some(r => r.id === hl);
+      const hlLatLngs = [];
       routes.forEach((r, idx) => {
         const pos = r.positions || [];
         if (pos.length < 2) return;
         const latlngs = pos.map(p => [p.lat, p.lng]);
         allLatLngs.push(...latlngs);
+        const isHl = hasHl && r.id === hl;
+        const isDim = hasHl && !isHl;
+        if (isHl) hlLatLngs.push(...latlngs);
         const color = r.color || '#3b82f6';
-        L.polyline(latlngs, { color, weight: 4, opacity: 0.85 }).addTo(group);
+        L.polyline(latlngs, { color, weight: isHl ? 6 : 4, opacity: isDim ? 0.18 : 0.9 }).addTo(group);
         // 시작 마커: 첫 주행=S, 그 외 주행 번호(1, 2, 3...)
         const startLabel = idx === 0 ? 'S' : String(idx);
-        const s = L.marker(latlngs[0], { icon: makeBadge(startLabel, color) }).addTo(group);
+        const s = L.marker(latlngs[0], { icon: makeBadge(startLabel, color), opacity: isDim ? 0.35 : 1 }).addTo(group);
         // 종료 마커: 마지막 주행만 E 배지, 그 외는 작은 점
         let e;
         if (idx === total - 1) {
-          e = L.marker(latlngs[latlngs.length - 1], { icon: makeBadge('E', color) }).addTo(group);
+          e = L.marker(latlngs[latlngs.length - 1], { icon: makeBadge('E', color), opacity: isDim ? 0.35 : 1 }).addTo(group);
         } else {
-          e = L.circleMarker(latlngs[latlngs.length - 1], { radius: 5, fillColor: color, color: '#fff', weight: 1.5, fillOpacity: 0.9 }).addTo(group);
+          e = L.circleMarker(latlngs[latlngs.length - 1], { radius: 5, fillColor: color, color: '#fff', weight: 1.5, fillOpacity: isDim ? 0.3 : 0.9, opacity: isDim ? 0.3 : 1 }).addTo(group);
         }
         markersRef.current.push(s, e);
       });
       polyRef.current = group;
-      if (allLatLngs.length >= 2) {
-        // animate:false — animate(default true) 진행 중 setPositions([]) 등에 의해
-        // cancel 되어 view 가 default(서울) 에 고정되던 race condition 제거
-        map.fitBounds(L.latLngBounds(allLatLngs), { padding: [50, 50], animate: false });
+      // 하이라이트된 구간이 있으면 그것에 맞춰 zoom — 없으면 전체 fit.
+      const fitTo = hlLatLngs.length >= 2 ? hlLatLngs : allLatLngs;
+      if (fitTo.length >= 2) {
+        // animate:false — race condition 제거 (CLAUDE.md 함정 참고).
+        map.fitBounds(L.latLngBounds(fitTo), { padding: [50, 50], animate: false });
       }
       return;
     }
@@ -145,7 +152,7 @@ export default function DriveMap({ positions, routes, loading, placeMarker, visi
     // animate:false — animate(default true) 진행 중 setPositions([]) 등에 의해
     // cancel 되어 view 가 default(서울) 에 고정되던 race condition 제거
     map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50], animate: false });
-  }, [positions, routes, placeMarker]);
+  }, [positions, routes, placeMarker, highlightRouteId]);
 
   // Keep a ref to the latest drawContent so init callback always calls current version
   const drawContentRef = useRef(drawContent);

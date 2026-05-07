@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import HomeChargerCard from '@/app/v2/battery/HomeChargerCard';
 import { RankRow, HeatmapChart } from '@/app/v2/battery/home-charger/FleetStatsCharts';
 import { formatEntry } from '@/app/v2/battery/home-charger/fleet-stats-utils';
+import ReportPanel from './_parts/ReportPanel';
 
 const DOW_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -24,19 +25,22 @@ function FleetStatsPanel() {
 
   useEffect(() => {
     let alive = true;
-    (async () => {
+    const load = async () => {
       try {
         const res = await fetch('/api/home-charger/fleet-stats', { cache: 'no-store' });
         const d = await res.json();
         if (!alive) return;
-        if (d.error) setError(d.error); else setData(d);
+        if (d.error) setError(d.error); else { setData(d); setError(null); }
       } catch (e) {
         if (alive) setError(e.message || '조회 실패');
       } finally {
         if (alive) setLoading(false);
       }
-    })();
-    return () => { alive = false; };
+    };
+    load();
+    // 페이지 머무는 동안 1분 주기로 자동 갱신 — 옆 패널들과 통일.
+    const t = setInterval(load, 60_000);
+    return () => { alive = false; clearInterval(t); };
   }, []);
 
   const TOP_VISIBLE = 15;
@@ -46,14 +50,6 @@ function FleetStatsPanel() {
   const restN = perCharger.slice(TOP_VISIBLE);
   const topMax = top3[0]?.count || 1;
   const top3Icons = ['🥇', '🥈', '🥉'];
-
-  // 사용률 — 우리 단지 충전기 활용도. (활동 시간 슬롯) / (전체 가능 슬롯).
-  // 분자: 기간 내 (charger × 시간) 활동 카운트 합 (시간당 0/1 clip)
-  // 분모: 관측일수 × 24 × 충전기수
-  const totalSlots = (data?.daysCovered || 0) * 24 * perCharger.length;
-  const usagePct = totalSlots > 0 && data?.total != null
-    ? Math.round((data.total / totalSlots) * 100)
-    : null;
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
@@ -81,9 +77,6 @@ function FleetStatsPanel() {
               <div>
                 <div className="text-[11px] text-zinc-400 mb-1.5">
                   🏆 전체 순위 <span className="text-zinc-600">· 총 {perCharger.length}대</span>
-                  {usagePct != null && (
-                    <span className="text-zinc-600"> · 사용률 <span className="text-zinc-300 tabular-nums">{usagePct}%</span></span>
-                  )}
                 </div>
                 {/* Top 1~3 — 강조 카드 (한 줄 3칸, 크게) */}
                 {top3.length > 0 && (
@@ -209,6 +202,9 @@ export default function V2ChargersPage() {
 
         {/* 집충전기 누적 사용 — Top 10 + 시간×요일 히트맵 (구 팝업 → 패널) */}
         <FleetStatsPanel />
+
+        {/* 활용도 리포트 — 외부 근거자료용 라이브 패널 (KPI + 월별 추이 + 시간대×요일) */}
+        <ReportPanel />
       </div>
     </main>
   );

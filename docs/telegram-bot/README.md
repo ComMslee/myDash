@@ -127,13 +127,12 @@ dashboard ⇄ hub: 양방향 X-Hub-Secret 헤더 (HUB_SHARED_SECRET) 로 인증
 
 | 명령 | 설명 | 호출 API |
 |---|---|---|
-| `/soc` | 배터리 % + 충전 상세 (충전 중이면 시작SOC→현재·kWh·kW·경과 / 아니면 마지막 충전 기록) | `/api/car` + `/api/charging-status` |
-| `/range` | 남은 주행거리 (rated/est) | `/api/car` |
-| `/today` | 오늘(KST) 주행/충전 요약 | `/api/summary?range=today` |
-| `/period` | 이번주·지난주·이번달 한 번에 (퀵뷰) | `/api/summary?range=multi` |
+| `/soc` | 배터리 % · 거리 · 충전 상세 (배터리·거리·충전 통합) | `/api/car` + `/api/charging-status` |
+| `/period` | 오늘·이번주·저번주·이번달·이전달 (km·전비) — 이번달=최근 4주 롤링 | `/api/summary?range=multi` |
 | `/where` | 현재 위치 — 정차/주행 통합 (지도 링크 + 핀) | `/api/parked` + `/api/location` |
-| `/chargers` | 즐겨찾기 충전기 가용/사용중 요약 (대시보드 캐시 우선) | `/api/home-charger` |
-| `/charge` `/yesterday` `/week` `/parked` | alias — `/charge→/soc`, `/yesterday`·`/week`→`/period`, `/parked`→`/where` | — |
+| `/places` | 자주가는 곳 / 오래머문 곳 TOP 10 (집·회사 제외, 분기 진입) | `/api/frequent-places` + `/api/long-stay-places` |
+| `/chargers` | 즐겨찾기 충전기 가용/사용중 요약 (동별 그룹화) | `/api/home-charger/groups` |
+| alias | `/charge` `/range` `/battery` → `/soc`. `/today` `/yesterday` `/week` `/summary` → `/period`. `/parked` → `/where` | — |
 
 **퀵뷰 컨셉**: 봇은 한 화면에 들어오는 짧은 요약. 상세 통계·내역은 대시보드 `/v2/*` 에서.
 
@@ -233,28 +232,87 @@ POST /api/sns/blog → ✅ 서버 전달 확인됨 (mock)
 
 ### 6-2. Inline 후속 액션 (데이터 명령 응답)
 
-각 데이터 명령 응답 끝에 `inline_keyboard` 동봉 — 1행 3버튼.
+각 데이터 명령 응답 끝에 `inline_keyboard` 동봉 — 1행 3버튼. 첫 칸은 항상 🔄 (재실행).
 
 | 응답 | 후속 버튼 |
 |---|---|
-| `/soc` | 🔄 / ⚡ 충전 / 🛣 거리 |
-| `/range` | 🔄 / 🔋 SOC / 📍 위치 |
-| `/charge` | 🔄 / 🔋 SOC / 📍 위치 |
-| `/parked` | 🔄 / 📍 위치 / 📅 오늘 |
-| `/where` | 🔄 / 🅿️ 주차 / 🛣 거리 |
-| `/today` | 🔄 / 📅 어제 / 📆 주간 |
-| `/yesterday` | 🔄 / 📅 오늘 / 📆 주간 |
-| `/week` | 🔄 / 📅 오늘 / 📅 어제 |
+| `/soc` (배터리) | 🔄 / 🛣 거리 / 🔌 충전기 |
+| `/range` | 🔄 / 🔋 배터리 / 📊 요약 |
+| `/where` | 🔄 / 🗺 가는 곳 / 📊 요약 |
+| `/period` (요약) | 🔄 / 🔋 배터리 / 🔌 충전기 |
+| `/chargers` | 🔄 / 🔋 배터리 / 📊 요약 |
+| `/places` | 🔄 / 📍 위치 / 📊 요약 |
 
-- callback_data 포맷: `cmd:<name>` — 같은 명령 새 실행 (=새로고침) 또는 인접 명령 단축
-- `tg_poller` 가 `callback_query` 분기에서 `handleCallback` 호출 → `CB_ROUTES` 매핑 → 핸들러 실행
-- 매번 새 메시지로 응답 (stateless) — `editMessageText` 인프라는 깔려 있고 향후 다단계 대화에서 사용
+`/places` 는 분기 진입화면 → 자주/오래 종류 선택 후 각 화면에 [🔄] [반대 종류] 버튼 (종류 전환).
+
+- callback_data 포맷: `cmd:<name>` (재실행/인접) · `places:freq|dwell` (종류 전환) · `sns:publish|edit|cancel` (글쓰기 다단계)
+- `tg_poller` 가 `callback_query` 분기에서 `handleCallback` 호출 → 라우터 분기
+- 매번 새 메시지로 응답 (stateless) — `editMessageText` 인프라는 깔려 있고 향후 in-place 갱신에 사용
 
 ### 6-3. 단일 소스
 
 명령 카탈로그: `commands.js` 의 `CATEGORY_COMMANDS` — `/help` 본문, Reply 키보드 (메인/sub) 공유.
 후속 액션: `FOLLOWUP` 맵.
 한글 라벨 → 슬래시 매핑: `BUTTON_TO_CMD`.
+
+## 6-A. 대시보드 활용도 리포트 (외부 근거자료용)
+
+봇과 별개로 대시보드 `/v2/chargers` 페이지 하단에 인라인 라이브 패널 + 단독 페이지 `/v2/chargers/report` 도 동일 컴포넌트. 단지 외부(관리사무소·확장 제안 등)에 보여주는 자료.
+
+```
+┌─ 활용도 리포트 ────────────────────────┐
+│ 망포늘푸른벽산 · 관측 N일 · 39기      │
+│                                        │
+│ ┌─ 전체 가동률 ─┐                      │
+│ │   N.N %      │ ← overall_pct        │
+│ └──────────────┘                      │
+│                                        │
+│ 단위    평균    피크                  │
+│ 일간    N.N%   N.N%                   │
+│ 주간    N.N%   N.N%                   │
+│ 월간    N.N%   N.N%                   │
+│                                        │
+│ 6개월 추세  +N.N %p  ↑ 증가           │
+│                                        │
+│ [주별 점유율 추이 — 라인+막대 차트]   │
+│                                        │
+│ 동별 가동률 (⭐=즐겨찾기)             │
+│ ⭐ 108동  ████████ N.N%  (2기)        │
+│ ⭐ 107동  ████░░░░ N.N%  (2기)        │
+│ ...                                    │
+│                                        │
+│ 🔍 디버그 (raw 응답)  [▾]             │
+└────────────────────────────────────────┘
+```
+
+**API**: `GET /api/home-charger/report` (1분 자동 폴링)
+
+```
+{
+  meta: { observation_start, observation_end, days_observed,
+          total_chargers, observed_chargers, complex_name },
+  kpi: {
+    overall_pct,                               // 전체 기간 평균 가동률
+    daily_avg_pct, daily_peak_pct,             // 일별 가동률 평균/최대
+    weekly_avg_pct, weekly_peak_pct,           // 주별 (월요일 시작)
+    monthly_avg_pct, monthly_peak_pct,         // 월별 (캘린더)
+    trend_6m_delta_pp,                         // 최근 6달 평균 - 직전 6달 평균
+  },
+  weekly: [{ w_start, label('MM/DD'), sessions, days, occupancy_pct }],
+  by_dong: [{ key, title, favorite, total, sessions, occupancy_pct }],
+}
+```
+
+**산식**:
+- 가동률 % = `SUM(count) / (chargers × days × 48) × 100` (30분 슬롯 정규화)
+- 일별 가동률 = 그 날 가동률 (chargers × 48 분모)
+- 주별 / 월별 = 그 단위 가동률, JS 에서 row 별 % 계산 후 평균/최대
+- 동별 가동률 = `constants.js` (P1·P2·P3 매핑) 기준 동별 합산
+
+**단일 진실원**:
+- 충전기 등록 갯수 → 환경공단 API 캐시 (`getCache().data.stations`)
+- 동별 그룹 매핑 → `app/v2/battery/home-charger/constants.js`
+- 봇 `/chargers` 의 그룹 카운트도 같은 정의 사용 (`/api/home-charger/groups`)
 
 ## 7. `/notify` HTTP 엔드포인트 (외부 서비스용)
 
@@ -264,7 +322,7 @@ POST /api/sns/blog → ✅ 서버 전달 확인됨 (mock)
 # 같은 box (docker network):
 curl -X POST http://telegram-hub:3000/notify \
   -H "Content-Type: application/json" \
-  -d '{"text":"빌드 실패 — main.go:42","chat_id":"8704087232"}'
+  -d '{"text":"빌드 실패 — main.go:42","chat_id":"<YOUR_CHAT_ID>"}'
 
 # Authorization: Bearer 헤더 필요 (HUB_SHARED_SECRET 설정 시)
 ```

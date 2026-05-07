@@ -87,6 +87,11 @@
 | `/api/slow-charges` | charging_processes | — | 없음 |
 | `/api/find-nearby-chargers` | — | 환경공단 EvCharger | 없음 |
 | `/api/car` | cars | — | 없음 |
+| `/api/charges` | charging_processes, geofences | — | 없음 |
+| `/api/summary` | drives, charging_processes | — | 없음 (range=multi 등 봇 `/period` 용) |
+| `/api/parked` | drives, states | — | 없음 (라이브 — 봇 `/where`) |
+| `/api/location` | positions | — | 없음 (라이브 최신 좌표 — 봇 `/where`) |
+| `/api/long-stay-places` | drives, addresses, geofences | — | 없음 (LEAD 윈도우로 dwell 산출) |
 
 ## 추후 개선 후보 (기능 영향 검토 필요)
 

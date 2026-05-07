@@ -1,4 +1,4 @@
-import { requireAuth } from '@/lib/auth-helper';
+import { requireAuth, assertSameOrigin } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { applyUserGroup, ensureUserGroupsSchema } from '@/lib/tg-user-groups';
 
@@ -41,6 +41,8 @@ function validateGroupFields({ key, label, desc }, { requireKey = true } = {}) {
 }
 
 export async function POST(req) {
+  const csrf = assertSameOrigin(req);
+  if (csrf) return csrf;
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
 

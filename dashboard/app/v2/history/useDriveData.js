@@ -23,6 +23,21 @@ async function fetchInChunks(items, fn, concurrency = 6) {
   return results;
 }
 
+// route-map fetch — r.ok 체크 후 5xx 1회 retry. 단일 경로(함정 #5) 와 일·월 모드 공통.
+// abort 신호 시 즉시 throw → 호출 측 catch 에서 null 리턴되어 누락 표시됨.
+async function fetchRouteMap(url, signal) {
+  const once = async () => {
+    const r = await fetch(url, { signal });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  };
+  try { return await once(); }
+  catch (e1) {
+    if (e1.name === 'AbortError' || signal?.aborted) throw e1;
+    return await once();
+  }
+}
+
 /**
  * 로드트립 페이지의 데이터 fetching + 상태를 단일 훅으로 격리.
  *
@@ -163,8 +178,7 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
     dayAbortRef.current = new AbortController();
     const palette = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7', '#84cc16', '#f43f5e'];
     fetchInChunks(dayDrives, (d, idx) =>
-      fetch(`/api/route-map?driveId=${d.id}`, { signal: dayAbortRef.current.signal })
-        .then(r => r.json())
+      fetchRouteMap(`/api/route-map?driveId=${d.id}`, dayAbortRef.current.signal)
         .then(data => ({
           positions: data.positions || [],
           color: palette[idx % palette.length],
@@ -193,8 +207,7 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
     monthAbortRef.current = new AbortController();
     const palette = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7', '#84cc16', '#f43f5e'];
     fetchInChunks(monthDrives, (d, idx) =>
-      fetch(`/api/route-map?driveId=${d.id}&detail=light`, { signal: monthAbortRef.current.signal })
-        .then(r => r.json())
+      fetchRouteMap(`/api/route-map?driveId=${d.id}&detail=light`, monthAbortRef.current.signal)
         .then(data => ({
           positions: data.positions || [],
           color: palette[idx % palette.length],

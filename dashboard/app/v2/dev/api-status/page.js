@@ -19,8 +19,11 @@ const ROUTES = [
       { key: 'to',   sample: '' },
     ] },
   { path: '/api/insights',         label: '인사이트',       desc: '누적 거리·kWh·평균효율·요약 통계', category: '차량' },
-  { path: '/api/summary',          label: '일자 요약',      desc: 'drives+charges 집계 (range=today|yesterday|week|this-week|last-week|month|multi) — 봇 /today /period 공용', category: '차량',
+  { path: '/api/summary',          label: '일자 요약',      desc: 'drives+charges 집계 + 전비(eff_wh_km). range=today|yesterday|week|this-week|last-week|month|last-month|multi — 봇 /period', category: '차량',
     params: [{ key: 'range', sample: 'multi' }] },
+  { path: '/api/home-charger/groups', label: '충전기 그룹',  desc: '동별 그룹 카운트 (구성 = constants.js) — 봇 /chargers', category: '집충전기' },
+  { path: '/api/home-charger/report', label: '활용도 리포트', desc: '월별 점유율·시간대×요일 히트맵·KPI — /v2/chargers/report 페이지', category: '집충전기',
+    dashboard: 'report' },
   { path: '/api/parked',           label: '주차 정보',      desc: '마지막 종료 drive 위치·경과 (driving=true 면 진행 중) — 봇 /where 의 정차/주행 분기에 사용', category: '차량' },
   { path: '/api/location',         label: '현재 좌표',      desc: '최신 positions 의 lat/lng/date — 봇 /where 공용', category: '차량' },
 
@@ -34,6 +37,11 @@ const ROUTES = [
   { path: '/api/year-heatmap',     label: '연간 히트맵',    desc: '최근 1년 일별 주행/충전 집계 (캘린더 셀)', category: '주행' },
   { path: '/api/monthly-history',  label: '월간 이력',      desc: '월별 주행거리/충전량/효율 집계', category: '주행' },
   { path: '/api/frequent-places',  label: '자주 가는 곳',   desc: '지오펜스 도착 빈도 + 카카오 reverse geocode (집/회사 우선 핀)', category: '주행' },
+  { path: '/api/resolve-address',  label: '좌표→주소',      desc: 'lat/lng → 한국어 라벨 (Kakao 역지오코딩, DB 캐시) — 봇 알림 주소 폴백', category: '주행',
+    params: [
+      { key: 'lat', required: true, sample: '37.5665' },
+      { key: 'lng', required: true, sample: '126.9780' },
+    ] },
   { path: '/api/long-stay-places', label: '오래 머문 곳',   desc: '체류 시간(다음 주행 시작-종료 갭) 누적 — 10분 미만 노이즈 필터', category: '주행' },
   { path: '/api/rankings',         label: '랭킹',           desc: '주행/일자별 TOP N (type=거리·시간·평속·효율)', category: '주행',
     params: [
@@ -69,9 +77,18 @@ const ROUTES = [
       { key: 'addr',   sample: '' },
       { key: 'name',   sample: '' },
     ] },
+
+  // 가족
+  { path: '/api/family/festivals', label: '축제',           desc: '한국관광공사 TourAPI(searchFestival2) 래핑 — 봇 /festivals (가족)', category: '가족',
+    params: [
+      { key: 'from',     sample: '' },
+      { key: 'to',       sample: '' },
+      { key: 'areaCode', sample: '' },
+      { key: 'size',     sample: '' },
+    ] },
 ];
 
-const CATEGORIES = ['차량', '주행', '배터리', '집충전기'];
+const CATEGORIES = ['차량', '주행', '배터리', '집충전기', '가족'];
 
 const SLOW_MS = 1500;
 

@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { readAuth, writeAuth, pinToken } from '@/lib/auth-store';
-import { COOKIE, MAX_AGE, requireAuth, timingSafeEqual } from '@/lib/auth-helper';
+import { COOKIE, MAX_AGE, requireAuth, timingSafeEqual, assertSameOrigin } from '@/lib/auth-helper';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function POST(req) {
+  const csrf = assertSameOrigin(req);
+  if (csrf) return csrf;
   const fail = await requireAuth();
   if (fail) return fail;
 

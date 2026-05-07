@@ -47,7 +47,8 @@ async function refresh() {
 // 메인 진입점 — 항상 await 로 호출. 핸들러 시작부에서 한 번 워밍하면
 // 이후 sync 헬퍼(categoryByKey, labelOf)가 같은 캐시를 본다.
 export async function getCategories() {
-  if (!_cache.length || Date.now() - _cacheAt > TTL_MS) await refresh();
+  // _cacheAt === 0 미초기화 / TTL 만료 시 refresh. 빈 결과도 TTL 동안 캐시.
+  if (!_cacheAt || Date.now() - _cacheAt > TTL_MS) await refresh();
   return _cache;
 }
 

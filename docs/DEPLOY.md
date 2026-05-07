@@ -20,7 +20,8 @@ GitHub-hosted Ubuntu runner (무료)
    ▼
 서버에서 실행:
   cd ~/myDash
-  git pull origin master
+  git fetch --all --prune
+  git reset --hard origin/master       # 로컬 변경 폐기 — 서버는 read-only 트리
   docker compose build dashboard
   docker compose up -d dashboard
 ```
@@ -70,24 +71,6 @@ git push origin master
 ```
 
 Actions 탭에서 로그 확인. 성공 시 ~2분 이내 서버 반영.
-
-## self-hosted runner 철거 (권장)
-
-Windows PC의 기존 러너를 정리:
-
-```powershell
-# Runner 서비스 정지
-cd C:\actions-runner
-.\svc.cmd stop   # 서비스로 돌고 있다면
-
-# Runner 등록 해제
-.\config.cmd remove --token <GitHub에서 새 토큰 발급>
-
-# 자동 재시작 스크립트 비활성화
-Remove-Item "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\GitHubActionsRunner.lnk"
-```
-
-저장소 → Settings → Actions → Runners 에서 제거됐는지 확인.
 
 ## 배포 실패 시
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { readAuth, pinToken } from '@/lib/auth-store';
-import { COOKIE, MAX_AGE, timingSafeEqual } from '@/lib/auth-helper';
+import { COOKIE, MAX_AGE, timingSafeEqual, assertSameOrigin } from '@/lib/auth-helper';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -17,6 +17,8 @@ function clientIp(req) {
 }
 
 export async function POST(req) {
+  const csrf = assertSameOrigin(req);
+  if (csrf) return csrf;
   const auth = await readAuth();
   if (!auth) {
     return NextResponse.json({ error: 'NEED_SETUP' }, { status: 412 });

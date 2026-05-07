@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMock } from '@/app/context/mock';
 import { KWH_PER_KM } from '@/lib/constants';
-import { formatDuration, shortAddr } from '@/lib/format';
+import { formatDuration, formatHm, shortAddr } from '@/lib/format';
 import { formatTimeRange, kstDateStr } from '@/lib/kst';
 import DriveMap, { loadLeaflet } from '@/app/components/DriveMap';
 import RouteSparklines from '@/app/components/RouteSparklines';
@@ -91,6 +91,17 @@ function HistoryInner() {
   const entryInMapView = !!initialId || !!initialDate;
   const [viewMode, setViewMode] = useState(entryInMapView ? 'map' : 'list');
 
+  // 모바일(<=768px) — dayMode 리스트 3행 / 데스크톱 5행 고정, 초과 운행 수일 때 내부 스크롤.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 768px)');
+    setIsMobile(mq.matches);
+    const handler = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   useEffect(() => {
     if (viewMode === 'map') {
       setPlacesCollapsed(true);
@@ -106,6 +117,9 @@ function HistoryInner() {
 
   const [selectedPosIdx, setSelectedPosIdx] = useState(null);
   useEffect(() => { setSelectedPosIdx(null); }, [selectedDrive?.id, dayMode, monthMode]);
+  // dayMode 컴팩트 strip 에서 선택된 drive — 지도에서 해당 polyline 만 강조 + zoom.
+  const [selectedDayDriveId, setSelectedDayDriveId] = useState(null);
+  useEffect(() => { setSelectedDayDriveId(null); }, [dayMode]);
 
   const sparkRoutes = useMemo(() => {
     if (monthMode && monthRoutes?.length) {
@@ -133,7 +147,6 @@ function HistoryInner() {
     return null;
   }, [selectedPosIdx, sparkRoutes]);
 
-  const goToDrive = (d) => { setSelectedDrive(d); setSelectedPlace(null); setDayMode(null); setMonthMode(null); setMapEverShown(true); setViewMode('map'); };
   const goToDay = (dateStr) => { setDayMode(dateStr); setMonthMode(null); setSelectedPlace(null); setMapEverShown(true); setViewMode('map'); };
   const goToMonth = (monthStr) => { setMonthMode(monthStr); setDayMode(null); setSelectedDrive(null); setSelectedPlace(null); setPositions([]); setMapEverShown(true); setViewMode('map'); };
 
@@ -163,7 +176,7 @@ function HistoryInner() {
       <div className="max-w-2xl mx-auto flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 57px - 58px - env(safe-area-inset-bottom, 0px))' }}>
 
       {/* 자주 가는 곳 / 오래 머문 곳 — 탭 토글로 메트릭 전환 */}
-      {(places.length > 0 || longStayPlaces.length > 0) && (() => {
+      {viewMode === 'list' && (places.length > 0 || longStayPlaces.length > 0) && (() => {
         const isLong = placesMode === 'long-stay';
         const displayPlaces = isLong ? longStayPlaces : places;
         if (displayPlaces.length === 0) return null;
@@ -303,7 +316,7 @@ function HistoryInner() {
             )}
           </div>
 
-          <div className="flex-1 min-h-0 flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden mb-20">
+          <div className="flex-1 min-h-0 flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden mb-4">
             {monthMode ? (() => {
               const mDrives = drives.filter(d => driveDayStr(d).slice(0, 7) === monthMode).slice().sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
               if (mDrives.length === 0) return null;
@@ -320,23 +333,51 @@ function HistoryInner() {
               const perKm = totalKm > 0 && totalKwh > 0 ? Math.round((totalKwh * 1000) / totalKm) : null;
               const dayCount = new Set(mDrives.map(d => driveDayStr(d))).size;
               const destMap = new Map();
-              for (const d of mDrives) { const key = shortAddr(d.end_address) || '?'; destMap.set(key, (destMap.get(key) || 0) + 1); }
+              const SKIP_DESTS = new Set(['집', '회사']);
+              for (const d of mDrives) {
+                const key = shortAddr(d.end_address) || '?';
+                if (SKIP_DESTS.has(key)) continue;
+                destMap.set(key, (destMap.get(key) || 0) + 1);
+              }
               const topDests = Array.from(destMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+              const monthLabel = (() => {
+                const [y, mm] = monthMode.split('-');
+                const cy = new Date().getFullYear();
+                return parseInt(y) === cy ? `${parseInt(mm)}월` : `${y}년 ${parseInt(mm)}월`;
+              })();
               return (
-                <div className="px-4 py-2 border-b border-white/[0.06] flex flex-col gap-1.5 flex-shrink-0">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-zinc-500 tabular-nums">{monthMode}<span className="text-zinc-600"> · {mDrives.length}회 ({dayCount}일, {formatDuration(Math.round(totalMin))})</span></p>
-                    </div>
-                    <div className="flex-shrink-0 text-right tabular-nums">
-                      <p className="text-sm font-bold text-blue-400">{totalKm.toFixed(0)}<span className="text-xs text-zinc-600 ml-0.5">km</span></p>
-                      {totalKwh > 0 && <p className="text-sm font-semibold text-green-400">{totalKwh.toFixed(1)}<span className="text-xs text-zinc-600 ml-0.5">kWh</span>{usedPct > 0 && <span className="text-zinc-500 text-xs ml-1">({usedPct}%)</span>}</p>}
-                      {perKm != null && <p className="text-xs text-amber-400">{perKm}<span className="text-zinc-600 ml-0.5">Wh/km</span></p>}
-                    </div>
-                  </div>
+                <div className="px-4 py-1.5 border-b border-white/[0.06] flex flex-col gap-0.5 flex-shrink-0">
+                  <p className="text-sm text-zinc-500 tabular-nums flex items-center gap-1.5 flex-wrap">
+                    <span className="text-zinc-300 font-semibold">{monthLabel}</span>
+                    <span className="text-zinc-700">·</span>
+                    <span title="주행"><span className="mr-0.5">🚗</span>{mDrives.length}회</span>
+                    <span className="text-zinc-700">·</span>
+                    <span title="운행일"><span className="mr-0.5">📅</span>{dayCount}일</span>
+                    {totalMin > 0 && (
+                      <>
+                        <span className="text-zinc-700">·</span>
+                        <span title="운전"><span className="mr-0.5">🛣️</span>{formatHm(Math.round(totalMin))}</span>
+                      </>
+                    )}
+                  </p>
+                  <p className="text-xs tabular-nums flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold text-blue-400">{totalKm.toFixed(0)}<span className="text-zinc-600 ml-0.5">km</span></span>
+                    {totalKwh > 0 && (
+                      <>
+                        <span className="text-zinc-700">·</span>
+                        <span className="font-semibold text-green-400">{totalKwh.toFixed(1)}<span className="text-zinc-600 ml-0.5">kWh</span>{usedPct > 0 && <span className="text-zinc-500 ml-1">({usedPct}%)</span>}</span>
+                      </>
+                    )}
+                    {perKm != null && (
+                      <>
+                        <span className="text-zinc-700">·</span>
+                        <span className="text-amber-400">{perKm}<span className="text-zinc-600 ml-0.5">Wh/km</span></span>
+                      </>
+                    )}
+                  </p>
                   {topDests.length > 0 && (
                     <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
-                      <span className="text-zinc-600 flex-shrink-0">자주 간 곳</span>
+                      <span className="flex-shrink-0">⭐</span>
                       {topDests.map(([addr, n], i) => (
                         <span key={addr} className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 truncate max-w-[140px]">
                           <span className="text-zinc-600 mr-1">{i + 1}</span>{addr}<span className="text-zinc-500 ml-1 tabular-nums">{n}</span>
@@ -358,24 +399,57 @@ function HistoryInner() {
               }, 0);
               const usedPct = dayDrives.reduce((s, d) => (d.start_battery_level != null && d.end_battery_level != null) ? s + Math.max(0, d.start_battery_level - d.end_battery_level) : s, 0);
               const perKm = totalKm > 0 && totalKwh > 0 ? Math.round((totalKwh * 1000) / totalKm) : null;
+              let stayMin = 0;
+              for (let i = 1; i < dayDrives.length; i++) {
+                const prev = dayDrives[i - 1];
+                const cur = dayDrives[i];
+                if (prev.end_date && cur.start_date) {
+                  const gap = (new Date(cur.start_date) - new Date(prev.end_date)) / 60000;
+                  if (gap > 0) stayMin += gap;
+                }
+              }
               return (
-                <div className="px-4 py-2 border-b border-white/[0.06] flex items-center gap-3 flex-shrink-0">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-zinc-500 tabular-nums">{formatTimeRange(first.start_date, last.end_date)}<span className="text-zinc-600"> · {dayDrives.length}회 ({formatDuration(Math.round(totalMin))})</span></p>
-                    <p className="text-sm text-zinc-300 leading-snug break-words">
-                      {(() => {
-                        const raw = [first.start_address, ...dayDrives.map(d => d.end_address)].map(a => shortAddr(a) || '?');
-                        const chain = [];
-                        for (const addr of raw) { if (chain.length === 0 || chain[chain.length - 1] !== addr) chain.push(addr); }
-                        return chain.map((addr, i) => <span key={i}>{i > 0 && <span className="text-zinc-600 mx-1">→</span>}{addr}</span>);
-                      })()}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0 text-right tabular-nums">
-                    <p className="text-sm font-bold text-blue-400">{totalKm.toFixed(1)}<span className="text-xs text-zinc-600 ml-0.5">km</span></p>
-                    {totalKwh > 0 && <p className="text-sm font-semibold text-green-400">{totalKwh.toFixed(1)}<span className="text-xs text-zinc-600 ml-0.5">kWh</span>{usedPct > 0 && <span className="text-zinc-500 text-xs ml-1">({usedPct}%)</span>}</p>}
-                    {perKm != null && <p className="text-xs text-amber-400">{perKm}<span className="text-zinc-600 ml-0.5">Wh/km</span></p>}
-                  </div>
+                <div className="px-4 py-1.5 border-b border-white/[0.06] flex flex-col gap-0.5 flex-shrink-0">
+                  <p className="text-sm text-zinc-500 tabular-nums flex items-center gap-1.5 flex-wrap">
+                    <span>{formatTimeRange(first.start_date, last.end_date)}</span>
+                    <span className="text-zinc-700">·</span>
+                    <span title="주행"><span className="mr-0.5">🚗</span>{dayDrives.length}회</span>
+                    {totalMin > 0 && (
+                      <>
+                        <span className="text-zinc-700">·</span>
+                        <span title="운전"><span className="mr-0.5">🛣️</span>{formatHm(Math.round(totalMin))}</span>
+                      </>
+                    )}
+                    {stayMin > 0 && (
+                      <>
+                        <span className="text-zinc-700">·</span>
+                        <span title="정차"><span className="mr-0.5">🅿️</span>{formatHm(Math.round(stayMin))}</span>
+                      </>
+                    )}
+                  </p>
+                  <p className="text-sm text-zinc-300 leading-snug truncate">
+                    {(() => {
+                      const raw = [first.start_address, ...dayDrives.map(d => d.end_address)].map(a => shortAddr(a) || '?');
+                      const chain = [];
+                      for (const addr of raw) { if (chain.length === 0 || chain[chain.length - 1] !== addr) chain.push(addr); }
+                      return chain.map((addr, i) => <span key={i}>{i > 0 && <span className="text-zinc-600 mx-1">→</span>}{addr}</span>);
+                    })()}
+                  </p>
+                  <p className="text-xs tabular-nums flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold text-blue-400">{totalKm.toFixed(1)}<span className="text-zinc-600 ml-0.5">km</span></span>
+                    {totalKwh > 0 && (
+                      <>
+                        <span className="text-zinc-700">·</span>
+                        <span className="font-semibold text-green-400">{totalKwh.toFixed(1)}<span className="text-zinc-600 ml-0.5">kWh</span>{usedPct > 0 && <span className="text-zinc-500 ml-1">({usedPct}%)</span>}</span>
+                      </>
+                    )}
+                    {perKm != null && (
+                      <>
+                        <span className="text-zinc-700">·</span>
+                        <span className="text-amber-400">{perKm}<span className="text-zinc-600 ml-0.5">Wh/km</span></span>
+                      </>
+                    )}
+                  </p>
                 </div>
               );
             })() : selectedDrive ? (() => {
@@ -424,18 +498,107 @@ function HistoryInner() {
                 )}
               </div>
             ) : null}
-            <div className="flex-1 p-2">
-              <DriveMap
-                positions={monthMode ? [] : positions}
-                routes={monthMode ? monthRoutes : dayMode ? dayRoutes : undefined}
-                loading={loadingRoute}
-                placeMarker={selectedPlace}
-                visible={viewMode === 'map'}
-                highlightLatLng={highlightLatLng}
-              />
-            </div>
-            {sparkRoutes.length > 0 && !selectedPlace && (
-              <RouteSparklines routes={sparkRoutes} selectedIdx={selectedPosIdx} onSelect={setSelectedPosIdx} />
+            {dayMode ? (() => {
+              // 리스트 영역 — 모바일(<=768px) 3행 / 데스크톱 5행 고정. 행수 초과 시 내부 스크롤.
+              // 높이 = HEADER + N*ITEM + (N-1)*GAP. 지도는 남은 공간 flex-1.
+              const ITEM_PX = 32; // py-1.5 + 배지 w-5(20px) → 32px
+              const GAP_PX = 22;  // 정차 gap 행: py-1 + text-[10px]
+              const HEADER_PX = 24;
+              const FIXED_ROWS = isMobile ? 3 : 5; // 모바일(<=768px) 3행, 데스크톱 5행
+              const listH = dayRoutes.length > 0 ? HEADER_PX + FIXED_ROWS * ITEM_PX + (FIXED_ROWS - 1) * GAP_PX : 0;
+              const scrollable = dayRoutes.length > FIXED_ROWS;
+              return (
+                <div className="flex-1 min-h-0 flex flex-col">
+                  <div className="flex-1 min-h-0 p-2">
+                    <DriveMap
+                      positions={positions}
+                      routes={dayRoutes}
+                      loading={loadingRoute}
+                      placeMarker={selectedPlace}
+                      visible={viewMode === 'map'}
+                      highlightLatLng={highlightLatLng}
+                      highlightRouteId={selectedDayDriveId}
+                    />
+                  </div>
+                  {sparkRoutes.length > 0 && !selectedPlace && (
+                    <RouteSparklines routes={sparkRoutes} selectedIdx={selectedPosIdx} onSelect={setSelectedPosIdx} />
+                  )}
+                  {dayRoutes.length > 0 && (
+                    <div className="flex-shrink-0 border-t border-white/[0.06] flex flex-col" style={{ height: `${listH}px` }}>
+                      <div className="px-3 py-1 text-[10px] text-zinc-500 font-semibold tracking-wider bg-white/[0.02] flex items-center justify-between flex-shrink-0">
+                        <span>그날의 주행 {dayRoutes.length}회</span>
+                        {selectedDayDriveId != null && (
+                          <button onClick={() => setSelectedDayDriveId(null)} className="text-[10px] text-zinc-400 hover:text-white">전체 보기</button>
+                        )}
+                      </div>
+                      <div className={`flex-1 min-h-0 ${scrollable ? 'overflow-y-auto overscroll-contain' : ''}`}>
+                        {dayRoutes.flatMap((r, idx) => {
+                          const drive = drives.find(d => d.id === r.id);
+                          if (!drive) return [];
+                          const prevR = idx > 0 ? dayRoutes[idx - 1] : null;
+                          const prevDrive = prevR ? drives.find(d => d.id === prevR.id) : null;
+                          const gapMin = (prevDrive?.end_date && drive.start_date)
+                            ? Math.round((new Date(drive.start_date) - new Date(prevDrive.end_date)) / 60000)
+                            : 0;
+                          const label = idx === 0 ? 'S' : idx === dayRoutes.length - 1 ? 'E' : String(idx);
+                          const dt = new Date(drive.start_date);
+                          const time = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+                          const isSelected = selectedDayDriveId === r.id;
+                          const nodes = [];
+                          if (gapMin > 0) {
+                            nodes.push(
+                              <div key={`gap-${r.id}`} className="flex items-center gap-2 px-3 py-1 bg-black/20">
+                                <div className="flex-1 h-px bg-white/[0.05]" />
+                                <span className="text-[10px] text-zinc-500 tabular-nums">{formatDuration(gapMin)}</span>
+                                <div className="flex-1 h-px bg-white/[0.05]" />
+                              </div>
+                            );
+                          }
+                          nodes.push(
+                            <button
+                              key={r.id}
+                              type="button"
+                              onClick={() => setSelectedDayDriveId(prev => prev === r.id ? null : r.id)}
+                              className={`w-full text-left flex items-center gap-2 px-3 py-1.5 border-b border-white/[0.04] last:border-0 transition-colors ${
+                                isSelected ? 'bg-blue-500/15' : 'hover:bg-white/[0.025] active:bg-blue-500/10'
+                              }`}
+                            >
+                              <span
+                                className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                                style={{ backgroundColor: r.color }}
+                              >{label}</span>
+                              <span className="text-[11px] text-zinc-500 tabular-nums flex-shrink-0">{time}</span>
+                              <span className="flex-1 text-xs text-zinc-300 truncate">
+                                {shortAddr(drive.start_address) || '?'}<span className="text-zinc-600 mx-1">→</span>{shortAddr(drive.end_address) || '?'}
+                              </span>
+                              <span className="text-xs font-bold text-blue-400 tabular-nums flex-shrink-0">
+                                {drive.distance}<span className="text-[10px] text-zinc-600 ml-0.5">km</span>
+                              </span>
+                            </button>
+                          );
+                          return nodes;
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })() : (
+              <>
+                <div className="flex-1 p-2">
+                  <DriveMap
+                    positions={monthMode ? [] : positions}
+                    routes={monthMode ? monthRoutes : undefined}
+                    loading={loadingRoute}
+                    placeMarker={selectedPlace}
+                    visible={viewMode === 'map'}
+                    highlightLatLng={highlightLatLng}
+                  />
+                </div>
+                {sparkRoutes.length > 0 && !selectedPlace && (
+                  <RouteSparklines routes={sparkRoutes} selectedIdx={selectedPosIdx} onSelect={setSelectedPosIdx} />
+                )}
+              </>
             )}
           </div>
         </div>
@@ -449,7 +612,6 @@ function HistoryInner() {
                 drives={drives}
                 loadingDrives={loadingDrives}
                 error={error}
-                onDriveClick={goToDrive}
                 onDayClick={goToDay}
                 onMonthClick={goToMonth}
                 driveDayStr={driveDayStr}

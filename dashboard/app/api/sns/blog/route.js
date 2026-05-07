@@ -1,4 +1,4 @@
-import { requireAuth } from '@/lib/auth-helper';
+import { requireAuth, assertSameOrigin } from '@/lib/auth-helper';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +9,8 @@ export const dynamic = 'force-dynamic';
 // 응답: { ok: true, request_id, accepted_at, platform, body_len }
 
 export async function POST(req) {
+  const csrf = assertSameOrigin(req);
+  if (csrf) return csrf;
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
 

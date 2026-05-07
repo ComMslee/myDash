@@ -33,7 +33,10 @@ export function getState() {
 export function setState(patch) {
   state = { ...state, ...patch };
   try {
-    fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+    // atomic — tmp 파일에 쓴 뒤 rename. 도중 crash 시 부분 쓰기로 JSON 깨지는 회귀 방지.
+    const tmp = STATE_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
+    fs.renameSync(tmp, STATE_FILE);
   } catch (e) {
     console.error('[state] save failed', e);
   }

@@ -66,9 +66,13 @@ TeslaMate가 관리하는 PostgreSQL 16 스키마. 직접 쿼리만 사용 (ORM 
 | 함수 | 설명 |
 |------|------|
 | `formatDuration(min)` | 분 → "X시간 Y분" 또는 "Y분" |
+| `formatHm(min)` | 분 → "Xh Ym" 또는 "—" (0/null) |
+| `formatHours(hours)` | 시간(소수) → "Xh Ym" |
 | `formatDate(iso)` | ISO → "M월 D일 HH:MM" |
 | `shortAddr(addr)` | 주소의 첫 번째 쉼표 이전 부분만 반환 |
 | `formatKorDate(iso)` | ISO → "YY/MM/DD" 또는 "MM/DD" (올해면 연도 생략) |
+| `formatKorDateTime(iso)` | ISO → "YY/MM/DD HH:MM" (올해면 연도 생략) |
+| `formatKorDay(day)` | "YYYY-MM-DD" → "M/D (요일)" |
 
 ## KST 헬퍼 (`dashboard/lib/kst.js`)
 

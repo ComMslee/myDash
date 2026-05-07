@@ -29,7 +29,7 @@
 - **자동 갱신 주기**:
   - 홈/헤더: 30초 (setInterval)
   - 집충전기 클라이언트 폴링: 60초 (`POLL_INTERVAL_MS`)
-  - 집충전기 서버 캐시 TTL: 동적 3~30분 (최근 90일 충전 히스토리 기반 학습, 24시간마다 재계산)
+  - 집충전기 서버 캐시 TTL: 정적 5~12분(시간대별 `CACHE_TIERS`). 동적 모드(`USE_DYNAMIC_TTL=true`) 활성화 시 4~15분 clamp + 90일 히스토리 학습(현재 비활성)
   - 집충전기 instrumentation keep-warm: 2분마다 점검 (fresh면 no-op)
   - 집충전기 사용 카운트(`charger_usage`): 30분당 최대 1회 증가 (시간당 최대 1회)
 
@@ -43,7 +43,7 @@
   - 전역 공유 컴포넌트 → `dashboard/app/components/`
   - 페이지 전용 컴포넌트 → 해당 라우트 폴더
   - 복잡한 컴포넌트 내부 모듈 → 동명 서브폴더 (예: `HomeChargerCard.js` + `home-charger/`)
-- **fetch 정리**: `useEffect` 내 fetch는 `AbortController`로 언마운트/파라미터 변경 시 취소 (`setState`-after-unmount 경고 방지) — 예: `roadtrips/useDriveData.js`
+- **fetch 정리**: `useEffect` 내 fetch는 `AbortController`로 언마운트/파라미터 변경 시 취소 (`setState`-after-unmount 경고 방지) — 예: `app/v2/history/useDriveData.js`
 - **비싼 계산**: 배열 flat/stats/패스 생성 등은 `useMemo`로 메모이즈 (예: `RouteSparklines.js`)
 
 ## 성능 · 안전성

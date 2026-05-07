@@ -7,7 +7,6 @@
 *.pem
 *.pfx
 *.p12
-nginx-*.htpasswd
 secrets/
 .tm_password.txt
 budget.json

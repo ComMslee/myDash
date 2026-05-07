@@ -1,7 +1,7 @@
 import { pool } from './db.js';
 import {
-  sendMessage, sendLocation, escapeHtml,
-  deleteMyCommands, answerCallbackQuery, editMessageText,
+  sendMessage, escapeHtml,
+  deleteMyCommands, answerCallbackQuery,
 } from './telegram.js';
 import { formatKst } from './format.js';
 import {
@@ -9,11 +9,17 @@ import {
   getUser, upsertPending, setRole,
   listPending, getRoots,
   hasPermission,
+  getDefaultAreaCode, setDefaultAreaCode,
 } from './auth.js';
-import { getCategories, categoryByKey, labelOf } from './categories.js';
+import { getCategories, labelOf } from './categories.js';
 import { listUserGroups, applyUserGroup } from './user_groups.js';
 import { dashGet, dashPost } from './dash.js';
 import { setPending, getPending, clearPending } from './pending.js';
+
+import { cmdSoc, cmdWhere, cmdPeriod, cmdChargers, cmdPlaces, showFreqPlaces, showDwellPlaces } from './handlers/car.js';
+import { cmdWeather, cmdForecast, cmdEvent, cmdMemo, cmdFestivals, showFestivals, cmdSetArea } from './handlers/family.js';
+import { cmdPost, handleSnsCallback, snsCancelKeyboard, snsConfirmKeyboard } from './handlers/sns.js';
+import { cmdPending, cmdSetGroup, cmdDeny } from './handlers/admin.js';
 
 // ── 명령 카탈로그 ─────────────────────────────────────
 // open: 누구나 (등록 안 된 사람도 가능)
@@ -26,26 +32,31 @@ const COMMANDS = {
   '/categories':{ open: true,     handler: cmdCategories },
   '/soc':       { feature: 'car', handler: cmdSoc },
   '/charge':    { feature: 'car', handler: cmdSoc },        // alias — /soc 응답에 충전 상세 통합.
-  '/today':     { feature: 'car', handler: cmdToday },
-  '/yesterday': { feature: 'car', handler: cmdYesterday }, // alias — /period 안에 포함, 옛 슬래시 호환.
-  '/week':      { feature: 'car', handler: cmdPeriod },     // alias — /period 와 동일.
+  '/range':     { feature: 'car', handler: cmdSoc },        // alias — /soc 응답에 거리 통합.
+  '/battery':   { feature: 'car', handler: cmdSoc },        // alias.
+  '/today':     { feature: 'car', handler: cmdPeriod },     // alias — /period 안에 오늘 포함.
+  '/yesterday': { feature: 'car', handler: cmdPeriod },     // alias — 옛 슬래시 호환.
+  '/week':      { feature: 'car', handler: cmdPeriod },     // alias.
+  '/summary':   { feature: 'car', handler: cmdPeriod },     // alias.
   '/period':    { feature: 'car', handler: cmdPeriod },
-  '/range':     { feature: 'car', handler: cmdRange },
   '/parked':    { feature: 'car', handler: cmdWhere },      // alias — /where 와 통합.
   '/where':     { feature: 'car', handler: cmdWhere },
   '/chargers':  { feature: 'car', handler: cmdChargers },
+  '/places':    { feature: 'car', handler: cmdPlaces },
   // family — mock. 인터페이스 검증용 placeholder.
   '/weather':   { feature: 'family', handler: cmdWeather },
   '/forecast':  { feature: 'family', handler: cmdForecast },
   '/event':     { feature: 'family', handler: cmdEvent },
   '/memo':      { feature: 'family', handler: cmdMemo },
+  '/festivals': { feature: 'family', handler: cmdFestivals },
+  '/setarea':   { feature: 'family', handler: cmdSetArea },
   // sns — 현재는 dashboard 까지 전달되는지 확인용 mock. 실제 발행 X.
   '/post':      { feature: 'sns', handler: cmdPost },
   // 운영 — 모바일에서 빠르게 처리할 최소 셋. 나머지(/users, /grant, /revoke,
   // /unmatched, /topnope, /resolve, /broadcast)는 /v2/tg 웹에서.
-  '/pending':   { rootOnly: true, handler: cmdPending },
-  '/setgroup':  { rootOnly: true, handler: cmdSetGroup },
-  '/deny':      { rootOnly: true, handler: cmdDeny },
+  '/pending':   { rootOnly: true, handler: (ctx) => cmdPending(ctx) },
+  '/setgroup':  { rootOnly: true, handler: (ctx) => cmdSetGroup(ctx, { syncUserMenu, cmdHelp }) },
+  '/deny':      { rootOnly: true, handler: (ctx) => cmdDeny(ctx, { syncUserMenu }) },
 };
 
 // hub_unmatched_inputs 스키마.
@@ -189,10 +200,11 @@ export async function handleMessage(message) {
 // "새로고침" 또는 인접 명령 단축). 응답은 새 메시지로 보냄(stateless).
 // 향후 SNS 등 다단계 대화는 'sns:tw', 'post:confirm' 같은 prefix 로 확장.
 const CB_ROUTES = {
-  soc: cmdSoc, range: cmdRange,     // /charge 는 /soc 와 통합 — 응답에 충전 상세 포함.
-  today: cmdToday, period: cmdPeriod,
-  where: cmdWhere,                  // /parked 와 통합.
+  soc: cmdSoc,                       // /charge /range /battery 모두 alias.
+  period: cmdPeriod,                 // /today /yesterday /week 모두 alias.
+  where: cmdWhere,                   // /parked 와 통합.
   chargers: cmdChargers,
+  places: cmdPlaces,
 };
 
 export async function handleCallback(cb) {
@@ -213,6 +225,23 @@ export async function handleCallback(cb) {
     return handleSnsCallback(chatId, data.slice(4), user);
   }
 
+  // places:<freq|dwell> — 가는 곳 종류 분기.
+  if (data.startsWith('places:')) {
+    if (!(await hasPermission(chatId, 'car'))) return;
+    const kind = data.slice(7);
+    if (kind === 'freq')  return showFreqPlaces(chatId);
+    if (kind === 'dwell') return showDwellPlaces(chatId);
+    return;
+  }
+
+  // festivals:<range>:<areaCode> — 축제 목록 재실행 (range, area 인라인 토글).
+  // areaCode 빈문자열 = 전국. range = 'month' | 'weekend'.
+  if (data.startsWith('festivals:')) {
+    if (!(await hasPermission(chatId, 'family'))) return;
+    const [, range, areaCode] = data.split(':');
+    return showFestivals(chatId, { range, areaCode: areaCode || '' });
+  }
+
   // cmd:<name> — 데이터 명령 후속 액션.
   const m = data.match(/^cmd:([a-z]+)$/);
   if (!m) return;
@@ -222,73 +251,6 @@ export async function handleCallback(cb) {
   // 데이터 명령 = car feature 권한 필요.
   if (!(await hasPermission(chatId, 'car'))) return;
   return fn({ chatId, args: '', user });
-}
-
-// SNS 글쓰기 다단계 대화 — pending 상태 + 사용자 액션 분기.
-async function handleSnsCallback(chatId, action, user) {
-  if (action === 'cancel') {
-    clearPending(chatId);
-    return sendMessage('❌ 글쓰기를 취소했어요.', chatId);
-  }
-  if (action === 'edit') {
-    setPending(chatId, 'sns:body');
-    return sendMessage(
-      '✏️ 다시 본문/사진을 보내주세요. (5분 안)',
-      chatId,
-      snsCancelKeyboard(),
-    );
-  }
-  if (action === 'publish') {
-    const p = getPending(chatId);
-    if (!p || p.action !== 'sns:confirm') {
-      return sendMessage('⏰ 입력 시간이 지났어요. 다시 시도해 주세요.', chatId);
-    }
-    const r = await dashPost('/api/sns/blog', {
-      platform: 'naver',
-      body: p.data.body || '',
-      photos: p.data.photos || [],
-      chat_id: chatId,
-      user_name: user?.name || null,
-    });
-    clearPending(chatId);
-    if (r?.ok) {
-      return sendMessage(
-        [
-          '✅ 서버 전달 확인됨 (mock)',
-          '',
-          `<i>요청 ID: ${escapeHtml(r.request_id || '-')}</i>`,
-          '<i>실제 발행은 후속 PR에서 추가됩니다.</i>',
-        ].join('\n'),
-        chatId,
-      );
-    }
-    return sendMessage(
-      `❌ 서버 전달 실패\n<i>${escapeHtml(r?.error || 'unknown')}</i>`,
-      chatId,
-    );
-  }
-}
-
-// 글쓰기 진입/수정 단계용 inline 키보드 ([❌ 취소] 만).
-function snsCancelKeyboard() {
-  return {
-    reply_markup: {
-      inline_keyboard: [[{ text: '❌ 취소', callback_data: 'sns:cancel' }]],
-    },
-  };
-}
-
-// 글쓰기 미리보기 단계용 inline 키보드 ([✅ 발행] [✏️ 수정] [❌ 취소]).
-function snsConfirmKeyboard() {
-  return {
-    reply_markup: {
-      inline_keyboard: [[
-        { text: '✅ 발행', callback_data: 'sns:publish' },
-        { text: '✏️ 수정', callback_data: 'sns:edit' },
-        { text: '❌ 취소', callback_data: 'sns:cancel' },
-      ]],
-    },
-  };
 }
 
 // pending 액션 진행 중인 사용자 메시지 처리.
@@ -388,18 +350,19 @@ async function cmdStart({ chatId }) {
 // btn: Reply 키보드에 노출되는 한글 라벨. 누르면 그 텍스트가 봇에 전송 → BUTTON_TO_CMD 로 슬래시 매핑.
 const CATEGORY_COMMANDS = {
   car: [
-    { cmd: '/soc',       desc: '배터리 % + 충전 상세 (통합)',     btn: '🔋 배터리' },
-    { cmd: '/range',     desc: '남은 주행거리',                   btn: '🛣 주행거리' },
-    { cmd: '/today',     desc: '오늘 (KST) 주행/충전',            btn: '📊 오늘' },
-    { cmd: '/period',    desc: '이번주·지난주·이번달 요약',       btn: '📆 주간/월간' },
-    { cmd: '/where',     desc: '현재 위치 (정차/주행 통합)',      btn: '📍 위치' },
-    { cmd: '/chargers',  desc: '즐겨찾기 충전기 사용량',          btn: '🔌 충전기' },
+    { cmd: '/soc',       desc: '배터리 % · 거리 · 충전 (통합)',          btn: '🔋 배터리' },
+    { cmd: '/period',    desc: '오늘·이번주·저번주·이번달·이전달 (km·전비)', btn: '📊 요약' },
+    { cmd: '/where',     desc: '현재 위치 (정차/주행 통합)',             btn: '📍 위치' },
+    { cmd: '/places',    desc: '자주가는 곳 / 오래머문 곳 TOP3 (집·회사 제외)', btn: '🗺 가는 곳' },
+    { cmd: '/chargers',  desc: '즐겨찾기 충전기 사용량',                 btn: '🔌 충전기' },
   ],
   family: [
-    { cmd: '/weather',   desc: '오늘 날씨 (mock)',           btn: '🌤 오늘 날씨' },
-    { cmd: '/forecast',  desc: '강수 사전 알림 (mock)',      btn: '🌧 강수 예보' },
-    { cmd: '/event',     desc: '일정 등록·조회 (mock)',      btn: '📅 일정' },
-    { cmd: '/memo',      desc: '메모/장보기 (mock)',         btn: '📝 메모' },
+    { cmd: '/weather',   desc: '오늘 날씨 (mock)',                              btn: '🌤 오늘 날씨' },
+    { cmd: '/forecast',  desc: '강수 사전 알림 (mock)',                         btn: '🌧 강수 예보' },
+    { cmd: '/event',     desc: '일정 등록·조회 (mock)',                         btn: '📅 일정' },
+    { cmd: '/memo',      desc: '메모/장보기 (mock)',                            btn: '📝 메모' },
+    { cmd: '/festivals', desc: '축제 — 한 달/주말, 지역 필터',                  btn: '🎉 축제' },
+    { cmd: '/setarea',   desc: '내 지역 설정 (축제 등 가족 기능 기본 지역)',    btn: '🗺 내 지역' },
   ],
   sns: [
     { cmd: '/post',      desc: '블로그 발행 (mock)',         btn: '📝 글쓰기' },
@@ -413,28 +376,7 @@ for (const arr of Object.values(CATEGORY_COMMANDS)) {
   for (const c of arr) if (c.btn) BUTTON_TO_CMD[c.btn] = c.cmd;
 }
 
-// 데이터 명령 응답 끝에 동봉할 inline 후속 액션 (1행 3버튼).
-// 첫 칸은 항상 🔄 새로고침 (같은 명령 재실행).
-// 나머지 2칸은 응답 컨텍스트와 연관성 높은 후속 명령.
-// callback_data 포맷: 'cmd:<name>'.
-const FOLLOWUP = {
-  soc:      [['🔄', 'cmd:soc'],     ['🛣 거리', 'cmd:range'],   ['🔌 충전기', 'cmd:chargers']],
-  range:    [['🔄', 'cmd:range'],   ['🔋 배터리', 'cmd:soc'],   ['📊 오늘', 'cmd:today']],
-  where:    [['🔄', 'cmd:where'],   ['📊 오늘', 'cmd:today'],   ['🛣 거리', 'cmd:range']],
-  today:    [['🔄', 'cmd:today'],   ['📆 주간/월간', 'cmd:period'], ['🔌 충전기', 'cmd:chargers']],
-  period:   [['🔄', 'cmd:period'],  ['📊 오늘', 'cmd:today'],   ['🔌 충전기', 'cmd:chargers']],
-  chargers: [['🔄', 'cmd:chargers'],['🔋 배터리', 'cmd:soc'],   ['📊 오늘', 'cmd:today']],
-};
-
-function followUp(cmdKey) {
-  const set = FOLLOWUP[cmdKey];
-  if (!set) return null;
-  return {
-    reply_markup: {
-      inline_keyboard: [set.map(([text, callback_data]) => ({ text, callback_data }))],
-    },
-  };
-}
+// FOLLOWUP/followUp 는 분할 후 handlers/car.js 안에 단일 정의로 이전됨 (호출처 = car 핸들러만).
 
 // 텔레그램 입력창 [/] 메뉴 자동완성을 사용자별로 비움.
 // 봇은 Reply 키보드 진입만 사용 — 슬래시는 채팅창에 직접 입력하면 응답·가이드가 잘 나오므로
@@ -555,343 +497,4 @@ async function cmdWhoami({ chatId, user }) {
   // chat_id 는 운영용 식별자라 root 한테만 노출 — 일반 가족 사용자엔 의미 없는 숫자.
   if (isRoot) lines.push(`<i>chat_id: <code>${chatId}</code></i>`);
   return sendMessage(lines.join('\n'), chatId);
-}
-
-// 배터리 + 충전 통합 응답 — 충전 중이면 상세 (시작SOC→현재, kWh, kW, 경과),
-// 충전 중 아니면 마지막 충전 기록만 짧게.
-async function cmdSoc({ chatId }) {
-  const [car, ch] = await Promise.all([
-    dashGet('/api/car'),
-    dashGet('/api/charging-status'),
-  ]);
-  if (!car || car.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
-  if (car.battery_level == null) return sendMessage('포지션 데이터 없음', chatId);
-
-  const usable = car.usable_battery_level != null && car.usable_battery_level !== car.battery_level
-    ? ` (사용가능 ${car.usable_battery_level}%)`
-    : '';
-  const lines = [`🔋 <b>${car.battery_level}%</b>${usable}`];
-
-  if (ch?.charging) {
-    const power = ch.charger_power != null ? Number(ch.charger_power).toFixed(1) : null;
-    const kwh = Number(ch.charge_energy_added || 0).toFixed(2);
-    const startSoc = ch.start_battery_level ?? '?';
-    const elapsedMin = ch.start_date
-      ? Math.floor((Date.now() - new Date(ch.start_date).getTime()) / 60000)
-      : null;
-    const fb = ch.fallback ? ' <i>(폴백 감지)</i>' : '';
-    lines.push(`⚡ <b>충전 중</b>${fb} — ${startSoc}% → <b>${car.battery_level}%</b>`);
-    const meta = [];
-    meta.push(`📥 ${kwh} kWh`);
-    if (power) meta.push(`${power} kW`);
-    if (elapsedMin != null) meta.push(`${fmtElapsed(elapsedMin)} 경과`);
-    lines.push(meta.join(' · '));
-  } else {
-    const last = car.last_charge;
-    if (last) {
-      lines.push(`⚡ 충전 중 아님`);
-      lines.push(`<i>마지막: ${formatKst(last.end_date)} KST · ${last.soc_start ?? '?'}% → ${last.soc_end ?? '?'}%</i>`);
-    } else {
-      lines.push('⚡ 충전 중 아님');
-    }
-  }
-
-  if (car.last_seen) lines.push(`<i>업데이트: ${formatKst(car.last_seen)} KST</i>`);
-  return sendMessage(lines.join('\n'), chatId, followUp('soc'));
-}
-
-async function cmdToday({ chatId }) {
-  const j = await dashGet('/api/summary?range=today');
-  if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
-  const d = j.drives || {}; const c = j.charges || {};
-  return sendMessage([
-    '<b>오늘 (KST)</b>',
-    d.n > 0 ? `🚗 ${d.n}회 주행 · ${Number(d.km).toFixed(1)} km · ${d.dur}분` : '🚗 주행 없음',
-    c.n > 0 ? `⚡ ${c.n}회 충전 · ${Number(c.kwh).toFixed(2)} kWh` : '⚡ 충전 없음',
-  ].join('\n'), chatId, followUp('today'));
-}
-
-// /parked 와 /where 통합 — 정차 중이면 장소·경과, 주행 중이면 시작 시각 + 현재 좌표 + 핀.
-async function cmdWhere({ chatId }) {
-  const [park, loc] = await Promise.all([
-    dashGet('/api/parked'),
-    dashGet('/api/location'),
-  ]);
-  const parkErr = !park || park.error;
-  const locErr  = !loc  || loc.error;
-  if (parkErr && locErr) return sendMessage('데이터를 가져오지 못했어요', chatId);
-
-  const lines = [];
-  if (!parkErr && park.driving) {
-    lines.push('🚗 <b>주행 중</b>');
-    if (park.drive_started_at) lines.push(`<i>시작: ${formatKst(park.drive_started_at)} KST</i>`);
-  } else if (!parkErr && park.parked) {
-    const p = park.parked;
-    lines.push(`🅿️ <b>${escapeHtml(p.place || '?')}</b>`);
-    lines.push(`<i>정차: ${formatKst(p.end_date)} KST (${fmtElapsed(p.elapsed_min)} 전)</i>`);
-  }
-
-  let lat = null, lng = null;
-  if (!locErr && loc.lat != null) {
-    lat = Number(loc.lat); lng = Number(loc.lng);
-    const latS = lat.toFixed(6);
-    const lngS = lng.toFixed(6);
-    const url = `https://maps.google.com/?q=${latS},${lngS}`;
-    if (lines.length) lines.push('');
-    lines.push(`📍 <a href="${url}">${latS}, ${lngS}</a>`);
-    lines.push(`<i>업데이트: ${formatKst(loc.date)} KST</i>`);
-  }
-
-  if (!lines.length) return sendMessage('위치 데이터 없음', chatId, followUp('where'));
-
-  await sendMessage(lines.join('\n'), chatId, followUp('where'));
-  if (lat != null && lng != null) return sendLocation(lat, lng, chatId);
-}
-
-// 새 핸들러는 dashboard API 호출만 — TeslaMate DB 직접 쿼리는 dashboard 가 책임.
-// 기존 /soc /today /where 도 같은 패턴으로 점진 마이그 (후속 PR).
-
-function fmtElapsed(min) {
-  if (!Number.isFinite(min) || min < 0) return '?';
-  return min >= 60
-    ? `${Math.floor(min / 60)}시간 ${min % 60}분`
-    : `${min}분`;
-}
-
-// 이번주·지난주·이번달 한 응답에 — 짧은 퀵뷰. 상세는 대시보드.
-async function cmdPeriod({ chatId }) {
-  const j = await dashGet('/api/summary?range=multi');
-  if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
-
-  const fmt = (key, label) => {
-    const r = j[key];
-    if (!r) return null;
-    const d = r.drives || {}; const c = r.charges || {};
-    const driveStr = d.n > 0
-      ? `🚗 ${Number(d.km).toFixed(0)} km · ${d.n}회`
-      : '🚗 -';
-    const chargeStr = c.n > 0
-      ? `⚡ ${Number(c.kwh).toFixed(1)} kWh · ${c.n}회`
-      : '⚡ -';
-    return `<b>${label}</b>  ${driveStr}  ${chargeStr}`;
-  };
-
-  const lines = ['<b>📆 기간 요약</b> (KST)', ''];
-  const t = fmt('this_week',  '이번주');
-  const l = fmt('last_week',  '지난주');
-  const m = fmt('month',      '이번달');
-  if (t) lines.push(t);
-  if (l) lines.push(l);
-  if (m) lines.push(m);
-  lines.push('');
-  lines.push('<i>상세는 대시보드 /v2 에서</i>');
-  return sendMessage(lines.join('\n'), chatId, followUp('period'));
-}
-
-// 옛 슬래시 호환 — /yesterday /week 입력 시에도 같은 퀵뷰 보여줌.
-async function cmdYesterday(args) {
-  return cmdPeriod(args);
-}
-
-async function cmdRange({ chatId }) {
-  const j = await dashGet('/api/car');
-  if (!j || j.error) return sendMessage('데이터를 가져오지 못했어요', chatId);
-  if (j.rated_battery_range == null) return sendMessage('주행거리 데이터 없음', chatId);
-  const rated = j.rated_battery_range;
-  const est = j.est_battery_range;
-  const lines = [`🛣 <b>${rated} km</b> 남음 (${j.battery_level ?? '-'}%)`];
-  if (est && est !== rated) lines.push(`<i>예상 ${est} km</i>`);
-  if (j.last_seen) lines.push(`<i>업데이트: ${formatKst(j.last_seen)} KST</i>`);
-  return sendMessage(lines.join('\n'), chatId, followUp('range'));
-}
-
-// 즐겨찾기 충전기 — station 별 가용/사용중/전체 한 줄 요약 (퀵뷰).
-// 상세는 대시보드 /v2 충전기 페이지.
-async function cmdChargers({ chatId }) {
-  const j = await dashGet('/api/home-charger');
-  if (!j || j.error) {
-    return sendMessage(
-      `🔌 충전기 데이터를 가져오지 못했어요\n<i>${escapeHtml(j?.error || '연결 오류').slice(0, 80)}</i>`,
-      chatId,
-      followUp('chargers'),
-    );
-  }
-  if (!Array.isArray(j.stations) || !j.stations.length) {
-    return sendMessage('🔌 등록된 충전기가 없어요', chatId, followUp('chargers'));
-  }
-
-  const lines = ['🔌 <b>즐겨찾기 충전기</b>', ''];
-  for (const s of j.stations) {
-    const name = escapeHtml(s.station?.statNm || s.station?.statId || '?');
-    const cs = s.chargers || [];
-    const total = cs.length;
-    if (!total) { lines.push(`<b>${name}</b> — 충전기 없음`); continue; }
-    // 환경공단 상태 코드: 1=오프라인, 2=가용, 3=충전 중, 4=운영 중지, 5=점검, 9=상태 미상
-    const available = cs.filter((c) => c.stat === '2').length;
-    const using     = cs.filter((c) => c.stat === '3').length;
-    const offline   = cs.filter((c) => c.stat === '1').length;
-    const maintain  = cs.filter((c) => c.stat === '4' || c.stat === '5' || c.stat === '9').length;
-    const icon = available > 0 ? '🟢' : (using > 0 ? '🔴' : '⚫');
-    let line = `${icon} <b>${name}</b>  가용 ${available} · 충전중 ${using} / 전체 ${total}`;
-    const extra = [];
-    if (offline) extra.push(`오프라인 ${offline}`);
-    if (maintain) extra.push(`점검 ${maintain}`);
-    if (extra.length) line += `  <i>(${extra.join(', ')})</i>`;
-    lines.push(line);
-  }
-  lines.push('');
-  if (j.fetchedAt) lines.push(`<i>업데이트: ${formatKst(j.fetchedAt)} KST${j.stale ? ' · 캐시' : ''}</i>`);
-  lines.push('<i>상세는 대시보드 /v2 에서</i>');
-  return sendMessage(lines.join('\n'), chatId, followUp('chargers'));
-}
-
-// ── family (mock) ────────────────────────────────────
-// 인터페이스 검증용 placeholder. 실제 구현은 후속 PR.
-async function cmdWeather({ chatId }) {
-  return sendMessage(
-    [
-      '🌤 <b>오늘 날씨</b> (mock)',
-      '',
-      '<i>기상청 단기예보 연동은 준비 중입니다.</i>',
-      '<i>예정: 강수확률 / 기온 / 미세먼지 한 화면 요약</i>',
-    ].join('\n'),
-    chatId,
-  );
-}
-
-async function cmdForecast({ chatId }) {
-  return sendMessage(
-    [
-      '🌧 <b>강수 사전 알림</b> (mock)',
-      '',
-      '<i>비/눈 1~2시간 전 자동 알림 — 가족 broadcast 예정.</i>',
-      '<i>현재는 알림 폴러 미구현.</i>',
-    ].join('\n'),
-    chatId,
-  );
-}
-
-async function cmdEvent({ chatId }) {
-  return sendMessage(
-    [
-      '📅 <b>일정 관리</b> (mock)',
-      '',
-      '<i>등록·조회·반복 일정 + 사전 알림 — 다단계 대화로 입력 예정.</i>',
-      '<i>현재는 placeholder.</i>',
-    ].join('\n'),
-    chatId,
-  );
-}
-
-async function cmdMemo({ chatId }) {
-  return sendMessage(
-    [
-      '📝 <b>메모/장보기</b> (mock)',
-      '',
-      '<i>가족 공유 메모 + 항목별 ✅ 완료 체크 예정.</i>',
-      '<i>현재는 placeholder.</i>',
-    ].join('\n'),
-    chatId,
-  );
-}
-
-// ── SNS (mock) ───────────────────────────────────────
-// 다단계 대화: cmdPost → pending 'sns:body' → 사용자 메시지(텍스트/사진/사진+캡션)
-// → handlePendingMessage 가 미리보기 표시 + pending 'sns:confirm' → [✅ 발행] inline
-// → handleSnsCallback('publish') 가 dashboard POST + clearPending.
-// 인자 있으면 즉시 본문 입력으로 간주 — 한 줄 발행 단축 (사진은 다음 메시지로 보낼 수 없음).
-async function cmdPost({ chatId, args, user }) {
-  const body = (args || '').trim();
-  if (!body) {
-    setPending(chatId, 'sns:body');
-    return sendMessage(
-      [
-        '📝 <b>블로그 글쓰기</b> (mock)',
-        '',
-        '본문을 보내주세요. 사진도 첨부 가능합니다.',
-        '<i>(텍스트만 / 사진만 / 사진+캡션 모두 OK · 5분 안)</i>',
-      ].join('\n'),
-      chatId,
-      snsCancelKeyboard(),
-    );
-  }
-  // 인자로 들어온 단축 모드 — 즉시 미리보기 단계로.
-  setPending(chatId, 'sns:confirm', { body, photos: [] });
-  const lines = [
-    '📝 <b>발행 미리보기</b>',
-    '',
-    `<b>플랫폼</b>: 네이버 블로그`,
-    `<b>본문</b> (${body.length}자):`,
-    `<code>${escapeHtml(body.slice(0, 500))}${body.length > 500 ? '…' : ''}</code>`,
-    '',
-    '<i>발행하시려면 아래 버튼을 눌러주세요.</i>',
-  ];
-  return sendMessage(lines.join('\n'), chatId, snsConfirmKeyboard());
-}
-
-// ── 운영 명령 (root) ─────────────────────────────────
-
-async function cmdPending({ chatId }) {
-  const rows = await listPending();
-  if (!rows.length) return sendMessage('가입 대기 없음 ✨', chatId);
-  const groups = await listUserGroups();
-  const keys = groups.map((g) => g.key).join(' / ') || 'root / guest';
-  const lines = ['<b>📋 가입 대기</b>'];
-  for (const r of rows) {
-    lines.push(`#${r.chat_id} · ${escapeHtml(r.name || '-')} · ${formatKst(r.registered_at)}`);
-  }
-  lines.push('');
-  lines.push(`<i>적용: /setgroup &lt;chat_id&gt; &lt;group&gt; (${keys})</i>`);
-  lines.push('<i>거부: /deny &lt;chat_id&gt;</i>');
-  return sendMessage(lines.join('\n'), chatId);
-}
-
-async function cmdSetGroup({ chatId, args, user }) {
-  const [target, groupKey] = (args || '').split(/\s+/);
-  const groups = await listUserGroups();
-
-  if (!/^\d+$/.test(target) || !groupKey) {
-    const list = groups.length
-      ? groups.map((g) => `  • <code>${g.key}</code> ${g.label}${g.is_root ? ' [root]' : ''}`).join('\n')
-      : '  (없음)';
-    return sendMessage(
-      [
-        '사용법: <code>/setgroup &lt;chat_id&gt; &lt;group&gt;</code>',
-        '예: <code>/setgroup 1234567890 guest</code>',
-        '',
-        '사용 가능 그룹:',
-        list,
-      ].join('\n'),
-      chatId,
-    );
-  }
-
-  const r = await applyUserGroup(target, groupKey, user.chat_id);
-  if (!r.ok) return sendMessage(`❌ ${r.error}`, chatId);
-  const label = groups.find((g) => g.key === groupKey)?.label || groupKey;
-  await sendMessage(`✅ #${target} → ${label} (role=${r.role})`, chatId);
-  // 대상자 [/] 메뉴 갱신 + 도움말 안내.
-  try { await syncUserMenu(target); } catch (e) { console.error('[setgroup] syncUserMenu', e?.message); }
-  try {
-    await sendMessage(
-      [
-        `🎉 사용 가능해요!`,
-        ``,
-        `채팅창 하단의 버튼을 누르거나 <b>/help</b> 로 시작하세요.`,
-      ].join('\n'),
-      target,
-    );
-    // /help 자동 호출 — 첫 사용 진입 부담 줄임.
-    await cmdHelp({ chatId: target });
-  } catch {}
-}
-
-async function cmdDeny({ chatId, args, user }) {
-  const target = (args || '').split(/\s+/)[0];
-  if (!/^\d+$/.test(target)) return sendMessage('사용법: /deny &lt;chat_id&gt;', chatId);
-  const ok = await setRole(target, 'denied', user.chat_id);
-  if (!ok) return sendMessage(`#${target} 없음`, chatId);
-  // 차단된 사용자 [/] 메뉴 비우기.
-  try { await syncUserMenu(target); } catch (e) { console.error('[deny] syncUserMenu', e?.message); }
-  return sendMessage(`🚫 #${target} 차단됨`, chatId);
 }

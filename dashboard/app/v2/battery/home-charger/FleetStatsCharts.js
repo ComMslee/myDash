@@ -63,22 +63,36 @@ export function RankRow({ icon, label, count, max, isPeak = false, delta = null,
   );
 }
 
-// 7×24 시간×요일 히트맵 — 한 셀 = (DOW, hour) 누적 활성 카운트
-// 색 구간: 0=회색(미사용), 약/중=파랑 농도, 강(>0.75)=주황(피크 강조)
-function heatColor(v, max) {
-  if (v === 0) return 'rgba(63,63,70,0.3)';
-  const r = v / max;
-  if (r > 0.75) return `rgba(245,158,11,${(0.6 + r * 0.35).toFixed(2)})`;
-  if (r > 0.4)  return `rgba(59,130,246,${(0.5 + r * 0.4).toFixed(2)})`;
-  return `rgba(59,130,246,${(0.3 + r * 0.25).toFixed(2)})`;
+// 7×24 시간×요일 히트맵 — 한 셀 = (DOW, hour) 누적 활성 카운트.
+// max 대비 비율 r = v/max 기반 5단계:
+//   0~60%  옅은 파랑    60~80% 중간 파랑    80~90% 진한 파랑
+//   90~95% 노랑(톤다운) 95~100% 주황
+// 평탄 분포(max < mean × 1.3) 시 노랑/주황 자동 OFF — 의미 없는 강조 방지.
+function makeHeatColor(flat) {
+  const max = Math.max(1, ...flat);
+  const active = flat.filter(v => v > 0);
+  const n = active.length;
+  const mean = n ? active.reduce((s, v) => s + v, 0) / n : 0;
+  const isFlat = n === 0 || max < mean * 1.3;
+  return (v) => {
+    if (v === 0) return 'rgba(63,63,70,0.3)';
+    const r = v / max;
+    if (!isFlat) {
+      if (r > 0.95) return 'rgba(245,158,11,0.95)';   // 주황 (피크)
+      if (r > 0.90) return 'rgba(202,138,4,0.85)';    // 노랑 톤다운 (yellow-600, 주목)
+    }
+    if (r > 0.80) return 'rgba(59,130,246,0.80)';     // 파랑 강
+    if (r > 0.60) return 'rgba(59,130,246,0.55)';     // 파랑 중
+    return 'rgba(59,130,246,0.30)';                    // 파랑 약
+  };
 }
 
 export function HeatmapChart({ heatmap }) {
   const flat = heatmap.flat();
-  const max = Math.max(1, ...flat);
   const total = flat.reduce((s, v) => s + v, 0);
   const nonZero = flat.filter(v => v > 0).length;
   const deadCells = 7 * 24 - nonZero;
+  const heatColor = makeHeatColor(flat);
   return (
     <div>
       {DOW_LABELS.map((lab, d) => (
@@ -92,7 +106,7 @@ export function HeatmapChart({ heatmap }) {
             <div
               key={h}
               className="h-5 rounded-[1px]"
-              style={{ background: heatColor(v, max) }}
+              style={{ background: heatColor(v) }}
               title={`${lab} ${h}시: ${v}회`}
             />
           ))}
@@ -103,9 +117,11 @@ export function HeatmapChart({ heatmap }) {
       </div>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1.5 text-[10px] text-zinc-500">
         <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(63,63,70,0.3)' }}/>미사용</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(59,130,246,0.4)' }}/>약</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(59,130,246,0.75)' }}/>중</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(245,158,11,0.95)' }}/>강</span>
+        <span className="flex items-center gap-1" title="0~60%"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(59,130,246,0.30)' }}/>약</span>
+        <span className="flex items-center gap-1" title="60~80%"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(59,130,246,0.55)' }}/>중</span>
+        <span className="flex items-center gap-1" title="80~90%"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(59,130,246,0.80)' }}/>강</span>
+        <span className="flex items-center gap-1" title="90~95% — 평탄 분포 시 자동 비활성"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(202,138,4,0.85)' }}/>주목</span>
+        <span className="flex items-center gap-1" title="95~100% — 평탄 분포 시 자동 비활성"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(245,158,11,0.95)' }}/>피크</span>
         <span className="ml-auto tabular-nums" title={`${total}회`}>총 {compact(total)}회 · 데드 {deadCells}/168</span>
       </div>
     </div>
