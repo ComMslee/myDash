@@ -62,7 +62,7 @@ export async function GET() {
 
     // 12개월 각 월 통계 + 패턴 쿼리 동시 실행 (패턴은 전체 기간)
     const [
-      twelveMonthBreakdown, hourly, weekday, chargeHourly, chargeWeekday,
+      twelveMonthBreakdown, driveHourDowQ, chargeHourDowQ,
       allTimeDrive, allTimeCharge, dayMaxResult,
     ] = await Promise.all([
       Promise.all(
@@ -72,46 +72,25 @@ export async function GET() {
           return monthStats(ms, me).then(s => ({ year: ms.getFullYear(), month: ms.getMonth() + 1, ...s }));
         })
       ),
-      // 시간대 주행 (전체 기간)
+      // 주행 (요일 × 시간) joint — 전체 기간
       pool.query(
-        `SELECT EXTRACT(HOUR FROM (start_date + INTERVAL '9 hours'))::int AS hour,
-                COUNT(*)::int AS count,
-                COALESCE(SUM(distance), 0)::float AS distance
+        `SELECT EXTRACT(DOW  FROM (start_date + INTERVAL '9 hours'))::int AS dow,
+                EXTRACT(HOUR FROM (start_date + INTERVAL '9 hours'))::int AS hour,
+                COUNT(*)::int AS count
          FROM drives
          WHERE car_id = $1
-         GROUP BY hour ORDER BY hour`,
+         GROUP BY dow, hour`,
         [carId]
       ),
-      // 요일 주행 (전체 기간)
+      // 충전 (요일 × 시간) joint — 전체 기간
       pool.query(
-        `SELECT EXTRACT(DOW FROM (start_date + INTERVAL '9 hours'))::int AS dow,
-                COUNT(*)::int AS count,
-                COALESCE(SUM(distance), 0)::float AS distance
-         FROM drives
-         WHERE car_id = $1
-         GROUP BY dow ORDER BY dow`,
-        [carId]
-      ),
-      // 시간대 충전 (전체 기간)
-      pool.query(
-        `SELECT EXTRACT(HOUR FROM (start_date + INTERVAL '9 hours'))::int AS hour,
-                COUNT(*)::int AS count,
-                COALESCE(SUM(charge_energy_added), 0)::float AS kwh
+        `SELECT EXTRACT(DOW  FROM (start_date + INTERVAL '9 hours'))::int AS dow,
+                EXTRACT(HOUR FROM (start_date + INTERVAL '9 hours'))::int AS hour,
+                COUNT(*)::int AS count
          FROM charging_processes
          WHERE car_id = $1
            AND charge_energy_added IS NOT NULL
-         GROUP BY hour ORDER BY hour`,
-        [carId]
-      ),
-      // 요일 충전 (전체 기간)
-      pool.query(
-        `SELECT EXTRACT(DOW FROM (start_date + INTERVAL '9 hours'))::int AS dow,
-                COUNT(*)::int AS count,
-                COALESCE(SUM(charge_energy_added), 0)::float AS kwh
-         FROM charging_processes
-         WHERE car_id = $1
-           AND charge_energy_added IS NOT NULL
-         GROUP BY dow ORDER BY dow`,
+         GROUP BY dow, hour`,
         [carId]
       ),
       // 전체 기간 주행 집계
@@ -282,22 +261,16 @@ export async function GET() {
         total_kwh: parseFloat(m.total_kwh.toFixed(1)),
         charge_count: m.charge_count,
       })),
-      hourly: Array.from({ length: 24 }, (_, h) => {
-        const row = hourly.rows.find(r => r.hour === h);
-        return { hour: h, count: row?.count || 0, distance: row ? parseFloat(row.distance.toFixed(1)) : 0 };
-      }),
-      weekday: Array.from({ length: 7 }, (_, d) => {
-        const row = weekday.rows.find(r => r.dow === d);
-        return { dow: d, count: row?.count || 0, distance: row ? parseFloat(row.distance.toFixed(1)) : 0 };
-      }),
-      charge_hourly: Array.from({ length: 24 }, (_, h) => {
-        const row = chargeHourly.rows.find(r => r.hour === h);
-        return { hour: h, count: row?.count || 0, kwh: row ? parseFloat(row.kwh.toFixed(1)) : 0 };
-      }),
-      charge_weekday: Array.from({ length: 7 }, (_, d) => {
-        const row = chargeWeekday.rows.find(r => r.dow === d);
-        return { dow: d, count: row?.count || 0, kwh: row ? parseFloat(row.kwh.toFixed(1)) : 0 };
-      }),
+      hour_dow: (() => {
+        const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
+        for (const r of driveHourDowQ.rows) grid[r.dow][r.hour] = r.count;
+        return grid;
+      })(),
+      charge_hour_dow: (() => {
+        const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
+        for (const r of chargeHourDowQ.rows) grid[r.dow][r.hour] = r.count;
+        return grid;
+      })(),
     });
   } catch (err) {
     console.error('/api/insights error:', err);

@@ -1,7 +1,23 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { MOCK_DATA } from '../context/mock';
+import { MOCK_DATA } from '@/app/context/mock';
+
+// 동시 요청 상한 헬퍼 — N개 워커가 cursor를 공유하며 items 소비
+async function fetchInChunks(items, fn, concurrency = 6) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  const worker = async () => {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      try { results[i] = await fn(items[i], i); }
+      catch { results[i] = null; }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  return results;
+}
 
 /**
  * 로드트립 페이지의 데이터 fetching + 상태를 단일 훅으로 격리.
@@ -31,8 +47,11 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
   const [error, setError] = useState(null);
   const [dayMode, setDayMode] = useState(initialDate || null); // 'YYYY-MM-DD' or null
   const [dayRoutes, setDayRoutes] = useState([]);
+  const [monthMode, setMonthMode] = useState(null); // 'YYYY-MM' or null
+  const [monthRoutes, setMonthRoutes] = useState([]);
   const abortRef = useRef(null);
   const dayAbortRef = useRef(null);
+  const monthAbortRef = useRef(null);
 
   // 진입 쿼리(id/date)에 맞는 주행을 선택 — id > date > 첫 항목
   const pickPreselect = (list) => {
@@ -78,7 +97,7 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
 
   // 단일 주행 경로 로드
   useEffect(() => {
-    if (dayMode) return; // 일 모드에서는 단일 경로 미로딩
+    if (dayMode || monthMode) return; // 일/월 모드에서는 단일 경로 미로딩
     if (!selectedDrive) return;
     if (isMock) {
       setPositions(MOCK_DATA.routePositions);
@@ -89,11 +108,18 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
     setPositions([]);
     setRouteData(null);
     if (abortRef.current) abortRef.current.abort();
-    abortRef.current = new AbortController();
-    fetch(`/api/route-map?driveId=${selectedDrive.id}`, { signal: abortRef.current.signal })
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const driveId = selectedDrive.id;
+    fetch(`/api/route-map?driveId=${driveId}`, { signal: controller.signal })
       .then(r => r.json())
       .then(data => {
-        setPositions(data.positions || []);
+        if (controller.signal.aborted) return;
+        const pos = data.positions || [];
+        if (pos.length < 2) {
+          console.warn(`[route-map] driveId=${driveId} positions=${pos.length} — no route data`);
+        }
+        setPositions(pos);
         setRouteData(data);
         setLoadingRoute(false);
       })
@@ -104,8 +130,8 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
           setLoadingRoute(false);
         }
       });
-    return () => { abortRef.current?.abort(); };
-  }, [selectedDrive?.id, isMock, refreshSignal, dayMode]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { controller.abort(); };
+  }, [selectedDrive?.id, isMock, refreshSignal, dayMode, monthMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 일 모드 — 해당 일의 모든 주행 경로 병렬 로드
   useEffect(() => {
@@ -120,25 +146,53 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
     if (dayAbortRef.current) dayAbortRef.current.abort();
     dayAbortRef.current = new AbortController();
     const palette = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7', '#84cc16', '#f43f5e'];
-    Promise.all(
-      dayDrives.map((d, idx) =>
-        fetch(`/api/route-map?driveId=${d.id}`, { signal: dayAbortRef.current.signal })
-          .then(r => r.json())
-          .then(data => ({
-            positions: data.positions || [],
-            color: palette[idx % palette.length],
-            id: d.id,
-            startDate: d.start_date,
-          }))
-          .catch(() => null)
-      )
-    ).then(results => {
+    fetchInChunks(dayDrives, (d, idx) =>
+      fetch(`/api/route-map?driveId=${d.id}`, { signal: dayAbortRef.current.signal })
+        .then(r => r.json())
+        .then(data => ({
+          positions: data.positions || [],
+          color: palette[idx % palette.length],
+          id: d.id,
+          startDate: d.start_date,
+        }))
+        .catch(() => null)
+    , 6).then(results => {
       const valid = results.filter(r => r && r.positions.length >= 2);
       setDayRoutes(valid);
       setLoadingRoute(false);
     });
     return () => { dayAbortRef.current?.abort(); };
   }, [dayMode, isMock, drives]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 월 모드 — 해당 월의 모든 주행 경로 병렬 로드
+  useEffect(() => {
+    if (!monthMode || isMock || drives.length === 0) { setMonthRoutes([]); return; }
+    const monthDrives = drives
+      .filter(d => driveDayStr(d).slice(0, 7) === monthMode)
+      .slice()
+      .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+    if (monthDrives.length === 0) { setMonthRoutes([]); return; }
+    setLoadingRoute(true);
+    if (monthAbortRef.current) monthAbortRef.current.abort();
+    monthAbortRef.current = new AbortController();
+    const palette = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7', '#84cc16', '#f43f5e'];
+    fetchInChunks(monthDrives, (d, idx) =>
+      fetch(`/api/route-map?driveId=${d.id}&detail=light`, { signal: monthAbortRef.current.signal })
+        .then(r => r.json())
+        .then(data => ({
+          positions: data.positions || [],
+          color: palette[idx % palette.length],
+          id: d.id,
+          startDate: d.start_date,
+        }))
+        .catch(() => null)
+    , 6).then(results => {
+      const valid = results.filter(r => r && r.positions.length >= 2);
+      setMonthRoutes(valid);
+      setLoadingRoute(false);
+    });
+    return () => { monthAbortRef.current?.abort(); };
+  }, [monthMode, isMock, drives]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     drives,
@@ -148,6 +202,8 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
     routeData,
     dayMode, setDayMode,
     dayRoutes,
+    monthMode, setMonthMode,
+    monthRoutes,
     loadingDrives, loadingRoute,
     error,
   };

@@ -1,17 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import HealthScoreCard from './HealthScoreCard';
-import IdleDrainCard from './IdleDrainCard';
-import { LevelHabitCard } from './RecordsHabit';
-import MonthlyChargeCard from './MonthlyChargeCard';
-import FastChargeCard from './FastChargeCard';
-import SlowChargeCard from './SlowChargeCard';
-import ChargeHeatmap from './ChargeHeatmap';
-import HomeChargerCard from './HomeChargerCard';
+import HealthScoreCard from '@/app/v2/battery/HealthScoreCard';
+import IdleDrainCard from '@/app/v2/battery/IdleDrainCard';
+import { LevelHabitCard } from '@/app/v2/battery/RecordsHabit';
+import MonthlyChargeCard from '@/app/v2/battery/MonthlyChargeCard';
+import FastChargeCard from '@/app/v2/battery/FastChargeCard';
+import SlowChargeCard from '@/app/v2/battery/SlowChargeCard';
+import ChargeHeatmap from '@/app/v2/battery/ChargeHeatmap';
 import { Spinner } from '@/app/components/PageLayout';
 
-export default function BatteryPage() {
+export default function V2BatteryPage() {
   const [data, setData] = useState(null);
   const [trend, setTrend] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -46,28 +45,12 @@ export default function BatteryPage() {
           </div>
         ) : data ? (
           <>
-            {/* 배터리 건강 — 점수/평균SOC/추이 + SOC 체류 분포 */}
             <HealthScoreCard data={data.health} trend={trend} />
-
-            {/* 현재 상태 — 집충전기 실시간 */}
-            <HomeChargerCard />
-
-            {/* 배터리 건강 — 대기 소모 */}
             <IdleDrainCard records={data.idle_drain} chargingSessions={data.charging_sessions} />
-
-            {/* 충전 습관 — SOC 시작/종료 분포 */}
             <LevelHabitCard histogram={data.histogram} />
-
-            {/* 충전 습관 — 요약 */}
             <MonthlyChargeCard />
-
-            {/* 충전 습관 — 연간 히트맵 */}
             <ChargeHeatmap />
-
-            {/* 충전 상세 — 급속 */}
             <FastChargeCard />
-
-            {/* 충전 상세 — 완속 */}
             <SlowChargeCard />
           </>
         ) : null}

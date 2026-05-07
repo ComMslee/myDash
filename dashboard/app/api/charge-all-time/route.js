@@ -8,7 +8,7 @@ export async function GET() {
     if (carResult.rows.length === 0) return Response.json({ error: 'No car found' }, { status: 404 });
     const carId = carResult.rows[0].id;
 
-    const [statsResult, hourlyResult, weekdayResult] = await Promise.all([
+    const [statsResult, hourDowResult] = await Promise.all([
       pool.query(`
         SELECT
           COUNT(*)::int AS charge_count,
@@ -29,25 +29,19 @@ export async function GET() {
       `, [carId]),
 
       pool.query(`
-        SELECT EXTRACT(HOUR FROM (start_date + INTERVAL '9 hours'))::int AS hour,
-               COUNT(*)::int AS count,
-               COALESCE(SUM(charge_energy_added), 0)::float AS kwh
+        SELECT EXTRACT(DOW  FROM (start_date + INTERVAL '9 hours'))::int AS dow,
+               EXTRACT(HOUR FROM (start_date + INTERVAL '9 hours'))::int AS hour,
+               COUNT(*)::int AS count
         FROM charging_processes
         WHERE car_id = $1 AND charge_energy_added IS NOT NULL
-        GROUP BY hour ORDER BY hour
-      `, [carId]),
-
-      pool.query(`
-        SELECT EXTRACT(DOW FROM (start_date + INTERVAL '9 hours'))::int AS dow,
-               COUNT(*)::int AS count,
-               COALESCE(SUM(charge_energy_added), 0)::float AS kwh
-        FROM charging_processes
-        WHERE car_id = $1 AND charge_energy_added IS NOT NULL
-        GROUP BY dow ORDER BY dow
+        GROUP BY dow, hour
       `, [carId]),
     ]);
 
     const s = statsResult.rows[0];
+
+    const hourDow = Array.from({ length: 7 }, () => Array(24).fill(0));
+    for (const r of hourDowResult.rows) hourDow[r.dow][r.hour] = r.count;
 
     return Response.json({
       charge_count: s.charge_count,
@@ -57,14 +51,7 @@ export async function GET() {
       other_charges: s.other_charges,
       fast_charges: s.fast_charges,
       slow_charges: s.slow_charges,
-      charge_hourly: Array.from({ length: 24 }, (_, h) => {
-        const row = hourlyResult.rows.find(r => r.hour === h);
-        return { hour: h, count: row?.count || 0, kwh: row ? parseFloat(Number(row.kwh).toFixed(1)) : 0 };
-      }),
-      charge_weekday: Array.from({ length: 7 }, (_, d) => {
-        const row = weekdayResult.rows.find(r => r.dow === d);
-        return { dow: d, count: row?.count || 0, kwh: row ? parseFloat(Number(row.kwh).toFixed(1)) : 0 };
-      }),
+      charge_hour_dow: hourDow,
     });
   } catch (err) {
     console.error('/api/charge-all-time error:', err);

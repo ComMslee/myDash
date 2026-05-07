@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useMock } from '../context/mock';
-import { KWH_PER_KM } from '../../lib/constants';
-import { formatDuration, shortAddr } from '../../lib/format';
-import { formatTimeRange, kstDateStr } from '../../lib/kst';
-import DriveMap from '../components/DriveMap';
-import RouteSparklines from '../components/RouteSparklines';
-import DriveListView from './DriveListView';
-import { useDriveData } from './useDriveData';
+import { useMock } from '@/app/context/mock';
+import { KWH_PER_KM } from '@/lib/constants';
+import { formatDuration, shortAddr } from '@/lib/format';
+import { formatTimeRange, kstDateStr } from '@/lib/kst';
+import DriveMap, { loadLeaflet } from '@/app/components/DriveMap';
+import RouteSparklines from '@/app/components/RouteSparklines';
+import DriveListView from '@/app/v2/history/DriveListView';
+import { useDriveData } from '@/app/v2/history/useDriveData';
 
 function efficiency(d) {
   if (!d.start_rated_range_km || !d.end_rated_range_km || !d.distance) return null;
@@ -17,18 +17,15 @@ function efficiency(d) {
   const usedKm = parseFloat(d.start_rated_range_km) - parseFloat(d.end_rated_range_km);
   if (usedKm <= 0 || !dist || dist === 0) return null;
   const kwh = (usedKm * KWH_PER_KM).toFixed(1);
-  const perKm = ((usedKm * KWH_PER_KM * 1000) / dist).toFixed(0); // Wh/km
+  const perKm = ((usedKm * KWH_PER_KM * 1000) / dist).toFixed(0);
   return { kwh, perKm };
 }
 
-// ── Page Inner ─────────────────────────────────────────────
-
-// 'YYYY-MM-DD' 형식 검증
 function isValidDateStr(s) {
   return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
 
-function DrivesInner() {
+function HistoryInner() {
   const { isMock, refreshSignal } = useMock();
   const searchParams = useSearchParams();
   const rawId = parseInt(searchParams.get('id') || '');
@@ -36,7 +33,6 @@ function DrivesInner() {
   const dateParamRaw = searchParams.get('date');
   const initialDate = isValidDateStr(dateParamRaw) ? dateParamRaw : null;
 
-  // 로드트립 페이지는 body 스크롤 차단 (내부 리스트/지도만 스크롤)
   useEffect(() => {
     const htmlPrev = document.documentElement.style.overflow;
     const bodyPrev = document.body.style.overflow;
@@ -48,7 +44,9 @@ function DrivesInner() {
     };
   }, []);
 
-  // 주행의 KST 날짜 문자열 — 브라우저 로컬 TZ가 아닌 KST 기준으로 통일 (해외/VPN 시 그룹 불일치 방지)
+  // Leaflet CDN 사전 로드 — 첫 항목 클릭 시 1~2초 다운로드 지연 제거
+  useEffect(() => { loadLeaflet(() => {}); }, []);
+
   const driveDayStr = (d) => kstDateStr(d.start_date);
 
   const {
@@ -58,19 +56,19 @@ function DrivesInner() {
     routeData,
     dayMode, setDayMode,
     dayRoutes,
+    monthMode, setMonthMode,
+    monthRoutes,
     loadingDrives, loadingRoute,
     error,
   } = useDriveData({ isMock, refreshSignal, initialId, initialDate, driveDayStr });
 
   const [selectedPlace, setSelectedPlace] = useState(null);
-  const [placesExpanded, setPlacesExpanded] = useState(false); // 인라인 세로 리스트 펼침
-  const [placesCollapsed, setPlacesCollapsed] = useState(false); // 지도 모드에서 섹션 전체 접힘
+  const [placesExpanded, setPlacesExpanded] = useState(false);
+  const [placesCollapsed, setPlacesCollapsed] = useState(false);
 
-  // 목록/지도 모드 — id 또는 date로 진입하면 지도 뷰로 바로
   const entryInMapView = !!initialId || !!initialDate;
   const [viewMode, setViewMode] = useState(entryInMapView ? 'map' : 'list');
 
-  // 지도 모드 진입 시 자주 가는 곳 섹션 자동 접힘, 목록 복귀 시 자동 펼침
   useEffect(() => {
     if (viewMode === 'map') {
       setPlacesCollapsed(true);
@@ -79,28 +77,27 @@ function DrivesInner() {
       setPlacesCollapsed(false);
     }
   }, [viewMode]);
+
   const [mapEverShown, setMapEverShown] = useState(entryInMapView);
   const selectedIdx = selectedDrive ? drives.findIndex(d => d.id === selectedDrive.id) : -1;
   const eff = selectedDrive ? efficiency(selectedDrive) : null;
 
-  // 스파크라인 선택 포인트 (전체 flat 인덱스) — drive/dayMode 변경 시 리셋
   const [selectedPosIdx, setSelectedPosIdx] = useState(null);
-  useEffect(() => { setSelectedPosIdx(null); }, [selectedDrive?.id, dayMode]);
+  useEffect(() => { setSelectedPosIdx(null); }, [selectedDrive?.id, dayMode, monthMode]);
 
-  // 스파크라인용 routes — 단일/일 모드 통합
   const sparkRoutes = useMemo(() => {
+    if (monthMode && monthRoutes?.length) {
+      return monthRoutes.filter(r => r.positions?.length >= 2).map(r => ({ positions: r.positions, startDate: r.startDate, color: r.color }));
+    }
     if (dayMode && dayRoutes?.length) {
-      return dayRoutes
-        .filter(r => r.positions?.length >= 2)
-        .map(r => ({ positions: r.positions, startDate: r.startDate, color: r.color }));
+      return dayRoutes.filter(r => r.positions?.length >= 2).map(r => ({ positions: r.positions, startDate: r.startDate, color: r.color }));
     }
     if (selectedDrive && positions?.length >= 2) {
       return [{ positions, startDate: selectedDrive.start_date, color: '#3b82f6' }];
     }
     return [];
-  }, [dayMode, dayRoutes, selectedDrive, positions]);
+  }, [monthMode, monthRoutes, dayMode, dayRoutes, selectedDrive, positions]);
 
-  // flat 인덱스 → 지도 하이라이트 좌표
   const highlightLatLng = useMemo(() => {
     if (selectedPosIdx == null) return null;
     let idx = selectedPosIdx;
@@ -114,10 +111,10 @@ function DrivesInner() {
     return null;
   }, [selectedPosIdx, sparkRoutes]);
 
-  const goToDrive = (d) => { setSelectedDrive(d); setSelectedPlace(null); setDayMode(null); setMapEverShown(true); setViewMode('map'); };
-  const goToDay = (dateStr) => { setDayMode(dateStr); setSelectedPlace(null); setMapEverShown(true); setViewMode('map'); };
+  const goToDrive = (d) => { setSelectedDrive(d); setSelectedPlace(null); setDayMode(null); setMonthMode(null); setMapEverShown(true); setViewMode('map'); };
+  const goToDay = (dateStr) => { setDayMode(dateStr); setMonthMode(null); setSelectedPlace(null); setMapEverShown(true); setViewMode('map'); };
+  const goToMonth = (monthStr) => { setMonthMode(monthStr); setDayMode(null); setSelectedDrive(null); setSelectedPlace(null); setPositions([]); setMapEverShown(true); setViewMode('map'); };
 
-  // 일 모드 날짜 네비 — drives에서 유니크 날짜를 내림차순 정렬 후 dayMode 인덱스 계산
   const uniqueDays = useMemo(() => {
     if (!drives.length) return [];
     const set = new Set(drives.map(d => driveDayStr(d)));
@@ -126,6 +123,16 @@ function DrivesInner() {
   const dayIdx = dayMode ? uniqueDays.indexOf(dayMode) : -1;
   const goPrevDay = () => { if (dayIdx > 0) setDayMode(uniqueDays[dayIdx - 1]); };
   const goNextDay = () => { if (dayIdx >= 0 && dayIdx < uniqueDays.length - 1) setDayMode(uniqueDays[dayIdx + 1]); };
+
+  const uniqueMonths = useMemo(() => {
+    if (!drives.length) return [];
+    const set = new Set(drives.map(d => driveDayStr(d).slice(0, 7)));
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [drives]);
+  const monthIdx = monthMode ? uniqueMonths.indexOf(monthMode) : -1;
+  const goPrevMonth = () => { if (monthIdx > 0) setMonthMode(uniqueMonths[monthIdx - 1]); };
+  const goNextMonth = () => { if (monthIdx >= 0 && monthIdx < uniqueMonths.length - 1) setMonthMode(uniqueMonths[monthIdx + 1]); };
+
   const goPrev = () => { if (selectedIdx > 0) { setSelectedDrive(drives[selectedIdx - 1]); setSelectedPlace(null); } };
   const goNext = () => { if (selectedIdx < drives.length - 1) { setSelectedDrive(drives[selectedIdx + 1]); setSelectedPlace(null); } };
 
@@ -137,7 +144,6 @@ function DrivesInner() {
       {places.length > 0 && (
         <div className="flex-shrink-0 px-4 pt-3 pb-2">
           {placesCollapsed ? (
-            // 지도 모드: 얇은 바 (탭하면 펼침)
             <button
               onClick={() => setPlacesCollapsed(false)}
               className="w-full flex items-center justify-between px-3 py-1.5 bg-zinc-800/40 border border-white/[0.06] rounded-lg hover:bg-zinc-800/70 transition-colors"
@@ -159,7 +165,7 @@ function DrivesInner() {
                 {places.slice(0, 5).map((p, i) => (
                   <button
                     key={p.id}
-                    onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMapEverShown(true); setViewMode('map'); }}
+                    onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMonthMode(null); setMapEverShown(true); setViewMode('map'); }}
                     className={`flex-shrink-0 flex flex-col gap-1.5 border rounded-xl px-3 py-3 w-[130px] text-left transition-colors ${
                       selectedPlace?.id === p.id
                         ? 'bg-amber-500/10 border-amber-500/30'
@@ -187,18 +193,13 @@ function DrivesInner() {
                   </button>
                 )}
               </div>
-
-              {/* 인라인 세로 리스트 — 더보기 클릭 시 펼침 */}
               {placesExpanded && (
                 <div className="mt-2 border border-white/[0.06] rounded-xl bg-[#161618] overflow-hidden">
                   <div className="overflow-y-auto" style={{ maxHeight: '40vh' }}>
                     {places.slice(5).map((p, i) => (
                       <button
                         key={p.id}
-                        onClick={() => {
-                          setSelectedPlace(p); setSelectedDrive(null); setPositions([]);
-                          setPlacesExpanded(false); setMapEverShown(true); setViewMode('map');
-                        }}
+                        onClick={() => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMonthMode(null); setPlacesExpanded(false); setMapEverShown(true); setViewMode('map'); }}
                         className="w-full flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.03] transition-colors text-left"
                       >
                         <span className="text-sm font-black w-7 text-center flex-shrink-0 text-zinc-600">{i + 6}</span>
@@ -217,100 +218,118 @@ function DrivesInner() {
         </div>
       )}
 
-      {/* ── 지도 모드 ── */}
+      {/* 지도 모드 */}
       {mapEverShown && (
       <div className="flex-1 flex flex-col px-4 pb-4" style={{ display: viewMode === 'map' ? 'flex' : 'none' }}>
-          {/* 상단 네비게이션 */}
           <div className="flex items-center justify-between py-2 mb-2">
             <button onClick={() => setViewMode('list')} className="flex items-center gap-1 text-sm text-zinc-400 hover:text-white transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               목록
             </button>
-            {dayMode ? (
+            {monthMode ? (
               <div className="flex items-center gap-3">
-                <button onClick={goPrevDay} disabled={dayIdx <= 0}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
+                <button onClick={goPrevMonth} disabled={monthIdx <= 0} className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <span className="text-xs text-zinc-400 tabular-nums">{monthMode}<span className="text-zinc-600 ml-1">({monthRoutes.length}회)</span></span>
+                <button onClick={goNextMonth} disabled={monthIdx < 0 || monthIdx >= uniqueMonths.length - 1} className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                </button>
+              </div>
+            ) : dayMode ? (
+              <div className="flex items-center gap-3">
+                <button onClick={goPrevDay} disabled={dayIdx <= 0} className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
                 </button>
                 <span className="text-xs text-zinc-400 tabular-nums">{dayMode}<span className="text-zinc-600 ml-1">({dayRoutes.length}회)</span></span>
-                <button onClick={goNextDay} disabled={dayIdx < 0 || dayIdx >= uniqueDays.length - 1}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
+                <button onClick={goNextDay} disabled={dayIdx < 0 || dayIdx >= uniqueDays.length - 1} className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
                 </button>
               </div>
             ) : selectedDrive && (
               <div className="flex items-center gap-3">
-                <button onClick={goPrev} disabled={selectedIdx <= 0}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
+                <button onClick={goPrev} disabled={selectedIdx <= 0} className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
                 </button>
                 <span className="text-xs text-zinc-600 tabular-nums">{selectedIdx + 1} / {drives.length}</span>
-                <button onClick={goNext} disabled={selectedIdx >= drives.length - 1}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
+                <button onClick={goNext} disabled={selectedIdx >= drives.length - 1} className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
                 </button>
               </div>
             )}
           </div>
 
-          {/* 주행 정보 + 지도 */}
           <div className="flex-1 min-h-0 flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden mb-20">
-            {dayMode ? (() => {
-              const dayDrives = drives
-                .filter(d => driveDayStr(d) === dayMode)
-                .slice()
-                .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
-              if (dayDrives.length === 0) return null;
-              const first = dayDrives[0];
-              const last = dayDrives[dayDrives.length - 1];
-              const totalKm = dayDrives.reduce((s, d) => s + (parseFloat(d.distance) || 0), 0);
-              const totalMin = dayDrives.reduce((s, d) => s + (parseFloat(d.duration_min) || 0), 0);
-              const totalKwh = dayDrives.reduce((s, d) => {
+            {monthMode ? (() => {
+              const mDrives = drives.filter(d => driveDayStr(d).slice(0, 7) === monthMode).slice().sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+              if (mDrives.length === 0) return null;
+              const totalKm = mDrives.reduce((s, d) => s + (parseFloat(d.distance) || 0), 0);
+              const totalMin = mDrives.reduce((s, d) => s + (parseFloat(d.duration_min) || 0), 0);
+              const totalKwh = mDrives.reduce((s, d) => {
                 if (d.start_rated_range_km && d.end_rated_range_km) {
                   const usedKm = parseFloat(d.start_rated_range_km) - parseFloat(d.end_rated_range_km);
                   if (usedKm > 0) return s + usedKm * KWH_PER_KM;
                 }
                 return s;
               }, 0);
-              // 주행 구간만 합산 (사이 충전 제외)
-              const usedPct = dayDrives.reduce((s, d) =>
-                (d.start_battery_level != null && d.end_battery_level != null)
-                  ? s + Math.max(0, d.start_battery_level - d.end_battery_level)
-                  : s, 0);
+              const usedPct = mDrives.reduce((s, d) => (d.start_battery_level != null && d.end_battery_level != null) ? s + Math.max(0, d.start_battery_level - d.end_battery_level) : s, 0);
+              const perKm = totalKm > 0 && totalKwh > 0 ? Math.round((totalKwh * 1000) / totalKm) : null;
+              const dayCount = new Set(mDrives.map(d => driveDayStr(d))).size;
+              const destMap = new Map();
+              for (const d of mDrives) { const key = shortAddr(d.end_address) || '?'; destMap.set(key, (destMap.get(key) || 0) + 1); }
+              const topDests = Array.from(destMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+              return (
+                <div className="px-4 py-2 border-b border-white/[0.06] flex flex-col gap-1.5 flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-zinc-500 tabular-nums">{monthMode}<span className="text-zinc-600"> · {mDrives.length}회 ({dayCount}일, {formatDuration(Math.round(totalMin))})</span></p>
+                    </div>
+                    <div className="flex-shrink-0 text-right tabular-nums">
+                      <p className="text-sm font-bold text-blue-400">{totalKm.toFixed(0)}<span className="text-xs text-zinc-600 ml-0.5">km</span></p>
+                      {totalKwh > 0 && <p className="text-sm font-semibold text-green-400">{totalKwh.toFixed(1)}<span className="text-xs text-zinc-600 ml-0.5">kWh</span>{usedPct > 0 && <span className="text-zinc-500 text-xs ml-1">({usedPct}%)</span>}</p>}
+                      {perKm != null && <p className="text-xs text-amber-400">{perKm}<span className="text-zinc-600 ml-0.5">Wh/km</span></p>}
+                    </div>
+                  </div>
+                  {topDests.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                      <span className="text-zinc-600 flex-shrink-0">자주 간 곳</span>
+                      {topDests.map(([addr, n], i) => (
+                        <span key={addr} className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 truncate max-w-[140px]">
+                          <span className="text-zinc-600 mr-1">{i + 1}</span>{addr}<span className="text-zinc-500 ml-1 tabular-nums">{n}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })() : dayMode ? (() => {
+              const dayDrives = drives.filter(d => driveDayStr(d) === dayMode).slice().sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+              if (dayDrives.length === 0) return null;
+              const first = dayDrives[0]; const last = dayDrives[dayDrives.length - 1];
+              const totalKm = dayDrives.reduce((s, d) => s + (parseFloat(d.distance) || 0), 0);
+              const totalMin = dayDrives.reduce((s, d) => s + (parseFloat(d.duration_min) || 0), 0);
+              const totalKwh = dayDrives.reduce((s, d) => {
+                if (d.start_rated_range_km && d.end_rated_range_km) { const usedKm = parseFloat(d.start_rated_range_km) - parseFloat(d.end_rated_range_km); if (usedKm > 0) return s + usedKm * KWH_PER_KM; }
+                return s;
+              }, 0);
+              const usedPct = dayDrives.reduce((s, d) => (d.start_battery_level != null && d.end_battery_level != null) ? s + Math.max(0, d.start_battery_level - d.end_battery_level) : s, 0);
               const perKm = totalKm > 0 && totalKwh > 0 ? Math.round((totalKwh * 1000) / totalKm) : null;
               return (
                 <div className="px-4 py-2 border-b border-white/[0.06] flex items-center gap-3 flex-shrink-0">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-zinc-500 tabular-nums">
-                      {formatTimeRange(first.start_date, last.end_date)}
-                      <span className="text-zinc-600"> · {dayDrives.length}회 ({formatDuration(Math.round(totalMin))})</span>
-                    </p>
+                    <p className="text-sm text-zinc-500 tabular-nums">{formatTimeRange(first.start_date, last.end_date)}<span className="text-zinc-600"> · {dayDrives.length}회 ({formatDuration(Math.round(totalMin))})</span></p>
                     <p className="text-sm text-zinc-300 leading-snug break-words">
                       {(() => {
-                        const raw = [first.start_address, ...dayDrives.map(d => d.end_address)]
-                          .map(a => shortAddr(a) || '?');
-                        // 연속 중복 주소 축약 (집→집 → 집)
+                        const raw = [first.start_address, ...dayDrives.map(d => d.end_address)].map(a => shortAddr(a) || '?');
                         const chain = [];
-                        for (const addr of raw) {
-                          if (chain.length === 0 || chain[chain.length - 1] !== addr) chain.push(addr);
-                        }
-                        return chain.map((addr, i) => (
-                          <span key={i}>
-                            {i > 0 && <span className="text-zinc-600 mx-1">→</span>}
-                            {addr}
-                          </span>
-                        ));
+                        for (const addr of raw) { if (chain.length === 0 || chain[chain.length - 1] !== addr) chain.push(addr); }
+                        return chain.map((addr, i) => <span key={i}>{i > 0 && <span className="text-zinc-600 mx-1">→</span>}{addr}</span>);
                       })()}
                     </p>
                   </div>
                   <div className="flex-shrink-0 text-right tabular-nums">
                     <p className="text-sm font-bold text-blue-400">{totalKm.toFixed(1)}<span className="text-xs text-zinc-600 ml-0.5">km</span></p>
-                    {totalKwh > 0 && (
-                      <p className="text-sm font-semibold text-green-400">
-                        {totalKwh.toFixed(1)}<span className="text-xs text-zinc-600 ml-0.5">kWh</span>
-                        {usedPct > 0 && <span className="text-zinc-500 text-xs ml-1">({usedPct}%)</span>}
-                      </p>
-                    )}
+                    {totalKwh > 0 && <p className="text-sm font-semibold text-green-400">{totalKwh.toFixed(1)}<span className="text-xs text-zinc-600 ml-0.5">kWh</span>{usedPct > 0 && <span className="text-zinc-500 text-xs ml-1">({usedPct}%)</span>}</p>}
                     {perKm != null && <p className="text-xs text-amber-400">{perKm}<span className="text-zinc-600 ml-0.5">Wh/km</span></p>}
                   </div>
                 </div>
@@ -319,35 +338,26 @@ function DrivesInner() {
               const sp = selectedDrive.start_battery_level ?? null;
               const ep = selectedDrive.end_battery_level ?? null;
               return (
-              <div className="px-4 py-2 border-b border-white/[0.06] flex items-center gap-3 flex-shrink-0">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-zinc-500 tabular-nums">{formatTimeRange(selectedDrive.start_date, selectedDrive.end_date)} <span className="text-zinc-600">({formatDuration(selectedDrive.duration_min)})</span></p>
-                  <p className="text-sm text-zinc-300 truncate">
-                    {shortAddr(selectedDrive.start_address) || '출발지'}&nbsp;→&nbsp;{shortAddr(selectedDrive.end_address) || '도착지'}
-                  </p>
-                  {sp != null && ep != null && (
-                    <div className="flex items-center gap-1 mt-0.5 text-xs text-zinc-500 tabular-nums">
-                      <div className="w-20 h-1.5 bg-zinc-800 rounded-sm overflow-hidden relative">
-                        <div className="absolute inset-y-0 rounded-sm bg-blue-400/30" style={{ left: `${ep}%`, width: `${sp - ep}%` }} />
-                        <div className="absolute inset-y-0 rounded-sm bg-green-400/40" style={{ left: 0, width: `${ep}%` }} />
+                <div className="px-4 py-2 border-b border-white/[0.06] flex items-center gap-3 flex-shrink-0">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-zinc-500 tabular-nums">{formatTimeRange(selectedDrive.start_date, selectedDrive.end_date)} <span className="text-zinc-600">({formatDuration(selectedDrive.duration_min)})</span></p>
+                    <p className="text-sm text-zinc-300 truncate">{shortAddr(selectedDrive.start_address) || '출발지'}&nbsp;→&nbsp;{shortAddr(selectedDrive.end_address) || '도착지'}</p>
+                    {sp != null && ep != null && (
+                      <div className="flex items-center gap-1 mt-0.5 text-xs text-zinc-500 tabular-nums">
+                        <div className="w-20 h-1.5 bg-zinc-800 rounded-sm overflow-hidden relative">
+                          <div className="absolute inset-y-0 rounded-sm bg-blue-400/30" style={{ left: `${ep}%`, width: `${sp - ep}%` }} />
+                          <div className="absolute inset-y-0 rounded-sm bg-green-400/40" style={{ left: 0, width: `${ep}%` }} />
+                        </div>
+                        <span>{sp}<span className="text-zinc-600">{'>'}</span>{ep}%</span>
                       </div>
-                      <span>{sp}<span className="text-zinc-600">{'>'}</span>{ep}%</span>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  <div className="flex-shrink-0 text-right tabular-nums">
+                    <p className="text-sm font-bold text-blue-400">{selectedDrive.distance}<span className="text-xs text-zinc-600 ml-0.5">km</span></p>
+                    {eff && <p className="text-sm font-semibold text-green-400">{eff.kwh}<span className="text-xs text-zinc-600 ml-0.5">kWh</span>{sp != null && ep != null && sp > ep && <span className="text-zinc-500 text-xs ml-1">({sp - ep}%)</span>}</p>}
+                    {eff && <p className="text-xs text-amber-400">{eff.perKm}<span className="text-zinc-600 ml-0.5">Wh/km</span></p>}
+                  </div>
                 </div>
-                <div className="flex-shrink-0 text-right tabular-nums">
-                  <p className="text-sm font-bold text-blue-400">{selectedDrive.distance}<span className="text-xs text-zinc-600 ml-0.5">km</span></p>
-                  {eff && (
-                    <p className="text-sm font-semibold text-green-400">
-                      {eff.kwh}<span className="text-xs text-zinc-600 ml-0.5">kWh</span>
-                      {sp != null && ep != null && sp > ep && (
-                        <span className="text-zinc-500 text-xs ml-1">({sp - ep}%)</span>
-                      )}
-                    </p>
-                  )}
-                  {eff && <p className="text-xs text-amber-400">{eff.perKm}<span className="text-zinc-600 ml-0.5">Wh/km</span></p>}
-                </div>
-              </div>
               );
             })() : selectedPlace ? (
               <div className="px-4 py-2.5 border-b border-white/[0.06] flex-shrink-0">
@@ -357,45 +367,23 @@ function DrivesInner() {
                   <span className="text-amber-400 text-sm font-bold tabular-nums flex-shrink-0">{selectedPlace.visit_count}회 방문</span>
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 pl-5 text-xs">
-                  {selectedPlace.first_visit && (
-                    <div className="flex justify-between">
-                      <span className="text-zinc-600">첫 방문</span>
-                      <span className="text-zinc-400 tabular-nums">{(() => { const d = new Date(selectedPlace.first_visit); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; })()}</span>
-                    </div>
-                  )}
-                  {selectedPlace.last_visit && (
-                    <div className="flex justify-between">
-                      <span className="text-zinc-600">최근 방문</span>
-                      <span className="text-zinc-400 tabular-nums">{(() => { const d = new Date(selectedPlace.last_visit); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; })()}</span>
-                    </div>
-                  )}
-                  {selectedPlace.avg_distance > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-zinc-600">이동 평균</span>
-                      <span className="text-blue-400/80 font-semibold tabular-nums">{selectedPlace.avg_distance}km</span>
-                    </div>
-                  )}
-                  {selectedPlace.avg_duration > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-zinc-600">소요시간</span>
-                      <span className="text-zinc-400 font-semibold tabular-nums">{formatDuration(selectedPlace.avg_duration)}</span>
-                    </div>
-                  )}
+                  {selectedPlace.first_visit && <div className="flex justify-between"><span className="text-zinc-600">첫 방문</span><span className="text-zinc-400 tabular-nums">{(() => { const d = new Date(selectedPlace.first_visit); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; })()}</span></div>}
+                  {selectedPlace.last_visit && <div className="flex justify-between"><span className="text-zinc-600">최근 방문</span><span className="text-zinc-400 tabular-nums">{(() => { const d = new Date(selectedPlace.last_visit); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; })()}</span></div>}
+                  {selectedPlace.avg_distance > 0 && <div className="flex justify-between"><span className="text-zinc-600">이동 평균</span><span className="text-blue-400/80 font-semibold tabular-nums">{selectedPlace.avg_distance}km</span></div>}
+                  {selectedPlace.avg_duration > 0 && <div className="flex justify-between"><span className="text-zinc-600">소요시간</span><span className="text-zinc-400 font-semibold tabular-nums">{formatDuration(selectedPlace.avg_duration)}</span></div>}
                 </div>
                 {selectedPlace.origins?.length > 0 && (
                   <div className="flex items-center gap-1 mt-2 pl-5 text-[11px]">
                     <span className="text-zinc-600">주요 출발지</span>
-                    {selectedPlace.origins.map((o, i) => (
-                      <span key={i} className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">{shortAddr(o.label)}</span>
-                    ))}
+                    {selectedPlace.origins.map((o, i) => <span key={i} className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">{shortAddr(o.label)}</span>)}
                   </div>
                 )}
               </div>
             ) : null}
             <div className="flex-1 p-2">
               <DriveMap
-                positions={positions}
-                routes={dayMode ? dayRoutes : undefined}
+                positions={monthMode ? [] : positions}
+                routes={monthMode ? monthRoutes : dayMode ? dayRoutes : undefined}
                 loading={loadingRoute}
                 placeMarker={selectedPlace}
                 visible={viewMode === 'map'}
@@ -403,17 +391,13 @@ function DrivesInner() {
               />
             </div>
             {sparkRoutes.length > 0 && !selectedPlace && (
-              <RouteSparklines
-                routes={sparkRoutes}
-                selectedIdx={selectedPosIdx}
-                onSelect={setSelectedPosIdx}
-              />
+              <RouteSparklines routes={sparkRoutes} selectedIdx={selectedPosIdx} onSelect={setSelectedPosIdx} />
             )}
           </div>
         </div>
       )}
 
-      {/* ── 목록 모드 ── */}
+      {/* 목록 모드 */}
       <div className="flex-1 min-h-0 flex flex-col px-4 pb-4 pt-3" style={{ display: viewMode === 'list' ? 'flex' : 'none' }}>
           <div className="flex-1 min-h-0 bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
             <div className="h-full overflow-y-auto">
@@ -423,6 +407,7 @@ function DrivesInner() {
                 error={error}
                 onDriveClick={goToDrive}
                 onDayClick={goToDay}
+                onMonthClick={goToMonth}
                 driveDayStr={driveDayStr}
               />
             </div>
@@ -434,14 +419,14 @@ function DrivesInner() {
   );
 }
 
-export default function DrivesPage() {
+export default function V2HistoryPage() {
   return (
     <Suspense fallback={
       <main className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
       </main>
     }>
-      <DrivesInner />
+      <HistoryInner />
     </Suspense>
   );
 }

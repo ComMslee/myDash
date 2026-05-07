@@ -8,7 +8,6 @@ import {
 } from './home-charger/constants';
 import { computeRanks, buildTtlTooltip, timeAgoKo } from './home-charger/utils';
 import { TileBox, StatusBadges, MiniGrid } from './home-charger/ChargerTile';
-import FleetStatsPopup from './home-charger/FleetStatsPopup';
 import PollLogPopup from './home-charger/PollLogPopup';
 
 // 브라우저 세션 동안 유지 — 탭 재진입 시 스피너 없이 즉시 이전 데이터 노출
@@ -22,14 +21,13 @@ function countByStat(chargers) {
   }, {});
 }
 
-export default function HomeChargerCard() {
+export default function HomeChargerCard({ showFavLabel = false } = {}) {
   const [data, setData] = useState(moduleCache);
   const [loading, setLoading] = useState(!moduleCache);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [tick, setTick] = useState(0);
   const [showP3, setShowP3] = useState(false);
-  const [showFleetStats, setShowFleetStats] = useState(false);
   const [showPollLog, setShowPollLog] = useState(false);
 
   const load = useCallback(async (force = false) => {
@@ -138,28 +136,6 @@ export default function HomeChargerCard() {
           >
             로그
           </button>
-          <button
-            type="button"
-            onClick={() => setShowFleetStats(true)}
-            aria-label="상세 현황"
-            className="h-7 px-2 rounded-md bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.12] flex items-center gap-1 text-zinc-300 hover:text-zinc-100 text-[11px] font-medium"
-          >
-            <svg
-              viewBox="0 0 20 20"
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M3 17v-5" />
-              <path d="M9 17v-9" />
-              <path d="M15 17v-7" />
-              <path d="M3 4h14" />
-            </svg>
-            <span>상세</span>
-          </button>
           {fetchedAt && (
             <span
               className="cursor-help"
@@ -204,9 +180,17 @@ export default function HomeChargerCard() {
 
       <div className="px-4 py-3 space-y-3">
         {/* P1: 108 · 107 — 1줄 2열, 셀 넘치면 자동 개행 */}
-        <div className="grid grid-cols-2 gap-1.5">
-          <TileBox title="108" chargers={cells108} {...tileProps} />
-          <TileBox title="107" chargers={cells107} {...tileProps} />
+        <div className="space-y-1.5">
+          {showFavLabel && (
+            <div className="text-[11px] text-zinc-400 flex items-center gap-1.5">
+              <span>⭐ 즐겨찾기</span>
+              <span className="text-zinc-600">· 108·107동</span>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-1.5">
+            <TileBox title="108" chargers={cells108} {...tileProps} />
+            <TileBox title="107" chargers={cells107} {...tileProps} />
+          </div>
         </div>
 
         {/* 더보기 (접힘) — 102 · 104 → 105 · 115 → 111 · 117 → 119 (전폭) */}
@@ -218,7 +202,7 @@ export default function HomeChargerCard() {
               className="w-full flex items-center justify-between py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300"
             >
               <span className="flex items-center gap-2">
-                <span>더보기 {p3AllChargers.length}대</span>
+                <span>{showFavLabel ? '그 외' : '더보기'} {p3AllChargers.length}대</span>
                 <span className="text-zinc-600">·</span>
                 <StatusBadges counts={p3Counts} size="sm" />
               </span>
@@ -283,7 +267,6 @@ export default function HomeChargerCard() {
         )}
       </div>
     </div>
-    {showFleetStats && <FleetStatsPopup onClose={() => setShowFleetStats(false)} />}
     {showPollLog && <PollLogPopup onClose={() => setShowPollLog(false)} />}
     </>
   );

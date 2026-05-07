@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); echo \"$input\" | grep -q 'git push' && printf '[릴리즈 리마인더] master 푸시는 자동 배포로 이어집니다. 아직 안 했다면 /release-check 와 /pii-mask 를 먼저 돌리세요.\\n' >&2; if echo \"$input\" | grep -q 'git commit'; then echo \"$input\" | grep -qE '(feat|fix|refactor|tune|ci|docs|chore):' || printf '[커밋 포맷] 메시지가 `<type>: <설명>` 형식인지 확인하세요. type: feat|fix|refactor|tune|ci|docs|chore\\n' >&2; fi; exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); fp=$(echo \"$input\" | grep -oE '\"file_path\"[[:space:]]*:[[:space:]]*\"[^\"]+\"' | sed -E 's/.*\"([^\"]+)\"$/\\1/'); echo \"$fp\" | grep -qE 'app/api/.*/route\\.(js|ts)$' || exit 0; [ -f \"$fp\" ] && grep -q 'force-dynamic' \"$fp\" && exit 0; printf '[API 라우트 규칙] %s 에 `export const dynamic = \"force-dynamic\"` 누락 — stale 캐시 위험.\\n' \"$fp\" >&2; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}

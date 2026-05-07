@@ -10,11 +10,15 @@ import { useIdleDrainDays } from './useIdleDrainDays';
 const CLIMATE_BG = 'rgba(56,189,248,0.5)';
 const SENTRY_BG = 'rgba(232,121,249,0.5)';
 
-// idle 전체 대비 퍼센트 — 1% 미만이면 null
-function pctOf(minutes, idleHours) {
+// 드레인 용량 중 공조/센트리가 차지한 추정 기여 % — 시간 점유율 × 드레인%
+// (시간 가중 단순 모델: 그 구간이 다른 구간과 동일 속도로 빠진다는 근사)
+// 0.05% 미만은 null, 1자리 소수.
+function dropSharePct(minutes, idleHours, drop) {
   if (!idleHours || idleHours <= 0) return null;
-  const pct = Math.round((minutes / (idleHours * 60)) * 100);
-  return pct >= 1 ? pct : null;
+  if (drop == null || drop <= 0) return null;
+  const share = (minutes / (idleHours * 60)) * drop;
+  if (share < 0.05) return null;
+  return Math.round(share * 10) / 10;
 }
 
 // 3분 미만 노이즈 제외 임계(ms)
@@ -78,7 +82,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
 
   // 전체 총계 + 일자별 파생치 + 주별 집계 — grouped 변경 시에만 재계산
   const { totalClimatePct, totalSentryPct, totalClimateMin, totalSentryMin, dayCompute, weeks } = useMemo(() => {
-    let totalIdleH = 0, totalClimateMin = 0, totalSentryMin = 0;
+    let totalIdleH = 0, totalDropRaw = 0, totalClimateMin = 0, totalSentryMin = 0;
     const dayCompute = new Map();
     const weekMap = new Map();
     const weekOrder = [];
@@ -94,16 +98,18 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
         daySentryMin += sumSpansMin(spans);
       }
       totalIdleH += dayIdleH;
+      totalDropRaw += dayDropRaw;
       totalClimateMin += dayClimateMin;
       totalSentryMin += daySentryMin;
+      const dayDrop = Math.round(dayDropRaw * 10) / 10;
       dayCompute.set(key, {
         items,
         dayIdleH,
-        dayDrop: Math.round(dayDropRaw * 10) / 10,
+        dayDrop,
         dayClimateMin,
         daySentryMin,
-        dayClimatePct: pctOf(dayClimateMin, dayIdleH),
-        daySentryPct: pctOf(daySentryMin, dayIdleH),
+        dayClimatePct: dropSharePct(dayClimateMin, dayIdleH, dayDrop),
+        daySentryPct: dropSharePct(daySentryMin, dayIdleH, dayDrop),
         sentrySpansList,
       });
 
@@ -123,20 +129,24 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
     }
     const weeks = weekOrder.map(wk => {
       const w = weekMap.get(wk);
+      // 일자 단위와 동일한 척도로 표시 — 데이터가 있는 날의 평균 일일 소실
+      // (기존: weekDrop/weekIdleH*24 = 24h 정규화 비율 → 짧은 idle만 있는 주에서 실제값보다 크게 보이는 버그)
+      const avgDrainPerDay = w.dayKeys.length > 0 ? Math.round(w.weekDropRaw / w.dayKeys.length * 10) / 10 : 0;
       return {
         weekKey: wk,
         dayKeys: w.dayKeys,
         avgIdleH: w.dayKeys.length > 0 ? w.weekIdleH / w.dayKeys.length : 0,
-        avgDrainPerDay: w.weekIdleH > 0 ? Math.round(w.weekDropRaw / w.weekIdleH * 24 * 10) / 10 : 0,
-        weekClimatePct: pctOf(w.weekClimateMin, w.weekIdleH),
-        weekSentryPct: pctOf(w.weekSentryMin, w.weekIdleH),
+        avgDrainPerDay,
+        weekClimatePct: dropSharePct(w.weekClimateMin, w.weekIdleH, avgDrainPerDay),
+        weekSentryPct: dropSharePct(w.weekSentryMin, w.weekIdleH, avgDrainPerDay),
         weekClimateMin: w.weekClimateMin,
         weekSentryMin: w.weekSentryMin,
       };
     });
+    const totalAvgDrainPerDay = totalIdleH > 0 ? Math.round(totalDropRaw / totalIdleH * 24 * 10) / 10 : 0;
     return {
-      totalClimatePct: pctOf(totalClimateMin, totalIdleH),
-      totalSentryPct: pctOf(totalSentryMin, totalIdleH),
+      totalClimatePct: dropSharePct(totalClimateMin, totalIdleH, totalAvgDrainPerDay),
+      totalSentryPct: dropSharePct(totalSentryMin, totalIdleH, totalAvgDrainPerDay),
       totalClimateMin,
       totalSentryMin,
       dayCompute,
@@ -144,18 +154,8 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
     };
   }, [grouped]);
 
-  // 주 헤더 토글 — 이번 주 항상 펼침, 월/화엔 지난 주도 펼침
-  const [expandedWeeks, setExpandedWeeks] = useState(() => {
-    const today = kstDateStr(Date.now());
-    const thisWeek = kstMondayStr(today + 'T00:00:00Z');
-    const dow = kstDayOfWeek();
-    const set = new Set([thisWeek]);
-    if (dow === 1 || dow === 2) {
-      const lastWeek = kstMondayStr(new Date(thisWeek + 'T00:00:00Z').getTime() - 7 * 86400000);
-      set.add(lastWeek);
-    }
-    return set;
-  });
+  // 기본 모두 접힘 — 사용자가 원하는 주만 펼침
+  const [expandedWeeks, setExpandedWeeks] = useState(() => new Set());
   const toggleWeek = (wk) => setExpandedWeeks(prev => {
     const next = new Set(prev);
     if (next.has(wk)) next.delete(wk); else next.add(wk);
@@ -239,21 +239,21 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                 <span className="text-[10px] text-zinc-600 tabular-nums">{weekRange(week.weekKey)}</span>
               </span>
               <span className="flex items-center gap-2 tabular-nums flex-shrink-0">
+                <span className={`text-[10px] font-bold ${dropTextClass(week.avgDrainPerDay)}`}>
+                  {week.avgDrainPerDay < 0.05 ? '0%' : `-${fmtDrop(week.avgDrainPerDay)}%`}
+                </span>
                 <span className="text-[10px] text-zinc-600">
-                  {formatHours(week.avgIdleH)}/일
                   {week.weekClimatePct != null && (
-                    <span className="text-sky-700 ml-1 opacity-80" title={`공조 ${Math.round(week.weekClimateMin)}분`}>
-                      (<span aria-hidden="true">🌀</span>{week.weekClimatePct}%)
+                    <span className="text-sky-700 mr-1 opacity-80" title={`공조 ${Math.round(week.weekClimateMin)}분`}>
+                      <span aria-hidden="true">🌀</span>{week.weekClimatePct}%
                     </span>
                   )}
                   {week.weekSentryPct != null && (
-                    <span className="text-fuchsia-400 ml-1 opacity-80" title={`센트리 의심 ${Math.round(week.weekSentryMin)}분`}>
-                      (<span aria-hidden="true">🛡</span>{week.weekSentryPct}%)
+                    <span className="text-fuchsia-400 mr-1 opacity-80" title={`센트리 의심 ${Math.round(week.weekSentryMin)}분`}>
+                      <span aria-hidden="true">🛡</span>{week.weekSentryPct}%
                     </span>
                   )}
-                </span>
-                <span className={`text-[10px] font-bold ${dropTextClass(week.avgDrainPerDay)}`}>
-                  {week.avgDrainPerDay < 0.05 ? '0%' : `-${fmtDrop(week.avgDrainPerDay)}%`}
+                  {formatHours(week.avgIdleH)}/일
                 </span>
               </span>
             </button>
@@ -264,33 +264,33 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
             <div className="px-4 py-1.5 bg-white/[0.02] flex items-center justify-between">
               <span className="text-[10px] font-semibold text-zinc-500 tabular-nums">{formatDateLabel(key)}</span>
               <div className="flex items-center gap-2 tabular-nums">
+                <span className={`text-[10px] font-bold ${dropTextClass(dayDrop)}`}>
+                  {dayDrop < 0.05 ? '0%' : `-${fmtDrop(dayDrop)}%`}
+                </span>
                 <span className="text-[10px] text-zinc-600">
-                  {formatHours(dayIdleH)}
                   {dayClimatePct != null && (
                     <span
-                      className="text-sky-700 ml-1 opacity-80"
+                      className="text-sky-700 mr-1 opacity-80"
                       title={`공조 작동 추정 ${Math.round(dayClimateMin)}분`}
                     >
-                      (<span aria-hidden="true">🌀</span>{dayClimatePct}%)
+                      <span aria-hidden="true">🌀</span>{dayClimatePct}%
                     </span>
                   )}
                   {daySentryPct != null && (
                     <span
-                      className="text-fuchsia-400 ml-1 opacity-80"
+                      className="text-fuchsia-400 mr-1 opacity-80"
                       title={`센트리 의심(공조 제외 온라인) 추정 ${Math.round(daySentryMin)}분`}
                     >
-                      (<span aria-hidden="true">🛡</span>{daySentryPct}%)
+                      <span aria-hidden="true">🛡</span>{daySentryPct}%
                     </span>
                   )}
-                </span>
-                <span className={`text-[10px] font-bold ${dropTextClass(dayDrop)}`}>
-                  {dayDrop < 0.05 ? '0%' : `-${fmtDrop(dayDrop)}%`}
+                  {formatHours(dayIdleH)}
                 </span>
               </div>
             </div>
             <div className="px-4 py-2.5">
-              {/* 24h 타임라인 — 상단 drain(38px) + 하단 공조/센트리 밴드(10px) */}
-              <div className="relative w-full h-12 rounded-md overflow-hidden bg-white/[0.05]">
+              {/* 24h 타임라인 — 상단 drain(28px) + 하단 공조/센트리 밴드(8px) */}
+              <div className="relative w-full h-9 rounded-md overflow-hidden bg-white/[0.05]">
                 {items.map((r, i) => {
                   const kstStart = toKstDate(r.idle_start);
                   const hourOffset = kstStart.getUTCHours() + kstStart.getUTCMinutes() / 60 + kstStart.getUTCSeconds() / 3600;
@@ -315,18 +315,18 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                     isZero ? '0%' : `-${fmtDrop(r.soc_drop)}%`,
                   ];
                   if (isPreCharge) titleParts.push('⚡충전 전 대기');
-                  const itemClimatePct = pctOf(climateMin, r.idle_hours);
-                  const itemSentryPct = pctOf(itemSentryMin, r.idle_hours);
+                  const itemClimatePct = dropSharePct(climateMin, r.idle_hours, r.soc_drop);
+                  const itemSentryPct = dropSharePct(itemSentryMin, r.idle_hours, r.soc_drop);
                   if (itemClimatePct != null) titleParts.push(`🌀 공조 ${itemClimatePct}%`);
                   if (itemSentryPct != null) titleParts.push(`🛡 센트리 의심 ${itemSentryPct}%`);
                   return (
                     <Fragment key={i}>
-                      {/* drain 바 — 상단 38px */}
+                      {/* drain 바 — 상단 28px */}
                       <div
                         className="absolute left-0 flex items-center justify-center text-[10px] font-bold tabular-nums text-white"
                         style={{
                           top: 0,
-                          height: '38px',
+                          height: '28px',
                           left: `${leftPct}%`,
                           width: `${widthPct}%`,
                           background: bg,
@@ -349,7 +349,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                             className="absolute pointer-events-none"
                             style={{
                               bottom: 0,
-                              height: '10px',
+                              height: '8px',
                               left: `${spLeft}%`,
                               width: `${spWidth}%`,
                               background: SENTRY_BG,
@@ -370,7 +370,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
                             className="absolute pointer-events-none"
                             style={{
                               bottom: 0,
-                              height: '10px',
+                              height: '8px',
                               left: `${spLeft}%`,
                               width: `${spWidth}%`,
                               background: CLIMATE_BG,

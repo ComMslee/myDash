@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
-export default function Home() {
+export default function V2Root() {
   redirect('/v2/drives');
 }
