@@ -6,26 +6,32 @@ import Link from 'next/link';
 
 const VARIANTS = [
   {
-    key: 'd',
-    label: 'D. Grounded ⭐ (추천)',
-    desc: '무화려 보수안 — floating 0, 시트 0, 데코 0. 메인 4탭 + 앱 풀페이지',
+    key: 'f',
+    label: 'F. Top Pills (지도앱 스타일) ⭐',
+    desc: '상단 카테고리 칩 가로 스크롤 — 지도앱 카테고리 패턴, 하단 탭 없음',
     color: 'text-fuchsia-400',
+  },
+  {
+    key: 'd',
+    label: 'D. Grounded',
+    desc: '무화려 보수안 — 평범한 하단 4탭 + 앱 풀페이지',
+    color: 'text-blue-400',
   },
   {
     key: 'a',
     label: 'A. Floating Dock',
-    desc: 'Mac Dock 스타일 — 떠있는 알약 dock (장식 위주)',
+    desc: '떠있는 알약 dock (장식 위주)',
     color: 'text-zinc-500',
   },
   {
     key: 'b',
     label: 'B. Radial FAB',
-    desc: '우하단 + 부채꼴 폭발 (장식 위주)',
+    desc: '우하단 + 부채꼴 (장식 위주)',
     color: 'text-zinc-500',
   },
   {
     key: 'ab',
-    label: 'AB. Dock + Radial Overflow',
+    label: 'AB. Dock + Radial',
     desc: 'A + B 믹스 (장식 위주)',
     color: 'text-zinc-500',
   },
@@ -60,8 +66,8 @@ export default function MockupNavIndex() {
         </div>
 
         <div className="mt-6 p-4 rounded-xl bg-zinc-900/40 border border-white/[0.04] text-xs text-zinc-500 leading-relaxed">
-          ※ 사용자 피드백: floating/장식 자체가 거슬림 + 9 도메인이 너무 많음 → D 안 도출.
-          <br />※ A·B·AB·C 는 비교용 보존 (장식 위주라 폐기 후보).
+          ※ 사용자 피드백 누적: floating 자체 거슬림 + 9 도메인 너무 많음 + 데코 싫음.
+          <br />※ F (지도앱 스타일) 가 사용자 본인 제안 — 콘텐츠 우선, nav 가벼움.
         </div>
       </div>
     </main>
