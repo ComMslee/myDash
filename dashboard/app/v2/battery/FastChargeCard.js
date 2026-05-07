@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { formatDuration, shortAddr } from '@/lib/format';
 
-export default function FastChargeCard({ flat = false }) {
+export default function FastChargeCard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -15,25 +15,23 @@ export default function FastChargeCard({ flat = false }) {
       .catch(() => { setError(true); setLoading(false); });
   }, []);
 
-  const rootCls = flat ? '' : 'bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden';
-
   if (loading) {
     return (
-      <div className={`${rootCls} flex items-center justify-center py-10`.trim()}>
+      <div className="bg-[#161618] border border-white/[0.06] rounded-2xl flex items-center justify-center py-10">
         <div className="w-5 h-5 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
       </div>
     );
   }
   if (error) {
     return (
-      <div className={`${rootCls} px-4 py-6 text-center`.trim()}>
+      <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-6 text-center">
         <p className="text-zinc-500 text-sm">데이터를 불러올 수 없습니다</p>
       </div>
     );
   }
   if (!data?.records?.length) {
     return (
-      <div className={`${rootCls} px-4 py-6 text-center`.trim()}>
+      <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-6 text-center">
         <p className="text-zinc-600 text-sm">급속 충전 기록이 없습니다</p>
       </div>
     );
@@ -42,7 +40,7 @@ export default function FastChargeCard({ flat = false }) {
   const records = data.records;
 
   return (
-    <div className={rootCls || undefined}>
+    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
         <span className="text-xs font-bold text-zinc-200">급속 충전 기록</span>
         <span className="text-xs text-zinc-600">{records.length}건</span>

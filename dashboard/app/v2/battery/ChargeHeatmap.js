@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import YearHeatmap from '@/app/components/YearHeatmap';
 
-export default function ChargeHeatmap({ flat = false }) {
+export default function ChargeHeatmap() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -23,7 +23,6 @@ export default function ChargeHeatmap({ flat = false }) {
       color="#4ade80"
       legendLabel="충전"
       latestLeft
-      flat={flat}
     />
   );
 }

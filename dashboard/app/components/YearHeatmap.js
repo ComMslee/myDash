@@ -67,7 +67,6 @@ export default function YearHeatmap({
   legendLabel,
   latestLeft = true,
   onSelectMonth,
-  flat = false,
 }) {
   const weeks = useMemo(() => buildWeeks({ latestLeft }), [latestLeft]);
 
@@ -110,7 +109,7 @@ export default function YearHeatmap({
   };
 
   return (
-    <div className={flat ? 'p-3' : 'bg-[#161618] border border-white/[0.06] rounded-2xl p-3'}>
+    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-3">
       {loading ? (
         <div className="h-24 flex items-center justify-center">
           <div className="w-5 h-5 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
