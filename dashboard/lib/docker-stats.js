@@ -3,7 +3,9 @@ import http from 'node:http';
 // Docker daemon API 호출 — /var/run/docker.sock 유닉스 소켓 (RO 마운트).
 // 컨테이너별 CPU%/Memory 점유율 산출용.
 const SOCKET = '/var/run/docker.sock';
-const TIMEOUT_MS = 2000;
+// /containers/{id}/stats?stream=false 는 1샘플 스트리밍에 1~2s 걸리는 게 정상 —
+// 2s 로 잡으면 가끔 timeout 떨어져서 cpuPct/mem 이 null 됨. 5s 로 완화.
+const TIMEOUT_MS = 5000;
 
 function dockerRequest(path) {
   return new Promise((resolve, reject) => {

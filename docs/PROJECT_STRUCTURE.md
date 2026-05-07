@@ -102,6 +102,7 @@ myDash/
     │       ├── battery-trend/route.js    # 배터리 용량/습관 월별 트렌드
     │       ├── charge-all-time/route.js  # 누적 충전 비용
     │       ├── frequent-places/route.js  # 자주 방문 장소 랭킹
+    │       ├── long-stay-places/route.js # 오래 머문 장소 랭킹 (drives LEAD 윈도우로 dwell 산출, ≥10분만)
     │       ├── rankings/route.js         # 랭킹 페이지 데이터
     │       ├── route-map/route.js        # 특정 주행의 GPS 경로
     │       ├── heatmap/route.js          # 히트맵 데이터
@@ -111,7 +112,7 @@ myDash/
     │       ├── home-charger/poll-log/route.js     # 폴링 로그 조회
     │       ├── find-nearby-chargers/route.js  # 좌표 기반 주변 충전소 검색
     │       ├── debug/charging/route.js        # 충전 디버그 정보
-    │       └── server-status/route.js         # 호스트/프로세스/DB 풀·freshness — /v2/dev/api-status 대시보드용
+    │       └── server-status/route.js         # 호스트(/proc/meminfo · statfs) + 컨테이너(docker.sock) + DB 로그(server_health_log) + 24h 피크/한산 — /v2/dev/api-status 4열 대시보드용
 ```
 
 ## 라우트

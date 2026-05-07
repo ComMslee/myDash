@@ -20,6 +20,7 @@ TeslaMate가 관리하는 PostgreSQL 16 스키마. 직접 쿼리만 사용 (ORM 
 |--------|------|-----------|
 | `charger_usage` | 집충전기 시간대별 사용 카운트 `(stat_id, chger_id, hour)` · 컨테이너 재시작 간 보존(DROP 금지) · 30분당 최대 1회 증가(시간당 최대 1회) | `lib/home-charger-cache.js::ensureTable()` |
 | `home_charger_snapshot` | 환경공단 API 응답 스냅샷 `(cache_key, payload JSONB, fetched_at)` · 컨테이너 재시작 직후 콜드 스타트 캐시 복원용 | `lib/home-charger-cache.js::ensureTable()` |
+| `server_health_log` | 서버 헬스 시계열 `(ts PK, host_cpu, host_mem_pct, host_mem_avail_pct, db_ms, tm_cpu, tm_mem_mb, dash_cpu, dash_mem_mb, disk_used_pct, swap_used_pct)` · 24h 피크/한산 추적용 · 5분 dedupe push (페이지 폴링 시 누적) | `app/api/server-status/route.js::ensureSchema()` |
 
 ### `charger_usage` 스키마
 
