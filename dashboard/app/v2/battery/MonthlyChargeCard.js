@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { HourDowHeatmap } from '@/app/components/ChartWidgets';
 
-export default function MonthlyChargeCard() {
+export default function MonthlyChargeCard({ flat = false }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -13,9 +13,11 @@ export default function MonthlyChargeCard() {
       .catch(() => setLoading(false));
   }, []);
 
+  const rootCls = flat ? '' : 'bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden';
+
   if (loading) {
     return (
-      <div className="bg-[#161618] border border-white/[0.06] rounded-2xl flex items-center justify-center py-10">
+      <div className={`${rootCls} flex items-center justify-center py-10`.trim()}>
         <div className="w-5 h-5 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
       </div>
     );
@@ -28,7 +30,7 @@ export default function MonthlyChargeCard() {
   const slowRatio = data.charge_count > 0 ? data.slow_charges / data.charge_count : 0;
 
   return (
-    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
+    <div className={rootCls || undefined}>
       {/* 헤더 — 회당 평균을 헤더 부속으로 */}
       <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center justify-between">
         <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">충전 요약</span>

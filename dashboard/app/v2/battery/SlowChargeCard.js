@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { formatDuration, shortAddr } from '@/lib/format';
 import { kstDateStr, kstMondayStr, kstDayOfWeek } from '@/lib/kst';
 
-export default function SlowChargeCard() {
+export default function SlowChargeCard({ flat = false }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -73,30 +73,32 @@ export default function SlowChargeCard() {
     return `${mon.getUTCMonth() + 1}/${mon.getUTCDate()} ~ ${sun.getUTCMonth() + 1}/${sun.getUTCDate()}`;
   };
 
+  const rootCls = flat ? '' : 'bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden';
+
   if (loading) {
     return (
-      <div className="bg-[#161618] border border-white/[0.06] rounded-2xl flex items-center justify-center py-10">
+      <div className={`${rootCls} flex items-center justify-center py-10`.trim()}>
         <div className="w-5 h-5 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
       </div>
     );
   }
   if (error) {
     return (
-      <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-6 text-center">
+      <div className={`${rootCls} px-4 py-6 text-center`.trim()}>
         <p className="text-zinc-500 text-sm">데이터를 불러올 수 없습니다</p>
       </div>
     );
   }
   if (!records.length) {
     return (
-      <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-6 text-center">
+      <div className={`${rootCls} px-4 py-6 text-center`.trim()}>
         <p className="text-zinc-600 text-sm">완속 충전 기록이 없습니다</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
+    <div className={rootCls || undefined}>
       <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between gap-2 tabular-nums">
         <span className="flex items-baseline gap-1.5 min-w-0">
           <span className="text-xs font-bold text-zinc-200 shrink-0">완속 충전 기록</span>
