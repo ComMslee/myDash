@@ -25,10 +25,10 @@ export default function VehicleKpiCard({ car, insights }) {
           <p className="text-[10px] text-zinc-600 mb-0.5">최근 6개월 효율</p>
           <p className="text-sm font-bold tabular-nums" style={{ color: recentEff ? effColor(recentEff) : '#52525b' }}>
             {recentEff ? `${recentEff.toFixed(0)} Wh/km` : '—'}
+            {allTimeEff != null && (
+              <span className="text-[10px] font-normal text-zinc-600 ml-1.5">(전기간 {allTimeEff.toFixed(0)})</span>
+            )}
           </p>
-          {allTimeEff != null && (
-            <p className="text-[10px] text-zinc-600">전기간 {allTimeEff.toFixed(0)}</p>
-          )}
         </div>
       )}
     </div>
