@@ -230,10 +230,10 @@ export default function GlobalHeader() {
               // 신뢰도 낮으면 숨김 (운행 데이터 부족)
               if (ec.confidence === 'low') return null;
               const days = ec.days_until;
-              // 3일 이상 여유면 노이즈라 숨김 (필요할 때만 표시)
-              if (days > 2) return null;
-              const label = days === 0 ? '오늘 충전 필요' : days === 1 ? '내일 충전' : '2일 뒤 충전';
-              const colorCls = days === 0 ? 'text-red-400' : days === 1 ? 'text-amber-400' : 'text-zinc-400';
+              // 2일 이상 여유면 노이즈라 숨김 (오늘/내일만 표시)
+              if (days > 1) return null;
+              const label = days === 0 ? '오늘 충전 필요' : '내일 충전';
+              const colorCls = days === 0 ? 'text-red-400' : 'text-amber-400';
               return <span className={`text-xs tabular-nums font-bold ${colorCls}`}>⚡ {label}</span>;
             })()}
             <PercentBadge level={lvl} color={color} charging={false} />
