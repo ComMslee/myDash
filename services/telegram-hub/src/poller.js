@@ -5,6 +5,20 @@ import { formatDur } from './format.js';
 import { getUsersWithFeature } from './auth.js';
 import { dashGet } from './dash.js';
 
+// 가족 봇이라 새벽 알림은 소리/진동 끔. 메시지는 도착하지만 깨우지 않음.
+// 23시~06시 KST = quiet.
+function isQuietKst() {
+  const kstH = new Date(Date.now() + 9 * 3600 * 1000).getUTCHours();
+  return kstH >= 23 || kstH < 6;
+}
+
+// dashboard 공개 URL (가족 폰에서 열리는 주소). 미설정이면 인라인 버튼 생략.
+const DASH_PUBLIC = process.env.DASHBOARD_PUBLIC_URL || '';
+function inlineButton(label, path) {
+  if (!DASH_PUBLIC) return undefined;
+  return { inline_keyboard: [[{ text: label, url: `${DASH_PUBLIC}${path}` }]] };
+}
+
 // 지오펜스/주소 이름이 모두 비면 좌표로 dashboard 의 Kakao 역지오코더 호출.
 // dashboard 가 단일 진실원: addresses.name NULL 인 케이스를 Kakao 폴백으로 채움.
 async function resolveLabel(geoName, addrName, lat, lng) {
@@ -16,7 +30,8 @@ async function resolveLabel(geoName, addrName, lat, lng) {
 }
 
 // 'car' feature 권한자 전원에게 발송 (root + 권한 부여된 user).
-async function broadcast(text) {
+// opts: { reply_markup, force_notify } — quiet 시간엔 disable_notification 자동 적용.
+async function broadcast(text, opts = {}) {
   let recipients = [];
   try {
     recipients = await getUsersWithFeature('car');
@@ -27,8 +42,11 @@ async function broadcast(text) {
     // 부트스트랩 직후 등 — 아직 hub_users 비어 있을 때 root 직접 발송.
     recipients = [String(process.env.TELEGRAM_CHAT_ID)];
   }
+  const sendOpts = {};
+  if (opts.reply_markup) sendOpts.reply_markup = opts.reply_markup;
+  if (isQuietKst() && !opts.force_notify) sendOpts.disable_notification = true;
   for (const r of recipients) {
-    try { await sendMessage(text, r); } catch (e) { console.error('[poller] send', e.message); }
+    try { await sendMessage(text, r, sendOpts); } catch (e) { console.error('[poller] send', e.message); }
   }
 }
 
@@ -101,40 +119,61 @@ async function checkChargeStart(carId) {
   );
   for (const r of rows) {
     const where = await resolveLabel(r.geo_name, r.addr_name, r.lat, r.lng);
-    const soc = r.start_battery_level != null ? ` (${r.start_battery_level}%부터)` : '';
-    await broadcast(`⚡ <b>충전 시작</b>${soc}\n📍 ${escapeHtml(where)}`);
+    const soc = r.start_battery_level != null ? ` ${r.start_battery_level}%` : '';
+    await broadcast(`⚡ <b>충전 시작</b>${soc} · 📍 ${escapeHtml(where)}`);
     setState({ last_charge_start_id: Number(r.id) });
   }
 }
 
 async function checkChargeEnd(carId) {
   const s = getState();
+  // charges JOIN 으로 fast_charger_present 집계 — 한 세션이라도 급속이면 ⚡급속 으로 간주.
   const { rows } = await pool.query(
     `SELECT cp.id, cp.duration_min, cp.charge_energy_added,
             cp.start_battery_level, cp.end_battery_level,
             g.name AS geo_name, a.name AS addr_name,
             COALESCE(g.latitude, a.latitude)::float AS lat,
-            COALESCE(g.longitude, a.longitude)::float AS lng
+            COALESCE(g.longitude, a.longitude)::float AS lng,
+            COALESCE(BOOL_OR(c.fast_charger_present), false) AS is_fast
      FROM charging_processes cp
      LEFT JOIN geofences g ON g.id = cp.geofence_id
      LEFT JOIN addresses a ON a.id = cp.address_id
+     LEFT JOIN charges c ON c.charging_process_id = cp.id
      WHERE cp.car_id = $1 AND cp.id > $2 AND cp.end_date IS NOT NULL
+     GROUP BY cp.id, g.name, a.name, g.latitude, a.latitude, g.longitude, a.longitude
      ORDER BY cp.id ASC`,
     [carId, s.last_charge_end_id],
   );
   for (const r of rows) {
     const where = await resolveLabel(r.geo_name, r.addr_name, r.lat, r.lng);
     const kwhNum = Number(r.charge_energy_added);
-    const kwh = Number.isFinite(kwhNum) ? kwhNum.toFixed(2) : '0.00';
+    const kwh = Number.isFinite(kwhNum) ? kwhNum : 0;
     const dur = formatDur(r.duration_min);
-    const socPart = (r.start_battery_level != null && r.end_battery_level != null)
-      ? ` ${r.start_battery_level}% → ${r.end_battery_level}%`
-      : '';
-    await broadcast([
-      `✅ <b>충전 완료</b>${socPart}`,
-      `⚡ ${kwh} kWh · ${dur}`,
-      `📍 ${escapeHtml(where)}`,
-    ].join('\n'));
+    const hours = Math.max(1 / 60, Number(r.duration_min || 0) / 60);
+    const avgKw = kwh > 0 ? (kwh / hours) : 0;
+    const kmGained = kwh > 0 ? Math.round(kwh / KWH_PER_KM) : 0;
+    const speedTag = r.is_fast ? '⚡ 급속' : '🔌 완속';
+
+    let socLine = '';
+    if (r.start_battery_level != null && r.end_battery_level != null) {
+      const delta = r.end_battery_level - r.start_battery_level;
+      const sign = delta >= 0 ? '+' : '';
+      socLine = ` ${r.start_battery_level}→${r.end_battery_level}% (${sign}${delta}%p)`;
+    }
+
+    const lines = [
+      `✅ <b>충전 완료</b>${socLine} · ${speedTag}`,
+      `🔋 ${kwh.toFixed(2)}kWh · ⏱️ ${dur}${avgKw > 0 ? ` · ${avgKw.toFixed(1)}kW` : ''}`,
+    ];
+    if (kmGained > 0) {
+      lines.push(`🚗 +${kmGained}km · 📍 ${escapeHtml(where)}`);
+    } else {
+      lines.push(`📍 ${escapeHtml(where)}`);
+    }
+
+    await broadcast(lines.join('\n'), {
+      reply_markup: inlineButton('🔋 배터리 상세', '/v2/battery'),
+    });
     setState({ last_charge_end_id: Number(r.id) });
   }
 }
@@ -172,12 +211,17 @@ async function checkDriveEnd(carId) {
       (Number(r.start_rated_range_km) || 0) - (Number(r.end_rated_range_km) || 0);
     const kwh = Math.max(0, rangeUsed * KWH_PER_KM);
     const eff = km > 0 ? (kwh * 1000) / km : 0;
-    const effPart = eff > 0 ? ` · ${eff.toFixed(0)} Wh/km` : '';
-    await broadcast([
-      '🚗 <b>주행 종료</b>',
-      `${escapeHtml(start)} → ${escapeHtml(end)}`,
-      `${km.toFixed(1)} km · ${dur}${effPart}`,
-    ].join('\n'));
+    const kmPerKwh = eff > 0 ? (1000 / eff) : 0;
+    const effLine = eff > 0
+      ? `\n⚡ ${eff.toFixed(0)}Wh/km · ${kmPerKwh.toFixed(1)}km/kWh`
+      : '';
+    await broadcast(
+      [
+        `🚗 ${escapeHtml(start)} → ${escapeHtml(end)}`,
+        `🛣️ ${km.toFixed(1)}km · ⏱️ ${dur}${effLine}`,
+      ].join('\n'),
+      { reply_markup: inlineButton('🗺️ 지도 보기', `/v2/history?id=${r.id}`) },
+    );
     setState({ last_drive_end_id: Number(r.id) });
   }
 }
