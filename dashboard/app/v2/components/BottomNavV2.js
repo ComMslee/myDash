@@ -131,15 +131,15 @@ export default function BottomNavV2() {
             >
               {icon}
               <span className="text-[10px] font-semibold leading-tight">{label}</span>
-              {metric && (
-                <span
-                  key={metric}
-                  className="text-[9px] tabular-nums leading-none truncate max-w-full"
-                  style={{ opacity: isActive ? 0.95 : 0.55 }}
-                >
-                  {metric}
-                </span>
-              )}
+              {/* 활성 탭은 peek 가 동일 정보를 더 크게 표시하므로 숨김(공간 유지). */}
+              <span
+                key={metric || 'spacer'}
+                className="text-[9px] tabular-nums leading-none truncate max-w-full"
+                style={{ opacity: isActive ? 0 : 0.7 }}
+                aria-hidden={isActive || !metric}
+              >
+                {metric || ' '}
+              </span>
               <span
                 className="w-1 h-1 rounded-full"
                 style={{ background: isActive ? accent : 'transparent' }}

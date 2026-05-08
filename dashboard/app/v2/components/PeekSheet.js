@@ -19,16 +19,16 @@ const TAB_BY_PATH = {
 
 const TAB_META = {
   drives: {
-    label: '주행', accent: '#34d399', accentSoft: 'rgba(52,211,153,0.10)', peekH: 124,
+    label: '주행', accent: '#34d399', accentSoft: 'rgba(52,211,153,0.10)', peekH: 96,
   },
   history: {
-    label: '이력', accent: '#a78bfa', accentSoft: 'rgba(167,139,250,0.10)', peekH: 132,
+    label: '이력', accent: '#a78bfa', accentSoft: 'rgba(167,139,250,0.10)', peekH: 104,
   },
   battery: {
-    label: '배터리', accent: '#60a5fa', accentSoft: 'rgba(96,165,250,0.10)', peekH: 156,
+    label: '배터리', accent: '#60a5fa', accentSoft: 'rgba(96,165,250,0.10)', peekH: 124,
   },
   chargers: {
-    label: '집 충전소', accent: '#fbbf24', accentSoft: 'rgba(251,191,36,0.10)', peekH: 124,
+    label: '집 충전소', accent: '#fbbf24', accentSoft: 'rgba(251,191,36,0.10)', peekH: 96,
   },
 };
 
@@ -98,19 +98,18 @@ function PulseDot({ accent }) {
 }
 
 // ── 탭별 표지 (Cover) ──────────────────────────────────────
+// 타이틀 제거 — 활성 탭 라벨은 내비바가 표시하므로 중복.
 function CoverDrives({ data, accent }) {
   const d = data?.drives;
   return (
-    <div className="flex justify-between items-start gap-3">
+    <div className="flex items-baseline justify-between gap-3">
       <div className="min-w-0 flex-1">
-        <div className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: accent }}>
-          오늘 주행
-        </div>
-        <div className="flex items-baseline gap-1 mt-1">
-          <span className="text-[28px] font-bold text-zinc-100 tabular-nums leading-none">
+        <div className="flex items-baseline gap-1">
+          <span className="text-[26px] font-bold text-zinc-100 tabular-nums leading-none">
             {d ? d.today_km.toFixed(1) : '—'}
           </span>
           <span className="text-sm text-zinc-400">km</span>
+          <span className="text-[10px] text-zinc-500 ml-2">오늘</span>
         </div>
         <div className="text-[11px] text-zinc-500 mt-1.5">
           {d?.today_count ? `${d.today_count}회 · ${formatDur(d.today_duration_min)}` : '오늘 주행 없음'}
@@ -120,22 +119,18 @@ function CoverDrives({ data, accent }) {
   );
 }
 
-function CoverHistory({ data, accent }) {
+function CoverHistory({ data }) {
   const d = data?.history;
   const lat = d?.latest;
   return (
-    <div className="flex justify-between items-start gap-3">
-      <div className="min-w-0 flex-1">
-        <div className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: accent }}>
-          최근 주행
-        </div>
-        <div className="text-[14px] font-bold text-zinc-100 mt-1 leading-tight truncate">
-          {lat ? `${shortAddr(lat.start_addr)} → ${shortAddr(lat.end_addr)}` : '—'}
-        </div>
-        <div className="text-[11px] text-zinc-500 mt-1.5 tabular-nums truncate">
-          {lat ? `${lat.distance.toFixed(1)}km · ${formatDur(lat.duration_min)} · ${relTime(lat.start)}` : ''}
-          {d ? ` · 이번 주 ${d.week_count}건` : ''}
-        </div>
+    <div className="min-w-0">
+      <div className="text-[15px] font-bold text-zinc-100 leading-tight truncate">
+        {lat ? `${shortAddr(lat.start_addr)} → ${shortAddr(lat.end_addr)}` : '—'}
+      </div>
+      <div className="text-[11px] text-zinc-500 mt-1.5 tabular-nums truncate">
+        {lat
+          ? `${lat.distance.toFixed(1)}km · ${formatDur(lat.duration_min)} · ${relTime(lat.start)}`
+          : '주행 이력 없음'}
       </div>
     </div>
   );
@@ -145,14 +140,11 @@ function CoverBattery({ data, accent }) {
   const d = data?.battery;
   return (
     <div className="flex items-center gap-3">
-      <SocRing accent={accent} value={d?.soc} size={84} />
+      <SocRing accent={accent} value={d?.soc} size={76} />
       <div className="flex-1 min-w-0">
-        <div className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: accent }}>
-          배터리
-        </div>
         {d?.charging ? (
           <>
-            <div className="flex items-center gap-1.5 mt-1">
+            <div className="flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: accent }} />
               <span className="text-[10px] text-zinc-400">충전 중</span>
             </div>
@@ -161,14 +153,12 @@ function CoverBattery({ data, accent }) {
               <span className="text-[11px] text-zinc-500 ml-0.5">kW</span>
             </div>
             <div className="text-[10px] text-zinc-500 mt-1">
-              +{(d.charge_added_kwh || 0).toFixed(1)} kWh
+              세션 +{(d.charge_added_kwh || 0).toFixed(1)} kWh
             </div>
           </>
         ) : (
           <>
-            <div className="text-[18px] font-bold text-zinc-200 mt-1 tabular-nums">
-              {d?.soc != null ? `${d.soc}%` : '—'}
-            </div>
+            <div className="text-[10px] text-zinc-400">충전 안 함</div>
             <div className="text-[10px] text-zinc-500 mt-1">
               {d?.last_position_at ? `${relTime(d.last_position_at)} 갱신` : '데이터 없음'}
             </div>
@@ -183,18 +173,16 @@ function CoverChargers({ data, accent }) {
   const d = data?.chargers;
   const fresh = !!d?.is_fresh;
   return (
-    <div className="flex justify-between items-start gap-3">
+    <div className="flex items-baseline justify-between gap-3">
       <div className="min-w-0 flex-1">
-        <div className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: accent }}>
-          집 충전소
-        </div>
-        <div className="flex items-baseline gap-1 mt-1">
-          <span className="text-[28px] font-bold text-zinc-100 tabular-nums leading-none">
+        <div className="flex items-baseline gap-1">
+          <span className="text-[26px] font-bold text-zinc-100 tabular-nums leading-none">
             {d?.success_rate_today != null ? d.success_rate_today : '—'}
           </span>
           {d?.success_rate_today != null && <span className="text-sm text-zinc-400">%</span>}
+          <span className="text-[10px] text-zinc-500 ml-2">오늘 성공률</span>
         </div>
-        <div className="text-[11px] text-zinc-500 mt-1.5">
+        <div className="text-[11px] text-zinc-500 mt-1.5 truncate">
           {fresh ? '폴링 정상' : '폴링 오래됨'}
           {d?.ttl_min != null && ` · TTL ${d.ttl_min}분`}
           {d?.last_fetched && ` · ${relTime(d.last_fetched)}`}
@@ -406,13 +394,8 @@ function PeekSheet() {
             <div className="flex justify-center pt-2 pb-1">
               <div className="w-10 h-1 rounded-full" style={{ background: `${meta.accent}88` }} />
             </div>
-            <div className="px-4 pb-3" key={activeTab} style={{ animation: 'peek-coverIn 0.32s' }}>
+            <div className="px-4 pb-2.5" key={activeTab} style={{ animation: 'peek-coverIn 0.32s' }}>
               {Cover && <Cover data={data} accent={meta.accent} />}
-              {!expanded && (
-                <div className="text-[9px] text-zinc-600 mt-2 text-right">
-                  탭 또는 ↑ 끌어 자세히 보기
-                </div>
-              )}
             </div>
           </div>
           {expanded && Expanded && (
