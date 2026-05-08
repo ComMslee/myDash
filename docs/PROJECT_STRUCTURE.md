@@ -89,7 +89,7 @@ myDash/
     │   │   ├── page.js           # `/v2` → `/home` 리다이렉트
     │   │   ├── home/page.js      # 5번째 탭 — 4영역(주행·이력·배터리·집충전소) 요약 카드 (quick-status 60초 폴링)
     │   │   ├── components/
-    │   │   │   ├── BottomNavV2.js    # 하단 탭 (홈/주행/이력/배터리/집 충전소 — 5탭) + 탭별 라이브 메트릭 1줄 + 실측 nav 높이 publish (--peek-nav-h)
+    │   │   │   ├── BottomNavV2.js    # 하단 탭 (홈/주행/배터리 — 3탭, 라벨 없이 이모지+메트릭만) — 이력은 주행에, 집충전소는 배터리에 흡수
     │   │   │   ├── RankingsSheet.js  # 랭킹 바텀시트
     │   │   │   └── PeekSheet.js      # 4탭 공용 표지(peek) 시트 — Provider/Context + 탭별 Cover/Expanded + /api/v2/quick-status 60초 폴링 + 드래그 확장(↑32px)/축소(↓80px)
     │   │   ├── drives/
@@ -186,11 +186,11 @@ myDash/
 | 경로 | 설명 | 하단 탭 |
 |------|------|---------|
 | `/` | `/home`으로 리다이렉트 | — |
-| `/home` (`/v2/home`) | 4영역 요약 카드 (주행·이력·배터리·집충전소) — quick-status 60초 폴링 | 홈 |
-| `/v2/drives` | 차량 KPI · 인사이트 · 연간 히트맵 · 시간×요일 패턴 · TOP50 · 연도별 월간/계절 효율 (섹션 anchor #kpi/#insights/#year/#patterns/#records/#monthly/#seasonal) | 주행 |
-| `/v2/battery` | 건강 점수 + 대기 소모 + 충전 습관 + 월간 충전 + 히트맵 + 급속/완속 기록 | 배터리 |
-| `/v2/history` | 일 카드 리스트 → 일 상세(지도 + 그날 주행 strip 하이라이트) / 월 합계(monthMode) | 이력 |
-| `/v2/chargers` | 집충전기 실시간 + Top 순위 + 활용도 리포트 (인라인) | 집 충전소 |
+| `/home` (`/v2/home`) | 4영역 요약 카드 (주행·이력·배터리·집충전소) — quick-status 60초 폴링 | 🏠 홈 |
+| `/v2/drives` | 차량 KPI · 인사이트 · 연간 히트맵 · 시간×요일 패턴 · TOP50 · 연도별 월간/계절 효율 (섹션 anchor #kpi/#insights/#year/#patterns/#records/#monthly/#seasonal) | 🚗 주행 |
+| `/v2/history` | 일 카드 리스트 → 일 상세(지도 + 그날 주행 strip 하이라이트) / 월 합계(monthMode) | 🚗 주행(흡수) |
+| `/v2/battery` | 건강 점수 + 대기 소모 + 충전 습관 + 월간 충전 + 히트맵 + 급속/완속 기록 | 🔋 배터리 |
+| `/v2/chargers` | 집충전기 실시간 + Top 순위 + 활용도 리포트 (인라인) | 🔋 배터리(흡수) |
 | `/v2/chargers/report` | 활용도 리포트 단독 페이지 (외부 캡처/공유) | — (URL 직접) |
 | `/v2/chargers/poll-log` | 폴링 로그 단독 페이지 — PeekSheet 의 집충전소 expanded 메뉴에서 진입 | — (URL 직접) |
 | `/v2/tg` | 텔레그램 봇 관리 (권한 · 방송 · 학습로그 · 가이드) | — (URL 직접) |

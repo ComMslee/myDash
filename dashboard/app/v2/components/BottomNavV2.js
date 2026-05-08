@@ -5,94 +5,61 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { usePeekSheet } from './PeekSheet';
 
+// 3탭 — 홈 / 주행(이력 흡수) / 배터리(집충전소 흡수). 라벨 텍스트 제거: 이모지 + 메트릭만.
 const tabs = [
   {
     href: '/home',
     id: 'home',
-    label: '홈',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3v-7h6v7h3a1 1 0 001-1V10" />
-      </svg>
-    ),
+    icon: '🏠',
+    // active 매칭 prefix
+    matches: ['/home'],
   },
   {
     href: '/drives',
     id: 'drives',
-    label: '주행',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18h18M7 14l4-4 4 4 5-5" />
-      </svg>
-    ),
-  },
-  {
-    href: '/history',
-    id: 'history',
-    label: '이력',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0L6.343 16.657a8 8 0 1111.314 0z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
+    icon: '🚗',
+    matches: ['/drives', '/history'],
   },
   {
     href: '/battery',
     id: 'battery',
-    label: '배터리',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <rect x="3" y="7" width="15" height="10" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 11v2" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 9l-2 4h3l-2 4" />
-      </svg>
-    ),
-  },
-  {
-    href: '/chargers',
-    id: 'chargers',
-    label: '집 충전소',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-      </svg>
-    ),
+    icon: '🔋',
+    matches: ['/battery', '/chargers'],
   },
 ];
 
-// quick-status 응답에서 탭별 짧은 라이브 메트릭 추출
+// quick-status 응답에서 탭별 메트릭 — 활성/비활성 모두 동일 라인.
+// (라벨이 사라졌으니 메트릭이 곧 탭의 식별자 + 라이브 정보)
 function tabMetric(tabId, data) {
   if (!data) return null;
   if (tabId === 'home') {
-    // 5탭 홈은 자체 메트릭 대신 각 탭 한눈 조합 — 너무 길면 잘리니 짧게
-    const b = data.battery;
-    return b?.soc != null ? `${b.soc}%${b.charging ? ' ⚡' : ''}` : null;
-  }
-  if (tabId === 'drives') {
-    const km = data.drives?.today_km;
-    if (km == null) return null;
-    return km > 0 ? `${km.toFixed(1)}km` : '쉬는 날';
-  }
-  if (tabId === 'history') {
-    const n = data.history?.week_count;
-    if (n == null) return null;
-    return `이번 주 ${n}건`;
-  }
-  if (tabId === 'battery') {
     const b = data.battery;
     if (!b) return null;
     if (b.charging) {
-      const kw = b.charger_power_kw;
-      return kw != null ? `${b.soc}% · ⚡${kw.toFixed(1)}kW` : `${b.soc}% · ⚡`;
+      return `${b.soc ?? '—'}% ⚡${b.charger_power_kw != null ? b.charger_power_kw.toFixed(1) : '—'}kW`;
     }
     return b.soc != null ? `${b.soc}%` : null;
   }
-  if (tabId === 'chargers') {
+  if (tabId === 'drives') {
+    const km = data.drives?.today_km;
+    const lat = data.history?.latest;
+    if (km == null && !lat) return null;
+    if (km > 0) return `${km.toFixed(1)}km`;
+    if (lat) return `최근 ${lat.distance.toFixed(0)}km`;
+    return '쉬는 날';
+  }
+  if (tabId === 'battery') {
+    const b = data.battery;
     const c = data.chargers;
-    if (!c) return null;
-    if (c.success_rate_today == null) return c.is_fresh ? '정상' : '대기';
-    return `${c.success_rate_today}% ${c.is_fresh ? '정상' : '오래됨'}`;
+    if (!b) return null;
+    if (b.charging) {
+      const kw = b.charger_power_kw;
+      return kw != null ? `⚡${kw.toFixed(1)}kW` : '⚡ 충전';
+    }
+    if (c?.success_rate_today != null) {
+      return `폴링 ${c.success_rate_today}%`;
+    }
+    return b.soc != null ? `${b.soc}%` : null;
   }
   return null;
 }
@@ -133,27 +100,31 @@ export default function BottomNavV2() {
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="max-w-2xl mx-auto flex">
-        {tabs.map(({ href, id, label, icon }) => {
-          const isActive = pathname === href || pathname.startsWith(href + '/');
+        {tabs.map(({ href, id, icon, matches }) => {
+          const isActive = matches.some(m => pathname === m || pathname.startsWith(m + '/'));
           const accent = peek?.tabMeta?.[id]?.accent || '#3b82f6';
           const metric = tabMetric(id, data);
           return (
             <Link
               key={href}
               href={href}
-              className="flex-1 flex flex-col items-center py-2 pb-2 gap-0.5 px-1 min-w-0 transition-colors"
+              className="flex-1 flex flex-col items-center justify-center py-1.5 gap-1 px-1 min-w-0 transition-colors"
               style={{ color: isActive ? accent : '#71717a' }}
             >
-              {icon}
-              <span className="text-[10px] font-semibold leading-tight">{label}</span>
-              {/* 활성 탭은 peek 가 동일 정보를 더 크게 표시하므로 숨김(공간 유지). */}
+              <span
+                className="text-xl leading-none"
+                style={{ filter: isActive ? 'none' : 'grayscale(0.4) opacity(0.8)' }}
+                aria-hidden
+              >
+                {icon}
+              </span>
               <span
                 key={metric || 'spacer'}
-                className="text-[9px] tabular-nums leading-none truncate max-w-full"
-                style={{ opacity: isActive ? 0 : 0.7 }}
-                aria-hidden={isActive || !metric}
+                className="text-[10px] tabular-nums leading-none truncate max-w-full font-semibold"
+                style={{ opacity: metric ? (isActive ? 1 : 0.7) : 0 }}
+                aria-hidden={!metric}
               >
-                {metric || ' '}
+                {metric || ' '}
               </span>
               <span
                 className="w-1 h-1 rounded-full"

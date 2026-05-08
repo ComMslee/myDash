@@ -53,24 +53,6 @@ const GEAR_ICON = (
   </svg>
 );
 
-function PercentBadge({ level, color, charging }) {
-  return (
-    <div
-      className="flex items-center gap-1"
-      role="progressbar"
-      aria-valuenow={level}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-label="배터리 잔량"
-    >
-      {charging && (
-        <span className="text-[10px] text-green-400 animate-pulse" aria-hidden="true">⚡</span>
-      )}
-      <span className="text-sm font-bold tabular-nums" style={{ color }}>{level}%</span>
-    </div>
-  );
-}
-
 export default function GlobalHeader() {
   const pathname = usePathname();
   const { isMock, toggleMock, isMockCharging, toggleMockCharging, lastRefresh, mockData } = useMock();
@@ -293,20 +275,11 @@ export default function GlobalHeader() {
 
         <div className="flex-1" />
 
-        {/* 우측: SOC% (+ 충전 중이면 ⚡ 펄스) — kW/타겟/잔여는 BottomNav·PeekSheet 가
-            동일 정보를 더 크게 표시하므로 헤더에선 생략. 예측 km 만 비충전 시 노출. */}
-        {isCharging ? (
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse flex-shrink-0" aria-hidden="true" />
-            <PercentBadge level={lvl} color={color} charging />
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            {estRange && (
-              <span className="text-zinc-500 text-[11px] tabular-nums">{estRange}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
-            )}
-            <PercentBadge level={lvl} color={color} charging={false} />
-          </div>
+        {/* 우측: SOC%/kW/range 모두 BottomNav 의 탭 메트릭으로 흡수. 배경 게이지로
+            시각적 SOC 컨텍스트만 유지. 충전 중에는 charge-pulse 가 좌측 아이콘에서
+            상태를 표시. 예측 거리는 비충전 시에만 짧게. */}
+        {!isCharging && estRange && (
+          <span className="text-zinc-500 text-[11px] tabular-nums">{estRange}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
         )}
 
         {process.env.NODE_ENV !== 'production' && (
