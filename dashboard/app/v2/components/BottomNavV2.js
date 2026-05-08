@@ -2,8 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { usePeekSheet } from './PeekSheet';
+
+// useLayoutEffect 는 SSR 시 경고 — 서버에선 useEffect 로 폴백.
+const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 // 3탭 — 홈 / 주행(이력 흡수) / 배터리(집충전소 흡수). SVG 아이콘 + 메트릭만 (라벨 없음).
 const tabs = [
@@ -65,8 +68,9 @@ export default function BottomNavV2() {
   const data = peek?.data;
   const navRef = useRef(null);
 
-  // PeekSheet 가 내비바 위에 정확히 안착하도록 실제 내비 높이를 CSS 변수로 publish
-  useEffect(() => {
+  // PeekSheet 가 내비바 위에 정확히 안착하도록 실제 내비 높이를 CSS 변수로 publish.
+  // useLayoutEffect 로 첫 페인트 전에 측정 — peek 와 nav 사이 초기 gap 방지.
+  useIsoLayoutEffect(() => {
     const el = navRef.current;
     if (!el) return;
     const update = () => {

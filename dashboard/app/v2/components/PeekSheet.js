@@ -25,12 +25,12 @@ const TAB_META = {
     label: '홈', accent: '#f472b6', accentSoft: 'rgba(244,114,182,0.10)', peekH: 0,
   },
   drives: {
-    // 주행 + 이력 흡수 — peek 에 최근 이력 1줄 포함
-    label: '주행', accent: '#34d399', accentSoft: 'rgba(52,211,153,0.10)', peekH: 100,
+    // 주행 + 이력 흡수 — peek 에 최근 이력 1줄 포함. peekH = 콘텐츠 실제 높이.
+    label: '주행', accent: '#34d399', accentSoft: 'rgba(52,211,153,0.10)', peekH: 108,
   },
   battery: {
-    // 배터리 + 집 충전소 흡수 — peek 에 폴링 상태 1줄 포함
-    label: '배터리', accent: '#60a5fa', accentSoft: 'rgba(96,165,250,0.10)', peekH: 130,
+    // 배터리 + 집 충전소 흡수 — peek 에 폴링 상태 1줄 포함. peekH = SOC 링 76 + 흡수 행 + 패딩.
+    label: '배터리', accent: '#60a5fa', accentSoft: 'rgba(96,165,250,0.10)', peekH: 138,
   },
 };
 
