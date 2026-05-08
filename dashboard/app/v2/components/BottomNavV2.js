@@ -2,10 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useRef } from 'react';
+import { usePeekSheet } from './PeekSheet';
 
 const tabs = [
   {
     href: '/drives',
+    id: 'drives',
     label: '주행',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -15,6 +18,7 @@ const tabs = [
   },
   {
     href: '/history',
+    id: 'history',
     label: '이력',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -25,6 +29,7 @@ const tabs = [
   },
   {
     href: '/battery',
+    id: 'battery',
     label: '배터리',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -36,6 +41,7 @@ const tabs = [
   },
   {
     href: '/chargers',
+    id: 'chargers',
     label: '집 충전소',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -45,8 +51,60 @@ const tabs = [
   },
 ];
 
+// quick-status 응답에서 탭별 짧은 라이브 메트릭 추출
+function tabMetric(tabId, data) {
+  if (!data) return null;
+  if (tabId === 'drives') {
+    const km = data.drives?.today_km;
+    if (km == null) return null;
+    return km > 0 ? `${km.toFixed(1)}km` : '쉬는 날';
+  }
+  if (tabId === 'history') {
+    const n = data.history?.week_count;
+    if (n == null) return null;
+    return `이번 주 ${n}건`;
+  }
+  if (tabId === 'battery') {
+    const b = data.battery;
+    if (!b) return null;
+    if (b.charging) {
+      const kw = b.charger_power_kw;
+      return kw != null ? `${b.soc}% · ⚡${kw.toFixed(1)}kW` : `${b.soc}% · ⚡`;
+    }
+    return b.soc != null ? `${b.soc}%` : null;
+  }
+  if (tabId === 'chargers') {
+    const c = data.chargers;
+    if (!c) return null;
+    if (c.success_rate_today == null) return c.is_fresh ? '정상' : '대기';
+    return `${c.success_rate_today}% ${c.is_fresh ? '정상' : '오래됨'}`;
+  }
+  return null;
+}
+
 export default function BottomNavV2() {
   const pathname = usePathname();
+  const peek = usePeekSheet();
+  const data = peek?.data;
+  const navRef = useRef(null);
+
+  // PeekSheet 가 내비바 위에 정확히 안착하도록 실제 내비 높이를 CSS 변수로 publish
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const update = () => {
+      document.documentElement.style.setProperty('--peek-nav-h', `${el.offsetHeight}px`);
+    };
+    update();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    ro?.observe(el);
+    window.addEventListener('resize', update);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', update);
+      document.documentElement.style.removeProperty('--peek-nav-h');
+    };
+  }, []);
 
   // dev 도구 페이지 + tg 어드민에서는 하단 탭 숨김 (탐색 가치 없음, 화면 절약)
   const p = pathname || '';
@@ -54,26 +112,37 @@ export default function BottomNavV2() {
 
   return (
     <nav
+      ref={navRef}
       aria-label="V2 하단 탭 메뉴"
       className="fixed bottom-0 left-0 right-0 z-50 bg-[#0f0f0f]/95 backdrop-blur border-t border-white/[0.06]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="max-w-2xl mx-auto flex">
-        {tabs.map(({ href, label, icon }) => {
+        {tabs.map(({ href, id, label, icon }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/');
+          const accent = peek?.tabMeta?.[id]?.accent || '#3b82f6';
+          const metric = tabMetric(id, data);
           return (
             <Link
               key={href}
               href={href}
-              className={`flex-1 flex flex-col items-center py-2.5 pb-2 gap-1 transition-colors ${
-                isActive ? 'text-blue-400' : 'text-zinc-600'
-              }`}
+              className="flex-1 flex flex-col items-center py-2 pb-2 gap-0.5 px-1 min-w-0 transition-colors"
+              style={{ color: isActive ? accent : '#71717a' }}
             >
               {icon}
-              <span className="text-[10px] font-semibold">{label}</span>
+              <span className="text-[10px] font-semibold leading-tight">{label}</span>
+              {metric && (
+                <span
+                  key={metric}
+                  className="text-[9px] tabular-nums leading-none truncate max-w-full"
+                  style={{ opacity: isActive ? 0.95 : 0.55 }}
+                >
+                  {metric}
+                </span>
+              )}
               <span
                 className="w-1 h-1 rounded-full"
-                style={{ background: isActive ? '#3b82f6' : 'transparent' }}
+                style={{ background: isActive ? accent : 'transparent' }}
               />
             </Link>
           );

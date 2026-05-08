@@ -26,6 +26,7 @@ const ROUTES = [
     dashboard: 'report' },
   { path: '/api/parked',           label: '주차 정보',      desc: '마지막 종료 drive 위치·경과 (driving=true 면 진행 중) — 봇 /where 의 정차/주행 분기에 사용', category: '차량' },
   { path: '/api/location',         label: '현재 좌표',      desc: '최신 positions 의 lat/lng/date — 봇 /where 공용', category: '차량' },
+  { path: '/api/v2/quick-status',  label: '4탭 요약',       desc: '주행·이력·배터리·집충전소 표지(peek) + 내비 라이브 메트릭 통합 — PeekSheet 가 60초 폴링', category: '차량' },
 
   // 주행
   { path: '/api/route-map',        label: '경로 지도',      desc: '단일 주행의 polyline + start/end + 통계 (driveId 필수)', category: '주행',
