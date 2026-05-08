@@ -46,6 +46,17 @@
 - **fetch 정리**: `useEffect` 내 fetch는 `AbortController`로 언마운트/파라미터 변경 시 취소 (`setState`-after-unmount 경고 방지) — 예: `app/v2/history/useDriveData.js`
 - **비싼 계산**: 배열 flat/stats/패스 생성 등은 `useMemo`로 메모이즈 (예: `RouteSparklines.js`)
 
+### Provider/Sheet 공유 패턴
+
+여러 페이지가 공유하는 모달/시트는 `createContext` + `Provider` + 커스텀 훅 형태로 작성, 레이아웃에서 한 번만 마운트:
+
+| 컴포넌트 | 트리거 | 데이터 |
+|---|---|---|
+| `RankingsSheet` | `useRankingsSheet().open(metric, base)` | 호출 시 `/api/rankings` fetch (사용자 액션 트리거) |
+| `PeekSheet` | 자동 (페이지 진입) | `/api/v2/quick-status` 60초 폴링 + visibilitychange 즉시 갱신 |
+
+`PeekSheet` 는 4탭 공용 표지(peek) — `usePathname()` 으로 활성 탭 결정, 탭별 Cover/Expanded 컴포넌트가 데이터 슬라이스 표시. 탭 전환 시 자동 축소(`expanded=false`). 내비바 실측 높이는 `--peek-nav-h` CSS 변수로 publish, peek 높이는 `--peek-h` 로 publish → 페이지 padding-bottom 자동 보정.
+
 ## 성능 · 안전성
 
 - **`Math.max(...arr)` / `Math.min(...arr)` 금지** — V8 인자 상한(~65k)으로 긴 배열에서 `RangeError` 발생. `for` 루프로 단일 패스 계산 (예: `RouteSparklines.js::computeStats`, `api/route-map/route.js`의 속도 통계)

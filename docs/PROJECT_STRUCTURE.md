@@ -88,8 +88,9 @@ myDash/
     │   │   ├── layout.js         # v2 레이아웃 (BottomNavV2 포함)
     │   │   ├── page.js           # `/v2` → `/v2/drives` 리다이렉트
     │   │   ├── components/
-    │   │   │   ├── BottomNavV2.js    # 하단 탭 (주행/이력/배터리/집 충전소)
-    │   │   │   └── RankingsSheet.js  # 랭킹 바텀시트
+    │   │   │   ├── BottomNavV2.js    # 하단 탭 (주행/이력/배터리/집 충전소) + 탭별 라이브 메트릭 1줄 + 실측 nav 높이 publish (--peek-nav-h)
+    │   │   │   ├── RankingsSheet.js  # 랭킹 바텀시트
+    │   │   │   └── PeekSheet.js      # 4탭 공용 표지(peek) 시트 — Provider/Context + 탭별 Cover/Expanded + /api/v2/quick-status 60초 폴링 + 드래그 확장(↑32px)/축소(↓80px)
     │   │   ├── drives/
     │   │   │   ├── page.js                   # 주행 분석 — 차량 KPI + 인사이트 + 연간 히트맵 + 패턴 + TOP50 + 연도별 월간
     │   │   │   └── _parts/
@@ -114,7 +115,8 @@ myDash/
     │   │   │   │   ├── utils.js              # computeRanks, elapsedLabel, buildTtlTooltip 등
     │   │   │   │   ├── ChargerTile.js        # UnifiedCell, TileBox, StatusBadges, MiniGrid
     │   │   │   │   ├── FleetStatsCharts.js   # 집단 통계 차트
-    │   │   │   │   ├── PollLogPopup.js       # 폴링 로그 팝업
+    │   │   │   │   ├── PollLogPopup.js       # 폴링 로그 팝업 (레거시 — 본문은 PollLogBody 재사용, /v2/chargers 는 PeekSheet 가 대체)
+    │   │   │   │   ├── poll-log/PollLogBody.js  # 폴링 로그 본문 — PollLogPopup·PeekSheet 양쪽에서 공유
     │   │   │   │   └── fleet-stats-utils.js  # 통계 집계 유틸
     │   │   │   ├── MonthlyChargeCard.js      # 집/외부·완/급속 비율 + 시간×요일 히트맵 (24열 SOC 시작→종료 띠 동봉)
     │   │   │   ├── ChargeHeatmap.js
@@ -157,6 +159,7 @@ myDash/
     │       ├── home-charger/groups/route.js       # 동별 그룹 카운트 (constants.js 매핑) — 봇 /chargers
     │       ├── home-charger/report/route.js       # 활용도 리포트 (KPI·주별·동별) — /v2/chargers/report 페이지
     │       ├── home-charger/poll-log/route.js     # 폴링 로그 조회
+    │       ├── v2/quick-status/route.js           # 4탭(주행·이력·배터리·집충전소) 표지/내비용 라이브 메트릭 통합 — PeekSheet 가 60초 폴링
     │       ├── summary/route.js                   # drives+charges 일자 집계 (range=multi 등) — 봇 /period
     │       ├── parked/route.js                    # 마지막 주차/주행중 — 봇 /where
     │       ├── location/route.js                  # 최신 좌표 — 봇 /where
