@@ -19,16 +19,18 @@ function getActiveTab(pathname) {
 }
 
 const TAB_META = {
+  // home 은 peek 를 띄우지 않음 — getActiveTab 에서 'home' 도 매핑하지만
+  // PeekSheet 본체가 home 일 때 null 반환. 이 객체는 메타데이터(BottomNav 색상) 용도.
   home: {
-    label: '홈', accent: '#f472b6', accentSoft: 'rgba(244,114,182,0.10)', peekH: 104,
+    label: '홈', accent: '#f472b6', accentSoft: 'rgba(244,114,182,0.10)', peekH: 0,
   },
   drives: {
     // 주행 + 이력 흡수 — peek 에 최근 이력 1줄 포함
-    label: '주행', accent: '#34d399', accentSoft: 'rgba(52,211,153,0.10)', peekH: 124,
+    label: '주행', accent: '#34d399', accentSoft: 'rgba(52,211,153,0.10)', peekH: 100,
   },
   battery: {
     // 배터리 + 집 충전소 흡수 — peek 에 폴링 상태 1줄 포함
-    label: '배터리', accent: '#60a5fa', accentSoft: 'rgba(96,165,250,0.10)', peekH: 152,
+    label: '배터리', accent: '#60a5fa', accentSoft: 'rgba(96,165,250,0.10)', peekH: 130,
   },
 };
 
@@ -89,44 +91,7 @@ function SocRing({ accent, value, size = 80 }) {
 }
 
 // ── 탭별 표지 (Cover) ──────────────────────────────────────
-// 타이틀 제거 — 활성 탭 라벨은 내비바가 표시하므로 중복.
-function CoverHome({ data }) {
-  const drives = data?.drives;
-  const battery = data?.battery;
-  const chargers = data?.chargers;
-  const Row = ({ label, value, hint, hintColor }) => (
-    <div className="flex items-baseline gap-2 min-w-0">
-      <span className="text-[10px] text-zinc-500 w-10 shrink-0">{label}</span>
-      <span className="text-[13px] font-bold text-zinc-100 tabular-nums truncate">
-        {value}
-      </span>
-      {hint && (
-        <span className="text-[10px] truncate" style={{ color: hintColor || '#71717a' }}>{hint}</span>
-      )}
-    </div>
-  );
-  return (
-    <div className="space-y-1">
-      <Row
-        label="주행"
-        value={drives ? `${drives.today_km.toFixed(1)} km` : '—'}
-        hint={drives?.today_count ? `${drives.today_count}회 · ${formatDur(drives.today_duration_min)}` : '오늘 없음'}
-      />
-      <Row
-        label="배터리"
-        value={battery?.soc != null ? `${battery.soc}%` : '—'}
-        hint={battery?.charging ? `⚡ ${battery.charger_power_kw?.toFixed(1) ?? '—'} kW` : null}
-        hintColor={battery?.charging ? '#60a5fa' : null}
-      />
-      <Row
-        label="충전소"
-        value={chargers?.success_rate_today != null ? `${chargers.success_rate_today}%` : '—'}
-        hint={chargers?.is_fresh ? '폴링 정상' : '폴링 오래됨'}
-        hintColor={chargers?.is_fresh ? '#fbbf24' : null}
-      />
-    </div>
-  );
-}
+// home 탭은 peek 가 안 뜨므로 CoverHome 없음. drives + battery 만 정의.
 
 // 주행 cover — 오늘 주행 + 최근 이력 1줄 (이력 흡수)
 function CoverDrives({ data, accent }) {
@@ -217,83 +182,37 @@ function CoverBattery({ data, accent }) {
   );
 }
 
+// home 은 peek 가 안 뜨므로 cover 불필요. drives/battery 만.
 const COVERS = {
-  home: CoverHome,
   drives: CoverDrives,
   battery: CoverBattery,
 };
 
 // ── 탭별 확장 본문 ─────────────────────────────────────────
-// 주행 expanded — 주행 섹션 메뉴 + 이력 메뉴 흡수
-function ExpandedDrives({ data }) {
-  const nav = useMenuNav();
-  const lat = data?.history?.latest;
-  const history = data?.history;
-  return (
-    <div className="px-4 py-3 space-y-1.5">
-      <div className="text-[10px] text-zinc-500 px-1 tracking-wide uppercase font-semibold mb-1">
-        주행 분석
-      </div>
-      <MenuItem icon="🚗" label="차량 KPI" sub="누적 거리 · 효율 · 기간별" onClick={() => nav('/drives#kpi')} />
-      <MenuItem icon="📈" label="이번달 인사이트" sub="4주 롤링 거리·효율" onClick={() => nav('/drives#insights')} />
-      <MenuItem icon="📅" label="연간 히트맵" sub="365일 일별 주행/충전" onClick={() => nav('/drives#year')} />
-      <MenuItem icon="📊" label="주행 패턴" sub="시간×요일 히트맵" onClick={() => nav('/drives#patterns')} />
-      <MenuItem icon="🏆" label="TOP 50 기록" sub="거리·시간·속도·효율 랭킹" onClick={() => nav('/drives#records')} />
-      <MenuItem icon="📆" label="연도별 월간" sub="과거 연도 비교 막대" onClick={() => nav('/drives#monthly')} />
-      <MenuItem icon="🌡️" label="계절별 효율" sub="봄·여름·가을·겨울 비교" onClick={() => nav('/drives#seasonal')} />
+// 정보 카드(InfoCard) 형태 — 단순 메뉴 라벨이 아니라 실제 데이터 표시,
+// 카드 전체가 클릭 가능 → 관련 페이지/섹션으로 이동.
 
-      <div className="text-[10px] text-zinc-500 px-1 tracking-wide uppercase font-semibold mt-3 mb-1">
-        이력 페이지
-      </div>
-      <MenuItem
-        icon="📅"
-        label="일자별 주행 목록"
-        sub={lat ? `${shortAddr(lat.start_addr)} → ${shortAddr(lat.end_addr)} · ${relTime(lat.start)}` : '월 그룹 → 일 카드'}
-        onClick={() => nav('/history')}
-      />
-      <MenuItem icon="🗺️" label="경로 지도" sub={`이번 주 ${history?.week_count ?? 0}건 · ${(history?.week_km ?? 0).toFixed(1)}km`} onClick={() => nav('/history')} />
-      <MenuItem icon="📍" label="자주 가는 곳" sub="지오펜스 도착 빈도 TOP" onClick={() => nav('/history')} />
-      <MenuItem icon="🕐" label="오래 머문 곳" sub="체류 시간 누적 (≥10분)" onClick={() => nav('/history')} />
-    </div>
-  );
-}
-
-// 홈 expanded — 주요 페이지 4개 + 부가 sub-page
-function ExpandedHome() {
-  const nav = useMenuNav();
-  return (
-    <div className="px-4 py-3 space-y-1.5">
-      <div className="text-[10px] text-zinc-500 px-1 tracking-wide uppercase font-semibold mb-1">
-        주요 페이지
-      </div>
-      <MenuItem icon="🚗" label="주행" sub="KPI · 인사이트 · 패턴 · TOP 50" onClick={() => nav('/drives')} />
-      <MenuItem icon="🗺️" label="이력" sub="일자별 · 지도 · 자주 가는 곳" onClick={() => nav('/history')} />
-      <MenuItem icon="🔋" label="배터리" sub="건강도 · 대기 소모 · 충전 기록" onClick={() => nav('/battery')} />
-      <MenuItem icon="⚡" label="집 충전소" sub="실시간 + 통계 + 리포트" onClick={() => nav('/chargers')} />
-
-      <div className="text-[10px] text-zinc-500 px-1 tracking-wide uppercase font-semibold mt-3 mb-1">
-        부가
-      </div>
-      <MenuItem icon="📊" label="활용도 리포트" sub="월별 점유율 · 시간×요일" onClick={() => nav('/chargers/report')} />
-      <MenuItem icon="🔧" label="폴링 로그" sub="시간별 / 일별 폴링 성공률" onClick={() => nav('/chargers/poll-log')} />
-    </div>
-  );
-}
-
-// 메뉴 아이템 — 페이지 내 #앵커 또는 sub-route 로 점프 + peek 닫기
-function MenuItem({ icon, label, sub, onClick }) {
+function InfoCard({ onClick, children, accent }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-center gap-3 bg-[#0f0f0f] border border-white/[0.06] rounded-lg px-3 py-2.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors"
+      className="w-full text-left bg-[#0f0f0f] border border-white/[0.06] rounded-xl px-4 py-3 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors"
+      style={accent ? { borderLeft: `2px solid ${accent}` } : undefined}
     >
-      <span className="text-[18px] leading-none shrink-0" aria-hidden>{icon}</span>
-      <div className="flex-1 min-w-0 text-left">
-        <div className="text-[13px] font-semibold text-zinc-200">{label}</div>
-        {sub && <div className="text-[10px] text-zinc-500 mt-0.5 truncate">{sub}</div>}
-      </div>
-      <span className="text-zinc-600 text-base shrink-0">›</span>
+      {children}
+    </button>
+  );
+}
+
+function ChipBtn({ onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-[11px] px-2.5 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.12] text-zinc-300 border border-white/[0.06] transition-colors"
+    >
+      {children}
     </button>
   );
 }
@@ -308,7 +227,6 @@ function useMenuNav() {
     const [path, hash] = target.split('#');
     const samePage = !path || path === pathname;
     if (samePage && hash) {
-      // close 애니메이션(320ms) 끝나기 전 스크롤하면 부드럽게 보임
       requestAnimationFrame(() => {
         document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
@@ -318,45 +236,200 @@ function useMenuNav() {
   };
 }
 
-// 배터리 expanded — 배터리 섹션 메뉴 + 집 충전소 메뉴 흡수
-function ExpandedBattery({ data }) {
+// 주행 expanded — 정보 카드 + 칩 (단순 메뉴 X)
+function ExpandedDrives({ data }) {
   const nav = useMenuNav();
-  const c = data?.chargers;
-  return (
-    <div className="px-4 py-3 space-y-1.5">
-      <div className="text-[10px] text-zinc-500 px-1 tracking-wide uppercase font-semibold mb-1">
-        배터리 분석
-      </div>
-      <MenuItem icon="🩺" label="배터리 건강도" sub="점수·등급 · SOC 분포 · 용량 추이" onClick={() => nav('/battery#health')} />
-      <MenuItem icon="🌡️" label="대기 소모" sub="주차 중 SOC 감소 24h 타임라인" onClick={() => nav('/battery#idle')} />
-      <MenuItem icon="📅" label="월간 충전" sub="집/외부·완/급속 비율 + 시간×요일" onClick={() => nav('/battery#monthly')} />
-      <MenuItem icon="📊" label="시간대 히트맵" sub="시간×요일 충전 패턴" onClick={() => nav('/battery#heatmap')} />
-      <MenuItem icon="⚡" label="급속 충전 기록" sub="DC · 슈퍼차저 세션" onClick={() => nav('/battery#fast')} />
-      <MenuItem icon="🔌" label="완속 충전 기록" sub="집 · AC 세션" onClick={() => nav('/battery#slow')} />
+  const d = data?.drives;
+  const h = data?.history;
+  const lat = h?.latest;
+  const accent = '#34d399';
 
-      <div className="text-[10px] text-zinc-500 px-1 tracking-wide uppercase font-semibold mt-3 mb-1">
-        집 충전소
+  return (
+    <div className="px-4 py-3 space-y-2.5">
+      {/* 오늘 주행 큰 카드 */}
+      <InfoCard onClick={() => nav('/drives#kpi')} accent={accent}>
+        <div className="flex items-baseline justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">오늘 주행</div>
+            <div className="flex items-baseline gap-1 mt-1">
+              <span className="text-[28px] font-bold tabular-nums leading-none" style={{ color: accent }}>
+                {d ? d.today_km.toFixed(1) : '—'}
+              </span>
+              <span className="text-sm text-zinc-400">km</span>
+            </div>
+            <div className="text-[11px] text-zinc-500 mt-1.5">
+              {d?.today_count
+                ? `${d.today_count}회 · ${formatDur(d.today_duration_min)}`
+                : '오늘 주행 없음'}
+            </div>
+          </div>
+          <span className="text-zinc-600 text-base shrink-0 self-center">›</span>
+        </div>
+      </InfoCard>
+
+      {/* 이번 주 인사이트 카드 */}
+      <InfoCard onClick={() => nav('/drives#insights')} accent={accent}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-5">
+            <div>
+              <div className="text-[9px] text-zinc-500 uppercase tracking-wide">이번 주</div>
+              <div className="text-[16px] font-bold text-zinc-100 tabular-nums leading-none mt-0.5">
+                {h?.week_count ?? 0}<span className="text-[10px] text-zinc-500 ml-0.5">건</span>
+              </div>
+            </div>
+            <div className="w-px h-8 bg-white/[0.06]" />
+            <div>
+              <div className="text-[9px] text-zinc-500 uppercase tracking-wide">거리</div>
+              <div className="text-[16px] font-bold text-zinc-100 tabular-nums leading-none mt-0.5">
+                {(h?.week_km ?? 0).toFixed(1)}<span className="text-[10px] text-zinc-500 ml-0.5">km</span>
+              </div>
+            </div>
+          </div>
+          <span className="text-zinc-600 text-base shrink-0">›</span>
+        </div>
+      </InfoCard>
+
+      {/* 최근 주행 (이력) 카드 */}
+      {lat && (
+        <InfoCard onClick={() => nav('/history')} accent="#a78bfa">
+          <div className="flex items-baseline justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold flex items-center gap-1">
+                🗺️ 최근 주행
+              </div>
+              <div className="text-[14px] font-bold text-zinc-100 mt-0.5 truncate">
+                {shortAddr(lat.start_addr)} → {shortAddr(lat.end_addr)}
+              </div>
+              <div className="text-[11px] text-zinc-500 mt-1 tabular-nums truncate">
+                {lat.distance.toFixed(1)}km · {formatDur(lat.duration_min)} · {relTime(lat.start)}
+              </div>
+            </div>
+            <span className="text-zinc-600 text-base shrink-0">›</span>
+          </div>
+        </InfoCard>
+      )}
+
+      {/* 더보기 칩 — 세부 페이지 섹션으로 점프 */}
+      <div className="pt-1">
+        <div className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold mb-2 px-1">
+          분석 / 이력 더보기
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <ChipBtn onClick={() => nav('/drives#year')}>📅 연간 히트맵</ChipBtn>
+          <ChipBtn onClick={() => nav('/drives#patterns')}>📊 시간×요일</ChipBtn>
+          <ChipBtn onClick={() => nav('/drives#records')}>🏆 TOP 50</ChipBtn>
+          <ChipBtn onClick={() => nav('/drives#monthly')}>📆 월간</ChipBtn>
+          <ChipBtn onClick={() => nav('/drives#seasonal')}>🌡️ 계절별</ChipBtn>
+          <ChipBtn onClick={() => nav('/history')}>📍 자주 가는 곳</ChipBtn>
+          <ChipBtn onClick={() => nav('/history')}>🕐 오래 머문 곳</ChipBtn>
+        </div>
       </div>
-      <MenuItem
-        icon="🗺️"
-        label="실시간 충전기"
-        sub={c?.is_fresh ? `폴링 정상 · TTL ${c.ttl_min ?? '—'}분` : '단지별 그리드 + 사용 카운트'}
-        onClick={() => nav('/chargers#live')}
-      />
-      <MenuItem icon="📈" label="단지 통계" sub="TOP 15 사용량 + 시간×요일 히트맵" onClick={() => nav('/chargers#fleet')} />
-      <MenuItem icon="📊" label="활용도 리포트" sub="KPI · 월별 추이 · 동별 점유율" onClick={() => nav('/chargers/report')} />
-      <MenuItem
-        icon="🔧"
-        label="폴링 로그"
-        sub={c?.success_rate_today != null ? `오늘 성공률 ${c.success_rate_today}%` : '시간별 / 일별 성공률'}
-        onClick={() => nav('/chargers/poll-log')}
-      />
     </div>
   );
 }
 
+// 배터리 expanded — 정보 카드 + 칩 (집충전소 흡수)
+function ExpandedBattery({ data }) {
+  const nav = useMenuNav();
+  const b = data?.battery;
+  const c = data?.chargers;
+  const accent = '#60a5fa';
+  const chAccent = '#fbbf24';
+
+  return (
+    <div className="px-4 py-3 space-y-2.5">
+      {/* 배터리 큰 카드 */}
+      <InfoCard onClick={() => nav('/battery#health')} accent={accent}>
+        <div className="flex items-center gap-3">
+          <SocRing accent={accent} value={b?.soc} size={88} />
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
+              {b?.charging ? '충전 중' : '배터리'}
+            </div>
+            {b?.charging ? (
+              <>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="text-[24px] font-bold tabular-nums leading-none" style={{ color: accent }}>
+                    {b.charger_power_kw != null ? b.charger_power_kw.toFixed(1) : '—'}
+                  </span>
+                  <span className="text-sm text-zinc-400">kW</span>
+                </div>
+                <div className="text-[11px] text-zinc-500 mt-1">
+                  세션 +{(b.charge_added_kwh || 0).toFixed(1)} kWh
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-[11px] text-zinc-400 mt-1">
+                  {b?.last_position_at ? `${relTime(b.last_position_at)} 갱신` : '데이터 없음'}
+                </div>
+                <div className="text-[10px] text-zinc-500 mt-1">
+                  탭하면 건강도 자세히 보기
+                </div>
+              </>
+            )}
+          </div>
+          <span className="text-zinc-600 text-base shrink-0 self-center">›</span>
+        </div>
+      </InfoCard>
+
+      {/* 폴링 / 집 충전소 카드 */}
+      <InfoCard onClick={() => nav('/chargers#live')} accent={chAccent}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="relative shrink-0">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ background: chAccent }} />
+              {c?.is_fresh && (
+                <div className="absolute inset-0 w-2.5 h-2.5 rounded-full animate-ping" style={{ background: chAccent, opacity: 0.6 }} />
+              )}
+            </div>
+            <div>
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">집 충전소</div>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="text-[18px] font-bold tabular-nums leading-none" style={{ color: chAccent }}>
+                  {c?.success_rate_today != null ? `${c.success_rate_today}%` : '—'}
+                </span>
+                <span className="text-[11px] text-zinc-400">
+                  {c?.is_fresh ? '폴링 정상' : '폴링 오래됨'}
+                </span>
+              </div>
+              <div className="text-[10px] text-zinc-500 mt-1 tabular-nums">
+                TTL {c?.ttl_min ?? '—'}분
+                {c?.last_fetched ? ` · ${relTime(c.last_fetched)}` : ''}
+              </div>
+            </div>
+          </div>
+          <span className="text-zinc-600 text-base shrink-0">›</span>
+        </div>
+      </InfoCard>
+
+      {/* 더보기 칩 — 배터리 + 집충전소 섹션 */}
+      <div className="pt-1">
+        <div className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold mb-2 px-1">
+          배터리 분석
+        </div>
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          <ChipBtn onClick={() => nav('/battery#idle')}>🌡️ 대기 소모</ChipBtn>
+          <ChipBtn onClick={() => nav('/battery#monthly')}>📅 월간 충전</ChipBtn>
+          <ChipBtn onClick={() => nav('/battery#heatmap')}>📊 시간대 히트맵</ChipBtn>
+          <ChipBtn onClick={() => nav('/battery#fast')}>⚡ 급속</ChipBtn>
+          <ChipBtn onClick={() => nav('/battery#slow')}>🔌 완속</ChipBtn>
+        </div>
+        <div className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold mb-2 px-1">
+          집 충전소
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <ChipBtn onClick={() => nav('/chargers#fleet')}>📈 단지 통계</ChipBtn>
+          <ChipBtn onClick={() => nav('/chargers/report')}>📊 활용도 리포트</ChipBtn>
+          <ChipBtn onClick={() => nav('/chargers/poll-log')}>🔧 폴링 로그</ChipBtn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// home 은 peek 가 안 뜨므로 등록 불필요. drives/battery 만.
 const EXPANDED = {
-  home: ExpandedHome,
   drives: ExpandedDrives,
   battery: ExpandedBattery,
 };
@@ -386,7 +459,8 @@ function PeekSheet() {
     else if (expanded && dy > 80) close();
   }
 
-  if (!meta) return null;
+  // 홈 탭은 peek 를 띄우지 않음 — 페이지 자체가 요약 역할
+  if (!meta || activeTab === 'home') return null;
 
   const Cover = COVERS[activeTab];
   const Expanded = EXPANDED[activeTab];

@@ -57,7 +57,7 @@
 
 `PeekSheet` 는 4탭 공용 표지(peek) — `usePathname()` 으로 활성 탭 결정, 탭별 Cover/Expanded 컴포넌트가 데이터 슬라이스 표시. 탭 전환 시 자동 축소(`expanded=false`). 내비바 실측 높이는 `--peek-nav-h` CSS 변수로 publish, peek 높이는 `--peek-h` 로 publish → 페이지 padding-bottom 자동 보정.
 
-**Expanded = 요약 + 메뉴 패턴** (배터리·집충전소): 확장된 시트는 자체 컨텐츠를 다 박지 않고 페이지 섹션(scroll-mt anchor)이나 sub-route 로 점프하는 메뉴를 제공. `useMenuNav()` 훅이 같은 페이지면 `scrollIntoView`, 다른 페이지면 `router.push`. 본문 디테일은 페이지에 두고 시트는 launcher 역할만 — 시트가 무거워지지 않고 페이지 본문도 제 위치에서 스크롤로 자연스럽게 노출.
+**Expanded = 정보 카드 + 칩 패턴** (주행·배터리, 단순 메뉴 X): 확장된 시트는 실제 데이터(오늘 km, SOC kW, 최근 출발→도착, 폴링 성공률 등)를 큰 카드로 보여주고, 카드 전체가 클릭 가능 → `useMenuNav()` 으로 같은 페이지면 `scrollIntoView`, 다른 페이지면 `router.push`. 카드 아래 칩(ChipBtn) 행으로 세부 섹션 점프 제공. 본문 디테일은 페이지에 두고 시트는 라이브 요약 + 진입 launcher 역할.
 
 ## 성능 · 안전성
 

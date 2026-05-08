@@ -3,8 +3,6 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-const KST = 9 * 3600 * 1000;
-
 function formatDur(min) {
   if (!min) return '0m';
   const h = Math.floor(min / 60), m = Math.round(min % 60);
@@ -30,53 +28,44 @@ function relTime(iso) {
   return `${Math.floor(hr / 24)}일 전`;
 }
 
-function SocRing({ accent, value, size = 64 }) {
-  const r = size / 2 - 5;
+function SocRing({ accent, value, size = 110 }) {
+  const r = size / 2 - 8;
   const c = 2 * Math.PI * r;
   const v = Math.max(0, Math.min(100, value || 0));
   return (
     <svg viewBox={`0 0 ${size} ${size}`} style={{ width: size, height: size }}>
-      <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.06)" strokeWidth="4" fill="none" />
+      <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.06)" strokeWidth="6" fill="none" />
       <circle
         cx={size / 2} cy={size / 2} r={r}
-        stroke={accent} strokeWidth="4" fill="none"
+        stroke={accent} strokeWidth="6" fill="none"
         strokeDasharray={c} strokeDashoffset={c * (1 - v / 100)}
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
         strokeLinecap="round"
       />
-      <text x={size / 2} y={size / 2 + 4} textAnchor="middle" fontSize="14" fill="white" fontWeight="bold">
+      <text x={size / 2} y={size / 2 + 6} textAnchor="middle" fontSize={size / 4} fill="white" fontWeight="bold">
         {value == null ? '—' : value}
       </text>
-      <text x={size / 2} y={size / 2 + 14} textAnchor="middle" fontSize="7" fill="rgba(255,255,255,0.5)">%</text>
+      <text x={size / 2} y={size / 2 + 22} textAnchor="middle" fontSize="10" fill="rgba(255,255,255,0.5)">%</text>
     </svg>
   );
 }
 
-function Card({ href, accent, label, headline, sub, right }) {
+// 4탭 진입용 큰 타일 (홈 화면 그리드 — 4개 영역)
+function Tile({ href, accent, label, icon, value, sub }) {
   return (
     <Link
       href={href}
-      className="block bg-[#161618] border border-white/[0.06] rounded-2xl p-4 hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors"
+      className="block bg-[#161618] border border-white/[0.06] rounded-2xl px-3 py-3.5 hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors"
+      style={{ borderTop: `2px solid ${accent}` }}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div
-            className="text-[10px] font-bold tracking-widest uppercase"
-            style={{ color: accent }}
-          >
-            {label}
-          </div>
-          <div className="text-[18px] font-bold text-zinc-100 mt-1 leading-tight truncate">
-            {headline}
-          </div>
-          {sub && (
-            <div className="text-[11px] text-zinc-500 mt-1 truncate tabular-nums">
-              {sub}
-            </div>
-          )}
-        </div>
-        {right && <div className="shrink-0">{right}</div>}
+      <div className="flex items-center gap-2">
+        <span className="text-2xl leading-none" aria-hidden>{icon}</span>
+        <span className="text-[11px] font-bold tracking-wider uppercase" style={{ color: accent }}>{label}</span>
       </div>
+      <div className="mt-2.5 text-[20px] font-bold text-zinc-100 tabular-nums leading-none truncate">
+        {value}
+      </div>
+      <div className="text-[11px] text-zinc-500 mt-1.5 truncate">{sub}</div>
     </Link>
   );
 }
@@ -115,89 +104,216 @@ export default function HomePage() {
   const chargers = data?.chargers;
   const lat = history?.latest;
 
+  // SOC 색상 — 헤더 게이지와 통일
+  const soc = battery?.soc ?? 0;
+  const socColor = soc > 50 ? '#10b981' : soc > 20 ? '#f59e0b' : '#ef4444';
+
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white">
-      <div className="max-w-2xl mx-auto px-4 py-5 pb-24 space-y-3">
+      <div className="max-w-2xl mx-auto px-4 py-4 pb-24 space-y-3">
         {error && (
           <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-3 text-[12px] text-rose-300">
             데이터 조회 실패 — {error}
           </div>
         )}
 
-        {/* 주행 */}
-        <Card
+        {/* HERO — 차량 상태 큰 카드 */}
+        <Link
+          href="/battery#health"
+          className="block bg-[#161618] border border-white/[0.06] rounded-2xl p-4 hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors relative overflow-hidden"
+        >
+          {/* 배경 SOC 게이지 */}
+          <div
+            className="absolute inset-y-0 left-0 transition-all duration-700 pointer-events-none"
+            style={{
+              width: `${soc}%`,
+              background: `linear-gradient(90deg, ${socColor}26 0%, ${socColor}10 70%, ${socColor}00 100%)`,
+            }}
+            aria-hidden
+          />
+          <div className="relative flex items-center gap-4">
+            <SocRing accent={socColor} value={battery?.soc} size={104} />
+            <div className="flex-1 min-w-0">
+              {battery?.charging ? (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" aria-hidden />
+                    <span className="text-[11px] font-bold text-green-400 uppercase tracking-wider">충전 중</span>
+                  </div>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-[26px] font-bold text-green-400 tabular-nums leading-none">
+                      {battery.charger_power_kw != null ? battery.charger_power_kw.toFixed(1) : '—'}
+                    </span>
+                    <span className="text-sm text-zinc-400">kW</span>
+                  </div>
+                  <div className="text-[11px] text-zinc-500 mt-1.5">
+                    세션 +{(battery.charge_added_kwh || 0).toFixed(1)} kWh
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">현재 배터리</div>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-[26px] font-bold text-zinc-100 tabular-nums leading-none">
+                      {battery?.soc ?? '—'}
+                    </span>
+                    <span className="text-sm text-zinc-400">%</span>
+                  </div>
+                  <div className="text-[11px] text-zinc-500 mt-1.5">
+                    {battery?.last_position_at ? `${relTime(battery.last_position_at)} 갱신` : '데이터 없음'}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </Link>
+
+        {/* 기간별 주행 — 3 col */}
+        <Link
           href="/drives"
-          accent="#34d399"
-          label="오늘 주행"
-          headline={drives ? `${drives.today_km.toFixed(1)} km` : '—'}
-          sub={
-            drives?.today_count
-              ? `${drives.today_count}회 · ${formatDur(drives.today_duration_min)}`
-              : '오늘 주행 없음'
-          }
-        />
-
-        {/* 이력 */}
-        <Card
-          href="/history"
-          accent="#a78bfa"
-          label="최근 주행"
-          headline={lat ? `${shortAddr(lat.start_addr)} → ${shortAddr(lat.end_addr)}` : '—'}
-          sub={
-            lat
-              ? `${lat.distance.toFixed(1)}km · ${formatDur(lat.duration_min)} · ${relTime(lat.start)}${
-                  history?.week_count != null ? ` · 이번 주 ${history.week_count}건` : ''
-                }`
-              : '이력 없음'
-          }
-        />
-
-        {/* 배터리 */}
-        <Card
-          href="/battery"
-          accent="#60a5fa"
-          label="배터리"
-          headline={
-            battery?.charging
-              ? `⚡ ${battery.charger_power_kw != null ? battery.charger_power_kw.toFixed(1) : '—'} kW`
-              : battery?.soc != null ? `${battery.soc} %` : '—'
-          }
-          sub={
-            battery?.charging
-              ? `현재 ${battery.soc ?? '—'}% · 세션 +${(battery.charge_added_kwh || 0).toFixed(1)} kWh`
-              : battery?.last_position_at
-                ? `${relTime(battery.last_position_at)} 갱신`
-                : '데이터 없음'
-          }
-          right={<SocRing accent="#60a5fa" value={battery?.soc} size={64} />}
-        />
-
-        {/* 집 충전소 */}
-        <Card
-          href="/chargers"
-          accent="#fbbf24"
-          label="집 충전소"
-          headline={
-            chargers?.success_rate_today != null
-              ? `${chargers.success_rate_today}% 성공`
-              : (chargers?.is_fresh ? '정상' : '대기')
-          }
-          sub={
-            chargers
-              ? `${chargers.is_fresh ? '폴링 정상' : '폴링 오래됨'}${
-                  chargers.ttl_min != null ? ` · TTL ${chargers.ttl_min}분` : ''
-                }${chargers.last_fetched ? ` · ${relTime(chargers.last_fetched)}` : ''}`
-              : '데이터 없음'
-          }
-          right={
-            chargers?.is_fresh && (
-              <div className="relative">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#fbbf24' }} />
-                <div className="absolute inset-0 w-2.5 h-2.5 rounded-full animate-ping" style={{ background: '#fbbf24', opacity: 0.6 }} />
+          className="block bg-[#161618] border border-white/[0.06] rounded-2xl p-3.5 hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors"
+        >
+          <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2.5">주행 요약</div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <div className="text-[10px] text-zinc-500">오늘</div>
+              <div className="text-[18px] font-bold text-emerald-400 tabular-nums leading-none mt-1">
+                {drives ? drives.today_km.toFixed(1) : '—'}<span className="text-[10px] text-zinc-500 ml-0.5">km</span>
               </div>
-            )
-          }
-        />
+              <div className="text-[10px] text-zinc-500 mt-0.5 truncate">
+                {drives?.today_count ? `${drives.today_count}회 · ${formatDur(drives.today_duration_min)}` : '없음'}
+              </div>
+            </div>
+            <div className="border-l border-white/[0.06] pl-3">
+              <div className="text-[10px] text-zinc-500">이번 주</div>
+              <div className="text-[18px] font-bold text-emerald-400 tabular-nums leading-none mt-1">
+                {history?.week_count ?? 0}<span className="text-[10px] text-zinc-500 ml-0.5">건</span>
+              </div>
+              <div className="text-[10px] text-zinc-500 mt-0.5 truncate tabular-nums">
+                {(history?.week_km ?? 0).toFixed(1)} km
+              </div>
+            </div>
+            <div className="border-l border-white/[0.06] pl-3">
+              <div className="text-[10px] text-zinc-500">최근 주행</div>
+              <div className="text-[18px] font-bold text-violet-400 tabular-nums leading-none mt-1">
+                {lat ? lat.distance.toFixed(0) : '—'}<span className="text-[10px] text-zinc-500 ml-0.5">km</span>
+              </div>
+              <div className="text-[10px] text-zinc-500 mt-0.5 truncate">
+                {lat ? relTime(lat.start) : ''}
+              </div>
+            </div>
+          </div>
+        </Link>
+
+        {/* 최근 주행 (이력) */}
+        {lat && (
+          <Link
+            href="/history"
+            className="block bg-[#161618] border border-white/[0.06] rounded-2xl p-3.5 hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors"
+            style={{ borderLeft: '2px solid #a78bfa' }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] font-bold text-violet-400 uppercase tracking-wider flex items-center gap-1.5">
+                  🗺️ 최근 주행
+                </div>
+                <div className="text-[15px] font-bold text-zinc-100 mt-1 truncate">
+                  {shortAddr(lat.start_addr)} → {shortAddr(lat.end_addr)}
+                </div>
+                <div className="text-[11px] text-zinc-500 mt-1 tabular-nums">
+                  {lat.distance.toFixed(1)}km · {formatDur(lat.duration_min)} · {relTime(lat.start)}
+                </div>
+              </div>
+              <span className="text-zinc-600 text-base shrink-0">›</span>
+            </div>
+          </Link>
+        )}
+
+        {/* 집 충전소 상태 */}
+        <Link
+          href="/chargers#live"
+          className="block bg-[#161618] border border-white/[0.06] rounded-2xl p-3.5 hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors"
+          style={{ borderLeft: '2px solid #fbbf24' }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="relative shrink-0">
+                <div className="w-3 h-3 rounded-full" style={{ background: '#fbbf24' }} />
+                {chargers?.is_fresh && (
+                  <div className="absolute inset-0 w-3 h-3 rounded-full animate-ping" style={{ background: '#fbbf24', opacity: 0.5 }} />
+                )}
+              </div>
+              <div>
+                <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">집 충전소</div>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-[20px] font-bold text-amber-400 tabular-nums leading-none">
+                    {chargers?.success_rate_today != null ? `${chargers.success_rate_today}%` : '—'}
+                  </span>
+                  <span className="text-[11px] text-zinc-400">
+                    {chargers?.is_fresh ? '폴링 정상' : '폴링 오래됨'}
+                  </span>
+                </div>
+                <div className="text-[11px] text-zinc-500 mt-1 tabular-nums">
+                  TTL {chargers?.ttl_min ?? '—'}분
+                  {chargers?.last_fetched ? ` · ${relTime(chargers.last_fetched)}` : ''}
+                </div>
+              </div>
+            </div>
+            <span className="text-zinc-600 text-base shrink-0">›</span>
+          </div>
+        </Link>
+
+        {/* 4탭 타일 그리드 — 깊은 진입용 */}
+        <div className="grid grid-cols-2 gap-2.5 pt-1">
+          <Tile
+            href="/drives"
+            accent="#34d399"
+            label="주행"
+            icon="🚗"
+            value={drives ? `${drives.today_km.toFixed(1)} km` : '—'}
+            sub="KPI · 인사이트 · TOP 50"
+          />
+          <Tile
+            href="/history"
+            accent="#a78bfa"
+            label="이력"
+            icon="🗺️"
+            value={history?.week_count ? `${history.week_count}건` : '—'}
+            sub="일자별 · 지도 · 자주 가는 곳"
+          />
+          <Tile
+            href="/battery"
+            accent="#60a5fa"
+            label="배터리"
+            icon="🔋"
+            value={battery?.soc != null ? `${battery.soc}%` : '—'}
+            sub="건강도 · 대기 소모 · 충전 기록"
+          />
+          <Tile
+            href="/chargers"
+            accent="#fbbf24"
+            label="집 충전소"
+            icon="⚡"
+            value={chargers?.success_rate_today != null ? `${chargers.success_rate_today}%` : '—'}
+            sub="실시간 + 통계 + 리포트"
+          />
+        </div>
+
+        {/* 부가 sub-page 진입 */}
+        <div className="flex flex-wrap gap-1.5 pt-2">
+          <Link
+            href="/chargers/report"
+            className="text-[11px] px-3 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 border border-white/[0.06] transition-colors"
+          >
+            📊 활용도 리포트
+          </Link>
+          <Link
+            href="/chargers/poll-log"
+            className="text-[11px] px-3 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 border border-white/[0.06] transition-colors"
+          >
+            🔧 폴링 로그
+          </Link>
+        </div>
       </div>
     </main>
   );

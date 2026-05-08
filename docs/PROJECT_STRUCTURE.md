@@ -87,11 +87,11 @@ myDash/
     │   ├── v2/                   # v2 앱 (현재 메인)
     │   │   ├── layout.js         # v2 레이아웃 (BottomNavV2 포함)
     │   │   ├── page.js           # `/v2` → `/home` 리다이렉트
-    │   │   ├── home/page.js      # 5번째 탭 — 4영역(주행·이력·배터리·집충전소) 요약 카드 (quick-status 60초 폴링)
+    │   │   ├── home/page.js      # 홈 탭 (peek 없음) — 차량 hero(SOC 링+상태) + 주행 요약(3 col) + 최근 주행 + 집충전소 카드 + 4탭 타일 그리드 + 부가 칩 (홈화면 스타일)
     │   │   ├── components/
-    │   │   │   ├── BottomNavV2.js    # 하단 탭 (홈/주행/배터리 — 3탭, 라벨 없이 이모지+메트릭만) — 이력은 주행에, 집충전소는 배터리에 흡수
+    │   │   │   ├── BottomNavV2.js    # 하단 탭 (홈/주행/배터리 — 3탭, 라벨 없이 SVG 아이콘+메트릭만) — 이력은 주행에, 집충전소는 배터리에 흡수. 홈 메트릭 없음, 주행=오늘km, 배터리=SOC%
     │   │   │   ├── RankingsSheet.js  # 랭킹 바텀시트
-    │   │   │   └── PeekSheet.js      # 4탭 공용 표지(peek) 시트 — Provider/Context + 탭별 Cover/Expanded + /api/v2/quick-status 60초 폴링 + 드래그 확장(↑32px)/축소(↓80px)
+    │   │   │   └── PeekSheet.js      # 주행/배터리 2탭에서만 활성화되는 표지(peek) 시트 — Provider/Context + Cover (이력/충전소 흡수 1줄) + Expanded (정보 카드 + 칩 — 클릭 시 페이지 섹션 이동) + 60초 폴링 + 드래그 확장(↑32px)/축소(↓80px). 홈/dev/tg 에선 미렌더.
     │   │   ├── drives/
     │   │   │   ├── page.js                   # 주행 분석 — 차량 KPI + 인사이트 + 연간 히트맵 + 패턴 + TOP50 + 연도별 월간
     │   │   │   └── _parts/
