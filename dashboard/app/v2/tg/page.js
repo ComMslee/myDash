@@ -787,15 +787,25 @@ function GuidePane() {
       </div>
 
       <div>
-        <div className="font-medium mb-1">6. 🔔 자동 알림 — 차량 이벤트 push</div>
+        <div className="font-medium mb-1">6. 🔔 자동 알림 — 이벤트 push</div>
         <div className="text-zinc-400 text-[11px] space-y-1">
-          <div>차량/요약 이벤트 발생 시 <b>car 권한자 전원</b>에 자동 발송 (poller 5초 간격 폴링).</div>
+          <div>각 알림은 해당 <b>기능그룹 권한자 전원</b>에 자동 발송. 그룹 권한 없으면 받지 않음.</div>
+          <div className="font-semibold text-zinc-300 mt-1">🚗 car 그룹 (차량 이벤트, poller 5초 폴링)</div>
           <ul className="list-disc list-inside space-y-0.5 ml-1">
             <li><b>⚡ 충전 시작</b> — SOC + 위치</li>
             <li><b>✅ 충전 완료</b> — SOC델타·kWh·환산km / ⚡급속·🔌완속 / ⏱️시간·📈평균kW · 위치</li>
             <li><b>🚗 주행 종료</b> — 시작→끝 / km · 시간 / Wh/km · km/kWh</li>
             <li><b>📊 일일 요약</b> — 매일 <b>09:00 KST</b> (전날치)</li>
             <li><b>📅 주간 요약</b> — 매주 <b>월 09:00 KST</b> (지난 주). 월요일은 일일+주간 한 메시지로 머지</li>
+          </ul>
+          <div className="font-semibold text-zinc-300 mt-2">🏠 family 그룹</div>
+          <ul className="list-disc list-inside space-y-0.5 ml-1 text-zinc-500">
+            <li>비/눈 1~2시간 전 자동 broadcast (예정)</li>
+            <li>등록 일정 알림 (예정)</li>
+          </ul>
+          <div className="font-semibold text-zinc-300 mt-2">📝 sns 그룹</div>
+          <ul className="list-disc list-inside space-y-0.5 ml-1 text-zinc-500">
+            <li>발행 결과 통보 (mock)</li>
           </ul>
           <div className="mt-1">
             <b>야간 매너모드</b>: 23~06시 KST 알림은 <code className="text-blue-300">disable_notification</code> 자동 적용 — 메시지는 도착하지만 소리/진동 OFF.
