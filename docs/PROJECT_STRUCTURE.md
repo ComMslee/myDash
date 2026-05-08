@@ -84,16 +84,27 @@ myDash/
     │   │   ├── layout.js         # v2 레이아웃 (BottomNavV2 포함)
     │   │   ├── page.js           # `/v2` → `/v2/drives` 리다이렉트
     │   │   ├── components/
-    │   │   │   ├── BottomNavV2.js    # 하단 탭 (주행/배터리/이력/충전소)
+    │   │   │   ├── BottomNavV2.js    # 하단 탭 (주행/이력/배터리/집 충전소)
     │   │   │   └── RankingsSheet.js  # 랭킹 바텀시트
     │   │   ├── drives/
-    │   │   │   └── page.js       # 주행 통계 + 지도 + 이력
+    │   │   │   ├── page.js                   # 주행 분석 — 차량 KPI + 인사이트 + 연간 히트맵 + 패턴 + TOP50 + 연도별 월간
+    │   │   │   └── _parts/
+    │   │   │       ├── VehicleKpiCard.js     # 차량 누적·효율·주행 KPI (전기간 인라인)
+    │   │   │       ├── MonthInsightsCard.js  # 이번달 인사이트 (4주 롤링)
+    │   │   │       ├── RecordsCardV2.js      # TOP 50 기록 + 랭킹 시트
+    │   │   │       ├── MonthlyHistoryByYear.js # 연도별 월간 통계 막대
+    │   │   │       └── SeasonalEffGrid.js    # 계절별 효율 그리드
     │   │   ├── battery/
-    │   │   │   ├── page.js                   # 배터리 — 건강/집충전기/충전 습관/충전 상세
+    │   │   │   ├── page.js                   # 배터리 — 건강/대기 소모/충전 습관/월간·히트맵/급속·완속
     │   │   │   ├── HealthScoreCard.js        # 점수(등급)·평균 SOC·용량 추이 + SOC 체류 분포
     │   │   │   ├── IdleDrainCard.js          # 대기 소모 24h 타임라인
     │   │   │   ├── useIdleDrainDays.js       # 대기 소모 일자별 데이터 훅
-    │   │   │   ├── HomeChargerCard.js        # 집충전기 실시간 상태 (환경공단 API)
+    │   │   │   ├── idle-drain/               # 대기 소모 카드 내부 모듈
+    │   │   │   │   ├── DayTimeline.js
+    │   │   │   │   ├── WeekHeader.js
+    │   │   │   │   ├── colors.js
+    │   │   │   │   └── compute.js
+    │   │   │   ├── HomeChargerCard.js        # 집충전기 실시간 상태 (환경공단 API) — `/v2/chargers` 에서 사용
     │   │   │   ├── home-charger/             # 집충전기 카드 내부 모듈
     │   │   │   │   ├── constants.js          # ID 매핑, 동 배치, 상태 메타, 주기 상수
     │   │   │   │   ├── utils.js              # computeRanks, elapsedLabel, buildTtlTooltip 등
@@ -101,13 +112,11 @@ myDash/
     │   │   │   │   ├── FleetStatsCharts.js   # 집단 통계 차트
     │   │   │   │   ├── PollLogPopup.js       # 폴링 로그 팝업
     │   │   │   │   └── fleet-stats-utils.js  # 통계 집계 유틸
-    │   │   │   ├── RecordsHabit.js           # 충전 시작/종료 SOC Range Bar
+    │   │   │   ├── RecordsHabit.js           # 충전 시작/종료 SOC Range Bar (LevelHabitCard 만 사용)
     │   │   │   ├── MonthlyChargeCard.js
     │   │   │   ├── ChargeHeatmap.js
     │   │   │   ├── FastChargeCard.js
-    │   │   │   ├── SlowChargeCard.js
-    │   │   │   ├── CycleCard.js
-    │   │   │   └── WeeklyCard.js
+    │   │   │   └── SlowChargeCard.js
     │   │   ├── history/
     │   │   │   ├── page.js           # 이력 페이지 — 리스트(일 카드) / dayMode(지도 + 컴팩트 strip 하이라이트) / monthMode(월 합계) / 단일 주행. 자주 가는 곳·오래 머문 곳 placesMode 탭 토글 포함
     │   │   │   ├── DriveListView.js  # 월 그룹 → 일 카드 (24h 막대 + 🚗/🛣️/🅿️ 메타라인). 일 카드 탭 = onDayClick(dateStr)
@@ -118,8 +127,10 @@ myDash/
     │   │   │   └── report/page.js        # 활용도 리포트 단독 페이지 (외부 캡처/공유)
     │   │   ├── tg/page.js            # 텔레그램 봇 관리 (권한·방송·학습로그·가이드)
     │   │   └── dev/                  # 개발/진단 도구 (하단 탭·헤더 미노출, URL 직접)
-    │   │       └── api-status/
-    │   │           └── page.js       # 29개 라우트 가용성 체크 + 서버/충전/폴링 진단 통합
+    │   │       ├── api-status/
+    │   │       │   └── page.js       # 29개 라우트 가용성 체크 + 서버/충전/폴링 진단 통합
+    │   │       └── auth/
+    │   │           └── page.js       # 로그인 PIN 변경 (단일 사용자)
     │   └── api/                  # 서버사이드 API 라우트 (모두 GET, force-dynamic)
     │       ├── car/route.js              # 차량 기본 정보 + 배터리 + 상태
     │       ├── charging-status/route.js  # 현재 충전 상태
@@ -167,10 +178,11 @@ myDash/
 | 경로 | 설명 | 하단 탭 |
 |------|------|---------|
 | `/` | `/v2/drives`로 리다이렉트 | — |
-| `/v2/drives` | 주행 통계 + 지도 + 이력 | 주행 |
-| `/v2/battery` | 건강 점수 + 대기 소모 + 집충전기 + 충전 습관 + 급속/완속 기록 | 배터리 |
+| `/v2/drives` | 차량 KPI · 인사이트 · 연간 히트맵 · 시간×요일 패턴 · TOP50 · 연도별 월간/계절 효율 | 주행 |
+| `/v2/battery` | 건강 점수 + 대기 소모 + 충전 습관 + 월간 충전 + 히트맵 + 급속/완속 기록 | 배터리 |
 | `/v2/history` | 일 카드 리스트 → 일 상세(지도 + 그날 주행 strip 하이라이트) / 월 합계(monthMode) | 이력 |
-| `/v2/chargers` | 집충전기 실시간 + Top 순위 + 활용도 리포트 (인라인) | 충전소 |
+| `/v2/chargers` | 집충전기 실시간 + Top 순위 + 활용도 리포트 (인라인) | 집 충전소 |
 | `/v2/chargers/report` | 활용도 리포트 단독 페이지 (외부 캡처/공유) | — (URL 직접) |
 | `/v2/tg` | 텔레그램 봇 관리 (권한 · 방송 · 학습로그 · 가이드) | — (URL 직접) |
 | `/v2/dev/api-status` | API 가용성 + 서버/진단 (개발자용, URL 직접) | — (헤더·탭 미노출) |
+| `/v2/dev/auth` | 로그인 PIN 변경 (헤더 우측 ⚙️ 시트에서 진입) | — (헤더·탭 미노출) |
