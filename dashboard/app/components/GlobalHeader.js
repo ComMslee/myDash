@@ -155,8 +155,6 @@ export default function GlobalHeader() {
     ? Math.max(0, Math.floor((Date.now() - new Date(elapsedSince).getTime()) / 60000))
     : null;
 
-  const remainMin = charging?.time_to_full_charge ? Math.round(charging.time_to_full_charge * 60) : null;
-
   // 충전 진행률 (현재% → 목표%)
   const startLvl = charging?.start_battery_level ?? (lvl > 10 ? lvl - 10 : 0);
   const chargePctDenom = limitLvl - startLvl;
@@ -231,9 +229,9 @@ export default function GlobalHeader() {
           aria-hidden="true"
         />
       )}
-      <div className="relative max-w-2xl mx-auto px-4 py-2 flex items-center gap-2">
+      <div className="relative max-w-2xl mx-auto px-4 py-1.5 flex items-center gap-2">
 
-        {/* 좌측: 아이콘 + 차량명 + 갱신시간 */}
+        {/* 좌측: 상태 아이콘 + 온라인 + 경과시간 */}
         <div className="flex items-center gap-1.5 min-w-0">
           {(() => {
             if (!displayState) return null;
@@ -260,10 +258,10 @@ export default function GlobalHeader() {
             const conf = MAP[displayState];
             return (
               <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 border transition-colors bg-gradient-to-br ${conf.cls}`}
+                className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 border transition-colors bg-gradient-to-br ${conf.cls}`}
                 title={conf.label}
               >
-                <svg className={`w-4 h-4 ${conf.txt}`} fill="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-3.5 h-3.5 ${conf.txt}`} fill="currentColor" viewBox="0 0 24 24">
                   {conf.icon}
                 </svg>
                 <span className="sr-only">{conf.label}</span>
@@ -295,25 +293,17 @@ export default function GlobalHeader() {
 
         <div className="flex-1" />
 
-        {/* 우측: 충전중 or 일반 상태 */}
+        {/* 우측: SOC% (+ 충전 중이면 ⚡ 펄스) — kW/타겟/잔여는 BottomNav·PeekSheet 가
+            동일 정보를 더 크게 표시하므로 헤더에선 생략. 예측 km 만 비충전 시 노출. */}
         {isCharging ? (
-          <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse flex-shrink-0" aria-hidden="true" />
-              <span className="text-green-400 text-sm font-bold tabular-nums">
-                {charging?.charger_power != null ? `${charging.charger_power}kW` : '충전 중'}
-              </span>
-            </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse flex-shrink-0" aria-hidden="true" />
             <PercentBadge level={lvl} color={color} charging />
-            {limitLvl && <span className="text-zinc-600 text-[11px] tabular-nums flex-shrink-0">→{limitLvl}%</span>}
-            {remainMin != null && (
-              <span className="text-zinc-500 text-[11px] tabular-nums truncate">{formatDuration(remainMin)}</span>
-            )}
           </div>
         ) : (
           <div className="flex items-center gap-2">
             {estRange && (
-              <span className="text-zinc-400 text-xs tabular-nums">예측 {estRange}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
+              <span className="text-zinc-500 text-[11px] tabular-nums">{estRange}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
             )}
             <PercentBadge level={lvl} color={color} charging={false} />
           </div>
