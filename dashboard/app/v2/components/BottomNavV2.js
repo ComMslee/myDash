@@ -49,7 +49,8 @@ export default function BottomNavV2() {
   const pathname = usePathname();
 
   // dev 도구 페이지 + tg 어드민에서는 하단 탭 숨김 (탐색 가치 없음, 화면 절약)
-  if (pathname?.startsWith('/dev') || pathname?.startsWith('/tg')) return null;
+  const p = pathname || '';
+  if (p.startsWith('/dev') || p.startsWith('/tg') || p.startsWith('/v2/dev') || p.startsWith('/v2/tg')) return null;
 
   return (
     <nav
