@@ -167,17 +167,20 @@ async function checkChargeEnd(carId) {
     let header;
     if (r.start_battery_level != null && r.end_battery_level != null) {
       const tail = amountParts.length > 0 ? ` (${amountParts.join(', ')})` : '';
-      header = `✅ ${r.start_battery_level}→${r.end_battery_level}%${tail} · ${speedTag}`;
+      header = `✅ ${r.start_battery_level}→${r.end_battery_level}%${tail}`;
     } else {
       const tail = amountParts.length > 0 ? ` ${amountParts.join(', ')}` : '';
-      header = `✅ <b>충전 완료</b>${tail} · ${speedTag}`;
+      header = `✅ <b>충전 완료</b>${tail}`;
     }
 
     const meta = [`⏱️ ${dur}`];
     if (avgKw > 0) meta.push(`📈 ${avgKw.toFixed(1)}kW`);
-    meta.push(`📍 ${escapeHtml(where)}`);
 
-    const lines = [header, meta.join(' · ')];
+    const lines = [
+      header,
+      `${speedTag} 📍 ${escapeHtml(where)}`,
+      meta.join(' · '),
+    ];
 
     await broadcast(lines.join('\n'), {
       reply_markup: inlineButton('🔋 배터리 상세', '/v2/battery'),
