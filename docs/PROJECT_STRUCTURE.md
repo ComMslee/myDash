@@ -57,11 +57,13 @@ myDash/
     │   ├── tg-user-groups.js     # 텔레그램 사용자→카테고리 그룹 매핑 (대시보드 측 캐시·조회)
     │   ├── docker-stats.js       # docker.sock CPU/메모리 통계 — server-status 용
     │   ├── drive-classify.js     # 주행 분류 헬퍼 (장거리/통근/단거리 등)
-    │   ├── queries/              # 배터리 관련 SQL 쿼리 모듈
+    │   ├── queries/              # 도메인별 SQL 쿼리 모듈
     │   │   ├── battery-capacity.js
     │   │   ├── battery-health.js
     │   │   ├── battery-idle.js
-    │   │   └── battery-records.js
+    │   │   ├── battery-records.js
+    │   │   ├── car.js                  # getDefaultCar() — 단일 차량 조회 헬퍼 (10+ 라우트 공유)
+    │   │   └── family-festivals.js     # family_festivals 테이블 스키마/CRUD — GHA cron 폴링 결과 저장
     │   └── home-charger/         # 집충전기 서버사이드 로직
     │       ├── fleet-stats.js    # 단지 통계 집계
     │       ├── poll-log.js       # 폴링 로그 조회
@@ -71,6 +73,8 @@ myDash/
     │   ├── layout.js             # 루트 레이아웃 (MockProvider, GlobalHeader)
     │   ├── globals.css           # Tailwind 지시어 + Leaflet 다크 테마 오버라이드
     │   ├── page.js               # `/` → `/v2` 리다이렉트
+    │   ├── login/page.js         # PIN 로그인 페이지 (`/login?next=...`) — Caddy forward_auth 미인증 리다이렉트 진입점
+    │   ├── setup/page.js         # 초기 PIN 설정 페이지 (`/setup`) — auth-store 비어있을 때만 노출
     │   ├── context/
     │   │   └── mock.js           # MockProvider + MOCK_DATA (개발용 가상 데이터)
     │   ├── components/           # 공용 컴포넌트 (v1·v2 공유)

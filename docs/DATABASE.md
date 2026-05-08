@@ -18,9 +18,18 @@ TeslaMate가 관리하는 PostgreSQL 16 스키마. 직접 쿼리만 사용 (ORM 
 
 | 테이블 | 용도 | 생성 위치 |
 |--------|------|-----------|
-| `charger_usage` | 집충전기 시간대별 사용 카운트 `(stat_id, chger_id, hour)` · 컨테이너 재시작 간 보존(DROP 금지) · 30분당 최대 1회 증가(시간당 최대 1회) | `lib/home-charger-cache.js::ensureTable()` |
-| `home_charger_snapshot` | 환경공단 API 응답 스냅샷 `(cache_key, payload JSONB, fetched_at)` · 컨테이너 재시작 직후 콜드 스타트 캐시 복원용 | `lib/home-charger-cache.js::ensureTable()` |
+| `charger_usage` | 집충전기 시간×충전기 사용 카운트 `(stat_id, chger_id, hour)` · 컨테이너 재시작 간 보존(DROP 금지) · 30분당 최대 1회 증가(시간당 최대 1회) | `lib/home-charger/schema.js::ensureTable()` |
+| `charger_usage_daily` | 집충전기 **일×시간×충전기** 사용 카운트 `(stat_id, chger_id, date, hour)` · 활용도 리포트의 일별/주별/월별 가동률 계산 소스 | `lib/home-charger/schema.js::ensureTable()` |
+| `home_charger_snapshot` | 환경공단 API 응답 스냅샷 `(cache_key, payload JSONB, fetched_at)` · 컨테이너 재시작 직후 콜드 스타트 캐시 복원용 | `lib/home-charger/schema.js::ensureTable()` |
+| `home_charger_poll_log` | 집충전기 폴링 시계열 `(date, hour, attempts, successes, partial, retries, retry_successes, quota_hits, manual_attempts, warm_calls)` · `/v2/dev/api-status` WarmDiagCard 의 폴링 진단 소스 | `lib/home-charger/schema.js::ensureTable()` |
 | `server_health_log` | 서버 헬스 시계열 `(ts PK, host_cpu, host_mem_pct, host_mem_avail_pct, db_ms, tm_cpu, tm_mem_mb, dash_cpu, dash_mem_mb, disk_used_pct, swap_used_pct)` · 24h 피크/한산 추적용 · 5분 dedupe push (페이지 폴링 시 누적) | `app/api/server-status/route.js::ensureSchema()` |
+| `kakao_address_cache` | 좌표 → 한글 주소 캐시 `(coord_key PK, label, updated_at)` · 30일 TTL · `/api/drives` batchReverseGeocode 가 사용 | `lib/kakao-geo.js` |
+| `kakao_cache_meta` | Kakao 캐시 스키마 버전 마커 (`v2_poi`) · 코드 측 버전 변경 시 TRUNCATE 트리거 | `lib/kakao-geo.js` |
+| `family_festivals` | TourAPI 축제 폴링 결과 `(id PK, title, start_date, end_date, addr, area_code, sigungu_code, lat, lng, image, thumbnail, tel, fetched_at)` · GHA cron(월·수·금 03:00 KST)이 `/api/family/festivals/refresh` 통해 upsert · GET 라우트는 SELECT 만 | `lib/queries/family-festivals.js::ensureSchema()` |
+| `hub_user_groups` | 텔레그램 봇 사용자 그룹 정의 `(group_key PK, label, description, is_root)` · `/v2/tg` 권한관리 탭에서 CRUD | `lib/tg-user-groups.js` |
+| `hub_user_group_features` | 사용자 그룹 ↔ 기능(카테고리) 매핑 `(group_key, feature)` · 가입 승인 시 `hub_permissions` 로 일괄 복사 | `lib/tg-user-groups.js` |
+
+> 텔레그램 hub 가 자체 관리하는 `hub_users`, `hub_permissions`, `hub_unmatched_inputs`, `hub_categories` 는 `services/telegram-hub` 가 idempotent 로 생성한다 ([`telegram-bot/README.md`](./telegram-bot/README.md) 참조).
 
 ### `charger_usage` 스키마
 

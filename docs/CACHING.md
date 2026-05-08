@@ -94,6 +94,8 @@
 | `/api/parked` | drives, states | — | 없음 (라이브 — 봇 `/where`) |
 | `/api/location` | positions | — | 없음 (라이브 최신 좌표 — 봇 `/where`) |
 | `/api/long-stay-places` | drives, addresses, geofences | — | 없음 (LEAD 윈도우로 dwell 산출) |
+| `/api/family/festivals` | family_festivals | — | DB 자체가 캐시 (GHA cron 주 3회 갱신, stale 임계 4일) — [TOUR_API.md](./TOUR_API.md) |
+| `/api/family/festivals/refresh` | family_festivals (upsert) | TourAPI searchFestival2 | 없음 (POST · HUB_SHARED_SECRET 인증) |
 
 ## 추후 개선 후보 (기능 영향 검토 필요)
 
