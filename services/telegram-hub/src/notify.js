@@ -62,7 +62,11 @@ export function startHttpServer() {
           res.end('text required');
           return;
         }
-        const r = await sendMessage(j.text, j.chat_id);
+        // optional pass-through: reply_markup, disable_notification.
+        const opts = {};
+        if (j.reply_markup) opts.reply_markup = j.reply_markup;
+        if (j.disable_notification) opts.disable_notification = true;
+        const r = await sendMessage(j.text, j.chat_id, opts);
         res.writeHead(r ? 200 : 502, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ ok: !!r }));
       } catch (e) {
