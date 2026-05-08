@@ -72,6 +72,18 @@ function rangeBounds(range, today) {
     // 캘린더 월은 월초 빈약 → 최근 4주(28일) 롤링 + 그 직전 4주.
     case 'rolling-4w':      return [new Date(today.getTime() - 28 * 86_400_000), null];
     case 'prev-rolling-4w': return [new Date(today.getTime() - 56 * 86_400_000), new Date(today.getTime() - 28 * 86_400_000)];
+    // 평일 5일 요약 (이번 주 월~금) — 토요일 09:00 KST 텔레그램 봇 발송용.
+    case 'weekdays': {
+      const mon = kstStartOfThisWeekUtc();
+      const sat = new Date(mon.getTime() + 5 * 86_400_000);
+      return [mon, sat];
+    }
+    // 주말 2일 요약 (직전 토·일) — 월요일 09:00 KST 발송용.
+    case 'weekend': {
+      const thisMon = kstStartOfThisWeekUtc();
+      const lastSat = new Date(thisMon.getTime() - 2 * 86_400_000);
+      return [lastSat, thisMon];
+    }
     default: return null;
   }
 }

@@ -314,30 +314,19 @@ const TEST_SAMPLES = {
     button: { label: '🗺️ 지도 보기', path: '/v2/history' },
   },
 
-  daily_digest: {
+  weekdays_digest: {
     text:
-      '📊 <b>어제 요약</b> (2026-05-07)\n' +
-      '🚗 3회 · 🛣️ 87.4km · ⏱️ 2h 15m\n' +
+      '📅 <b>주간 요약 (월~금)</b>\n' +
+      '🚗 12회 · 🛣️ 312.4km · ⏱️ 8h 30m\n' +
+      '⚡ 142Wh/km · 7.0km/kWh\n' +
+      '🔋 3회 · ⚡ +90.0kWh',
+  },
+
+  weekend_digest: {
+    text:
+      '📅 <b>주말 요약 (토·일)</b>\n' +
+      '🚗 4회 · 🛣️ 128.6km · ⏱️ 3h 10m\n' +
       '⚡ 138Wh/km · 7.2km/kWh\n' +
-      '🔋 1회 · ⚡ +18.5kWh',
-  },
-
-  weekly_digest: {
-    text:
-      '📅 <b>지난 주 요약</b>\n' +
-      '🚗 14회 · 🛣️ 412.3km · ⏱️ 11h\n' +
-      '⚡ 142Wh/km · 7.0km/kWh\n' +
-      '🔋 4회 · ⚡ +120.0kWh',
-  },
-
-  monday_merge: {
-    text:
-      '📊 <b>어제 요약</b> (2026-05-10)\n' +
-      '🚗 1회 · 🛣️ 22.1km · ⏱️ 35m\n' +
-      '⚡ 132Wh/km · 7.6km/kWh\n\n' +
-      '📅 <b>지난 주 요약</b>\n' +
-      '🚗 14회 · 🛣️ 412.3km · ⏱️ 11h\n' +
-      '⚡ 142Wh/km · 7.0km/kWh\n' +
-      '🔋 4회 · ⚡ +120.0kWh',
+      '🔋 1회 · ⚡ +25.0kWh',
   },
 };

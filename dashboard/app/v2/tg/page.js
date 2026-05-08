@@ -598,9 +598,8 @@ const TEST_KINDS = [
   { key: 'charge_end_zero',      label: '✅ 충전 완료 (0kWh 취소성)' },
   { key: 'drive_end',            label: '🚗 주행 종료 (단거리)' },
   { key: 'drive_end_long',       label: '🚗 주행 종료 (장거리)' },
-  { key: 'daily_digest',         label: '📊 일일 요약 (09:00)' },
-  { key: 'weekly_digest',        label: '📅 주간 요약 (월 09:00)' },
-  { key: 'monday_merge',         label: '📊+📅 월요일 머지' },
+  { key: 'weekdays_digest',      label: '📅 주간 요약 (토 09:00, 월~금)' },
+  { key: 'weekend_digest',       label: '📅 주말 요약 (월 09:00, 토·일)' },
 ];
 
 function TestNotify({ action, busy }) {
@@ -795,8 +794,8 @@ function GuidePane() {
             <li><b>⚡ 충전 시작</b> — SOC + 위치</li>
             <li><b>✅ 충전 완료</b> — SOC델타·kWh·환산km / ⚡급속·🔌완속 / ⏱️시간·📈평균kW · 위치</li>
             <li><b>🚗 주행 종료</b> — 시작→끝 / km · 시간 / Wh/km · km/kWh</li>
-            <li><b>📊 일일 요약</b> — 매일 <b>09:00 KST</b> (전날치)</li>
-            <li><b>📅 주간 요약</b> — 매주 <b>월 09:00 KST</b> (지난 주). 월요일은 일일+주간 한 메시지로 머지</li>
+            <li><b>📅 주간 요약 (월~금)</b> — 매주 <b>토 09:00 KST</b></li>
+            <li><b>📅 주말 요약 (토·일)</b> — 매주 <b>월 09:00 KST</b></li>
           </ul>
           <div className="font-semibold text-zinc-300 mt-2">🏠 family 그룹</div>
           <ul className="list-disc list-inside space-y-0.5 ml-1 text-zinc-500">

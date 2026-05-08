@@ -1,6 +1,6 @@
-// 일일 요약 (매일 09:00 KST, 전날치) + 주간 요약 (매주 월 09:00 KST, 지난 주).
-// 월요일 09:00 은 두 요약을 한 메시지로 머지 발송 (중복 알림 방지).
-// /api/summary 재활용 — DB 직접 쿼리 금지 (CLAUDE.md 데이터 경로 원칙).
+// 주간 요약 (토 09:00 KST, 이번 주 월~금) + 주말 요약 (월 09:00 KST, 직전 토·일).
+// 일주일에 두 번만 발송 — 일일 알림 제거.
+// /api/summary?range=weekdays|weekend 재활용 (CLAUDE.md 데이터 경로 원칙).
 
 import { sendMessage } from './telegram.js';
 import { getState, setState } from './state.js';
@@ -10,7 +10,8 @@ import { dashGet } from './dash.js';
 
 const TICK_MS = 60_000;
 const FIRE_HOUR = 9;
-const WEEKLY_DOW = 1; // 월요일 (0=Sun)
+const SAT = 6; // 0=Sun, 6=Sat
+const MON = 1;
 
 function kstNow() {
   return new Date(Date.now() + 9 * 3600 * 1000);
@@ -19,11 +20,6 @@ function kstNow() {
 function kstYmd() {
   const x = kstNow();
   return `${x.getUTCFullYear()}${String(x.getUTCMonth() + 1).padStart(2, '0')}${String(x.getUTCDate()).padStart(2, '0')}`;
-}
-
-function kstYesterdayLabel() {
-  const x = new Date(kstNow().getTime() - 86_400_000);
-  return `${x.getUTCFullYear()}-${String(x.getUTCMonth() + 1).padStart(2, '0')}-${String(x.getUTCDate()).padStart(2, '0')}`;
 }
 
 async function broadcast(text) {
@@ -55,16 +51,6 @@ function fmtAggBlock(agg) {
   return lines.join('\n');
 }
 
-async function fetchDaily() {
-  const j = await dashGet('/api/summary?range=yesterday');
-  return (j && !j.error) ? j : null;
-}
-
-async function fetchWeekly() {
-  const j = await dashGet('/api/summary?range=last-week');
-  return (j && !j.error) ? j : null;
-}
-
 let running = false;
 async function tick() {
   if (running) return;
@@ -77,35 +63,19 @@ async function tick() {
     const ymd = kstYmd();
     const s = getState();
 
-    // 09:00~09:04 사이 첫 호출에서 1회 발송 (분 단위 폴링 노이즈 흡수)
     if (h !== FIRE_HOUR || m >= 5) return;
 
-    const isMonday = dow === WEEKLY_DOW;
-    const dailyDone  = s.last_daily_ymd  === ymd;
-    const weeklyDone = s.last_weekly_ymd === ymd;
-
-    // 월요일 09:00: 일일+주간 머지 1회 발송
-    if (isMonday && !dailyDone && !weeklyDone) {
-      const [daily, weekly] = await Promise.all([fetchDaily(), fetchWeekly()]);
-      const blocks = [];
-      blocks.push(`📊 <b>어제 요약</b> (${kstYesterdayLabel()})\n${fmtAggBlock(daily)}`);
-      blocks.push(`📅 <b>지난 주 요약</b>\n${fmtAggBlock(weekly)}`);
-      await broadcast(blocks.join('\n\n'));
-      setState({ last_daily_ymd: ymd, last_weekly_ymd: ymd });
-      return;
+    // 토 09:00 — 평일(월~금) 요약
+    if (dow === SAT && s.last_weekdays_ymd !== ymd) {
+      const j = await dashGet('/api/summary?range=weekdays');
+      await broadcast(`📅 <b>주간 요약 (월~금)</b>\n${fmtAggBlock(j && !j.error ? j : null)}`);
+      setState({ last_weekdays_ymd: ymd });
     }
-
-    // 평일 09:00: 일일만
-    if (!dailyDone) {
-      const daily = await fetchDaily();
-      await broadcast(`📊 <b>어제 요약</b> (${kstYesterdayLabel()})\n${fmtAggBlock(daily)}`);
-      setState({ last_daily_ymd: ymd });
-    }
-    // 월요일인데 일일은 이미 보낸 상태라면 주간만
-    if (isMonday && !weeklyDone) {
-      const weekly = await fetchWeekly();
-      await broadcast(`📅 <b>지난 주 요약</b>\n${fmtAggBlock(weekly)}`);
-      setState({ last_weekly_ymd: ymd });
+    // 월 09:00 — 주말(토·일) 요약
+    if (dow === MON && s.last_weekend_ymd !== ymd) {
+      const j = await dashGet('/api/summary?range=weekend');
+      await broadcast(`📅 <b>주말 요약 (토·일)</b>\n${fmtAggBlock(j && !j.error ? j : null)}`);
+      setState({ last_weekend_ymd: ymd });
     }
   } catch (e) {
     console.error('[digest] tick', e?.message || e);
@@ -117,5 +87,5 @@ async function tick() {
 export function startDigestScheduler() {
   setInterval(tick, TICK_MS);
   tick();
-  console.log('[digest] scheduler — daily 09:00 KST(전날치), weekly Mon 09:00 KST(지난 주). 월요일 09:00 머지 발송.');
+  console.log('[digest] scheduler — 주간(월~금) Sat 09:00 KST, 주말(토·일) Mon 09:00 KST.');
 }
