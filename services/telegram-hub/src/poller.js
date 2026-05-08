@@ -154,22 +154,30 @@ async function checkChargeEnd(carId) {
     const kmGained = kwh > 0 ? Math.round(kwh / KWH_PER_KM) : 0;
     const speedTag = r.is_fast ? '⚡ 급속' : '🔌 완속';
 
-    let socLine = '';
+    // 충전된 양(SOC 델타·kWh·km)은 의미상 한 묶음 → 한 괄호로 묶기.
+    const amountParts = [];
     if (r.start_battery_level != null && r.end_battery_level != null) {
       const delta = r.end_battery_level - r.start_battery_level;
       const sign = delta >= 0 ? '+' : '';
-      socLine = ` ${r.start_battery_level}→${r.end_battery_level}% (${sign}${delta}%p)`;
+      amountParts.push(`${sign}${delta}%p`);
+    }
+    if (kwh > 0) amountParts.push(`${kwh.toFixed(2)}kWh`);
+    if (kmGained > 0) amountParts.push(`${kmGained}km`);
+
+    let header;
+    if (r.start_battery_level != null && r.end_battery_level != null) {
+      const tail = amountParts.length > 0 ? ` (${amountParts.join(', ')})` : '';
+      header = `✅ ${r.start_battery_level}→${r.end_battery_level}%${tail} · ${speedTag}`;
+    } else {
+      const tail = amountParts.length > 0 ? ` ${amountParts.join(', ')}` : '';
+      header = `✅ <b>충전 완료</b>${tail} · ${speedTag}`;
     }
 
-    const lines = [
-      `✅ <b>충전 완료</b>${socLine} · ${speedTag}`,
-      `🔋 ${kwh.toFixed(2)}kWh · ⏱️ ${dur}${avgKw > 0 ? ` · 📈 ${avgKw.toFixed(1)}kW` : ''}`,
-    ];
-    if (kmGained > 0) {
-      lines.push(`🚗 +${kmGained}km · 📍 ${escapeHtml(where)}`);
-    } else {
-      lines.push(`📍 ${escapeHtml(where)}`);
-    }
+    const meta = [`⏱️ ${dur}`];
+    if (avgKw > 0) meta.push(`📈 ${avgKw.toFixed(1)}kW`);
+    meta.push(`📍 ${escapeHtml(where)}`);
+
+    const lines = [header, meta.join(' · ')];
 
     await broadcast(lines.join('\n'), {
       reply_markup: inlineButton('🔋 배터리 상세', '/v2/battery'),
