@@ -235,9 +235,26 @@ export async function POST(req) {
       if (!recipients.length && process.env.TELEGRAM_CHAT_ID) {
         recipients.push(String(process.env.TELEGRAM_CHAT_ID));
       }
-      const opts = sample.button ? { reply_markup: inlineButton(sample.button.label, sample.button.path) } : {};
+
+      // 주행 샘플은 실제 최근 drive id 로 deep-link → 클릭 시 그 주행이 선택된 상태로 열림.
+      let buttonPath = sample.button?.path;
+      if (buttonPath === '/v2/history' && (kind === 'drive_end' || kind === 'drive_end_long')) {
+        try {
+          const lastDrive = await pool.query(
+            "SELECT id FROM drives WHERE end_date IS NOT NULL ORDER BY id DESC LIMIT 1",
+          );
+          if (lastDrive.rowCount) buttonPath = `/v2/history?id=${lastDrive.rows[0].id}`;
+        } catch {}
+      }
+
+      const opts = (sample.button && buttonPath)
+        ? { reply_markup: inlineButton(sample.button.label, buttonPath) }
+        : {};
       for (const c of recipients) await notifyChat(c, sample.text, opts);
-      return Response.json({ ok: true, sent: recipients.length, kind, has_button: !!opts.reply_markup });
+      return Response.json({
+        ok: true, sent: recipients.length, kind,
+        has_button: !!opts.reply_markup, button_path: buttonPath,
+      });
     }
     default:
       return bad('unknown action');
