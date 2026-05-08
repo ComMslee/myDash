@@ -12,7 +12,7 @@ export async function GET() {
     if (!car) return Response.json({ error: 'No car found' }, { status: 404 });
     const carId = car.id;
 
-    const [statsResult, hourDowResult] = await Promise.all([
+    const [statsResult, hourDowResult, hourSocResult] = await Promise.all([
       pool.query(`
         SELECT
           COUNT(*)::int AS charge_count,
@@ -40,12 +40,32 @@ export async function GET() {
         WHERE car_id = $1 AND charge_energy_added IS NOT NULL
         GROUP BY dow, hour
       `, [carId]),
+
+      pool.query(`
+        SELECT EXTRACT(HOUR FROM (start_date + INTERVAL '9 hours'))::int AS hour,
+               AVG(start_battery_level)::float AS avg_start,
+               AVG(end_battery_level)::float AS avg_end
+        FROM charging_processes
+        WHERE car_id = $1
+          AND charge_energy_added IS NOT NULL
+          AND start_battery_level IS NOT NULL
+          AND end_battery_level IS NOT NULL
+        GROUP BY hour
+      `, [carId]),
     ]);
 
     const s = statsResult.rows[0];
 
     const hourDow = Array.from({ length: 7 }, () => Array(24).fill(0));
     for (const r of hourDowResult.rows) hourDow[r.dow][r.hour] = r.count;
+
+    const hourSoc = Array.from({ length: 24 }, () => ({ avg_start: null, avg_end: null }));
+    for (const r of hourSocResult.rows) {
+      hourSoc[r.hour] = {
+        avg_start: r.avg_start != null ? Number(r.avg_start) : null,
+        avg_end:   r.avg_end   != null ? Number(r.avg_end)   : null,
+      };
+    }
 
     return Response.json({
       charge_count: s.charge_count,
@@ -56,6 +76,7 @@ export async function GET() {
       fast_charges: s.fast_charges,
       slow_charges: s.slow_charges,
       charge_hour_dow: hourDow,
+      charge_hour_soc: hourSoc,
     });
   } catch (err) {
     console.error('/api/charge-all-time error:', err);

@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import HealthScoreCard from '@/app/v2/battery/HealthScoreCard';
 import IdleDrainCard from '@/app/v2/battery/IdleDrainCard';
-import { LevelHabitCard } from '@/app/v2/battery/RecordsHabit';
 import MonthlyChargeCard from '@/app/v2/battery/MonthlyChargeCard';
 import FastChargeCard from '@/app/v2/battery/FastChargeCard';
 import SlowChargeCard from '@/app/v2/battery/SlowChargeCard';
@@ -47,7 +46,6 @@ export default function V2BatteryPage() {
           <>
             <HealthScoreCard data={data.health} trend={trend} />
             <IdleDrainCard records={data.idle_drain} chargingSessions={data.charging_sessions} />
-            <LevelHabitCard histogram={data.histogram} />
             <MonthlyChargeCard />
             <ChargeHeatmap />
             <FastChargeCard />

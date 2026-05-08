@@ -116,8 +116,7 @@ myDash/
     │   │   │   │   ├── FleetStatsCharts.js   # 집단 통계 차트
     │   │   │   │   ├── PollLogPopup.js       # 폴링 로그 팝업
     │   │   │   │   └── fleet-stats-utils.js  # 통계 집계 유틸
-    │   │   │   ├── RecordsHabit.js           # 충전 시작/종료 SOC Range Bar (LevelHabitCard 만 사용)
-    │   │   │   ├── MonthlyChargeCard.js
+    │   │   │   ├── MonthlyChargeCard.js      # 집/외부·완/급속 비율 + 시간×요일 히트맵 (24열 SOC 시작→종료 띠 동봉)
     │   │   │   ├── ChargeHeatmap.js
     │   │   │   ├── FastChargeCard.js
     │   │   │   └── SlowChargeCard.js
