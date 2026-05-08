@@ -373,7 +373,7 @@ function PeekSheet() {
         <div
           className="fixed inset-0 z-[55] bg-black/60 backdrop-blur-sm"
           onClick={close}
-          style={{ animation: 'peek-fadeIn 0.3s' }}
+          style={{ animation: 'fadeIn 0.3s' }}
         />
       )}
       <div
@@ -498,15 +498,10 @@ export function PeekSheetProvider({ children }) {
     tabMeta: TAB_META,
   };
 
+  // 키프레임 (peek-coverIn / fadeIn) 은 globals.css 에 정의됨
+
   return (
     <PeekSheetContext.Provider value={ctx}>
-      <style jsx global>{`
-        @keyframes peek-fadeIn { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes peek-coverIn {
-          from { opacity: 0; transform: translateY(4px) }
-          to { opacity: 1; transform: translateY(0) }
-        }
-      `}</style>
       {children}
       {activeTab && <PeekSheet />}
     </PeekSheetContext.Provider>
