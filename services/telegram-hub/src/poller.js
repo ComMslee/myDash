@@ -163,7 +163,7 @@ async function checkChargeEnd(carId) {
 
     const lines = [
       `✅ <b>충전 완료</b>${socLine} · ${speedTag}`,
-      `🔋 ${kwh.toFixed(2)}kWh · ⏱️ ${dur}${avgKw > 0 ? ` · ${avgKw.toFixed(1)}kW` : ''}`,
+      `🔋 ${kwh.toFixed(2)}kWh · ⏱️ ${dur}${avgKw > 0 ? ` · 📈 ${avgKw.toFixed(1)}kW` : ''}`,
     ];
     if (kmGained > 0) {
       lines.push(`🚗 +${kmGained}km · 📍 ${escapeHtml(where)}`);
