@@ -100,7 +100,7 @@ myDash/
     │   │   │       ├── MonthlyHistoryByYear.js # 연도별 월간 통계 막대
     │   │   │       └── SeasonalEffGrid.js    # 계절별 효율 그리드
     │   │   ├── battery/
-    │   │   │   ├── page.js                   # 배터리 — 건강/대기 소모/충전 습관/월간·히트맵/급속·완속
+    │   │   │   ├── page.js                   # 배터리 — 건강/대기 소모/충전 습관/월간·히트맵/급속·완속 — 섹션 anchor #health/#idle/#monthly/#heatmap/#fast/#slow (PeekSheet 메뉴 점프용)
     │   │   │   ├── HealthScoreCard.js        # 점수(등급)·평균 SOC·용량 추이 + SOC 체류 분포
     │   │   │   ├── IdleDrainCard.js          # 대기 소모 24h 타임라인
     │   │   │   ├── useIdleDrainDays.js       # 대기 소모 일자별 데이터 훅
@@ -127,9 +127,10 @@ myDash/
     │   │   │   ├── DriveListView.js  # 월 그룹 → 일 카드 (24h 막대 + 🚗/🛣️/🅿️ 메타라인). 일 카드 탭 = onDayClick(dateStr)
     │   │   │   └── useDriveData.js   # drives + dayRoutes/monthRoutes 병렬 fetch (CLAUDE.md DriveMap 함정 5개 상주)
     │   │   ├── chargers/
-    │   │   │   ├── page.js               # 집충전기 실시간 + Top 순위 + 활용도 리포트 인라인
+    │   │   │   ├── page.js               # 집충전기 실시간 + Top 순위 + 활용도 리포트 인라인 — 섹션 anchor #live/#fleet/#report (PeekSheet 메뉴 점프용)
     │   │   │   ├── _parts/ReportPanel.js # 활용도 라이브 리포트 컴포넌트 (KPI · 주별 추이 · 동별)
-    │   │   │   └── report/page.js        # 활용도 리포트 단독 페이지 (외부 캡처/공유)
+    │   │   │   ├── report/page.js        # 활용도 리포트 단독 페이지 (외부 캡처/공유)
+    │   │   │   └── poll-log/page.js      # 폴링 로그 단독 페이지 — PeekSheet 메뉴에서 진입 (PollLogBody 래퍼)
     │   │   ├── tg/page.js            # 텔레그램 봇 관리 (권한·방송·학습로그·가이드)
     │   │   └── dev/                  # 개발/진단 도구 (하단 탭·헤더 미노출, URL 직접)
     │   │       ├── api-status/
@@ -189,6 +190,7 @@ myDash/
 | `/v2/history` | 일 카드 리스트 → 일 상세(지도 + 그날 주행 strip 하이라이트) / 월 합계(monthMode) | 이력 |
 | `/v2/chargers` | 집충전기 실시간 + Top 순위 + 활용도 리포트 (인라인) | 집 충전소 |
 | `/v2/chargers/report` | 활용도 리포트 단독 페이지 (외부 캡처/공유) | — (URL 직접) |
+| `/v2/chargers/poll-log` | 폴링 로그 단독 페이지 — PeekSheet 의 집충전소 expanded 메뉴에서 진입 | — (URL 직접) |
 | `/v2/tg` | 텔레그램 봇 관리 (권한 · 방송 · 학습로그 · 가이드) | — (URL 직접) |
 | `/v2/dev/api-status` | API 가용성 + 서버/진단 (개발자용, URL 직접) | — (헤더·탭 미노출) |
 | `/v2/dev/auth` | 로그인 PIN 변경 (헤더 우측 ⚙️ 시트에서 진입) | — (헤더·탭 미노출) |
