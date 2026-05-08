@@ -21,6 +21,7 @@ const TAB_DATA = {
     metric: '25.4',
     unit: 'km',
     sub: '1h 12m · ⚡5.8km/kWh · 평속 38km/h',
+    nav: '25.4 km',
   },
   history: {
     accent: '#a78bfa',
@@ -30,6 +31,7 @@ const TAB_DATA = {
     metric: '서울 → 부산',
     unit: '',
     sub: '5/7 · 391km · 4h 20m · 86% 사용',
+    nav: '7건 · 5/7',
   },
   battery: {
     accent: '#60a5fa',
@@ -39,6 +41,7 @@ const TAB_DATA = {
     metric: '78',
     unit: '%',
     sub: '⚡7.2kW 충전 중 · 만충까지 1h 20m',
+    nav: '78% · ⚡',
   },
   chargers: {
     accent: '#fbbf24',
@@ -48,6 +51,7 @@ const TAB_DATA = {
     metric: '96',
     unit: '%',
     sub: '폴링 정상 · 1분 전 · TTL 5분 · 큐 0',
+    nav: '96% 정상',
   },
 };
 
@@ -566,7 +570,7 @@ function PeekSheet({ tabId, expanded, onExpand, onCollapse }) {
   );
 }
 
-// ── 목업 내비바 ──────────────────────────────────────────────
+// ── 목업 내비바 (탭별 라이브 정보 노출) ──────────────────────
 function MockNav({ activeId, onTabClick }) {
   return (
     <nav
@@ -577,19 +581,30 @@ function MockNav({ activeId, onTabClick }) {
       <div className="max-w-2xl mx-auto h-full flex">
         {TABS.map((t) => {
           const isActive = t.id === activeId;
-          const accent = TAB_DATA[t.id].accent;
+          const data = TAB_DATA[t.id];
           return (
             <button
               key={t.id}
               type="button"
               onClick={() => onTabClick(t.id)}
-              className="flex-1 flex flex-col items-center justify-center gap-1"
-              style={{ color: isActive ? accent : '#71717a' }}
+              className="flex-1 flex flex-col items-center justify-center gap-0.5 px-1 min-w-0"
+              style={{ color: isActive ? data.accent : '#71717a' }}
             >
-              <span className="text-[12px] font-semibold">{t.label}</span>
+              <span className="text-[11px] font-semibold leading-tight">{t.label}</span>
               <span
-                className="w-1 h-1 rounded-full"
-                style={{ background: isActive ? accent : 'transparent' }}
+                key={data.nav}
+                className="text-[10px] tabular-nums leading-none truncate max-w-full"
+                style={{
+                  color: isActive ? data.accent : '#a1a1aa',
+                  opacity: isActive ? 1 : 0.55,
+                  animation: 'b2-coverIn 0.3s',
+                }}
+              >
+                {data.nav}
+              </span>
+              <span
+                className="w-1 h-1 rounded-full mt-0.5"
+                style={{ background: isActive ? data.accent : 'transparent' }}
               />
             </button>
           );
