@@ -8,8 +8,9 @@ const PeekSheetContext = createContext(null);
 export function usePeekSheet() { return useContext(PeekSheetContext); }
 
 // ── 탭 메타 ─────────────────────────────────────────────────
-// next.config 의 rewrites 로 URL 은 /drives, /history, /battery, /chargers (prefix 없음)
+// next.config 의 rewrites 로 URL 은 /home, /drives, /history, /battery, /chargers (prefix 없음)
 const TAB_BY_PATH = {
+  '/home': 'home',
   '/drives': 'drives',
   '/history': 'history',
   '/battery': 'battery',
@@ -17,6 +18,9 @@ const TAB_BY_PATH = {
 };
 
 const TAB_META = {
+  home: {
+    label: '홈', accent: '#f472b6', accentSoft: 'rgba(244,114,182,0.10)', peekH: 104,
+  },
   drives: {
     label: '주행', accent: '#34d399', accentSoft: 'rgba(52,211,153,0.10)', peekH: 96,
   },
@@ -98,6 +102,44 @@ function PulseDot({ accent }) {
 
 // ── 탭별 표지 (Cover) ──────────────────────────────────────
 // 타이틀 제거 — 활성 탭 라벨은 내비바가 표시하므로 중복.
+function CoverHome({ data }) {
+  const drives = data?.drives;
+  const battery = data?.battery;
+  const chargers = data?.chargers;
+  const Row = ({ label, value, hint, hintColor }) => (
+    <div className="flex items-baseline gap-2 min-w-0">
+      <span className="text-[10px] text-zinc-500 w-10 shrink-0">{label}</span>
+      <span className="text-[13px] font-bold text-zinc-100 tabular-nums truncate">
+        {value}
+      </span>
+      {hint && (
+        <span className="text-[10px] truncate" style={{ color: hintColor || '#71717a' }}>{hint}</span>
+      )}
+    </div>
+  );
+  return (
+    <div className="space-y-1">
+      <Row
+        label="주행"
+        value={drives ? `${drives.today_km.toFixed(1)} km` : '—'}
+        hint={drives?.today_count ? `${drives.today_count}회 · ${formatDur(drives.today_duration_min)}` : '오늘 없음'}
+      />
+      <Row
+        label="배터리"
+        value={battery?.soc != null ? `${battery.soc}%` : '—'}
+        hint={battery?.charging ? `⚡ ${battery.charger_power_kw?.toFixed(1) ?? '—'} kW` : null}
+        hintColor={battery?.charging ? '#60a5fa' : null}
+      />
+      <Row
+        label="충전소"
+        value={chargers?.success_rate_today != null ? `${chargers.success_rate_today}%` : '—'}
+        hint={chargers?.is_fresh ? '폴링 정상' : '폴링 오래됨'}
+        hintColor={chargers?.is_fresh ? '#fbbf24' : null}
+      />
+    </div>
+  );
+}
+
 function CoverDrives({ data, accent }) {
   const d = data?.drives;
   return (
@@ -193,6 +235,7 @@ function CoverChargers({ data, accent }) {
 }
 
 const COVERS = {
+  home: CoverHome,
   drives: CoverDrives,
   history: CoverHistory,
   battery: CoverBattery,
@@ -216,57 +259,70 @@ function StatGrid({ accent, items }) {
   );
 }
 
-function ExpandedDrives({ data, accent }) {
-  const d = data?.drives;
-  const km = d?.today_km ?? 0;
+// 주행 expanded — 페이지 섹션 메뉴 + 이력 진입
+function ExpandedDrives({ data }) {
+  const nav = useMenuNav();
+  const lat = data?.history?.latest;
   return (
-    <div className="px-4 py-3 space-y-3">
-      <StatGrid accent={accent} items={[
-        { label: '오늘 거리', value: km.toFixed(1), unit: 'km' },
-        { label: '주행 횟수', value: d?.today_count ?? 0, unit: '회' },
-        { label: '주행 시간', value: formatDur(d?.today_duration_min || 0), unit: '' },
-      ]} />
-      <div className="bg-[#0f0f0f] border border-white/[0.06] rounded-lg p-4 text-center">
-        <div className="text-[11px] text-zinc-500">전체 주행 통계는 페이지 본문 참고</div>
+    <div className="px-4 py-3 space-y-1.5">
+      <div className="text-[10px] text-zinc-500 px-1 tracking-wide uppercase font-semibold mb-1">
+        주행 분석
       </div>
+      <MenuItem icon="🚗" label="차량 KPI" sub="누적 거리 · 효율 · 기간별" onClick={() => nav('/drives#kpi')} />
+      <MenuItem icon="📈" label="이번달 인사이트" sub="4주 롤링 거리·효율" onClick={() => nav('/drives#insights')} />
+      <MenuItem icon="📅" label="연간 히트맵" sub="365일 일별 주행/충전" onClick={() => nav('/drives#year')} />
+      <MenuItem icon="📊" label="주행 패턴" sub="시간×요일 히트맵" onClick={() => nav('/drives#patterns')} />
+      <MenuItem icon="🏆" label="TOP 50 기록" sub="거리·시간·속도·효율 랭킹" onClick={() => nav('/drives#records')} />
+      <MenuItem icon="📆" label="연도별 월간" sub="과거 연도 비교 막대" onClick={() => nav('/drives#monthly')} />
+      <MenuItem icon="🌡️" label="계절별 효율" sub="봄·여름·가을·겨울 비교" onClick={() => nav('/drives#seasonal')} />
+
+      <div className="text-[10px] text-zinc-500 px-1 tracking-wide uppercase font-semibold mt-3 mb-1">
+        이력
+      </div>
+      <MenuItem
+        icon="🗺️"
+        label="최근 주행 이력"
+        sub={lat ? `${shortAddr(lat.start_addr)} → ${shortAddr(lat.end_addr)} · ${relTime(lat.start)}` : '주행 이력 페이지'}
+        onClick={() => nav('/history')}
+      />
     </div>
   );
 }
 
-function ExpandedHistory({ data, accent }) {
-  const d = data?.history;
-  const lat = d?.latest;
+// 이력 expanded — 메뉴 패턴 (chargers·battery 와 동일 컨셉)
+function ExpandedHistory() {
+  const nav = useMenuNav();
   return (
-    <div className="px-4 py-3 space-y-3">
-      <StatGrid accent={accent} items={[
-        { label: '이번 주 주행', value: d?.week_count ?? 0, unit: '회' },
-        { label: '이번 주 거리', value: (d?.week_km ?? 0).toFixed(1), unit: 'km' },
-        { label: '최근 주행', value: lat ? relTime(lat.start) : '—', unit: '' },
-      ]} />
-      {lat && (
-        <div className="bg-[#0f0f0f] border border-white/[0.06] rounded-lg p-3">
-          <div className="text-[11px] text-zinc-400 font-semibold mb-2">최근 주행 상세</div>
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-[12px]">
-              <span className="text-zinc-500">출발</span>
-              <span className="text-zinc-200 truncate ml-2">{shortAddr(lat.start_addr)}</span>
-            </div>
-            <div className="flex justify-between text-[12px]">
-              <span className="text-zinc-500">도착</span>
-              <span className="text-zinc-200 truncate ml-2">{shortAddr(lat.end_addr)}</span>
-            </div>
-            <div className="flex justify-between text-[12px]">
-              <span className="text-zinc-500">거리 · 시간</span>
-              <span className="text-zinc-200 tabular-nums">
-                {lat.distance.toFixed(1)}km · {formatDur(lat.duration_min)}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-      <div className="bg-[#0f0f0f] border border-white/[0.06] rounded-lg p-4 text-center">
-        <div className="text-[11px] text-zinc-500">전체 이력 · 지도 · 자주 가는 곳은 페이지 본문</div>
+    <div className="px-4 py-3 space-y-1.5">
+      <div className="text-[10px] text-zinc-500 px-1 tracking-wide uppercase font-semibold mb-1">
+        자세히 보기
       </div>
+      <MenuItem icon="📅" label="일자별 주행 목록" sub="월 그룹 → 일 카드 · 24h 막대" onClick={() => nav('/history')} />
+      <MenuItem icon="🗺️" label="경로 지도" sub="일 합계 / 단일 주행 시각화" onClick={() => nav('/history')} />
+      <MenuItem icon="📍" label="자주 가는 곳" sub="지오펜스 도착 빈도 TOP" onClick={() => nav('/history')} />
+      <MenuItem icon="🕐" label="오래 머문 곳" sub="체류 시간(LEAD 윈도우) 누적" onClick={() => nav('/history')} />
+    </div>
+  );
+}
+
+// 홈 expanded — 4탭 + 자주 가는 sub-page 모음
+function ExpandedHome() {
+  const nav = useMenuNav();
+  return (
+    <div className="px-4 py-3 space-y-1.5">
+      <div className="text-[10px] text-zinc-500 px-1 tracking-wide uppercase font-semibold mb-1">
+        섹션 바로가기
+      </div>
+      <MenuItem icon="🚗" label="주행 분석" sub="KPI · 인사이트 · 패턴 · TOP 50" onClick={() => nav('/drives')} />
+      <MenuItem icon="🗺️" label="이력" sub="일자별 · 지도 · 자주 가는 곳" onClick={() => nav('/history')} />
+      <MenuItem icon="🔋" label="배터리" sub="건강도 · 대기 소모 · 충전 기록" onClick={() => nav('/battery')} />
+      <MenuItem icon="⚡" label="집 충전소" sub="실시간 + 통계 + 리포트" onClick={() => nav('/chargers')} />
+
+      <div className="text-[10px] text-zinc-500 px-1 tracking-wide uppercase font-semibold mt-3 mb-1">
+        부가
+      </div>
+      <MenuItem icon="📊" label="활용도 리포트" sub="월별 점유율 · 시간×요일" onClick={() => nav('/chargers/report')} />
+      <MenuItem icon="🔧" label="폴링 로그" sub="시간별 / 일별 폴링 성공률" onClick={() => nav('/chargers/poll-log')} />
     </div>
   );
 }
@@ -343,6 +399,7 @@ function ExpandedChargers() {
 }
 
 const EXPANDED = {
+  home: ExpandedHome,
   drives: ExpandedDrives,
   history: ExpandedHistory,
   battery: ExpandedBattery,

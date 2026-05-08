@@ -7,6 +7,16 @@ import { usePeekSheet } from './PeekSheet';
 
 const tabs = [
   {
+    href: '/home',
+    id: 'home',
+    label: '홈',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3v-7h6v7h3a1 1 0 001-1V10" />
+      </svg>
+    ),
+  },
+  {
     href: '/drives',
     id: 'drives',
     label: '주행',
@@ -54,6 +64,11 @@ const tabs = [
 // quick-status 응답에서 탭별 짧은 라이브 메트릭 추출
 function tabMetric(tabId, data) {
   if (!data) return null;
+  if (tabId === 'home') {
+    // 5탭 홈은 자체 메트릭 대신 각 탭 한눈 조합 — 너무 길면 잘리니 짧게
+    const b = data.battery;
+    return b?.soc != null ? `${b.soc}%${b.charging ? ' ⚡' : ''}` : null;
+  }
   if (tabId === 'drives') {
     const km = data.drives?.today_km;
     if (km == null) return null;
