@@ -216,7 +216,77 @@ export async function POST(req) {
       for (const r of recipients) await notifyChat(r, text);
       return Response.json({ ok: true, sent: recipients.length });
     }
+    case 'test_notify': {
+      const kind = String(body.kind || '').trim();
+      const sample = TEST_SAMPLES[kind];
+      if (!sample) return bad('unknown kind');
+      // root 사용자에게만 발송 — 가족 broadcast 방지.
+      const r = await pool.query("SELECT chat_id::text FROM hub_users WHERE role='root'");
+      const recipients = r.rows.map((x) => x.chat_id);
+      if (!recipients.length && process.env.TELEGRAM_CHAT_ID) {
+        recipients.push(String(process.env.TELEGRAM_CHAT_ID));
+      }
+      for (const c of recipients) await notifyChat(c, sample);
+      return Response.json({ ok: true, sent: recipients.length, kind });
+    }
     default:
       return bad('unknown action');
   }
 }
+
+// poller.js / digest.js 가 실제 렌더하는 포맷과 1:1 일치해야 의미 있음.
+// 포맷 변경 시 여기도 동기화.
+const TEST_SAMPLES = {
+  charge_start: '⚡ <b>충전 시작</b> 25% · 📍 집',
+
+  charge_end_slow_full:
+    '✅ 30→100% (+70%p, 41.20kWh, 274km)\n' +
+    '🔌 완속 📍 집\n' +
+    '⏱️ 6h 5m · 📈 6.8kW',
+
+  charge_end_fast_quick:
+    '✅ 35→78% (+43%p, 25.30kWh, 168km)\n' +
+    '⚡ 급속 📍 강남 슈퍼차저\n' +
+    '⏱️ 25m · 📈 60.7kW',
+
+  charge_end_topup:
+    '✅ 65→72% (+7%p, 4.20kWh, 28km)\n' +
+    '🔌 완속 📍 집\n' +
+    '⏱️ 35m · 📈 7.2kW',
+
+  charge_end_zero:
+    '✅ 80→80% (+0%p)\n' +
+    '🔌 완속 📍 집\n' +
+    '⏱️ 2m',
+
+  drive_end:
+    '🚗 집 → 회사\n' +
+    '🛣️ 28.4km · ⏱️ 42m\n' +
+    '⚡ 138Wh/km · 7.2km/kWh',
+
+  drive_end_long:
+    '🚗 부산 → 서울\n' +
+    '🛣️ 350.5km · ⏱️ 4h 12m\n' +
+    '⚡ 145Wh/km · 6.9km/kWh',
+
+  daily_digest:
+    '📊 <b>어제 요약</b> (2026-05-07)\n' +
+    '🚗 3회 · 🛣️ 87.4km · ⏱️ 2h 15m\n' +
+    '⚡ 138Wh/km · 7.2km/kWh\n' +
+    '🔋 1회 · ⚡ +18.5kWh',
+
+  weekly_digest:
+    '📅 <b>지난 주 요약</b>\n' +
+    '🚗 14회 · 🛣️ 412.3km · ⏱️ 11h\n' +
+    '⚡ 142Wh/km · 7.0km/kWh\n' +
+    '🔋 4회 · ⚡ +120.0kWh',
+
+  monday_merge:
+    '📊 <b>어제 요약</b> (2026-05-10)\n' +
+    '🚗 1회 · 🛣️ 22.1km · ⏱️ 35m\n' +
+    '⚡ 132Wh/km · 7.6km/kWh\n\n' +
+    '📅 <b>지난 주 요약</b>\n' +
+    '🚗 14회 · 🛣️ 412.3km · ⏱️ 11h\n' +
+    '⚡ 142Wh/km · 7.0km/kWh\n' +
+    '🔋 4회 · ⚡ +120.0kWh',
+};
