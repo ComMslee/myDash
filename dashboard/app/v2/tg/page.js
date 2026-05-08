@@ -787,7 +787,30 @@ function GuidePane() {
       </div>
 
       <div>
-        <div className="font-medium mb-1">6. 응답 후속 액션</div>
+        <div className="font-medium mb-1">6. 🔔 자동 알림 — 차량 이벤트 push</div>
+        <div className="text-zinc-400 text-[11px] space-y-1">
+          <div>차량/요약 이벤트 발생 시 <b>car 권한자 전원</b>에 자동 발송 (poller 5초 간격 폴링).</div>
+          <ul className="list-disc list-inside space-y-0.5 ml-1">
+            <li><b>⚡ 충전 시작</b> — SOC + 위치</li>
+            <li><b>✅ 충전 완료</b> — SOC델타·kWh·환산km / ⚡급속·🔌완속 / ⏱️시간·📈평균kW · 위치</li>
+            <li><b>🚗 주행 종료</b> — 시작→끝 / km · 시간 / Wh/km · km/kWh</li>
+            <li><b>📊 일일 요약</b> — 매일 <b>09:00 KST</b> (전날치)</li>
+            <li><b>📅 주간 요약</b> — 매주 <b>월 09:00 KST</b> (지난 주). 월요일은 일일+주간 한 메시지로 머지</li>
+          </ul>
+          <div className="mt-1">
+            <b>야간 매너모드</b>: 23~06시 KST 알림은 <code className="text-blue-300">disable_notification</code> 자동 적용 — 메시지는 도착하지만 소리/진동 OFF.
+          </div>
+          <div>
+            <b>인라인 버튼</b> (env <code className="text-blue-300">DASHBOARD_PUBLIC_URL</code> 설정 시): 주행 종료 → 🗺️ 지도 보기, 충전 완료 → 🔋 배터리 상세.
+          </div>
+          <div className="text-zinc-500">
+            "알림" 탭의 <b>🧪 알림 포맷 테스트</b> 에서 10종 샘플 발송 가능 (root 한정).
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div className="font-medium mb-1">7. 응답 후속 액션</div>
         <div className="text-zinc-400 text-[11px]">
           데이터 명령 응답 끝에 inline 버튼 자동 동봉:
           <span className="ml-1 px-1.5 py-0.5 bg-zinc-800 rounded">🔄</span> (새로고침),
@@ -797,7 +820,7 @@ function GuidePane() {
       </div>
 
       <div>
-        <div className="font-medium mb-1">7. 공통 명령 (누구나)</div>
+        <div className="font-medium mb-1">8. 공통 명령 (누구나)</div>
         <ul className="text-zinc-400 list-disc list-inside space-y-0.5">
           <li><code className="text-blue-300">/help</code> — 본인 권한 기준 도움말 + Reply 키보드</li>
           <li><code className="text-blue-300">/whoami</code> — 이름·역할·권한 (root 만 chat_id)</li>
@@ -806,7 +829,7 @@ function GuidePane() {
       </div>
 
       <div>
-        <div className="font-medium mb-1">8. 자연어 — 미지원</div>
+        <div className="font-medium mb-1">9. 자연어 — 미지원</div>
         <div className="text-zinc-400 text-[11px]">
           정규식 기반 자연어 매칭은 정확도 부족으로 제거. 슬래시 명령 또는 키보드 버튼만 동작.
           잘못된 입력은 친근한 안내로 폴백 + 학습 로그(<code className="text-blue-300">hub_unmatched_inputs</code>) 적재.
@@ -814,7 +837,7 @@ function GuidePane() {
       </div>
 
       <div>
-        <div className="font-medium mb-1">9. 활용도 리포트 (대시보드)</div>
+        <div className="font-medium mb-1">10. 활용도 리포트 (대시보드)</div>
         <div className="text-zinc-400 text-[11px]">
           <code className="text-blue-300">/v2/chargers</code> 하단의 라이브 패널 — 단지 충전기 활용도 한 화면 요약 (외부 근거자료용). KPI · 주별 추이 · 동별 가동률.
         </div>
