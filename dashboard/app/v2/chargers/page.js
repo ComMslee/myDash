@@ -197,14 +197,16 @@ export default function V2ChargersPage() {
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white">
       <div className="max-w-2xl mx-auto px-4 py-5 pb-24 flex flex-col gap-5">
-        {/* 집충전기 실시간 현황 (P1/그 외 + 상태 배지) */}
-        <HomeChargerCard showFavLabel />
-
-        {/* 집충전기 누적 사용 — Top 10 + 시간×요일 히트맵 (구 팝업 → 패널) */}
-        <FleetStatsPanel />
-
-        {/* 활용도 리포트 — 외부 근거자료용 라이브 패널 (KPI + 월별 추이 + 시간대×요일) */}
-        <ReportPanel />
+        {/* PeekSheet 메뉴에서 '#live'/'#fleet'/'#report' 로 직접 점프. */}
+        <section id="live" className="scroll-mt-16">
+          <HomeChargerCard showFavLabel />
+        </section>
+        <section id="fleet" className="scroll-mt-16">
+          <FleetStatsPanel />
+        </section>
+        <section id="report" className="scroll-mt-16">
+          <ReportPanel />
+        </section>
       </div>
     </main>
   );

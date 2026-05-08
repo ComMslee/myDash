@@ -44,12 +44,25 @@ export default function V2BatteryPage() {
           </div>
         ) : data ? (
           <>
-            <HealthScoreCard data={data.health} trend={trend} />
-            <IdleDrainCard records={data.idle_drain} chargingSessions={data.charging_sessions} />
-            <MonthlyChargeCard />
-            <ChargeHeatmap />
-            <FastChargeCard />
-            <SlowChargeCard />
+            {/* PeekSheet 메뉴에서 '#health' 등으로 직접 점프. scroll-mt 는 sticky 헤더 보정. */}
+            <section id="health" className="scroll-mt-16">
+              <HealthScoreCard data={data.health} trend={trend} />
+            </section>
+            <section id="idle" className="scroll-mt-16">
+              <IdleDrainCard records={data.idle_drain} chargingSessions={data.charging_sessions} />
+            </section>
+            <section id="monthly" className="scroll-mt-16">
+              <MonthlyChargeCard />
+            </section>
+            <section id="heatmap" className="scroll-mt-16">
+              <ChargeHeatmap />
+            </section>
+            <section id="fast" className="scroll-mt-16">
+              <FastChargeCard />
+            </section>
+            <section id="slow" className="scroll-mt-16">
+              <SlowChargeCard />
+            </section>
           </>
         ) : null}
       </div>

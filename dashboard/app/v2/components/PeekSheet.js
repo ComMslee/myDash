@@ -1,8 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { usePathname } from 'next/navigation';
-import PollLogBody from '../battery/home-charger/poll-log/PollLogBody';
+import { usePathname, useRouter } from 'next/navigation';
 
 // ── Context ─────────────────────────────────────────────────
 const PeekSheetContext = createContext(null);
@@ -272,50 +271,75 @@ function ExpandedHistory({ data, accent }) {
   );
 }
 
-function ExpandedBattery({ data, accent }) {
-  const d = data?.battery;
+// 메뉴 아이템 — 페이지 내 #앵커 또는 sub-route 로 점프 + peek 닫기
+function MenuItem({ icon, label, sub, onClick }) {
   return (
-    <div className="px-4 py-3 space-y-3">
-      <div className="bg-[#0f0f0f] border border-white/[0.06] rounded-lg p-3">
-        <div className="flex items-center gap-3">
-          <SocRing accent={accent} value={d?.soc} size={96} />
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] text-zinc-500 uppercase tracking-wide">현재 상태</div>
-            <div className="flex items-center gap-1.5 mt-1">
-              {d?.charging && (
-                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: accent }} />
-              )}
-              <span className="text-[12px] text-zinc-200 font-semibold">
-                {d?.charging ? '충전 중' : '충전 안 함'}
-              </span>
-            </div>
-            {d?.charging ? (
-              <>
-                <div className="text-[22px] font-bold tabular-nums mt-0.5" style={{ color: accent }}>
-                  {d.charger_power_kw != null ? d.charger_power_kw.toFixed(1) : '—'}
-                  <span className="text-[11px] text-zinc-500 ml-1">kW</span>
-                </div>
-                <div className="text-[10px] text-zinc-500 mt-0.5">
-                  세션 +{(d.charge_added_kwh || 0).toFixed(2)} kWh
-                </div>
-              </>
-            ) : (
-              <div className="text-[10px] text-zinc-500 mt-1">
-                {d?.last_position_at ? `${relTime(d.last_position_at)} 갱신` : '—'}
-              </div>
-            )}
-          </div>
-        </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-center gap-3 bg-[#0f0f0f] border border-white/[0.06] rounded-lg px-3 py-2.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors"
+    >
+      <span className="text-[18px] leading-none shrink-0" aria-hidden>{icon}</span>
+      <div className="flex-1 min-w-0 text-left">
+        <div className="text-[13px] font-semibold text-zinc-200">{label}</div>
+        {sub && <div className="text-[10px] text-zinc-500 mt-0.5 truncate">{sub}</div>}
       </div>
-      <div className="bg-[#0f0f0f] border border-white/[0.06] rounded-lg p-4 text-center">
-        <div className="text-[11px] text-zinc-500">건강도 · SOC 분포 · 충전 추이는 페이지 본문</div>
+      <span className="text-zinc-600 text-base shrink-0">›</span>
+    </button>
+  );
+}
+
+// 같은 페이지 #앵커면 스크롤, 다른 페이지면 router.push
+function useMenuNav() {
+  const { close } = usePeekSheet();
+  const router = useRouter();
+  const pathname = usePathname();
+  return (target) => {
+    close();
+    const [path, hash] = target.split('#');
+    const samePage = !path || path === pathname;
+    if (samePage && hash) {
+      // close 애니메이션(320ms) 끝나기 전 스크롤하면 부드럽게 보임
+      requestAnimationFrame(() => {
+        document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    } else if (path) {
+      router.push(target);
+    }
+  };
+}
+
+// Expanded — 현재 상태 요약은 cover 가 이미 표시하므로 메뉴만.
+function ExpandedBattery() {
+  const nav = useMenuNav();
+  return (
+    <div className="px-4 py-3 space-y-1.5">
+      <div className="text-[10px] text-zinc-500 px-1 tracking-wide uppercase font-semibold mb-1">
+        자세히 보기
       </div>
+      <MenuItem icon="🩺" label="배터리 건강도" sub="점수·등급 · SOC 분포 · 용량 추이" onClick={() => nav('/battery#health')} />
+      <MenuItem icon="🌡️" label="대기 소모" sub="주차 중 SOC 감소 24h 타임라인" onClick={() => nav('/battery#idle')} />
+      <MenuItem icon="📅" label="월간 충전" sub="집/외부·완/급속 비율 + 시간×요일" onClick={() => nav('/battery#monthly')} />
+      <MenuItem icon="📊" label="시간대 히트맵" sub="시간×요일 충전 패턴" onClick={() => nav('/battery#heatmap')} />
+      <MenuItem icon="⚡" label="급속 충전 기록" sub="DC · 슈퍼차저 세션" onClick={() => nav('/battery#fast')} />
+      <MenuItem icon="🔌" label="완속 충전 기록" sub="집 · AC 세션" onClick={() => nav('/battery#slow')} />
     </div>
   );
 }
 
 function ExpandedChargers() {
-  return <PollLogBody />;
+  const nav = useMenuNav();
+  return (
+    <div className="px-4 py-3 space-y-1.5">
+      <div className="text-[10px] text-zinc-500 px-1 tracking-wide uppercase font-semibold mb-1">
+        자세히 보기
+      </div>
+      <MenuItem icon="🗺️" label="실시간 충전기" sub="단지별 그리드 + 사용 카운트" onClick={() => nav('/chargers#live')} />
+      <MenuItem icon="📈" label="단지 통계" sub="TOP 15 사용량 + 시간×요일 히트맵" onClick={() => nav('/chargers#fleet')} />
+      <MenuItem icon="📊" label="활용도 리포트" sub="KPI · 월별 추이 · 동별 점유율" onClick={() => nav('/chargers/report')} />
+      <MenuItem icon="🔧" label="폴링 로그" sub="시간별 / 일별 성공률 · 히트맵 · 표" onClick={() => nav('/chargers/poll-log')} />
+    </div>
+  );
 }
 
 const EXPANDED = {
