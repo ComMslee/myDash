@@ -143,7 +143,7 @@ export function HourDowHeatmap({ data, hexColor = '#3b82f6' }) {
         <div
           key={d}
           className="grid items-center"
-          style={{ gridTemplateColumns: '18px repeat(24, 1fr)', gap: '1px', marginBottom: '1px' }}
+          style={{ gridTemplateColumns: '18px repeat(6, 0.5fr) repeat(18, 1fr)', gap: '1px', marginBottom: '1px' }}
         >
           <div className="text-[9px] text-zinc-500 text-center">{lab}</div>
           {data[d].map((v, h) => (
@@ -156,8 +156,16 @@ export function HourDowHeatmap({ data, hexColor = '#3b82f6' }) {
           ))}
         </div>
       ))}
-      <div className="flex justify-between text-[9px] text-zinc-500 tabular-nums mt-1" style={{ paddingLeft: '18px' }}>
-        <span className="font-semibold">0시</span><span>6</span><span>12</span><span>18</span><span>23시</span>
+      <div
+        className="grid text-[9px] text-zinc-500 tabular-nums mt-1"
+        style={{ gridTemplateColumns: '18px repeat(6, 0.5fr) repeat(18, 1fr)', gap: '1px' }}
+      >
+        <div />
+        <div className="font-semibold" style={{ gridColumn: 2 }}>0시</div>
+        <div style={{ gridColumn: 8 }}>6</div>
+        <div style={{ gridColumn: 14 }}>12</div>
+        <div style={{ gridColumn: 20 }}>18</div>
+        <div className="text-right" style={{ gridColumn: 25 }}>23시</div>
       </div>
       {peakVal > 0 && (
         <div className="flex flex-wrap items-center gap-x-2 mt-1.5 text-[10px] text-zinc-500 tabular-nums">
