@@ -51,6 +51,7 @@ function SocRing({ accent, value, size = 110 }) {
 }
 
 // 4탭 진입용 큰 타일 (홈 화면 그리드 — 4개 영역)
+// value 가 비어있으면 그 자리는   로 채워 grid 높이 통일
 function Tile({ href, accent, label, icon, value, sub }) {
   return (
     <Link
@@ -63,7 +64,7 @@ function Tile({ href, accent, label, icon, value, sub }) {
         <span className="text-[11px] font-bold tracking-wider uppercase" style={{ color: accent }}>{label}</span>
       </div>
       <div className="mt-2.5 text-[20px] font-bold text-zinc-100 tabular-nums leading-none truncate">
-        {value}
+        {value || ' '}
       </div>
       <div className="text-[11px] text-zinc-500 mt-1.5 truncate">{sub}</div>
     </Link>
@@ -229,41 +230,7 @@ export default function HomePage() {
           </Link>
         )}
 
-        {/* 집 충전소 상태 */}
-        <Link
-          href="/chargers#live"
-          className="block bg-[#161618] border border-white/[0.06] rounded-2xl p-3.5 hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors"
-          style={{ borderLeft: '2px solid #fbbf24' }}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="relative shrink-0">
-                <div className="w-3 h-3 rounded-full" style={{ background: '#fbbf24' }} />
-                {chargers?.is_fresh && (
-                  <div className="absolute inset-0 w-3 h-3 rounded-full animate-ping" style={{ background: '#fbbf24', opacity: 0.5 }} />
-                )}
-              </div>
-              <div>
-                <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">집 충전소</div>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-[20px] font-bold text-amber-400 tabular-nums leading-none">
-                    {chargers?.success_rate_today != null ? `${chargers.success_rate_today}%` : '—'}
-                  </span>
-                  <span className="text-[11px] text-zinc-400">
-                    {chargers?.is_fresh ? '폴링 정상' : '폴링 오래됨'}
-                  </span>
-                </div>
-                <div className="text-[11px] text-zinc-500 mt-1 tabular-nums">
-                  TTL {chargers?.ttl_min ?? '—'}분
-                  {chargers?.last_fetched ? ` · ${relTime(chargers.last_fetched)}` : ''}
-                </div>
-              </div>
-            </div>
-            <span className="text-zinc-600 text-base shrink-0">›</span>
-          </div>
-        </Link>
-
-        {/* 4탭 타일 그리드 — 깊은 진입용 */}
+        {/* 4탭 타일 그리드 — 깊은 진입용 (집 충전소 카드는 폴링 진단 정보 위주라 제거) */}
         <div className="grid grid-cols-2 gap-2.5 pt-1">
           <Tile
             href="/drives"
@@ -294,24 +261,20 @@ export default function HomePage() {
             accent="#fbbf24"
             label="집 충전소"
             icon="⚡"
-            value={chargers?.success_rate_today != null ? `${chargers.success_rate_today}%` : '—'}
+            // 폴링 % 는 진단 정보 — 사용자 시야 X. 사용량 stats_count 도 cache 미스 시 0 으로 떠 신뢰성 낮음.
+            // value 비움 + sub 만으로 진입 카드 역할.
+            value=""
             sub="실시간 + 통계 + 리포트"
           />
         </div>
 
-        {/* 부가 sub-page 진입 */}
+        {/* 부가 sub-page 진입 (폴링 로그 칩은 진단 정보라 home 노출 X — /chargers/poll-log URL 직접) */}
         <div className="flex flex-wrap gap-1.5 pt-2">
           <Link
             href="/chargers/report"
             className="text-[11px] px-3 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 border border-white/[0.06] transition-colors"
           >
             📊 활용도 리포트
-          </Link>
-          <Link
-            href="/chargers/poll-log"
-            className="text-[11px] px-3 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 border border-white/[0.06] transition-colors"
-          >
-            🔧 폴링 로그
           </Link>
         </div>
       </div>
