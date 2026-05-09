@@ -63,6 +63,8 @@
 
 **한 정보 = 한 큰 표시소**: 같은 메트릭이 여러 surface 에서 prominent 하게 반복되지 않도록 1차 위치를 정함. 예) SOC 큰 링: home hero ↔ peek battery cover 중 활성 컨텍스트만, BottomNav 의 "78%" 는 작은 보조. 오늘 km: home 주행요약 ↔ peek drives cover 중 활성 컨텍스트만, BottomNav 의 "25.4km" 는 작은 보조. 주의: 충전 중 kW 도 동일 원칙 — cover 에서 큰 표시, expanded 에선 반복 X.
 
+**3탭 BottomNav (홈/주행/배터리) — 활성 탭만 라벨**: 한국 지도 앱(네이버/카카오/T맵) 표준은 항상 라벨 노출이지만 우리는 절충. 활성 탭만 텍스트 라벨로 위치 명시성 확보, 비활성 탭은 SVG 아이콘 + 라이브 메트릭만(컴팩트). 라벨이 동적으로 추가/제거되니 nav 높이가 활성 상태에 따라 달라짐 — `ResizeObserver` 가 `--peek-nav-h` CSS 변수를 자동 갱신해 peek 시트가 흔들림 없이 안착. `이력(/history)` 은 주행 그룹, `집충전소(/chargers, /chargers/*)` 는 배터리 그룹으로 흡수 — `matches` prefix 배열로 sub-page 까지 active 매칭. 홈 탭은 peek 자체가 안 뜸 (`TAB_META.home.peekH = 0` + `PeekSheet` 가 `activeTab === 'home'` 일 때 null 반환).
+
 ## 성능 · 안전성
 
 - **`Math.max(...arr)` / `Math.min(...arr)` 금지** — V8 인자 상한(~65k)으로 긴 배열에서 `RangeError` 발생. `for` 루프로 단일 패스 계산 (예: `RouteSparklines.js::computeStats`, `api/route-map/route.js`의 속도 통계)
