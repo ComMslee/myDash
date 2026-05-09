@@ -91,7 +91,6 @@
 | `/api/car` | cars | — | 없음 |
 | `/api/charges` | charging_processes, geofences | — | 없음 |
 | `/api/summary` | drives, charging_processes | — | 없음 (range=multi 등 봇 `/period` 용) |
-| `/api/v2/quick-status` | drives, charging_processes, charges, positions, addresses, home_charger_poll_log + home-charger-cache 모듈 | — | 없음 (라이브 — PeekSheet 가 60초 폴링) |
 | `/api/parked` | drives, states | — | 없음 (라이브 — 봇 `/where`) |
 | `/api/location` | positions | — | 없음 (라이브 최신 좌표 — 봇 `/where`) |
 | `/api/long-stay-places` | drives, addresses, geofences | — | 없음 (LEAD 윈도우로 dwell 산출) |

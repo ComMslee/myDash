@@ -86,12 +86,10 @@ myDash/
     │   │   └── YearHeatmap.js    # 연간 히트맵 (GitHub 스타일)
     │   ├── v2/                   # v2 앱 (현재 메인)
     │   │   ├── layout.js         # v2 레이아웃 (BottomNavV2 포함)
-    │   │   ├── page.js           # `/v2` → `/home` 리다이렉트
-    │   │   ├── home/page.js      # 홈 탭 (peek 없음) — 차량 hero(SOC 링+상태) + 주행 요약(3 col) + 최근 주행 + 집충전소 카드 + 4탭 타일 그리드 + 부가 칩 (홈화면 스타일)
+    │   │   ├── page.js           # `/v2` → `/v2/drives` 리다이렉트
     │   │   ├── components/
-    │   │   │   ├── BottomNavV2.js    # 하단 탭 (홈/주행/배터리 — 3탭, 라벨 없이 SVG 아이콘+메트릭만) — 이력은 주행에, 집충전소는 배터리에 흡수. 홈 메트릭 없음, 주행=오늘km, 배터리=SOC%
-    │   │   │   ├── RankingsSheet.js  # 랭킹 바텀시트
-    │   │   │   └── PeekSheet.js      # 주행/배터리 2탭에서만 활성화되는 표지(peek) 시트 — Provider/Context + Cover (이력/충전소 흡수 1줄) + Expanded (정보 카드 + 칩 — 클릭 시 페이지 섹션 이동) + 60초 폴링 + 드래그 확장(↑32px)/축소(↓80px). 홈/dev/tg 에선 미렌더.
+    │   │   │   ├── BottomNavV2.js    # 하단 탭 (주행/이력/배터리/집 충전소)
+    │   │   │   └── RankingsSheet.js  # 랭킹 바텀시트
     │   │   ├── drives/
     │   │   │   ├── page.js                   # 주행 분석 — 차량 KPI + 인사이트 + 연간 히트맵 + 패턴 + TOP50 + 연도별 월간
     │   │   │   └── _parts/
@@ -101,7 +99,7 @@ myDash/
     │   │   │       ├── MonthlyHistoryByYear.js # 연도별 월간 통계 막대
     │   │   │       └── SeasonalEffGrid.js    # 계절별 효율 그리드
     │   │   ├── battery/
-    │   │   │   ├── page.js                   # 배터리 — 건강/대기 소모/충전 습관/월간·히트맵/급속·완속 — 섹션 anchor #health/#idle/#monthly/#heatmap/#fast/#slow (PeekSheet 메뉴 점프용)
+    │   │   │   ├── page.js                   # 배터리 — 건강/대기 소모/충전 습관/월간·히트맵/급속·완속
     │   │   │   ├── HealthScoreCard.js        # 점수(등급)·평균 SOC·용량 추이 + SOC 체류 분포
     │   │   │   ├── IdleDrainCard.js          # 대기 소모 24h 타임라인
     │   │   │   ├── useIdleDrainDays.js       # 대기 소모 일자별 데이터 훅
@@ -116,8 +114,7 @@ myDash/
     │   │   │   │   ├── utils.js              # computeRanks, elapsedLabel, buildTtlTooltip 등
     │   │   │   │   ├── ChargerTile.js        # UnifiedCell, TileBox, StatusBadges, MiniGrid
     │   │   │   │   ├── FleetStatsCharts.js   # 집단 통계 차트
-    │   │   │   │   ├── PollLogPopup.js       # 폴링 로그 팝업 (레거시 — 본문은 PollLogBody 재사용, /v2/chargers 는 PeekSheet 가 대체)
-    │   │   │   │   ├── poll-log/PollLogBody.js  # 폴링 로그 본문 — PollLogPopup·PeekSheet 양쪽에서 공유
+    │   │   │   │   ├── PollLogPopup.js       # 폴링 로그 팝업
     │   │   │   │   └── fleet-stats-utils.js  # 통계 집계 유틸
     │   │   │   ├── MonthlyChargeCard.js      # 집/외부·완/급속 비율 + 시간×요일 히트맵 (24열 SOC 시작→종료 띠 동봉)
     │   │   │   ├── ChargeHeatmap.js
@@ -128,10 +125,9 @@ myDash/
     │   │   │   ├── DriveListView.js  # 월 그룹 → 일 카드 (24h 막대 + 🚗/🛣️/🅿️ 메타라인). 일 카드 탭 = onDayClick(dateStr)
     │   │   │   └── useDriveData.js   # drives + dayRoutes/monthRoutes 병렬 fetch (CLAUDE.md DriveMap 함정 5개 상주)
     │   │   ├── chargers/
-    │   │   │   ├── page.js               # 집충전기 실시간 + Top 순위 + 활용도 리포트 인라인 — 섹션 anchor #live/#fleet/#report (PeekSheet 메뉴 점프용)
+    │   │   │   ├── page.js               # 집충전기 실시간 + Top 순위 + 활용도 리포트 인라인
     │   │   │   ├── _parts/ReportPanel.js # 활용도 라이브 리포트 컴포넌트 (KPI · 주별 추이 · 동별)
-    │   │   │   ├── report/page.js        # 활용도 리포트 단독 페이지 (외부 캡처/공유)
-    │   │   │   └── poll-log/page.js      # 폴링 로그 단독 페이지 — PeekSheet 메뉴에서 진입 (PollLogBody 래퍼)
+    │   │   │   └── report/page.js        # 활용도 리포트 단독 페이지 (외부 캡처/공유)
     │   │   ├── tg/page.js            # 텔레그램 봇 관리 (권한·방송·학습로그·가이드)
     │   │   └── dev/                  # 개발/진단 도구 (하단 탭·헤더 미노출, URL 직접)
     │   │       ├── api-status/
@@ -161,7 +157,6 @@ myDash/
     │       ├── home-charger/groups/route.js       # 동별 그룹 카운트 (constants.js 매핑) — 봇 /chargers
     │       ├── home-charger/report/route.js       # 활용도 리포트 (KPI·주별·동별) — /v2/chargers/report 페이지
     │       ├── home-charger/poll-log/route.js     # 폴링 로그 조회
-    │       ├── v2/quick-status/route.js           # 4탭(주행·이력·배터리·집충전소) 표지/내비용 라이브 메트릭 통합 — PeekSheet 가 60초 폴링
     │       ├── summary/route.js                   # drives+charges 일자 집계 (range=multi 등) — 봇 /period
     │       ├── parked/route.js                    # 마지막 주차/주행중 — 봇 /where
     │       ├── location/route.js                  # 최신 좌표 — 봇 /where
@@ -185,14 +180,12 @@ myDash/
 
 | 경로 | 설명 | 하단 탭 |
 |------|------|---------|
-| `/` | `/home`으로 리다이렉트 | — |
-| `/home` (`/v2/home`) | 4영역 요약 카드 (주행·이력·배터리·집충전소) — quick-status 60초 폴링 | 🏠 홈 |
-| `/v2/drives` | 차량 KPI · 인사이트 · 연간 히트맵 · 시간×요일 패턴 · TOP50 · 연도별 월간/계절 효율 (섹션 anchor #kpi/#insights/#year/#patterns/#records/#monthly/#seasonal) | 🚗 주행 |
-| `/v2/history` | 일 카드 리스트 → 일 상세(지도 + 그날 주행 strip 하이라이트) / 월 합계(monthMode) | 🚗 주행(흡수) |
-| `/v2/battery` | 건강 점수 + 대기 소모 + 충전 습관 + 월간 충전 + 히트맵 + 급속/완속 기록 | 🔋 배터리 |
-| `/v2/chargers` | 집충전기 실시간 + Top 순위 + 활용도 리포트 (인라인) | 🔋 배터리(흡수) |
+| `/` | `/v2/drives`로 리다이렉트 | — |
+| `/v2/drives` | 차량 KPI · 인사이트 · 연간 히트맵 · 시간×요일 패턴 · TOP50 · 연도별 월간/계절 효율 | 주행 |
+| `/v2/battery` | 건강 점수 + 대기 소모 + 충전 습관 + 월간 충전 + 히트맵 + 급속/완속 기록 | 배터리 |
+| `/v2/history` | 일 카드 리스트 → 일 상세(지도 + 그날 주행 strip 하이라이트) / 월 합계(monthMode) | 이력 |
+| `/v2/chargers` | 집충전기 실시간 + Top 순위 + 활용도 리포트 (인라인) | 집 충전소 |
 | `/v2/chargers/report` | 활용도 리포트 단독 페이지 (외부 캡처/공유) | — (URL 직접) |
-| `/v2/chargers/poll-log` | 폴링 로그 단독 페이지 — PeekSheet 의 집충전소 expanded 메뉴에서 진입 | — (URL 직접) |
 | `/v2/tg` | 텔레그램 봇 관리 (권한 · 방송 · 학습로그 · 가이드) | — (URL 직접) |
 | `/v2/dev/api-status` | API 가용성 + 서버/진단 (개발자용, URL 직접) | — (헤더·탭 미노출) |
 | `/v2/dev/auth` | 로그인 PIN 변경 (헤더 우측 ⚙️ 시트에서 진입) | — (헤더·탭 미노출) |

@@ -89,67 +89,57 @@ export default function V2DrivesPage() {
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white">
       <div className="max-w-2xl mx-auto px-4 py-5 pb-24 space-y-5">
-        {/* PeekSheet 메뉴에서 #kpi/#insights/#year/#patterns/#records/#monthly/#seasonal 직접 점프 */}
-        <section id="kpi" className="scroll-mt-16">
-          {loading.car || loading.insights || loading.drives ? <Spinner /> : (
-            <VehicleKpiCard car={car} insights={insights} drives={drives} />
-          )}
-        </section>
 
-        {!loading.insights && (
-          <section id="insights" className="scroll-mt-16">
-            <MonthInsightsCard insights={insights} />
-          </section>
+        {/* 1. 차량 요약 — 누적·효율 + 기간별 통계 */}
+        {loading.car || loading.insights || loading.drives ? <Spinner /> : (
+          <VehicleKpiCard car={car} insights={insights} drives={drives} />
         )}
 
-        <section id="year" className="scroll-mt-16">
-          <YearHeatmap
-            data={yearHeatmap}
-            loading={loading.heatmap}
-            title=""
-            metric="km"
-            color="#3b82f6"
-            legendLabel="주행"
-            latestLeft
-          />
-        </section>
+        {/* 2. 이번달 인사이트 */}
+        {!loading.insights && <MonthInsightsCard insights={insights} />}
 
+        {/* 4. 연간 히트맵 */}
+        <YearHeatmap
+          data={yearHeatmap}
+          loading={loading.heatmap}
+          title=""
+          metric="km"
+          color="#3b82f6"
+          legendLabel="주행"
+          latestLeft
+        />
+
+        {/* 5. 주행 패턴 — 시간×요일 히트맵 */}
         {insights?.hour_dow && (
-          <section id="patterns" className="scroll-mt-16 bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
+          <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
             <div className="px-3 py-2 border-b border-white/[0.06]">
               <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">주행 패턴</span>
             </div>
             <div className="px-4 pt-4 pb-4">
               <HourDowHeatmap data={insights.hour_dow} hexColor="#3b82f6" />
             </div>
-          </section>
+          </div>
         )}
 
-        {!loading.insights && (
-          <section id="records" className="scroll-mt-16">
-            <RecordsCardV2 allTime={insights?.allTime} />
-          </section>
-        )}
+        {/* 6. TOP 50 기록 (랭킹 시트) */}
+        {!loading.insights && <RecordsCardV2 allTime={insights?.allTime} />}
 
+        {/* 7. 연도별 월간 통계 + 계절별 효율 */}
         {loading.history ? <Spinner /> : months.length === 0 ? (
           <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-6 text-center text-zinc-600 text-xs">
             데이터가 없습니다
           </div>
         ) : (
           <>
-            <section id="monthly" className="scroll-mt-16">
-              <MonthlyHistoryByYear
-                years={years}
-                byYear={byYear}
-                yearTotals={yearTotals}
-                driveDaysByYear={driveDaysByYear}
-                curYear={curYear}
-                maxDist={maxDist}
-              />
-            </section>
-            <section id="seasonal" className="scroll-mt-16">
-              <SeasonalEffGrid seasonalEff={seasonalEff} />
-            </section>
+            <MonthlyHistoryByYear
+              years={years}
+              byYear={byYear}
+              yearTotals={yearTotals}
+              driveDaysByYear={driveDaysByYear}
+              curYear={curYear}
+              maxDist={maxDist}
+            />
+            <SeasonalEffGrid seasonalEff={seasonalEff} />
           </>
         )}
       </div>
