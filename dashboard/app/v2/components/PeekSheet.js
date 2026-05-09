@@ -29,8 +29,8 @@ const TAB_META = {
     label: '주행', accent: '#34d399', accentSoft: 'rgba(52,211,153,0.10)', peekH: 108,
   },
   battery: {
-    // 배터리 + 집 충전소 흡수 — peek 에 폴링 상태 1줄 포함. peekH = SOC 링 76 + 흡수 행 + 패딩.
-    label: '배터리', accent: '#60a5fa', accentSoft: 'rgba(96,165,250,0.10)', peekH: 138,
+    // 배터리 — SOC 링 + 충전 정보. 폴링은 사용자 시야에서 demote.
+    label: '배터리', accent: '#60a5fa', accentSoft: 'rgba(96,165,250,0.10)', peekH: 108,
   },
 };
 
@@ -127,56 +127,35 @@ function CoverDrives({ data, accent }) {
   );
 }
 
-// 배터리 cover — SOC + 충전 + 충전소 폴링 1줄 (충전소 흡수)
+// 배터리 cover — SOC + 충전 정보. (폴링은 진단 정보라 사용자 시야 노출 X)
 function CoverBattery({ data, accent }) {
   const d = data?.battery;
-  const c = data?.chargers;
-  const fresh = !!c?.is_fresh;
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-3">
-        <SocRing accent={accent} value={d?.soc} size={76} />
-        <div className="flex-1 min-w-0">
-          {d?.charging ? (
-            <>
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: accent }} />
-                <span className="text-[10px] text-zinc-400">충전 중</span>
-              </div>
-              <div className="text-[20px] font-bold tabular-nums leading-none mt-0.5" style={{ color: accent }}>
-                {d.charger_power_kw != null ? d.charger_power_kw.toFixed(1) : '—'}
-                <span className="text-[11px] text-zinc-500 ml-0.5">kW</span>
-              </div>
-              <div className="text-[10px] text-zinc-500 mt-1">
-                세션 +{(d.charge_added_kwh || 0).toFixed(1)} kWh
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="text-[10px] text-zinc-400">충전 안 함</div>
-              <div className="text-[10px] text-zinc-500 mt-1">
-                {d?.last_position_at ? `${relTime(d.last_position_at)} 갱신` : '데이터 없음'}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-      {/* 충전소 흡수 — 폴링 상태 1줄 */}
-      <div className="flex items-center gap-2 pt-2 border-t border-white/[0.06] min-w-0">
-        <span className="text-[10px] text-zinc-500 shrink-0">충전소</span>
-        {fresh && (
-          <span className="relative w-2 h-2 shrink-0">
-            <span className="absolute inset-0 rounded-full" style={{ background: '#fbbf24' }} />
-            <span className="absolute inset-0 rounded-full animate-ping" style={{ background: '#fbbf24', opacity: 0.5 }} />
-          </span>
+    <div className="flex items-center gap-3">
+      <SocRing accent={accent} value={d?.soc} size={76} />
+      <div className="flex-1 min-w-0">
+        {d?.charging ? (
+          <>
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: accent }} />
+              <span className="text-[10px] text-zinc-400">충전 중</span>
+            </div>
+            <div className="text-[20px] font-bold tabular-nums leading-none mt-0.5" style={{ color: accent }}>
+              {d.charger_power_kw != null ? d.charger_power_kw.toFixed(1) : '—'}
+              <span className="text-[11px] text-zinc-500 ml-0.5">kW</span>
+            </div>
+            <div className="text-[10px] text-zinc-500 mt-1">
+              세션 +{(d.charge_added_kwh || 0).toFixed(1)} kWh
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-[10px] text-zinc-400">충전 안 함</div>
+            <div className="text-[10px] text-zinc-500 mt-1">
+              {d?.last_position_at ? `${relTime(d.last_position_at)} 갱신` : '데이터 없음'}
+            </div>
+          </>
         )}
-        <span className="text-[12px] font-semibold tabular-nums" style={{ color: '#fbbf24' }}>
-          {c?.success_rate_today != null ? `${c.success_rate_today}%` : '—'}
-        </span>
-        <span className="text-[10px] text-zinc-500 truncate">
-          {c?.is_fresh ? '폴링 정상' : '폴링 오래됨'}
-          {c?.ttl_min != null ? ` · TTL ${c.ttl_min}분` : ''}
-        </span>
       </div>
     </div>
   );
@@ -236,51 +215,29 @@ function useMenuNav() {
   };
 }
 
-// 주행 expanded — 정보 카드 + 칩 (단순 메뉴 X)
+// 주행 expanded — 'cover 에 없는 정보' + 칩만.
+// (오늘 주행/최근 출발→도착 = cover 가 이미 표시 → 중복 제거)
 function ExpandedDrives({ data }) {
   const nav = useMenuNav();
-  const d = data?.drives;
   const h = data?.history;
-  const lat = h?.latest;
   const accent = '#34d399';
 
   return (
-    <div className="px-4 py-3 space-y-2.5">
-      {/* 오늘 주행 큰 카드 */}
-      <InfoCard onClick={() => nav('/drives#kpi')} accent={accent}>
-        <div className="flex items-baseline justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">오늘 주행</div>
-            <div className="flex items-baseline gap-1 mt-1">
-              <span className="text-[28px] font-bold tabular-nums leading-none" style={{ color: accent }}>
-                {d ? d.today_km.toFixed(1) : '—'}
-              </span>
-              <span className="text-sm text-zinc-400">km</span>
-            </div>
-            <div className="text-[11px] text-zinc-500 mt-1.5">
-              {d?.today_count
-                ? `${d.today_count}회 · ${formatDur(d.today_duration_min)}`
-                : '오늘 주행 없음'}
-            </div>
-          </div>
-          <span className="text-zinc-600 text-base shrink-0 self-center">›</span>
-        </div>
-      </InfoCard>
-
-      {/* 이번 주 인사이트 카드 */}
+    <div className="px-4 py-3 space-y-3">
+      {/* 이번 주 인사이트 — cover 에 없는 정보 */}
       <InfoCard onClick={() => nav('/drives#insights')} accent={accent}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-5">
             <div>
               <div className="text-[9px] text-zinc-500 uppercase tracking-wide">이번 주</div>
-              <div className="text-[16px] font-bold text-zinc-100 tabular-nums leading-none mt-0.5">
+              <div className="text-[20px] font-bold text-zinc-100 tabular-nums leading-none mt-1">
                 {h?.week_count ?? 0}<span className="text-[10px] text-zinc-500 ml-0.5">건</span>
               </div>
             </div>
-            <div className="w-px h-8 bg-white/[0.06]" />
+            <div className="w-px h-9 bg-white/[0.06]" />
             <div>
               <div className="text-[9px] text-zinc-500 uppercase tracking-wide">거리</div>
-              <div className="text-[16px] font-bold text-zinc-100 tabular-nums leading-none mt-0.5">
+              <div className="text-[20px] font-bold text-zinc-100 tabular-nums leading-none mt-1">
                 {(h?.week_km ?? 0).toFixed(1)}<span className="text-[10px] text-zinc-500 ml-0.5">km</span>
               </div>
             </div>
@@ -289,141 +246,59 @@ function ExpandedDrives({ data }) {
         </div>
       </InfoCard>
 
-      {/* 최근 주행 (이력) 카드 */}
-      {lat && (
-        <InfoCard onClick={() => nav('/history')} accent="#a78bfa">
-          <div className="flex items-baseline justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <div className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold flex items-center gap-1">
-                🗺️ 최근 주행
-              </div>
-              <div className="text-[14px] font-bold text-zinc-100 mt-0.5 truncate">
-                {shortAddr(lat.start_addr)} → {shortAddr(lat.end_addr)}
-              </div>
-              <div className="text-[11px] text-zinc-500 mt-1 tabular-nums truncate">
-                {lat.distance.toFixed(1)}km · {formatDur(lat.duration_min)} · {relTime(lat.start)}
-              </div>
-            </div>
-            <span className="text-zinc-600 text-base shrink-0">›</span>
-          </div>
-        </InfoCard>
-      )}
-
-      {/* 더보기 칩 — 세부 페이지 섹션으로 점프 */}
-      <div className="pt-1">
-        <div className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold mb-2 px-1">
-          분석 / 이력 더보기
-        </div>
+      {/* 분석 칩 */}
+      <section>
+        <div className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold mb-2 px-1">분석</div>
         <div className="flex flex-wrap gap-1.5">
-          <ChipBtn onClick={() => nav('/drives#year')}>📅 연간 히트맵</ChipBtn>
-          <ChipBtn onClick={() => nav('/drives#patterns')}>📊 시간×요일</ChipBtn>
+          <ChipBtn onClick={() => nav('/drives#kpi')}>🚗 차량 KPI</ChipBtn>
+          <ChipBtn onClick={() => nav('/drives#year')}>📅 연간</ChipBtn>
+          <ChipBtn onClick={() => nav('/drives#patterns')}>📊 패턴</ChipBtn>
           <ChipBtn onClick={() => nav('/drives#records')}>🏆 TOP 50</ChipBtn>
           <ChipBtn onClick={() => nav('/drives#monthly')}>📆 월간</ChipBtn>
-          <ChipBtn onClick={() => nav('/drives#seasonal')}>🌡️ 계절별</ChipBtn>
-          <ChipBtn onClick={() => nav('/history')}>📍 자주 가는 곳</ChipBtn>
-          <ChipBtn onClick={() => nav('/history')}>🕐 오래 머문 곳</ChipBtn>
+          <ChipBtn onClick={() => nav('/drives#seasonal')}>🌡️ 계절</ChipBtn>
         </div>
-      </div>
+      </section>
+      {/* 이력 칩 */}
+      <section>
+        <div className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold mb-2 px-1">이력</div>
+        <div className="flex flex-wrap gap-1.5">
+          <ChipBtn onClick={() => nav('/history')}>📅 일자별</ChipBtn>
+          <ChipBtn onClick={() => nav('/history')}>🗺️ 지도</ChipBtn>
+          <ChipBtn onClick={() => nav('/history')}>📍 자주</ChipBtn>
+          <ChipBtn onClick={() => nav('/history')}>🕐 오래</ChipBtn>
+        </div>
+      </section>
     </div>
   );
 }
 
-// 배터리 expanded — 정보 카드 + 칩 (집충전소 흡수)
-function ExpandedBattery({ data }) {
+// 배터리 expanded — cover 가 SOC + 충전 정보 표시 → 중복 제거. 칩만.
+// 폴링 정보(성공률/TTL/갱신시각)는 진단 정보라 사용자 시야 노출 X.
+function ExpandedBattery() {
   const nav = useMenuNav();
-  const b = data?.battery;
-  const c = data?.chargers;
-  const accent = '#60a5fa';
-  const chAccent = '#fbbf24';
-
   return (
-    <div className="px-4 py-3 space-y-2.5">
-      {/* 배터리 큰 카드 */}
-      <InfoCard onClick={() => nav('/battery#health')} accent={accent}>
-        <div className="flex items-center gap-3">
-          <SocRing accent={accent} value={b?.soc} size={88} />
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
-              {b?.charging ? '충전 중' : '배터리'}
-            </div>
-            {b?.charging ? (
-              <>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <span className="text-[24px] font-bold tabular-nums leading-none" style={{ color: accent }}>
-                    {b.charger_power_kw != null ? b.charger_power_kw.toFixed(1) : '—'}
-                  </span>
-                  <span className="text-sm text-zinc-400">kW</span>
-                </div>
-                <div className="text-[11px] text-zinc-500 mt-1">
-                  세션 +{(b.charge_added_kwh || 0).toFixed(1)} kWh
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="text-[11px] text-zinc-400 mt-1">
-                  {b?.last_position_at ? `${relTime(b.last_position_at)} 갱신` : '데이터 없음'}
-                </div>
-                <div className="text-[10px] text-zinc-500 mt-1">
-                  탭하면 건강도 자세히 보기
-                </div>
-              </>
-            )}
-          </div>
-          <span className="text-zinc-600 text-base shrink-0 self-center">›</span>
-        </div>
-      </InfoCard>
-
-      {/* 폴링 / 집 충전소 카드 */}
-      <InfoCard onClick={() => nav('/chargers#live')} accent={chAccent}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="relative shrink-0">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ background: chAccent }} />
-              {c?.is_fresh && (
-                <div className="absolute inset-0 w-2.5 h-2.5 rounded-full animate-ping" style={{ background: chAccent, opacity: 0.6 }} />
-              )}
-            </div>
-            <div>
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">집 충전소</div>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-[18px] font-bold tabular-nums leading-none" style={{ color: chAccent }}>
-                  {c?.success_rate_today != null ? `${c.success_rate_today}%` : '—'}
-                </span>
-                <span className="text-[11px] text-zinc-400">
-                  {c?.is_fresh ? '폴링 정상' : '폴링 오래됨'}
-                </span>
-              </div>
-              <div className="text-[10px] text-zinc-500 mt-1 tabular-nums">
-                TTL {c?.ttl_min ?? '—'}분
-                {c?.last_fetched ? ` · ${relTime(c.last_fetched)}` : ''}
-              </div>
-            </div>
-          </div>
-          <span className="text-zinc-600 text-base shrink-0">›</span>
-        </div>
-      </InfoCard>
-
-      {/* 더보기 칩 — 배터리 + 집충전소 섹션 */}
-      <div className="pt-1">
-        <div className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold mb-2 px-1">
-          배터리 분석
-        </div>
-        <div className="flex flex-wrap gap-1.5 mb-3">
+    <div className="px-4 py-3 space-y-3">
+      {/* 배터리 분석 칩 */}
+      <section>
+        <div className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold mb-2 px-1">배터리 분석</div>
+        <div className="flex flex-wrap gap-1.5">
+          <ChipBtn onClick={() => nav('/battery#health')}>🩺 건강도</ChipBtn>
           <ChipBtn onClick={() => nav('/battery#idle')}>🌡️ 대기 소모</ChipBtn>
           <ChipBtn onClick={() => nav('/battery#monthly')}>📅 월간 충전</ChipBtn>
-          <ChipBtn onClick={() => nav('/battery#heatmap')}>📊 시간대 히트맵</ChipBtn>
+          <ChipBtn onClick={() => nav('/battery#heatmap')}>📊 시간대</ChipBtn>
           <ChipBtn onClick={() => nav('/battery#fast')}>⚡ 급속</ChipBtn>
           <ChipBtn onClick={() => nav('/battery#slow')}>🔌 완속</ChipBtn>
         </div>
-        <div className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold mb-2 px-1">
-          집 충전소
-        </div>
+      </section>
+      {/* 집 충전소 — 사용량 통계 위주, 폴링 진단 X */}
+      <section>
+        <div className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold mb-2 px-1">집 충전소</div>
         <div className="flex flex-wrap gap-1.5">
+          <ChipBtn onClick={() => nav('/chargers#live')}>⚡ 실시간</ChipBtn>
           <ChipBtn onClick={() => nav('/chargers#fleet')}>📈 단지 통계</ChipBtn>
           <ChipBtn onClick={() => nav('/chargers/report')}>📊 활용도 리포트</ChipBtn>
-          <ChipBtn onClick={() => nav('/chargers/poll-log')}>🔧 폴링 로그</ChipBtn>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

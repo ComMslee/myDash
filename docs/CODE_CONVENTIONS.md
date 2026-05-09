@@ -57,7 +57,11 @@
 
 `PeekSheet` 는 4탭 공용 표지(peek) — `usePathname()` 으로 활성 탭 결정, 탭별 Cover/Expanded 컴포넌트가 데이터 슬라이스 표시. 탭 전환 시 자동 축소(`expanded=false`). 내비바 실측 높이는 `--peek-nav-h` CSS 변수로 publish, peek 높이는 `--peek-h` 로 publish → 페이지 padding-bottom 자동 보정.
 
-**Expanded = 정보 카드 + 칩 패턴** (주행·배터리, 단순 메뉴 X): 확장된 시트는 실제 데이터(오늘 km, SOC kW, 최근 출발→도착, 폴링 성공률 등)를 큰 카드로 보여주고, 카드 전체가 클릭 가능 → `useMenuNav()` 으로 같은 페이지면 `scrollIntoView`, 다른 페이지면 `router.push`. 카드 아래 칩(ChipBtn) 행으로 세부 섹션 점프 제공. 본문 디테일은 페이지에 두고 시트는 라이브 요약 + 진입 launcher 역할.
+**Expanded = cover 미노출 정보 + 칩 패턴** (주행·배터리, 단순 메뉴 X): cover 가 이미 표시한 정보는 expanded 에서 다시 안 보여줌 (중복 제거). expanded 는 cover 에 없는 추가 데이터(예: 주행=이번 주 건수/거리)만 InfoCard 로, 그 아래 칩(ChipBtn) 행으로 세부 섹션 점프. `useMenuNav()` 이 같은 페이지면 `scrollIntoView`, 다른 페이지면 `router.push`. 본문 디테일은 페이지에 두고 시트는 라이브 요약 + 진입 launcher 역할.
+
+**폴링 진단 정보는 사용자 시야에서 demote**: 충전소 폴링 성공률·TTL·갱신시각은 사용자에게 의미 있는 정보가 아니라 시스템 진단 데이터. peek cover/expanded, home page 의 prominent 카드/칩 어디에도 노출 X. `/chargers/poll-log` 페이지는 보존(URL 직접 접근 / `/v2/dev/api-status` 에서 진입). 사용자에게 의미 있는 충전소 데이터(사용량 통계·시간×요일 히트맵·활용도 리포트) 만 home/peek 에 노출.
+
+**한 정보 = 한 큰 표시소**: 같은 메트릭이 여러 surface 에서 prominent 하게 반복되지 않도록 1차 위치를 정함. 예) SOC 큰 링: home hero ↔ peek battery cover 중 활성 컨텍스트만, BottomNav 의 "78%" 는 작은 보조. 오늘 km: home 주행요약 ↔ peek drives cover 중 활성 컨텍스트만, BottomNav 의 "25.4km" 는 작은 보조. 주의: 충전 중 kW 도 동일 원칙 — cover 에서 큰 표시, expanded 에선 반복 X.
 
 ## 성능 · 안전성
 
