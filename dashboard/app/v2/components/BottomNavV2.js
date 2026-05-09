@@ -8,11 +8,13 @@ import { usePeekSheet } from './PeekSheet';
 // useLayoutEffect 는 SSR 시 경고 — 서버에선 useEffect 로 폴백.
 const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
-// 3탭 — 홈 / 주행(이력 흡수) / 배터리(집충전소 흡수). SVG 아이콘 + 메트릭만 (라벨 없음).
+// 3탭 — 홈 / 주행(이력 흡수) / 배터리(집충전소 흡수). SVG 아이콘 + (활성 탭만) 라벨 + 메트릭.
+// 한국 지도 앱(네이버/카카오/T맵)은 항상 라벨 노출이 표준이지만, 우리는 절충 — 활성 탭만 라벨로 명시성 확보, 비활성은 컴팩트(아이콘+메트릭).
 const tabs = [
   {
     href: '/home',
     id: 'home',
+    label: '홈',
     matches: ['/home'],
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -23,6 +25,7 @@ const tabs = [
   {
     href: '/drives',
     id: 'drives',
+    label: '주행',
     matches: ['/drives', '/history'],
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -33,6 +36,7 @@ const tabs = [
   {
     href: '/battery',
     id: 'battery',
+    label: '배터리',
     matches: ['/battery', '/chargers'],
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,7 +103,7 @@ export default function BottomNavV2() {
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="max-w-2xl mx-auto flex">
-        {tabs.map(({ href, id, icon, matches }) => {
+        {tabs.map(({ href, id, icon, label, matches }) => {
           const isActive = matches.some(m => pathname === m || pathname.startsWith(m + '/'));
           const accent = peek?.tabMeta?.[id]?.accent || '#3b82f6';
           const metric = tabMetric(id, data);
@@ -107,10 +111,14 @@ export default function BottomNavV2() {
             <Link
               key={href}
               href={href}
-              className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 px-1 min-w-0 transition-colors"
+              className="flex-1 flex flex-col items-center justify-center py-1.5 gap-0.5 px-1 min-w-0 transition-colors"
               style={{ color: isActive ? accent : '#71717a' }}
             >
               {icon}
+              {/* 활성 탭만 라벨 노출 — 비활성은 컴팩트, 활성 탭은 위치 명시. */}
+              {isActive && (
+                <span className="text-[10px] font-bold leading-tight">{label}</span>
+              )}
               {metric ? (
                 <span
                   key={metric}
