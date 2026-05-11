@@ -118,7 +118,7 @@ function hexToRgb(hex) {
 }
 
 // 7×24 시간×요일 히트맵 — data: 7×24 number[][] (dow x hour)
-export function HourDowHeatmap({ data, hexColor = '#3b82f6' }) {
+export function HourDowHeatmap({ data, hexColor = '#3b82f6', hourSoc = null }) {
   if (!data || data.length !== 7) return null;
   const flat = data.flat();
   const max = Math.max(1, ...flat);
@@ -143,7 +143,7 @@ export function HourDowHeatmap({ data, hexColor = '#3b82f6' }) {
         <div
           key={d}
           className="grid items-center"
-          style={{ gridTemplateColumns: '18px repeat(24, 1fr)', gap: '1px', marginBottom: '1px' }}
+          style={{ gridTemplateColumns: '18px repeat(6, 0.5fr) repeat(18, 1fr)', gap: '1px', marginBottom: '1px' }}
         >
           <div className="text-[9px] text-zinc-500 text-center">{lab}</div>
           {data[d].map((v, h) => (
@@ -156,8 +156,52 @@ export function HourDowHeatmap({ data, hexColor = '#3b82f6' }) {
           ))}
         </div>
       ))}
-      <div className="flex justify-between text-[9px] text-zinc-500 tabular-nums mt-1" style={{ paddingLeft: '18px' }}>
-        <span className="font-semibold">0시</span><span>6</span><span>12</span><span>18</span><span>23시</span>
+      {hourSoc && hourSoc.length === 24 && (
+        <div
+          className="grid items-center mt-1"
+          style={{ gridTemplateColumns: '18px repeat(6, 0.5fr) repeat(18, 1fr)', gap: '1px' }}
+          title="시간별 평균 SOC (amber: 시작 → emerald: 종료)"
+        >
+          <div className="text-[8px] text-zinc-600 text-center leading-none">SOC</div>
+          {hourSoc.map((s, h) => {
+            const hasData = s && s.avg_start != null && s.avg_end != null;
+            const start = hasData ? Math.max(0, Math.min(100, s.avg_start)) : 0;
+            const end   = hasData ? Math.max(0, Math.min(100, s.avg_end))   : 0;
+            const lo = Math.min(start, end);
+            const hi = Math.max(start, end);
+            return (
+              <div
+                key={h}
+                className="h-6 relative bg-zinc-800/30 rounded-[1px] overflow-hidden"
+                title={hasData ? `${h}시 평균 ${Math.round(start)}% → ${Math.round(end)}%` : `${h}시 데이터 없음`}
+              >
+                {hasData && (
+                  <>
+                    <div
+                      className="absolute left-0 right-0 bg-amber-400/40"
+                      style={{ bottom: 0, height: `${lo}%` }}
+                    />
+                    <div
+                      className="absolute left-0 right-0 bg-emerald-400/65"
+                      style={{ bottom: `${lo}%`, height: `${Math.max(1, hi - lo)}%` }}
+                    />
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div
+        className="grid text-[9px] text-zinc-500 tabular-nums mt-1"
+        style={{ gridTemplateColumns: '18px repeat(6, 0.5fr) repeat(18, 1fr)', gap: '1px' }}
+      >
+        <div />
+        <div className="font-semibold" style={{ gridColumn: 2 }}>0시</div>
+        <div style={{ gridColumn: 8 }}>6</div>
+        <div style={{ gridColumn: 14 }}>12</div>
+        <div style={{ gridColumn: 20 }}>18</div>
+        <div className="text-right" style={{ gridColumn: 25 }}>23시</div>
       </div>
       {peakVal > 0 && (
         <div className="flex flex-wrap items-center gap-x-2 mt-1.5 text-[10px] text-zinc-500 tabular-nums">

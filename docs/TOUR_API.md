@@ -106,14 +106,35 @@ TOUR_API_KEY=<decoding 키>
 ## 본 프로젝트 라우트 — `dashboard /api/family/festivals`
 
 ```
-GET /api/family/festivals?from=YYYYMMDD&to=YYYYMMDD&areaCode=1&size=20
+GET  /api/family/festivals?from=YYYYMMDD&to=YYYYMMDD&areaCode=1&size=20
+POST /api/family/festivals/refresh   (HUB_SHARED_SECRET 인증)
 ```
 
+**아키텍처** — TourAPI 직접 호출 X. `family_festivals` Postgres 테이블만 SELECT.
+
+```
+GHA cron (월·수·금 03:00 KST) ──POST /refresh──► TourAPI (오늘~+90일, 전국)
+                                                    │
+                                                    ▼
+                              upsertMany() + cleanupExpired()
+                                                    │
+                                                    ▼
+                                       family_festivals 테이블
+                                                    ▲
+                              GET /api/family/festivals (DB SELECT 만)
+                                                    │
+                                       ├─ 봇 /festivals
+                                       └─ dashboard UI
+```
+
+- 폴링 워크플로: `.github/workflows/refresh-festivals.yml`
+- stale 임계: 4일 (마지막 `fetched_at` 기준 — 폴링 주 3회라 4일 이상이면 stale 표시)
 - `from`/`to` 미지정 시 `오늘 ~ +30일` (KST).
 - `areaCode` 미지정 시 전국.
-- 30분 LRU 캐시 (`from|to|area|size` 키).
-- 응답: `{ festivals: [...정규화...], totalCount, fetchedAt, stale, cached }`
+- 응답: `{ festivals: [...정규화...], totalCount, fetchedAt, stale }`
 - 정규화 필드: `id, title, startDate, endDate, addr, areaCode, sigunguCode, lat, lng, image, thumbnail, tel`.
+
+> 외부 API 직접 호출은 `/refresh` 한 곳뿐 — TourAPI 장애가 GET 라우트에 전파되지 않는다. 대시보드/봇은 항상 DB 의 가장 최근 스냅샷을 본다. 테이블 스키마는 [`DATABASE.md`](./DATABASE.md#대시보드가-생성하는-테이블) 참조.
 
 ## 봇 통합 — `/festivals` (가족 카테고리)
 

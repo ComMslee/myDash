@@ -176,7 +176,7 @@ export default function YearHeatmap({
                   <div
                     key={wi}
                     title={`${ym} 합계 ${Math.round(total).toLocaleString()}${unitSuffix}`}
-                    className="w-[15px] h-[5px] rounded-[1px] bg-zinc-800/40"
+                    className="w-[15px] h-[8px] rounded-[1px] bg-zinc-800/40"
                     style={cellStyle}
                   />
                 );

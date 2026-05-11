@@ -18,8 +18,9 @@ export async function GET() {
     const now = new Date();
     const nextStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const twelveMonthStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = nextStart;
+    // best_drive_* 는 "최근 4주" 윈도우 — drives API 의 month_distance 와 의미 일치
+    const monthStart = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+    const monthEnd = now;
 
     const iso = (d) => d.toISOString();
 

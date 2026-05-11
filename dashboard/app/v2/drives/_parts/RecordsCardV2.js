@@ -3,12 +3,6 @@
 import { formatDuration } from '@/lib/format';
 import { useRankingsSheet } from '../../components/RankingsSheet';
 
-function NewBadge() {
-  return (
-    <span className="text-[8px] font-bold px-1 py-px rounded bg-gradient-to-br from-blue-500 to-violet-500 text-white leading-none">NEW</span>
-  );
-}
-
 export default function RecordsCardV2({ allTime }) {
   const { open } = useRankingsSheet();
 
@@ -55,7 +49,6 @@ export default function RecordsCardV2({ allTime }) {
     {
       label: '효율',
       color: 'text-emerald-400',
-      isNew: true,
       icon: (
         <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -72,7 +65,7 @@ export default function RecordsCardV2({ allTime }) {
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       <div className="px-4 pt-3 pb-3">
         <div className="grid grid-cols-[40px_1fr_1fr] gap-1 pb-1">
-          <div className="text-[9px] font-bold tracking-wider text-zinc-600 flex items-center justify-center">TOP 50</div>
+          <div className="text-[9px] font-bold tracking-wider text-zinc-500 flex items-center justify-center">랭킹</div>
           <div className="text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500">단일 주행</div>
           <div className="text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500">일 합계</div>
         </div>
@@ -80,7 +73,6 @@ export default function RecordsCardV2({ allTime }) {
           {rows.flatMap((r, i) => [
             <div key={`l-${i}`} className={`flex flex-col items-center justify-center gap-0.5 ${r.color}`}>
               {r.icon}
-              {r.isNew && <NewBadge />}
             </div>,
             <button
               key={`d-${i}`}

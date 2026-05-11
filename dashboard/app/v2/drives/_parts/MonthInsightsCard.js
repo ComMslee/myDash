@@ -3,12 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { effColor } from '@/lib/effColor';
 
-function NewBadge() {
-  return (
-    <span className="text-[8px] font-bold px-1 py-px rounded bg-gradient-to-br from-blue-500 to-violet-500 text-white leading-none">NEW</span>
-  );
-}
-
 export default function MonthInsightsCard({ insights }) {
   const router = useRouter();
   const longBest = insights?.current?.best_drive_long;
@@ -37,9 +31,8 @@ export default function MonthInsightsCard({ insights }) {
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      <div className="px-3 py-2 border-b border-white/[0.06] flex items-center gap-2">
-        <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">이번달 인사이트</span>
-        <NewBadge />
+      <div className="px-3 py-2 border-b border-white/[0.06]">
+        <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">최근 4주 인사이트</span>
       </div>
       {longBest && (
         <Row

@@ -76,6 +76,8 @@
 | `/api/charging-status` | car, charging_processes, positions | — | 없음 (라이브) |
 | `/api/home-charger` | home_charger_snapshot | 환경공단 EvCharger | 모듈 메모리 + DB 스냅샷 |
 | `/api/home-charger/fleet-stats` | charger_usage, home_charger_snapshot | — | 없음 |
+| `/api/home-charger/groups` | charger_usage, home_charger_snapshot | — | 없음 (constants.js 매핑) |
+| `/api/home-charger/report` | charger_usage, home_charger_snapshot | — | `getCache()` 의 모듈 캐시 활용 (콜드 스타트 시 DB observed_chargers 폴백) |
 | `/api/home-charger/poll-log` | (메모리 진단) | — | 없음 |
 | `/api/year-heatmap` | charging_processes | — | 없음 |
 | `/api/monthly-history` | charging_processes | — | 없음 |
@@ -92,6 +94,8 @@
 | `/api/parked` | drives, states | — | 없음 (라이브 — 봇 `/where`) |
 | `/api/location` | positions | — | 없음 (라이브 최신 좌표 — 봇 `/where`) |
 | `/api/long-stay-places` | drives, addresses, geofences | — | 없음 (LEAD 윈도우로 dwell 산출) |
+| `/api/family/festivals` | family_festivals | — | DB 자체가 캐시 (GHA cron 주 3회 갱신, stale 임계 4일) — [TOUR_API.md](./TOUR_API.md) |
+| `/api/family/festivals/refresh` | family_festivals (upsert) | TourAPI searchFestival2 | 없음 (POST · HUB_SHARED_SECRET 인증) |
 
 ## 추후 개선 후보 (기능 영향 검토 필요)
 

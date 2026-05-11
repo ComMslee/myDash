@@ -6,7 +6,6 @@ import { Spinner } from '@/app/components/PageLayout';
 import { HourDowHeatmap } from '@/app/components/ChartWidgets';
 import YearHeatmap from '@/app/components/YearHeatmap';
 import VehicleKpiCard from './_parts/VehicleKpiCard';
-import PeriodStats from './_parts/PeriodStats';
 import MonthInsightsCard from './_parts/MonthInsightsCard';
 import RecordsCardV2 from './_parts/RecordsCardV2';
 import MonthlyHistoryByYear from './_parts/MonthlyHistoryByYear';
@@ -91,17 +90,12 @@ export default function V2DrivesPage() {
     <main className="min-h-screen bg-[#0f0f0f] text-white">
       <div className="max-w-2xl mx-auto px-4 py-5 pb-24 space-y-5">
 
-        {/* 1. 차량 KPI 헤더 */}
-        {!loading.car && !loading.insights && (
-          <VehicleKpiCard car={car} insights={insights} />
+        {/* 1. 차량 요약 — 누적·효율 + 기간별 통계 */}
+        {loading.car || loading.insights || loading.drives ? <Spinner /> : (
+          <VehicleKpiCard car={car} insights={insights} drives={drives} />
         )}
 
-        {/* 2. 기간별 통계 (이번달 포함) */}
-        {loading.drives || loading.history ? <Spinner /> : (
-          <PeriodStats drives={drives} />
-        )}
-
-        {/* 3. 이번달 인사이트 */}
+        {/* 2. 이번달 인사이트 */}
         {!loading.insights && <MonthInsightsCard insights={insights} />}
 
         {/* 4. 연간 히트맵 */}
