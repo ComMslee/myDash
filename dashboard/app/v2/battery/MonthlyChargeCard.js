@@ -73,7 +73,7 @@ export default function MonthlyChargeCard() {
 
         {/* 시간×요일 히트맵 */}
         <div className="pt-4 border-t border-white/[0.06]">
-          <HourDowHeatmap data={data.charge_hour_dow} hexColor="#34d399" hourSoc={data.charge_hour_soc} />
+          <HourDowHeatmap data={data.charge_hour_dow} hexColor="#34d399" />
         </div>
       </div>
     </div>
