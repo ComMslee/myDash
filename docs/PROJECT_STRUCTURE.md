@@ -77,6 +77,8 @@ myDash/
     │   ├── setup/page.js         # 초기 PIN 설정 페이지 (`/setup`) — auth-store 비어있을 때만 노출
     │   ├── context/
     │   │   └── mock.js           # MockProvider + MOCK_DATA (개발용 가상 데이터)
+    │   ├── lib/
+    │   │   └── useScrollShrink.js  # 스크롤 임계점 기반 축소 토글 훅 — GlobalHeader/BottomNavV2 공용
     │   ├── components/           # 공용 컴포넌트 (v1·v2 공유)
     │   │   ├── GlobalHeader.js   # 차량 상태/배터리/충전 상태 헤더 (sticky)
     │   │   ├── PageLayout.js     # Spinner 공유 컴포넌트
@@ -88,7 +90,7 @@ myDash/
     │   │   ├── layout.js         # v2 레이아웃 (BottomNavV2 포함)
     │   │   ├── page.js           # `/v2` → `/v2/drives` 리다이렉트
     │   │   ├── components/
-    │   │   │   ├── BottomNavV2.js    # 하단 탭 (주행/이력/배터리/집 충전소)
+    │   │   │   ├── BottomNavV2.js    # 하단 탭 (주행/이력/배터리/충전소) — 스크롤 시 캡슐 축소 (useScrollShrink)
     │   │   │   └── RankingsSheet.js  # 랭킹 바텀시트
     │   │   ├── drives/
     │   │   │   ├── page.js                   # 주행 분석 — 차량 KPI + 인사이트 + 연간 히트맵 + 패턴 + TOP50 + 연도별 월간
@@ -184,7 +186,7 @@ myDash/
 | `/v2/drives` | 차량 KPI · 인사이트 · 연간 히트맵 · 시간×요일 패턴 · TOP50 · 연도별 월간/계절 효율 | 주행 |
 | `/v2/battery` | 건강 점수 + 대기 소모 + 충전 습관 + 월간 충전 + 히트맵 + 급속/완속 기록 | 배터리 |
 | `/v2/history` | 일 카드 리스트 → 일 상세(지도 + 그날 주행 strip 하이라이트) / 월 합계(monthMode) | 이력 |
-| `/v2/chargers` | 집충전기 실시간 + Top 순위 + 활용도 리포트 (인라인) | 집 충전소 |
+| `/v2/chargers` | 집충전기 실시간 + Top 순위 + 활용도 리포트 (인라인) | 충전소 |
 | `/v2/chargers/report` | 활용도 리포트 단독 페이지 (외부 캡처/공유) | — (URL 직접) |
 | `/v2/tg` | 텔레그램 봇 관리 (권한 · 방송 · 학습로그 · 가이드) | — (URL 직접) |
 | `/v2/dev/api-status` | API 가용성 + 서버/진단 (개발자용, URL 직접) | — (헤더·탭 미노출) |

@@ -47,7 +47,7 @@ export default function HealthScoreCard({ data, trend }) {
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       {/* 상단: 점수(등급) · 평균 SOC · 추이 — 한 줄 */}
-      <div className="flex items-center justify-around px-4 py-3 border-b border-white/[0.06]">
+      <div className="flex items-center justify-around px-4 py-2 border-b border-white/[0.06]">
         <div className="text-center">
           <p className="text-[10px] text-zinc-600 mb-0.5">점수</p>
           <p className="text-xl font-black leading-none tabular-nums" style={{ color: arcColor }}>
@@ -79,7 +79,7 @@ export default function HealthScoreCard({ data, trend }) {
       </div>
 
       {/* SOC 체류 분포 — 2% 단위 */}
-      <div className="px-4 py-3">
+      <div className="px-4 py-2">
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-xs font-semibold text-zinc-400">SOC 체류 분포</span>
           {tips?.[0] && <span className="text-[11px] text-zinc-500">💡 {tips[0]}</span>}

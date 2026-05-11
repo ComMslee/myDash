@@ -97,7 +97,7 @@ export default function SlowChargeCard() {
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between gap-2 tabular-nums">
+      <div className="px-4 py-2 border-b border-white/[0.06] flex items-center justify-between gap-2 tabular-nums">
         <span className="flex items-baseline gap-1.5 min-w-0">
           <span className="text-xs font-bold text-zinc-200 shrink-0">완속 충전 기록</span>
           <span className="text-[11px] text-zinc-600 shrink-0">{records.length}건</span>

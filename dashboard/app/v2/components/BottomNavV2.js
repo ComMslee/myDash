@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useScrollShrink } from '../../lib/useScrollShrink';
 
 const tabs = [
   {
@@ -36,7 +37,7 @@ const tabs = [
   },
   {
     href: '/chargers',
-    label: '집 충전소',
+    label: '충전소',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -47,6 +48,7 @@ const tabs = [
 
 export default function BottomNavV2() {
   const pathname = usePathname();
+  const shrunk = useScrollShrink();
 
   // dev 도구 페이지 + tg 어드민에서는 하단 탭 숨김 (탐색 가치 없음, 화면 절약)
   if (pathname?.startsWith('/dev') || pathname?.startsWith('/tg')) return null;
@@ -54,26 +56,36 @@ export default function BottomNavV2() {
   return (
     <nav
       aria-label="V2 하단 탭 메뉴"
-      className="fixed bottom-0 left-0 right-0 z-50 bg-[#0f0f0f]/95 backdrop-blur border-t border-white/[0.06]"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      className="fixed z-50 right-3 rounded-full bg-[#161618]/90 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] transition-[padding] duration-300"
+      style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
     >
-      <div className="max-w-2xl mx-auto flex">
+      <div className={`flex items-center transition-all duration-300 ${shrunk ? 'gap-0.5 px-1.5 py-1' : 'gap-1.5 px-2.5 py-1.5'}`}>
         {tabs.map(({ href, label, icon }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/');
+          if (shrunk) {
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-label={label}
+                className={`p-3 rounded-full transition-colors ${
+                  isActive ? 'bg-blue-500/20 text-blue-400' : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                {icon}
+              </Link>
+            );
+          }
           return (
             <Link
               key={href}
               href={href}
-              className={`flex-1 flex flex-col items-center py-2.5 pb-2 gap-1 transition-colors ${
-                isActive ? 'text-blue-400' : 'text-zinc-600'
+              className={`flex flex-col items-center gap-0.5 px-3.5 py-1.5 rounded-2xl transition-colors min-w-[5rem] ${
+                isActive ? 'bg-blue-500/20 text-blue-400' : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
               {icon}
-              <span className="text-[10px] font-semibold">{label}</span>
-              <span
-                className="w-1 h-1 rounded-full"
-                style={{ background: isActive ? '#3b82f6' : 'transparent' }}
-              />
+              <span className="text-[10px] font-semibold tracking-tight">{label}</span>
             </Link>
           );
         })}

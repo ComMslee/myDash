@@ -63,7 +63,7 @@ export default function RecordsCardV2({ allTime }) {
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      <div className="px-4 pt-3 pb-3">
+      <div className="px-4 pt-2 pb-2">
         <div className="grid grid-cols-[40px_1fr_1fr] gap-1 pb-1">
           <div className="text-[9px] font-bold tracking-wider text-zinc-500 flex items-center justify-center">랭킹</div>
           <div className="text-center text-[10px] font-bold uppercase tracking-wider text-zinc-500">단일 주행</div>

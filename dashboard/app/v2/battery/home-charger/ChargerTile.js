@@ -92,10 +92,10 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
     highlight?.rank === 2 ? '🥈' :
     highlight?.rank === 3 ? '🥉' : null;
 
-  // 하단 info 텍스트
+  // 하단 info 텍스트 — 충전중 경과시간 / 장애 '–' 만 표시.
+  // 누적 카운트는 정보 과부하라 제거 (툴팁/사용 순위에서 확인).
   const bottomText = isCharging ? elapsed
     : (c.stat === '9' || c.stat === '1') ? '–'
-    : count > 0 ? String(count)
     : '';
 
   // 호버 툴팁 — 정보 손실 방지용 풀버전 유지
@@ -144,17 +144,22 @@ const VARIANT_CLS = {
   nearby:   'bg-[#161618] border border-dashed border-white/[0.06]',
 };
 
-// 동별 타일 박스 — 헤더(동번호) + 셀 wrap
+// 동별 타일 박스 — 좌측 세로 라벨(동 번호 digit stack) + 우측 셀 wrap
+// 헤더 row 제거 + 가로 인라인 칩 대신 세로 스트립으로 → 셀 영역 최대 확보.
 export function TileBox({ title, chargers, ranks, usage, statId, now, variant = 'default', className = '' }) {
   if (!chargers.length) return null;
   const keyOf = (c) => `${statId}_${c.chgerId}`;
   const variantCls = VARIANT_CLS[variant] || VARIANT_CLS.default;
   return (
-    <div className={`rounded-2xl p-3 ${variantCls} ${className}`}>
-      <div className="text-[11px] text-zinc-400 font-semibold mb-2 px-0.5 tabular-nums">
-        {title}
+    <div className={`rounded-2xl p-3 ${variantCls} ${className} flex items-start gap-2`}>
+      <div
+        className="shrink-0 flex flex-col items-center gap-0.5 px-1 py-1 rounded-md bg-zinc-700/70 text-zinc-100 font-bold text-[11px] tabular-nums leading-none"
+        title={String(title)}
+        aria-label={String(title)}
+      >
+        {String(title).split('').map((ch, i) => <span key={i}>{ch}</span>)}
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 flex-1 min-w-0">
         {chargers.map(c => {
           const u = usage[keyOf(c)];
           return (

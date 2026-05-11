@@ -184,7 +184,7 @@ function HistoryInner() {
         const titleShort = isLong ? '오래 머문 곳' : '자주 가는 곳';
         const metric = (p) => isLong ? fmtDwell(p.max_dwell_sec) : `${p.visit_count}회`;
         return (
-        <div className="flex-shrink-0 px-4 pt-3 pb-2">
+        <div className="flex-shrink-0 px-4 pt-2 pb-1.5">
           {placesCollapsed ? (
             <button
               onClick={() => setPlacesCollapsed(false)}
@@ -197,27 +197,32 @@ function HistoryInner() {
             </button>
           ) : (
             <>
-              {/* 토글 헤더 — list/map 양쪽 모드 모두 노출. 접기 버튼은 map 모드에만. */}
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-1.5 bg-zinc-800/40 border border-white/[0.06] rounded-lg p-0.5">
+              {/* 토글을 카드 행 첫 칸으로 인라인 — 별도 줄 차지 제거. 카드 높이에 맞춰 세로 분할. */}
+              <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
+                <div className="flex-shrink-0 flex flex-col gap-0.5 bg-zinc-800/40 border border-white/[0.06] rounded-xl p-0.5 w-[58px]">
                   <button
                     onClick={() => { setPlacesMode('frequent'); setPlacesExpanded(false); }}
-                    className={`text-xs font-semibold px-2.5 py-1 rounded-md transition-colors ${
-                      !isLong ? 'text-zinc-100 bg-white/[0.10]' : 'text-zinc-500 hover:text-zinc-300'
+                    aria-label="자주 가는 곳"
+                    title="자주 가는 곳"
+                    className={`flex-1 flex flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-semibold transition-colors ${
+                      !isLong ? 'bg-white/[0.10] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
                     }`}
-                  >📍 자주 가는 곳</button>
+                  >
+                    <span className="text-base leading-none">📍</span>
+                    <span className="leading-none">자주</span>
+                  </button>
                   <button
                     onClick={() => { setPlacesMode('long-stay'); setPlacesExpanded(false); }}
-                    className={`text-xs font-semibold px-2.5 py-1 rounded-md transition-colors ${
-                      isLong ? 'text-zinc-100 bg-white/[0.10]' : 'text-zinc-500 hover:text-zinc-300'
+                    aria-label="오래 머문 곳"
+                    title="오래 머문 곳"
+                    className={`flex-1 flex flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-semibold transition-colors ${
+                      isLong ? 'bg-white/[0.10] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
                     }`}
-                  >🕐 오래 머문 곳</button>
+                  >
+                    <span className="text-base leading-none">🕐</span>
+                    <span className="leading-none">오래</span>
+                  </button>
                 </div>
-                {viewMode === 'map' && (
-                  <button onClick={() => setPlacesCollapsed(true)} className="text-[10px] text-zinc-600 hover:text-zinc-300 px-1.5">접기</button>
-                )}
-              </div>
-              <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
                 {displayPlaces.slice(0, 5).map((p, i) => (
                   <button
                     key={p.id}
@@ -607,7 +612,7 @@ function HistoryInner() {
       )}
 
       {/* 목록 모드 */}
-      <div className="flex-1 min-h-0 flex flex-col px-4 pb-4 pt-3" style={{ display: viewMode === 'list' ? 'flex' : 'none' }}>
+      <div className="flex-1 min-h-0 flex flex-col px-4 pt-3" style={{ display: viewMode === 'list' ? 'flex' : 'none' }}>
           <div className="flex-1 min-h-0 bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
             <div className="h-full overflow-y-auto">
               <DriveListView

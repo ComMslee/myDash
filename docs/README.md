@@ -19,13 +19,14 @@ AWS Lightsail 기반 TeslaMate Dashboard 운영 문서.
 
 ## 구성 서비스 (docker-compose)
 
-| 서비스 | 포트 | 역할 |
+| 서비스 | 포트 (호스트:컨테이너) | 역할 |
 |---|---|---|
-| dashboard | 80 | Next.js 대시보드 (`80:5000` 매핑, 부가 `5000:5000`도 열림) |
+| teslamate-auth | `80:80`, `443:443`, `4000:4000` | Caddy — 외부 80/443 → dashboard, `:4000` 은 forward_auth 로 보호된 teslamate UI |
+| dashboard | `5000:5000` | Next.js 대시보드 — 외부 진입은 Caddy 경유, 호스트 `:5000` 은 디버그/우회용 |
 | teslamate | (내부) | 데이터 수집기 — 외부 노출 없음 |
-| teslamate-auth | 4000 | Caddy forward_auth (dashboard PIN 공유) → teslamate |
+| telegram-hub | (내부) | 텔레그램 봇 게이트웨이 — `.env` 에 `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` 있을 때만 기동 |
 | database | (내부) | PostgreSQL 16 |
-| mosquitto | 1883 | MQTT 브로커 |
+| mosquitto | `1883:1883` | MQTT 브로커 |
 
 ## 문서 목차
 

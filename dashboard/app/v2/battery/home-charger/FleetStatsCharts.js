@@ -39,24 +39,28 @@ function DeltaBadge({ delta, isNew, prevRank }) {
 
 // Top/Bottom 순위 행 — 2열 그리드 컴팩트 버전
 // [좌측 강도 스트립][아이콘][라벨][delta][카운트]
-// 강도는 4px 두께 세로 바의 오파시티로 표현 (시간/요일 차트와 동일 색상 규칙)
-export function RankRow({ icon, label, count, max, isPeak = false, delta = null, isNew = false, prevRank = null }) {
+// rank ∈ {1,2,3} → 금/은/동 톤 + 아이콘/카운트 폰트 한 단계↑ 로 시선 집중.
+const MEDAL_STRIP = { 1: '#f59e0b', 2: '#cbd5e1', 3: '#ea580c' };
+const MEDAL_COUNT = { 1: 'text-amber-400 font-bold', 2: 'text-slate-300 font-bold', 3: 'text-orange-500 font-bold' };
+
+export function RankRow({ icon, label, count, max, rank = null, delta = null, isNew = false, prevRank = null }) {
   const ratio = max > 0 ? count / max : 0;
-  const color = isPeak ? '#f59e0b' : '#3b82f6';
+  const color = MEDAL_STRIP[rank] || '#3b82f6';
+  const isMedal = rank != null;
+  const rowH = isMedal ? 'h-6' : 'h-5';
+  const iconCls = isMedal ? 'text-sm font-bold w-6' : 'text-xs font-semibold w-5';
+  const countCls = `${MEDAL_COUNT[rank] || 'text-zinc-400'} ${isMedal ? 'text-sm' : ''}`;
   return (
-    <div className="flex items-center gap-1.5 text-[10px] tabular-nums h-5">
+    <div className={`flex items-center gap-1.5 text-[10px] tabular-nums ${rowH}`}>
       <div
         className="w-1 self-stretch rounded-full shrink-0"
         style={{ background: color, opacity: count === 0 ? 0.1 : 0.2 + ratio * 0.8 }}
         title={`${label}: ${count}회`}
       />
-      <span className="text-xs font-semibold text-zinc-400 w-5 text-center shrink-0 tabular-nums">{icon}</span>
+      <span className={`text-center shrink-0 tabular-nums text-zinc-400 ${iconCls}`}>{icon}</span>
       <span className="text-zinc-200 flex-1 truncate">{label}</span>
       <DeltaBadge delta={delta} isNew={isNew} prevRank={prevRank} />
-      <span
-        className={`shrink-0 tabular-nums ${isPeak ? 'text-amber-400 font-semibold' : 'text-zinc-400'}`}
-        title={`${count}회`}
-      >
+      <span className={`shrink-0 tabular-nums ${countCls}`} title={`${count}회`}>
         {compact(count)}
       </span>
     </div>

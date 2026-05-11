@@ -122,7 +122,7 @@ export default function HomeChargerCard({ showFavLabel = false } = {}) {
     <>
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       <div className="px-4 py-2.5 border-b border-white/[0.06] flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] tabular-nums">
-        <span className="font-bold tracking-widest uppercase text-zinc-500 shrink-0">집충전기</span>
+        <span className="text-xs font-bold tracking-wider uppercase text-zinc-300 shrink-0">집충전기</span>
         <span className="text-zinc-400">총 {allChargers.length}기</span>
         <StatusBadges counts={counts} />
         <span className="ml-auto flex items-center gap-1.5 text-zinc-500">
@@ -178,19 +178,12 @@ export default function HomeChargerCard({ showFavLabel = false } = {}) {
       )}
 
       <div className="px-4 py-3 space-y-3">
-        {/* P1 즐겨찾기: 108·107(1행) + 102·104(2행) — 카드 헤더에 동번호 표시되므로 라벨에선 제거 */}
-        <div className="space-y-1.5">
-          {showFavLabel && (
-            <div className="text-[11px] text-zinc-400 flex items-center gap-1.5">
-              <span>⭐ 즐겨찾기</span>
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-1.5">
-            <TileBox title="108" chargers={cells108} variant="favorite" {...tileProps} />
-            <TileBox title="107" chargers={cells107} variant="favorite" {...tileProps} />
-            <TileBox title="102" chargers={cells102} variant="favorite" {...tileProps} />
-            <TileBox title="104" chargers={cells104} variant="favorite" {...tileProps} />
-          </div>
+        {/* P1 즐겨찾기: 108·107·102·104 — variant="favorite" 의 외곽 sky 라이트로 별도 라벨 없이 식별 */}
+        <div className="grid grid-cols-2 gap-1.5">
+          <TileBox title="108" chargers={cells108} variant="favorite" {...tileProps} />
+          <TileBox title="107" chargers={cells107} variant="favorite" {...tileProps} />
+          <TileBox title="102" chargers={cells102} variant="favorite" {...tileProps} />
+          <TileBox title="104" chargers={cells104} variant="favorite" {...tileProps} />
         </div>
 
         {/* 더보기 (접힘) — 105 → 115 → 111 → 117 → 인근 (모두 단일 컬럼) */}
@@ -215,11 +208,15 @@ export default function HomeChargerCard({ showFavLabel = false } = {}) {
                   return g105 ? <TileBox title="105" chargers={g105.chargers} {...tileProps} /> : null;
                 })()}
                 {show115 && (
-                  <div className="bg-[#1c1d20] border border-white/[0.06] rounded-2xl p-3">
-                    <div className="text-[11px] text-zinc-400 font-semibold mb-2 px-0.5 tabular-nums">
-                      115
+                  <div className="bg-[#1c1d20] border border-white/[0.06] rounded-2xl p-3 flex items-start gap-2">
+                    <div
+                      className="shrink-0 flex flex-col items-center gap-0.5 px-1 py-1 rounded-md bg-zinc-700/70 text-zinc-100 font-bold text-[11px] tabular-nums leading-none"
+                      title="115"
+                      aria-label="115"
+                    >
+                      <span>1</span><span>1</span><span>5</span>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 flex-1 min-w-0">
                       {cells115Ground.map(c => {
                         const k = `${MAIN_STATION_ID}_${c.chgerId}`;
                         const u = usage[k];

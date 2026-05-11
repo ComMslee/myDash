@@ -41,7 +41,7 @@ export default function FastChargeCard() {
 
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
+      <div className="px-4 py-2 border-b border-white/[0.06] flex items-center justify-between">
         <span className="text-xs font-bold text-zinc-200">급속 충전 기록</span>
         <span className="text-xs text-zinc-600">{records.length}건</span>
       </div>

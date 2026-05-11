@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMock, MOCK_DATA } from '../context/mock';
 import { formatDuration } from '../../lib/format';
+import { useScrollShrink } from '../lib/useScrollShrink';
 
 // GlobalHeader를 숨길 경로 (서브/상세 페이지 + dev 도구 + 로그인/등록)
 const HIDDEN_ROUTES = ['/rankings', '/v1/rankings', '/dev', '/tg', '/login', '/setup'];
@@ -79,6 +80,7 @@ export default function GlobalHeader() {
   const [carFetchedAt, setCarFetchedAt] = useState(null);
   const [, setTick] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const shrunk = useScrollShrink();
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 60_000);
@@ -231,9 +233,14 @@ export default function GlobalHeader() {
           aria-hidden="true"
         />
       )}
-      <div className="relative max-w-2xl mx-auto px-4 py-2 flex items-center gap-2">
+      <div
+        className={`relative max-w-2xl mx-auto px-4 flex items-center gap-2 transition-all duration-200 ${
+          shrunk ? 'py-0.5' : 'py-1'
+        }`}
+      >
 
-        {/* 좌측: 아이콘 + 차량명 + 갱신시간 */}
+        {/* 좌측: 아이콘 + 차량명 + 갱신시간 — 축소 시 숨김 */}
+        {!shrunk && (
         <div className="flex items-center gap-1.5 min-w-0">
           {(() => {
             if (!displayState) return null;
@@ -260,7 +267,7 @@ export default function GlobalHeader() {
             const conf = MAP[displayState];
             return (
               <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 border transition-colors bg-gradient-to-br ${conf.cls}`}
+                className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 border transition-colors bg-gradient-to-br ${conf.cls}`}
                 title={conf.label}
               >
                 <svg className={`w-4 h-4 ${conf.txt}`} fill="currentColor" viewBox="0 0 24 24">
@@ -292,34 +299,37 @@ export default function GlobalHeader() {
             <span className="text-[11px] tabular-nums text-zinc-500 flex-shrink-0">{formatDuration(elapsedMin)}</span>
           )}
         </div>
+        )}
 
         <div className="flex-1" />
 
         {/* 우측: 충전중 or 일반 상태 */}
         {isCharging ? (
           <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse flex-shrink-0" aria-hidden="true" />
-              <span className="text-green-400 text-sm font-bold tabular-nums">
-                {charging?.charger_power != null ? `${charging.charger_power}kW` : '충전 중'}
-              </span>
-            </div>
+            {!shrunk && (
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse flex-shrink-0" aria-hidden="true" />
+                <span className="text-green-400 text-sm font-bold tabular-nums">
+                  {charging?.charger_power != null ? `${charging.charger_power}kW` : '충전 중'}
+                </span>
+              </div>
+            )}
             <PercentBadge level={lvl} color={color} charging />
-            {limitLvl && <span className="text-zinc-600 text-[11px] tabular-nums flex-shrink-0">→{limitLvl}%</span>}
-            {remainMin != null && (
+            {!shrunk && limitLvl && <span className="text-zinc-600 text-[11px] tabular-nums flex-shrink-0">→{limitLvl}%</span>}
+            {!shrunk && remainMin != null && (
               <span className="text-zinc-500 text-[11px] tabular-nums truncate">{formatDuration(remainMin)}</span>
             )}
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            {estRange && (
+            {!shrunk && estRange && (
               <span className="text-zinc-400 text-xs tabular-nums">예측 {estRange}<span className="text-zinc-600 text-[10px] ml-0.5">km</span></span>
             )}
             <PercentBadge level={lvl} color={color} charging={false} />
           </div>
         )}
 
-        {process.env.NODE_ENV !== 'production' && (
+        {!shrunk && process.env.NODE_ENV !== 'production' && (
           <>
             {isMock && (
               <button

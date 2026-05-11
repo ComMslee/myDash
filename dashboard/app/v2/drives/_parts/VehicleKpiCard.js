@@ -24,7 +24,7 @@ export default function VehicleKpiCard({ car, insights, drives }) {
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       {/* 헤더 — 누적거리 + 효율 KPI */}
-      <div className="px-4 py-3 flex items-center gap-4 border-b border-white/[0.06]">
+      <div className="px-4 py-2 flex items-center gap-3 border-b border-white/[0.06]">
         <div className="flex-1 min-w-0">
           <p className="text-[11px] text-zinc-500 font-semibold tracking-widest uppercase mb-0.5">누적 주행거리</p>
           {odometer != null ? (
@@ -60,7 +60,7 @@ export default function VehicleKpiCard({ car, insights, drives }) {
         return (
           <div
             key={s.label}
-            className={`grid grid-cols-4 px-4 py-3 items-center ${i < stats.length - 1 ? 'border-b border-white/[0.04]' : ''} ${s.highlight ? 'bg-blue-500/[0.04]' : ''}`}
+            className={`grid grid-cols-4 px-4 py-2 items-center ${i < stats.length - 1 ? 'border-b border-white/[0.04]' : ''} ${s.highlight ? 'bg-blue-500/[0.04]' : ''}`}
           >
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-bold text-zinc-400">{s.label}</span>

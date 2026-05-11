@@ -7,8 +7,13 @@ import { useEffect, useState } from 'react';
 export default function ReportPanel() {
   const [d, setD] = useState(null);
   const [err, setErr] = useState(null);
+  const [showDebug, setShowDebug] = useState(false);
 
   useEffect(() => {
+    // ?debug=1 로 진입한 경우에만 raw 응답 덤프 노출 — 외부 캡처용 패널에 노이즈 차단
+    if (typeof window !== 'undefined') {
+      setShowDebug(new URLSearchParams(window.location.search).has('debug'));
+    }
     let alive = true;
     const load = async () => {
       try {
@@ -57,7 +62,7 @@ export default function ReportPanel() {
         <WeeklyLine weekly={d.weekly} />
         <DongBars byDong={d.by_dong} />
         <Footer />
-        <DebugDump data={d} />
+        {showDebug && <DebugDump data={d} />}
       </div>
     </div>
   );
@@ -121,9 +126,8 @@ function Header({ meta }) {
   const end   = fmtDate(meta.observation_end);
   return (
     <div className="px-4 py-2.5 border-b border-white/[0.06] flex flex-wrap items-center gap-x-2 gap-y-0.5">
-      <span className="text-base">📊</span>
       <span className="text-xs font-bold tracking-wider uppercase text-zinc-300">활용도 리포트</span>
-      <span className="text-[10px] text-zinc-500 ml-auto">
+      <span className="text-[10px] text-zinc-500 ml-auto tabular-nums">
         {start} ~ {end} · {meta.days_observed}일 · {meta.total_chargers}기
       </span>
     </div>
@@ -143,29 +147,37 @@ function KpiGrid({ kpi }) {
     ? '변화 없음'
     : (trend > 0 ? '↑ 증가' : trend < 0 ? '↓ 감소' : '→ 유지');
 
+  // 전체 가동률 + 6개월 추세 + 일/주/월 표를 한 카드에 통합 — 세로 ~40% 압축.
   return (
-    <div className="space-y-2">
-      {/* 1. 전체 가동률 — 큰 카드 */}
-      <div className="bg-black/20 rounded-lg p-3 text-center">
-        <div className="text-[10px] text-zinc-500 tracking-wider uppercase">전체 가동률</div>
-        <div className="mt-1 leading-none">
-          <span className="text-3xl font-black tabular-nums text-emerald-400">{fmt(kpi.overall_pct)}</span>
-          <span className="text-xs text-zinc-600 ml-1">%</span>
+    <div className="bg-black/20 rounded-lg overflow-hidden">
+      <div className="grid grid-cols-2 divide-x divide-white/[0.04]">
+        <div className="px-3 py-2.5 text-center">
+          <div className="text-[10px] text-zinc-500 tracking-wider uppercase">전체 가동률</div>
+          <div className="mt-1 leading-none">
+            <span className="text-3xl font-black tabular-nums text-emerald-400">{fmt(kpi.overall_pct)}</span>
+            <span className="text-xs text-zinc-600 ml-1">%</span>
+          </div>
+          <div className="text-[9px] text-zinc-600 mt-1">관측 전체 평균</div>
         </div>
-        <div className="text-[9px] text-zinc-600 mt-1">관측 전체 기간 평균</div>
+        <div className="px-3 py-2.5 text-center">
+          <div className="text-[10px] text-zinc-500 tracking-wider uppercase">6개월 추세</div>
+          <div className="mt-1 leading-none">
+            <span className={`text-3xl font-black tabular-nums ${trendColor}`}>{trendStr}</span>
+            <span className="text-xs text-zinc-600 ml-1">%p</span>
+          </div>
+          <div className={`text-[9px] mt-1 ${trendColor}`}>{trendLabel}</div>
+        </div>
       </div>
-
-      {/* 2. 단위별 평균/피크 — 헤더 row + 일/주/월 row */}
-      <div className="bg-black/20 rounded-lg overflow-hidden">
+      <div className="border-t border-white/[0.04]">
         <div className="grid grid-cols-3 px-3 py-1 text-[9px] text-zinc-500 tracking-wider uppercase border-b border-white/[0.04]">
           <span></span>
           <span className="text-right">평균</span>
           <span className="text-right">피크</span>
         </div>
         {[
-          { label: '일간', avg: kpi.daily_avg_pct,   peak: kpi.daily_peak_pct,   hint: '일별' },
-          { label: '주간', avg: kpi.weekly_avg_pct,  peak: kpi.weekly_peak_pct,  hint: '주별' },
-          { label: '월간', avg: kpi.monthly_avg_pct, peak: kpi.monthly_peak_pct, hint: '월별' },
+          { label: '일간', avg: kpi.daily_avg_pct,   peak: kpi.daily_peak_pct },
+          { label: '주간', avg: kpi.weekly_avg_pct,  peak: kpi.weekly_peak_pct },
+          { label: '월간', avg: kpi.monthly_avg_pct, peak: kpi.monthly_peak_pct },
         ].map((row) => (
           <div key={row.label} className="grid grid-cols-3 px-3 py-1.5 items-baseline border-b border-white/[0.03] last:border-0">
             <span className="text-[11px] font-bold text-zinc-300">{row.label}</span>
@@ -179,16 +191,6 @@ function KpiGrid({ kpi }) {
             </span>
           </div>
         ))}
-      </div>
-
-      {/* 3. 추세 (증감) */}
-      <div className="bg-black/20 rounded-lg p-3 flex items-center justify-between">
-        <span className="text-[10px] text-zinc-500 tracking-wider uppercase">6개월 추세</span>
-        <span className="text-right">
-          <span className={`text-xl font-black tabular-nums ${trendColor}`}>{trendStr}</span>
-          <span className="text-[9px] text-zinc-600 ml-1">%p</span>
-          <span className={`text-[10px] ml-2 ${trendColor}`}>{trendLabel}</span>
-        </span>
       </div>
     </div>
   );

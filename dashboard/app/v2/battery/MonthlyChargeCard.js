@@ -30,7 +30,7 @@ export default function MonthlyChargeCard() {
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
       {/* 헤더 — 회당 평균을 헤더 부속으로 */}
-      <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center justify-between">
+      <div className="px-4 py-2 border-b border-white/[0.06] flex items-center justify-between">
         <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">충전 요약</span>
         <span className="text-[11px] text-zinc-500 tabular-nums">
           회당 평균 <span className="text-emerald-400 font-bold">{data.avg_kwh}</span>
