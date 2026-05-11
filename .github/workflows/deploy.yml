@@ -1,0 +1,48 @@
+name: Deploy Dashboard to Lightsail
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-lightsail
+      cancel-in-progress: false
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          timeout: 60s
+          command_timeout: 20m
+          script: |
+            set -e
+            cd ~/myDash
+            git fetch --all --prune
+            git reset --hard origin/master
+            # teslamate-auth 가 Caddy 로 전환됨 — 과거 nginx 잔재 정리.
+            for stale in nginx-teslamate.htpasswd nginx-teslamate.conf; do
+              if [ -e "$stale" ]; then
+                echo "[deploy] 과거 nginx 잔재 제거: $stale"
+                sudo docker compose stop teslamate-auth 2>/dev/null || true
+                sudo rm -rf "$stale"
+              fi
+            done
+            sudo docker compose build dashboard
+            sudo docker compose up -d dashboard
+            sudo docker compose up -d teslamate-auth
+            # telegram-hub: .env에 TELEGRAM_BOT_TOKEN/CHAT_ID 있을 때만 기동
+            if grep -q '^TELEGRAM_BOT_TOKEN=' .env 2>/dev/null && grep -q '^TELEGRAM_CHAT_ID=' .env 2>/dev/null; then
+              sudo docker compose build telegram-hub
+              sudo docker compose up -d telegram-hub
+            else
+              echo "[deploy] TELEGRAM_BOT_TOKEN/CHAT_ID 미설정 — telegram-hub 스킵"
+            fi
+            sudo docker image prune -f

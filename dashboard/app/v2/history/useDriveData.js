@@ -1,0 +1,240 @@
+'use client';
+
+// ⚠️  수정 전 필독: /CLAUDE.md "알려진 함정 — DriveMap 첫 렌더 폴리라인" 섹션.
+//     단일 경로 fetch useEffect 에서 setPositions([]) 금지, /api/route-map 5xx
+//     1회 retry + r.ok 체크 패턴은 회귀 방지를 위해 유지.
+
+import { useState, useEffect, useRef } from 'react';
+import { MOCK_DATA } from '@/app/context/mock';
+
+// 동시 요청 상한 헬퍼 — N개 워커가 cursor를 공유하며 items 소비
+async function fetchInChunks(items, fn, concurrency = 6) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  const worker = async () => {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      try { results[i] = await fn(items[i], i); }
+      catch { results[i] = null; }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  return results;
+}
+
+// route-map fetch — r.ok 체크 후 5xx 1회 retry. 단일 경로(함정 #5) 와 일·월 모드 공통.
+// abort 신호 시 즉시 throw → 호출 측 catch 에서 null 리턴되어 누락 표시됨.
+async function fetchRouteMap(url, signal) {
+  const once = async () => {
+    const r = await fetch(url, { signal });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  };
+  try { return await once(); }
+  catch (e1) {
+    if (e1.name === 'AbortError' || signal?.aborted) throw e1;
+    return await once();
+  }
+}
+
+/**
+ * 로드트립 페이지의 데이터 fetching + 상태를 단일 훅으로 격리.
+ *
+ * @param {object} args
+ *   - isMock: boolean — Mock 토글
+ *   - refreshSignal: number — MockProvider 새로고침 트리거
+ *   - initialId: number|null — 진입 시 선택할 drive id
+ *   - initialDate: string|null — 'YYYY-MM-DD' 진입 시 선택할 일자
+ *   - driveDayStr: (drive) => 'YYYY-MM-DD' — 로컬 타임존 기준 날짜 키 변환
+ *
+ * @returns {object}
+ *   drives, places, selectedDrive, setSelectedDrive,
+ *   positions, setPositions,
+ *   routeData, dayRoutes,
+ *   dayMode, setDayMode,
+ *   loadingDrives, loadingRoute, error
+ */
+export function useDriveData({ isMock, refreshSignal, initialId, initialDate, driveDayStr }) {
+  const [drives, setDrives] = useState([]);
+  const [selectedDrive, setSelectedDrive] = useState(null);
+  const [positions, setPositions] = useState([]);
+  const [places, setPlaces] = useState([]);
+  const [longStayPlaces, setLongStayPlaces] = useState([]);
+  const [routeData, setRouteData] = useState(null);
+  const [loadingDrives, setLoadingDrives] = useState(true);
+  const [loadingRoute, setLoadingRoute] = useState(false);
+  const [error, setError] = useState(null);
+  const [dayMode, setDayMode] = useState(initialDate || null); // 'YYYY-MM-DD' or null
+  const [dayRoutes, setDayRoutes] = useState([]);
+  const [monthMode, setMonthMode] = useState(null); // 'YYYY-MM' or null
+  const [monthRoutes, setMonthRoutes] = useState([]);
+  const abortRef = useRef(null);
+  const dayAbortRef = useRef(null);
+  const monthAbortRef = useRef(null);
+
+  // 진입 쿼리(id/date)에 맞는 주행을 선택 — id > date > 첫 항목
+  const pickPreselect = (list) => {
+    if (initialId) {
+      const found = list.find(d => d.id === initialId);
+      if (found) return found;
+    }
+    if (initialDate) {
+      const found = list.find(d => driveDayStr(d) === initialDate);
+      if (found) return found;
+    }
+    return list[0];
+  };
+
+  // drives + places 초기 로드
+  useEffect(() => {
+    if (isMock) {
+      const list = MOCK_DATA.drives.recent_drives;
+      setDrives(list);
+      setPlaces(MOCK_DATA.frequentPlaces);
+      setLoadingDrives(false);
+      setSelectedDrive(pickPreselect(list));
+      return;
+    }
+    setLoadingDrives(true);
+    setError(null);
+    Promise.allSettled([
+      fetch('/api/drives').then(r => r.json()),
+      fetch('/api/frequent-places').then(r => r.json()),
+      fetch('/api/long-stay-places').then(r => r.json()),
+    ]).then(([drivesResult, placesResult, longStayResult]) => {
+      const drivesData = drivesResult.status === 'fulfilled' ? drivesResult.value : { recent_drives: [] };
+      const placesData = placesResult.status === 'fulfilled' ? placesResult.value : { places: [] };
+      const longStayData = longStayResult.status === 'fulfilled' ? longStayResult.value : { places: [] };
+      if (drivesResult.status === 'rejected') setError('데이터를 불러오지 못했습니다.');
+      const list = drivesData.recent_drives || [];
+      setDrives(list);
+      setPlaces(placesData.places || []);
+      setLongStayPlaces(longStayData.places || []);
+      setLoadingDrives(false);
+      if (list.length > 0) {
+        setSelectedDrive(pickPreselect(list));
+      }
+    });
+  }, [isMock, refreshSignal, initialId, initialDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 단일 주행 경로 로드
+  useEffect(() => {
+    if (dayMode || monthMode) return; // 일/월 모드에서는 단일 경로 미로딩
+    if (!selectedDrive) return;
+    if (isMock) {
+      setPositions(MOCK_DATA.routePositions);
+      setRouteData({ positions: MOCK_DATA.routePositions, maxSpeedKmh: 127, speedBands: { jam: 12, slow: 35, flow: 28, fast: 25 } });
+      return;
+    }
+    setLoadingRoute(true);
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const driveId = selectedDrive.id;
+
+    // 5xx transient 에러 회복용 1회 retry. r.ok 체크해서 HTTP 에러를 throw 로 명시 처리.
+    const fetchOnce = async () => {
+      const r = await fetch(`/api/route-map?driveId=${driveId}`, { signal: controller.signal });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    };
+    (async () => {
+      let data;
+      try {
+        data = await fetchOnce();
+      } catch (e1) {
+        if (e1.name === 'AbortError' || controller.signal.aborted) return;
+        try {
+          data = await fetchOnce();
+        } catch (e2) {
+          if (e2.name === 'AbortError' || controller.signal.aborted) return;
+          setPositions([]);
+          setRouteData(null);
+          setLoadingRoute(false);
+          return;
+        }
+      }
+      if (controller.signal.aborted) return;
+      const pos = data.positions || [];
+      setPositions(pos);
+      setRouteData(data);
+      setLoadingRoute(false);
+    })();
+    return () => { controller.abort(); };
+  }, [selectedDrive?.id, isMock, refreshSignal, dayMode, monthMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 일 모드 — 해당 일의 모든 주행 경로 병렬 로드
+  useEffect(() => {
+    if (!dayMode || isMock || drives.length === 0) { setDayRoutes([]); return; }
+    // 하루 주행을 시간 순(ASC)으로 정렬 → 지도 번호 배지 1번 = 그날 첫 주행
+    const dayDrives = drives
+      .filter(d => driveDayStr(d) === dayMode)
+      .slice()
+      .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+    if (dayDrives.length === 0) { setDayRoutes([]); return; }
+    setLoadingRoute(true);
+    if (dayAbortRef.current) dayAbortRef.current.abort();
+    dayAbortRef.current = new AbortController();
+    const palette = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7', '#84cc16', '#f43f5e'];
+    fetchInChunks(dayDrives, (d, idx) =>
+      fetchRouteMap(`/api/route-map?driveId=${d.id}`, dayAbortRef.current.signal)
+        .then(data => ({
+          positions: data.positions || [],
+          color: palette[idx % palette.length],
+          id: d.id,
+          startDate: d.start_date,
+        }))
+        .catch(() => null)
+    , 6).then(results => {
+      const valid = results.filter(r => r && r.positions.length >= 2);
+      setDayRoutes(valid);
+      setLoadingRoute(false);
+    });
+    return () => { dayAbortRef.current?.abort(); };
+  }, [dayMode, isMock, drives]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 월 모드 — 해당 월의 모든 주행 경로 병렬 로드
+  useEffect(() => {
+    if (!monthMode || isMock || drives.length === 0) { setMonthRoutes([]); return; }
+    const monthDrives = drives
+      .filter(d => driveDayStr(d).slice(0, 7) === monthMode)
+      .slice()
+      .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+    if (monthDrives.length === 0) { setMonthRoutes([]); return; }
+    setLoadingRoute(true);
+    if (monthAbortRef.current) monthAbortRef.current.abort();
+    monthAbortRef.current = new AbortController();
+    const palette = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7', '#84cc16', '#f43f5e'];
+    fetchInChunks(monthDrives, (d, idx) =>
+      fetchRouteMap(`/api/route-map?driveId=${d.id}&detail=light`, monthAbortRef.current.signal)
+        .then(data => ({
+          positions: data.positions || [],
+          color: palette[idx % palette.length],
+          id: d.id,
+          startDate: d.start_date,
+        }))
+        .catch(() => null)
+    , 6).then(results => {
+      const valid = results.filter(r => r && r.positions.length >= 2);
+      setMonthRoutes(valid);
+      setLoadingRoute(false);
+    });
+    return () => { monthAbortRef.current?.abort(); };
+  }, [monthMode, isMock, drives]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return {
+    drives,
+    places,
+    longStayPlaces,
+    selectedDrive, setSelectedDrive,
+    positions, setPositions,
+    routeData,
+    dayMode, setDayMode,
+    dayRoutes,
+    monthMode, setMonthMode,
+    monthRoutes,
+    loadingDrives, loadingRoute,
+    error,
+  };
+}

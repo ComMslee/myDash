@@ -1,0 +1,107 @@
+services:
+  teslamate:
+    image: teslamate/teslamate:latest
+    restart: always
+    environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - DATABASE_USER=${TM_DB_USER}
+      - DATABASE_PASS=${TM_DB_PASS}
+      - DATABASE_NAME=${TM_DB_NAME}
+      - DATABASE_HOST=database
+      - MQTT_HOST=mosquitto
+    volumes:
+      - ./import:/opt/app/import
+    cap_drop:
+      - all
+
+  teslamate-auth:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - 80:80
+      - 443:443
+      - 4000:4000
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - teslamate
+      - dashboard
+
+  database:
+    image: postgres:16
+    restart: always
+    environment:
+      - POSTGRES_USER=${TM_DB_USER}
+      - POSTGRES_PASSWORD=${TM_DB_PASS}
+      - POSTGRES_DB=${TM_DB_NAME}
+    volumes:
+      - teslamate-db:/var/lib/postgresql/data
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: always
+    command: mosquitto -c /mosquitto-no-auth.conf
+    ports:
+      - 1883:1883
+    volumes:
+      - mosquitto-conf:/mosquitto/config
+      - mosquitto-data:/mosquitto/data
+
+  dashboard:
+    build: ./dashboard
+    restart: always
+    environment:
+      - TM_DB_USER=${TM_DB_USER}
+      - TM_DB_PASS=${TM_DB_PASS}
+      - TM_DB_NAME=${TM_DB_NAME}
+      - DB_HOST=database
+      - KAKAO_REST_API_KEY=${KAKAO_REST_API_KEY}
+      - EV_CHARGER_API_KEY=${EV_CHARGER_API_KEY}
+      - TOUR_API_KEY=${TOUR_API_KEY}
+      - HOME_CHARGER_STAT_ID=${HOME_CHARGER_STAT_ID:-PI795111}
+      - HOME_CHARGER_STAT_IDS=${HOME_CHARGER_STAT_IDS:-PI795111,PI313299,PIH01089}
+      - TELEGRAM_HUB_URL=${TELEGRAM_HUB_URL:-http://telegram-hub:3000}
+      - HUB_SHARED_SECRET=${HUB_SHARED_SECRET:-}
+      # Spotify — refresh_token 1회 발급 후 영원히 자동 갱신.
+      # 발급: SPOTIFY_CLIENT_ID=xxx SPOTIFY_CLIENT_SECRET=yyy node scripts/spotify-bootstrap.mjs
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID:-}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET:-}
+      - SPOTIFY_REFRESH_TOKEN=${SPOTIFY_REFRESH_TOKEN:-}
+    volumes:
+      - dashboard-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # 컨테이너별 stats 조회용 (api-status 페이지)
+    # 외부 80/443 은 teslamate-auth (Caddy) 가 담당. 내부 컨테이너 통신은 dashboard:5000.
+    # 5000 호스트 직접 노출은 디버그/우회용 (curl localhost:5000 으로 Caddy 우회 진단).
+    ports:
+      - 5000:5000
+    depends_on:
+      - database
+
+  telegram-hub:
+    build: ./services/telegram-hub
+    restart: always
+    environment:
+      - TM_DB_USER=${TM_DB_USER}
+      - TM_DB_PASS=${TM_DB_PASS}
+      - TM_DB_NAME=${TM_DB_NAME}
+      - DB_HOST=database
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - HUB_SHARED_SECRET=${HUB_SHARED_SECRET:-}
+      - DASHBOARD_URL=${DASHBOARD_URL:-http://dashboard:5000}
+      - DB_POLL_MS=${TG_HUB_DB_POLL_MS:-5000}
+    volumes:
+      - telegram-hub-data:/data
+    depends_on:
+      - database
+
+volumes:
+  teslamate-db:
+  mosquitto-conf:
+  mosquitto-data:
+  dashboard-data:
+  telegram-hub-data:
+  caddy-data:
+  caddy-config:

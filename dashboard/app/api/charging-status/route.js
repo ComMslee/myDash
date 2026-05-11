@@ -1,0 +1,132 @@
+import { requireAuth } from '@/lib/auth-helper';
+import pool from '@/lib/db';
+import { getDefaultCar } from '@/lib/queries/car';
+
+export const dynamic = 'force-dynamic';
+
+// ⚠️  수정 전 필독: /CLAUDE.md "알려진 함정 — TeslaMate charges 테이블 스키마 변동" 섹션.
+//     일부 TeslaMate 버전엔 `charges.charge_limit_soc`, `charges.time_to_full_charge`
+//     컬럼이 없음. SELECT 추가시 해당 컬럼 존재 여부 확인 필요.
+
+// 최근 이 시간(초) 안의 positions.power < 0 이면 충전 중으로 간주 (폴백)
+const FALLBACK_WINDOW_SEC = 180;
+const FALLBACK_POWER_THRESHOLD = -0.1; // kW (충전=음수)
+
+export async function GET() {
+  const __unauth = await requireAuth();
+  if (__unauth) return __unauth;
+  try {
+    const car = await getDefaultCar();
+    if (!car) {
+      return Response.json({ charging: false });
+    }
+    const carId = car.id;
+
+    // Find active charging process (no end_date)
+    const activeResult = await pool.query(
+      `SELECT id, start_date, charge_energy_added, start_battery_level
+       FROM charging_processes
+       WHERE car_id = $1 AND end_date IS NULL
+       ORDER BY start_date DESC
+       LIMIT 1`,
+      [carId]
+    );
+
+    if (activeResult.rows.length > 0) {
+      const activeProcess = activeResult.rows[0];
+
+      // Get latest + first charge detail.
+      // - TeslaMate charges 테이블에 charge_limit_soc, time_to_full_charge 컬럼이
+      //   없는 스키마가 있어 SELECT 에서 제외. 응답에서는 null.
+      // - charging_processes.start_battery_level 은 세션 종료 시점에 업데이트되는
+      //   패턴이 있어 진행 중엔 null. charges 첫 row(date ASC) 로 폴백.
+      const chargeDetail = await pool.query(
+        `SELECT
+           (SELECT charger_power FROM charges
+              WHERE charging_process_id = $1 ORDER BY date DESC LIMIT 1) AS charger_power,
+           (SELECT battery_level FROM charges
+              WHERE charging_process_id = $1 ORDER BY date DESC LIMIT 1) AS battery_level,
+           (SELECT battery_level FROM charges
+              WHERE charging_process_id = $1 ORDER BY date ASC LIMIT 1) AS first_battery_level`,
+        [activeProcess.id]
+      );
+
+      const detail = chargeDetail.rows[0] || {};
+      const startSoc = activeProcess.start_battery_level ?? detail.first_battery_level ?? null;
+
+      return Response.json({
+        charging: true,
+        charging_process_id: activeProcess.id,
+        start_date: activeProcess.start_date,
+        charge_energy_added: activeProcess.charge_energy_added
+          ? parseFloat(parseFloat(activeProcess.charge_energy_added).toFixed(2))
+          : 0,
+        charger_power: detail.charger_power ? parseFloat(detail.charger_power) : null,
+        time_to_full_charge: null,
+        battery_level: detail.battery_level ?? null,
+        start_battery_level: startSoc,
+        charge_limit_soc: null,
+      });
+    }
+
+    // 폴백 — TeslaMate가 charging_processes를 닫아버리거나 아예 안 여는 케이스 대비.
+    // 두 신호 OR로 판정: (a) 최근 positions.power < 0, (b) 최근 배터리 레벨 증가
+    const fallback = await pool.query(
+      `SELECT
+         (SELECT power FROM positions
+            WHERE car_id = $1 ORDER BY date DESC LIMIT 1) AS latest_power,
+         (SELECT battery_level FROM positions
+            WHERE car_id = $1 AND date >= NOW() - ($2 || ' seconds')::interval
+            ORDER BY date DESC LIMIT 1) AS recent_level,
+         (SELECT battery_level FROM positions
+            WHERE car_id = $1 AND date <= NOW() - ($3 || ' seconds')::interval
+              AND date >= NOW() - ($4 || ' seconds')::interval
+            ORDER BY date DESC LIMIT 1) AS older_level,
+         (SELECT date FROM positions
+            WHERE car_id = $1 ORDER BY date DESC LIMIT 1) AS latest_date,
+         (SELECT start_date FROM charging_processes
+            WHERE car_id = $1 ORDER BY start_date DESC LIMIT 1) AS last_start`,
+      [carId, FALLBACK_WINDOW_SEC, 300, 1200] // 최근 3분 / 5~20분 전
+    );
+
+    const fb = fallback.rows[0] || {};
+    const powerSignal = fb.latest_power != null
+      && parseFloat(fb.latest_power) < FALLBACK_POWER_THRESHOLD;
+    const levelSignal = fb.recent_level != null
+      && fb.older_level != null
+      && fb.recent_level > fb.older_level;
+
+    const debug = {
+      latest_power: fb.latest_power != null ? parseFloat(fb.latest_power) : null,
+      recent_level: fb.recent_level ?? null,
+      older_level: fb.older_level ?? null,
+      latest_date: fb.latest_date ?? null,
+      power_signal: powerSignal,
+      level_signal: levelSignal,
+    };
+
+    if (powerSignal || levelSignal) {
+      const inferredPower = fb.latest_power != null && parseFloat(fb.latest_power) < 0
+        ? Math.abs(parseFloat(fb.latest_power))
+        : null;
+      return Response.json({
+        charging: true,
+        fallback: true,
+        fallback_reason: powerSignal && levelSignal ? 'power+level'
+          : powerSignal ? 'power' : 'level',
+        start_date: fb.last_start ?? null,
+        charge_energy_added: 0,
+        charger_power: inferredPower,
+        time_to_full_charge: null,
+        battery_level: fb.recent_level ?? null,
+        charge_limit_soc: null,
+        debug,
+      });
+    }
+
+    return Response.json({ charging: false, debug });
+  } catch (err) {
+    console.error('/api/charging-status error:', err);
+    return Response.json({ error: 'DB error', detail: err.message }, { status: 500 });
+  }
+}

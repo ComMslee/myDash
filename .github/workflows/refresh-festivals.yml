@@ -1,0 +1,46 @@
+name: Refresh Festivals (TourAPI poll)
+
+# 월·수·금 03:00 KST = UTC 일·화·목 18:00.
+# Lightsail SSH → 내부 curl POST /api/family/festivals/refresh (HUB_SHARED_SECRET 인증).
+# 외부 노출 없이 컨테이너 → 컨테이너 호출.
+
+on:
+  schedule:
+    - cron: '0 18 * * 0,2,4'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: refresh-festivals
+      cancel-in-progress: false
+
+    steps:
+      - name: Trigger refresh via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          timeout: 30s
+          command_timeout: 5m
+          script: |
+            set -e
+            cd ~/myDash
+            SECRET=$(grep "^HUB_SHARED_SECRET=" .env | cut -d= -f2)
+            if [ -z "$SECRET" ]; then
+              echo "HUB_SHARED_SECRET 미설정" >&2
+              exit 1
+            fi
+            HTTP_CODE=$(curl -sS -o /tmp/festivals-refresh.json -w "%{http_code}" \
+              -X POST \
+              -H "x-hub-secret: $SECRET" \
+              "http://localhost:5000/api/family/festivals/refresh")
+            echo "HTTP $HTTP_CODE"
+            cat /tmp/festivals-refresh.json
+            echo
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "Refresh 실패" >&2
+              exit 1
+            fi

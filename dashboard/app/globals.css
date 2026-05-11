@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Leaflet base styles - must be global */
+.leaflet-container {
+  background: #1a1a2e;
+}
+
+.leaflet-tile {
+  filter: brightness(0.8) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+}
+
+.leaflet-control-attribution {
+  background: rgba(0,0,0,0.6) !important;
+  color: #666 !important;
+}
+
+.leaflet-control-attribution a {
+  color: #888 !important;
+}
+
+.leaflet-control-zoom a {
+  background: #1e1e1e !important;
+  color: #ccc !important;
+  border-color: #333 !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: #2a2a2a !important;
+  color: #fff !important;
+}
+
+html, body {
+  background-color: #0f0f0f;
+}
+
+/* NOW 도트 펄스 — 현재 SoC 위치 */
+@keyframes now-pulse {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.35); }
+}
+.now-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: now-pulse 1.8s ease-in-out infinite;
+}
+
+/* 예측 드레인 구간 시머 — 시간 흐름 느낌 */
+@keyframes predict-shimmer {
+  0%   { opacity: 0.55; }
+  50%  { opacity: 0.95; }
+  100% { opacity: 0.55; }
+}
+.predict-shimmer {
+  animation: predict-shimmer 5s ease-in-out infinite;
+}
+
+/* 충전 임박 펄스 (번개 아이콘용) */
+@keyframes charge-pulse {
+  0%, 100% { opacity: 0.85; filter: drop-shadow(0 0 3px currentColor); }
+  50%      { opacity: 1;    filter: drop-shadow(0 0 8px currentColor); }
+}
+.charge-pulse {
+  animation: charge-pulse 1.6s ease-in-out infinite;
+}
+
+/* 충전 중 배터리 채움 펄스 (빠른 숨쉬기) */
+@keyframes charge-fill-pulse {
+  0%, 100% { opacity: 0.78; }
+  50%      { opacity: 1;    }
+}
+.charge-fill-pulse {
+  animation: charge-fill-pulse 1.6s ease-in-out infinite;
+}
+
+/* 앱 런처 시트 — backdrop fade + 시트 slide-up */
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
