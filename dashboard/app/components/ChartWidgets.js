@@ -195,7 +195,7 @@ export function HourDowHeatmap({ data, hexColor = '#3b82f6', hourSoc = null }) {
         </div>
       )}
       <div
-        className="grid text-[9px] text-zinc-500 tabular-nums mt-1"
+        className="grid text-[9px] text-zinc-500 tabular-nums mt-1 whitespace-nowrap"
         style={{ gridTemplateColumns: '18px repeat(6, 0.5fr) repeat(18, 1fr)', gap: '1px' }}
       >
         <div />
