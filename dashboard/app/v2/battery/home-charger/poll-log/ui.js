@@ -1,5 +1,6 @@
 'use client';
 import { formatHM } from '@/lib/kst';
+import { Icon } from '@/app/lib/Icons';
 
 function successRate(row) {
   if (!row || !row.attempts) return null;
@@ -50,7 +51,7 @@ export function SummaryCard({ totals, lastQuotaHitAt }) {
           </div>
         </div>
         <div>
-          <div className="text-[9px] text-emerald-500">재시도✓</div>
+          <div className="text-[9px] text-emerald-500">재시도<Icon name="check" className="w-4 h-4 inline-block align-middle ml-0.5" /></div>
           <div className="text-emerald-400 font-semibold">{retrySuccesses}</div>
         </div>
         <div>
@@ -74,7 +75,7 @@ export function HourlyTable({ rows, schedule, nowHour, isToday }) {
           <th className="text-right font-normal py-1 px-1">성공</th>
           <th className="text-right font-normal py-1 px-1">부분</th>
           <th className={`text-right font-normal py-1 px-1 ${sep}`} title="재시도 실패">재시도</th>
-          <th className="text-right font-normal py-1 px-1" title="재시도 성공">재시도✓</th>
+          <th className="text-right font-normal py-1 px-1" title="재시도 성공">재시도<Icon name="check" className="w-4 h-4 inline-block align-middle ml-0.5" /></th>
           <th className={`text-right font-normal py-1 px-1 ${sep}`}>성공률</th>
         </tr>
       </thead>
@@ -120,7 +121,7 @@ export function DailyTable({ rows, todayStr }) {
           <th className="text-right font-normal py-1 px-1">성공</th>
           <th className="text-right font-normal py-1 px-1">부분</th>
           <th className={`text-right font-normal py-1 px-1 ${sep}`} title="재시도 실패">재시도</th>
-          <th className="text-right font-normal py-1 px-1" title="재시도 성공">재시도✓</th>
+          <th className="text-right font-normal py-1 px-1" title="재시도 성공">재시도<Icon name="check" className="w-4 h-4 inline-block align-middle ml-0.5" /></th>
           <th className={`text-right font-normal py-1 px-1 ${sep}`}>성공률</th>
         </tr>
       </thead>

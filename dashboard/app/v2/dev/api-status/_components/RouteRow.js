@@ -1,6 +1,7 @@
 import { WarmDiagCard } from '@/app/v2/battery/home-charger/poll-log/diag';
 import { ServerStatusCard } from './ServerStatusCard';
 import { ChargingDiagPanel } from './ChargingDiagPanel';
+import { Icon } from '@/app/lib/Icons';
 
 function fmtMs(n) {
   if (n == null) return '—';
@@ -63,11 +64,11 @@ export function RouteRow({ route, result, values, setValue, expanded, onToggleEx
         {hasParams && (
           <button
             onClick={onToggleEdit}
-            className={`px-3 flex items-center justify-center text-base active:bg-white/[0.05] ${editing ? 'text-blue-300' : 'text-zinc-600 hover:text-zinc-300'}`}
+            className={`px-3 flex items-center justify-center active:bg-white/[0.05] ${editing ? 'text-blue-300' : 'text-zinc-600 hover:text-zinc-300'}`}
             title="파라미터 편집"
             aria-label="파라미터 편집"
           >
-            ✎
+            <Icon name="pencil" className="w-5 h-5" />
           </button>
         )}
       </div>

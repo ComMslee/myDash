@@ -3,6 +3,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { formatHours } from '@/lib/format';
 import { kstDateStr, kstMondayStr } from '@/lib/kst';
+import { Icon } from '../../lib/Icons';
 import { useIdleDrainDays } from './useIdleDrainDays';
 import { dropSharePct, computeSentrySpans, sumSpansMin } from './idle-drain/compute';
 import { dropTextClass } from './idle-drain/colors';
@@ -132,12 +133,12 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
             {avgDrainPerDay}%<span className="text-[9px] font-normal text-zinc-600 ml-0.5">/일</span>
             {totalClimatePct != null && (
               <span className="text-[10px] font-normal text-sky-700 opacity-80 ml-1" title={`공조 작동 ${Math.round(totalClimateMin)}분`}>
-                <span aria-hidden="true">🌀</span>{totalClimatePct}%
+                <Icon name="climate" className="w-4 h-4 inline-block align-middle mr-0.5" />{totalClimatePct}%
               </span>
             )}
             {totalSentryPct != null && (
               <span className="text-[10px] font-normal text-fuchsia-400 opacity-80 ml-1" title={`센트리 의심 ${Math.round(totalSentryMin)}분`}>
-                <span aria-hidden="true">🛡</span>{totalSentryPct}%
+                <Icon name="shield" className="w-4 h-4 inline-block align-middle mr-0.5" />{totalSentryPct}%
               </span>
             )}
           </div>

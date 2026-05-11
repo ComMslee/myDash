@@ -88,7 +88,7 @@ export default function V2DrivesPage() {
 
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white">
-      <div className="max-w-2xl mx-auto px-4 py-5 pb-24 space-y-5">
+      <div className="max-w-2xl mx-auto px-4 py-5 pb-3 space-y-5">
 
         {/* 1. 차량 요약 — 누적·효율 + 기간별 통계 */}
         {loading.car || loading.insights || loading.drives ? <Spinner /> : (

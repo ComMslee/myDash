@@ -3,6 +3,7 @@
 import { useState, Fragment } from 'react';
 import { KWH_PER_KM } from '@/lib/constants';
 import { formatDuration, formatHm } from '@/lib/format';
+import { Icon } from '../../lib/Icons';
 
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -20,39 +21,32 @@ function formatMonthLabel(mk) {
   return `${yLabel}${parseInt(m)}월`;
 }
 
-// 06~24h 막대 — 새벽(00~06)은 거의 안 쓰는 시간이라 윈도우 밖.
-// 좌측 점: 06시 이전 시작 운행 존재 / 우측 점: 자정 넘김 운행 존재. 정확한 시각은 메타라인.
-function DayTimelineBar({ items, dayStart }) {
+// 카드 풀배경 그라데이션 — 06~23h 윈도우. 운행 구간만 아래쪽이 짙고 위로 페이드.
+// 별도 막대 행 없이 카드 자체가 타임라인. 새벽/심야 점은 메타라인의 🌙 emoji 가 흡수.
+function DayBgGradient({ items, dayStart, dayMs }) {
   const visible = items.filter(d => !d.absorbed && d.start_date);
   if (!visible.length) return null;
-  const dayMs = 18 * 3600000; // 06:00 ~ 24:00
-  const hasEarly = visible.some(d => new Date(d.start_date) - dayStart < 0);
-  const hasLate = visible.some(d => d.end_date && new Date(d.end_date) - dayStart > dayMs);
   return (
-    <div className="flex items-center gap-1">
-      <div className="w-1 flex-shrink-0 flex justify-center">
-        {hasEarly && <div className="w-1 h-1 rounded-full bg-blue-400/70" />}
-      </div>
-      <div className="relative h-2.5 flex-1 bg-white/[0.04] rounded overflow-hidden">
-        {visible.map(d => {
-          const s = new Date(d.start_date) - dayStart;
-          const eMs = d.end_date ? (new Date(d.end_date) - dayStart) : (s + 60000);
-          if (eMs <= 0) return null; // 윈도우 밖(새벽만)
-          const left = Math.max(0, Math.min(100, (s / dayMs) * 100));
-          const right = Math.max(0, Math.min(100, (eMs / dayMs) * 100));
-          const width = Math.max(0.4, right - left);
-          return (
-            <div
-              key={d.id}
-              className="absolute inset-y-0 bg-blue-400/80"
-              style={{ left: `${left}%`, width: `${width}%` }}
-            />
-          );
-        })}
-      </div>
-      <div className="w-1 flex-shrink-0 flex justify-center">
-        {hasLate && <div className="w-1 h-1 rounded-full bg-blue-400/70" />}
-      </div>
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {visible.map(d => {
+        const s = new Date(d.start_date) - dayStart;
+        const eMs = d.end_date ? (new Date(d.end_date) - dayStart) : (s + 60000);
+        if (eMs <= 0) return null; // 윈도우 밖(새벽만)
+        const left = Math.max(0, Math.min(100, (s / dayMs) * 100));
+        const right = Math.max(0, Math.min(100, (eMs / dayMs) * 100));
+        const width = Math.max(0, right - left);
+        return (
+          <div
+            key={d.id}
+            className="absolute inset-y-0"
+            style={{
+              left: `${left}%`,
+              width: `max(4px, ${width}%)`,
+              background: 'linear-gradient(to top, rgba(96,165,250,0.32) 0%, rgba(96,165,250,0.32) 10%, rgba(96,165,250,0) 30%, transparent 100%)',
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -149,7 +143,7 @@ export default function DriveListView({
     }
     const dayStart = new Date(g.firstDate);
     dayStart.setHours(6, 0, 0, 0); // 막대 윈도우 시작 = 06:00 (00~06 새벽은 점 indicator)
-    const dayMs = 18 * 3600000;
+    const dayMs = 17 * 3600000;
     const isEarly = new Date(first.start_date).getHours() < 6;
     const isLateEnd = last.end_date && (new Date(last.end_date) - dayStart) > dayMs; // 자정 넘김 종료
     return (
@@ -157,13 +151,19 @@ export default function DriveListView({
         key={g.key}
         type="button"
         onClick={() => onDayClick(g.dateStr)}
-        className="w-full text-left flex flex-col gap-2 px-3 py-3 border-b border-white/[0.04] last:border-0 hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
+        className="relative w-full text-left flex flex-col gap-1 px-3 py-3 border-b border-white/[0.04] last:border-0 hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
       >
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-bold text-zinc-200 tabular-nums flex-shrink-0">
-            {g.firstDate.getMonth() + 1}/{g.firstDate.getDate()}
-            <span className="text-[10px] text-zinc-600 font-normal ml-0.5">({weekday})</span>
-          </span>
+        <DayBgGradient items={visible} dayStart={dayStart} dayMs={dayMs} />
+        <div className="relative flex items-center justify-between gap-2">
+          <div className="flex items-baseline gap-2 min-w-0 flex-shrink">
+            <span className="text-sm font-bold text-zinc-200 tabular-nums flex-shrink-0">
+              {g.firstDate.getMonth() + 1}/{g.firstDate.getDate()}
+              <span className="text-[10px] text-zinc-600 font-normal ml-0.5">({weekday})</span>
+            </span>
+            <span className="text-[11px] text-zinc-500 tabular-nums truncate">
+              {isEarly && <Icon name="moon" className="w-4 h-4 inline-block align-middle mr-0.5" />}{fmt(first.start_date)} → {fmt(last.end_date || last.start_date)}{isLateEnd && <Icon name="moon" className="w-4 h-4 inline-block align-middle ml-0.5" />}
+            </span>
+          </div>
           <div className="text-right tabular-nums flex-shrink-0">
             <span className="text-sm font-bold text-blue-400">{g.distance.toFixed(0)}<span className="text-[10px] text-zinc-600 ml-0.5">km</span></span>
             {g.kwh > 0 && (
@@ -174,21 +174,18 @@ export default function DriveListView({
             )}
           </div>
         </div>
-        <DayTimelineBar items={visible} dayStart={dayStart} />
-        <div className="flex items-center gap-2 text-[11px] text-zinc-500 tabular-nums flex-wrap">
-          <span>{isEarly && <span className="mr-0.5">🌙</span>}{fmt(first.start_date)} → {fmt(last.end_date || last.start_date)}{isLateEnd && <span className="ml-0.5">🌙</span>}</span>
-          <span className="text-zinc-700">·</span>
-          <span title="주행"><span className="mr-0.5">🚗</span>{driveCount}회</span>
+        <div className="relative flex items-center gap-2 text-[11px] text-zinc-500 tabular-nums flex-wrap">
+          <span title="주행" className="inline-flex items-center gap-0.5"><Icon name="car" />{driveCount}회</span>
           {driveTotalMin > 0 && (
             <>
               <span className="text-zinc-700">·</span>
-              <span title="운전"><span className="mr-0.5">🛣️</span>{formatHm(Math.round(driveTotalMin))}</span>
+              <span title="운전" className="inline-flex items-center gap-0.5"><Icon name="road" />{formatHm(Math.round(driveTotalMin))}</span>
             </>
           )}
           {stayMin > 0 && (
             <>
               <span className="text-zinc-700">·</span>
-              <span title="정차"><span className="mr-0.5">🅿️</span>{formatHm(Math.round(stayMin))}</span>
+              <span title="정차" className="inline-flex items-center gap-0.5"><Icon name="park" />{formatHm(Math.round(stayMin))}</span>
             </>
           )}
         </div>
@@ -237,7 +234,7 @@ export default function DriveListView({
                 className="px-3 flex items-center text-zinc-500 border-l border-white/[0.06] hover:bg-white/[0.05] active:bg-white/[0.08] transition-colors"
                 title={expanded ? '접기' : '펼치기'}
               >
-                <svg className={`w-3 h-3 transition-transform ${expanded ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-4 h-4 transition-transform ${expanded ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>

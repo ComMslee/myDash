@@ -1,6 +1,7 @@
 'use client';
 
 import { NOMINAL_BATTERY_KWH } from '@/lib/constants';
+import { Icon } from '../../lib/Icons';
 
 export default function HealthScoreCard({ data, trend }) {
   const {
@@ -82,7 +83,7 @@ export default function HealthScoreCard({ data, trend }) {
       <div className="px-4 py-2">
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-xs font-semibold text-zinc-400">SOC 체류 분포</span>
-          {tips?.[0] && <span className="text-[11px] text-zinc-500">💡 {tips[0]}</span>}
+          {tips?.[0] && <span className="text-[11px] text-zinc-500 inline-flex items-center gap-1"><Icon name="bulb" />{tips[0]}</span>}
         </div>
         <div className="relative">
           <div className="flex items-end gap-0.5" style={{ height: histH }}>

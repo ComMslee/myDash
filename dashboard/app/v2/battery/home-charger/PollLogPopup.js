@@ -4,6 +4,7 @@ import { kstDateStr, KST_OFFSET_MS } from '@/lib/kst';
 import { WarmDiagCard } from './poll-log/diag';
 import { MetricHeatmap5Row, DailyFailureHeatmap } from './poll-log/heatmap';
 import { TabButton, SummaryCard, HourlyTable, DailyTable } from './poll-log/ui';
+import { Icon } from '../../../lib/Icons';
 
 export default function PollLogPopup({ onClose }) {
   const [view, setView] = useState('hourly'); // 'hourly' | 'daily'
@@ -76,7 +77,7 @@ export default function PollLogPopup({ onClose }) {
             aria-label="닫기"
             className="w-7 h-7 rounded-md hover:bg-white/[0.06] flex items-center justify-center text-zinc-400 hover:text-zinc-200"
           >
-            ✕
+            <Icon name="x" className="w-5 h-5" />
           </button>
         </div>
 

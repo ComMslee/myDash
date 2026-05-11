@@ -1,5 +1,7 @@
 'use client';
 
+import { Icon } from '../lib/Icons';
+
 export function CombinedHourlyHeatmap({ driveData, chargeData }) {
   const driveMax = Math.max(1, ...driveData.map(h => h.count));
   const chargeMax = Math.max(1, ...chargeData.map(h => h.count));
@@ -205,7 +207,7 @@ export function HourDowHeatmap({ data, hexColor = '#3b82f6', hourSoc = null }) {
       </div>
       {peakVal > 0 && (
         <div className="flex flex-wrap items-center gap-x-2 mt-1.5 text-[10px] text-zinc-500 tabular-nums">
-          <span>🔥 피크 {DOW_LABELS_KO[peakDow]} {peakHour}시 ({peakVal}회)</span>
+          <span className="inline-flex items-center gap-1 text-orange-400/80"><Icon name="fire" />피크 {DOW_LABELS_KO[peakDow]} {peakHour}시 ({peakVal}회)</span>
           <span className="ml-auto">총 {total}회</span>
         </div>
       )}

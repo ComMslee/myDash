@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Icon } from '../../../lib/Icons';
 
 // 단지 충전 인프라 활용도 라이브 패널.
 // /v2/chargers 페이지 하단 인라인 + /v2/chargers/report 별도 페이지 캡처용 공유.
@@ -38,7 +39,7 @@ export default function ReportPanel() {
   if (err) return (
     <Wrap>
       <div className="p-4 text-sm">
-        <div className="text-rose-400 font-bold">⚠️ {err.error}</div>
+        <div className="text-rose-400 font-bold inline-flex items-center gap-1.5"><Icon name="warn" className="w-5 h-5" />{err.error}</div>
         {err.detail && (
           <div className="text-rose-300 text-xs mt-1 break-all">{err.detail}</div>
         )}
@@ -72,7 +73,7 @@ export default function ReportPanel() {
 function DebugDump({ data }) {
   return (
     <details className="text-[10px] text-zinc-600 mt-1">
-      <summary className="cursor-pointer select-none hover:text-zinc-400">🔍 디버그 (raw 응답)</summary>
+      <summary className="cursor-pointer select-none hover:text-zinc-400 inline-flex items-center gap-1"><Icon name="search" className="w-4 h-4" />디버그 (raw 응답)</summary>
       <div className="mt-1.5 space-y-1.5 bg-black/30 rounded p-2 border border-white/[0.04]">
         <div>
           <span className="text-zinc-500">meta:</span>{' '}
@@ -305,7 +306,7 @@ function DongBars({ byDong }) {
     <div className="bg-black/20 rounded-lg p-2.5">
       <div className="flex items-baseline justify-between mb-1.5 px-1">
         <span className="text-[10px] font-bold tracking-wider uppercase text-zinc-400">동별 가동률</span>
-        <span className="text-[9px] text-zinc-600">⭐ = 즐겨찾기 · 막대 = 점유율 %</span>
+        <span className="text-[9px] text-zinc-600 inline-flex items-center gap-1"><Icon name="star" filled className="w-4 h-4 text-amber-400" />= 즐겨찾기 · 막대 = 점유율 %</span>
       </div>
       <div className="space-y-1.5">
         {byDong.map((d) => {
@@ -315,7 +316,7 @@ function DongBars({ byDong }) {
             <div key={d.key} className="flex items-center gap-2">
               {/* 좌: ⭐(즐겨찾기) + "119동 앞" 까지 안 잘리게. 우: "100.0% (12기)" 까지 안 잘리게. */}
               <div className="w-[88px] shrink-0 text-[10px] text-zinc-300 truncate" title={d.title}>
-                {d.favorite && <span className="text-amber-400 mr-0.5">⭐</span>}
+                {d.favorite && <Icon name="star" filled className="w-4 h-4 inline-block align-middle text-amber-400 mr-0.5" />}
                 {d.title}
               </div>
               <div className="flex-1 h-3 bg-black/40 rounded-sm overflow-hidden">

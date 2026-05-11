@@ -10,6 +10,7 @@ import DriveMap, { loadLeaflet } from '@/app/components/DriveMap';
 import RouteSparklines from '@/app/components/RouteSparklines';
 import DriveListView from '@/app/v2/history/DriveListView';
 import { useDriveData } from '@/app/v2/history/useDriveData';
+import { Icon } from '@/app/lib/Icons';
 
 // 체류 시간 포맷 — 초 단위 → 분/시간/일/주 자동 스케일.
 function fmtDwell(sec) {
@@ -52,17 +53,6 @@ function HistoryInner() {
   const initialId = Number.isFinite(rawId) ? rawId : null;
   const dateParamRaw = searchParams.get('date');
   const initialDate = isValidDateStr(dateParamRaw) ? dateParamRaw : null;
-
-  useEffect(() => {
-    const htmlPrev = document.documentElement.style.overflow;
-    const bodyPrev = document.body.style.overflow;
-    document.documentElement.style.overflow = 'hidden';
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.documentElement.style.overflow = htmlPrev;
-      document.body.style.overflow = bodyPrev;
-    };
-  }, []);
 
   // Leaflet CDN 사전 로드 — 첫 항목 클릭 시 1~2초 다운로드 지연 제거
   useEffect(() => { loadLeaflet(() => {}); }, []);
@@ -109,6 +99,19 @@ function HistoryInner() {
     } else {
       setPlacesCollapsed(false);
     }
+  }, [viewMode]);
+
+  // list 모드는 페이지 전체 스크롤 — body 잠금 skip. map/day 는 내부 컨테이너 스크롤이라 잠금.
+  useEffect(() => {
+    if (viewMode === 'list') return;
+    const htmlPrev = document.documentElement.style.overflow;
+    const bodyPrev = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.documentElement.style.overflow = htmlPrev;
+      document.body.style.overflow = bodyPrev;
+    };
   }, [viewMode]);
 
   const [mapEverShown, setMapEverShown] = useState(entryInMapView);
@@ -173,15 +176,18 @@ function HistoryInner() {
 
   return (
     <main className="bg-[#0f0f0f] text-white">
-      <div className="max-w-2xl mx-auto flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 57px - 58px - env(safe-area-inset-bottom, 0px))' }}>
+      <div
+        className={`max-w-2xl mx-auto flex flex-col ${viewMode === 'list' ? '' : 'overflow-hidden'}`}
+        style={viewMode === 'list' ? undefined : { height: 'calc(100dvh - 3.5rem - env(safe-area-inset-bottom, 0px))' }}
+      >
 
       {/* 자주 가는 곳 / 오래 머문 곳 — 탭 토글로 메트릭 전환 */}
       {viewMode === 'list' && (places.length > 0 || longStayPlaces.length > 0) && (() => {
         const isLong = placesMode === 'long-stay';
         const displayPlaces = isLong ? longStayPlaces : places;
         if (displayPlaces.length === 0) return null;
-        const titleText = isLong ? '🕐 오래 머문 곳' : '📍 자주 가는 곳';
-        const titleShort = isLong ? '오래 머문 곳' : '자주 가는 곳';
+        const titleIcon = isLong ? 'clock' : 'pin';
+        const titleLabel = isLong ? '오래 머문 곳' : '자주 가는 곳';
         const metric = (p) => isLong ? fmtDwell(p.max_dwell_sec) : `${p.visit_count}회`;
         return (
         <div className="flex-shrink-0 px-4 pt-2 pb-1.5">
@@ -190,7 +196,7 @@ function HistoryInner() {
               onClick={() => setPlacesCollapsed(false)}
               className="w-full flex items-center justify-between px-3 py-1.5 bg-zinc-800/40 border border-white/[0.06] rounded-lg hover:bg-zinc-800/70 transition-colors"
             >
-              <span className="text-xs text-zinc-400">{titleText} <span className="text-zinc-600 ml-1">· {displayPlaces.length}개</span></span>
+              <span className="text-xs text-zinc-400 inline-flex items-center gap-1"><Icon name={titleIcon} className="w-4 h-4" />{titleLabel} <span className="text-zinc-600 ml-1">· {displayPlaces.length}개</span></span>
               <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -199,28 +205,26 @@ function HistoryInner() {
             <>
               {/* 토글을 카드 행 첫 칸으로 인라인 — 별도 줄 차지 제거. 카드 높이에 맞춰 세로 분할. */}
               <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
-                <div className="flex-shrink-0 flex flex-col gap-0.5 bg-zinc-800/40 border border-white/[0.06] rounded-xl p-0.5 w-[58px]">
+                <div className="flex-shrink-0 flex flex-col gap-0.5 bg-zinc-800/40 border border-white/[0.06] rounded-xl p-0.5 w-[40px]">
                   <button
                     onClick={() => { setPlacesMode('frequent'); setPlacesExpanded(false); }}
                     aria-label="자주 가는 곳"
                     title="자주 가는 곳"
-                    className={`flex-1 flex flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-semibold transition-colors ${
-                      !isLong ? 'bg-white/[0.10] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
+                    className={`flex-1 flex items-center justify-center rounded-lg transition-colors ${
+                      !isLong ? 'bg-white/[0.10] text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
-                    <span className="text-base leading-none">📍</span>
-                    <span className="leading-none">자주</span>
+                    <Icon name="pin" className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => { setPlacesMode('long-stay'); setPlacesExpanded(false); }}
                     aria-label="오래 머문 곳"
                     title="오래 머문 곳"
-                    className={`flex-1 flex flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-semibold transition-colors ${
-                      isLong ? 'bg-white/[0.10] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
+                    className={`flex-1 flex items-center justify-center rounded-lg transition-colors ${
+                      isLong ? 'bg-white/[0.10] text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
-                    <span className="text-base leading-none">🕐</span>
-                    <span className="leading-none">오래</span>
+                    <Icon name="clock" className="w-5 h-5" />
                   </button>
                 </div>
                 {displayPlaces.slice(0, 5).map((p, i) => (
@@ -355,13 +359,13 @@ function HistoryInner() {
                   <p className="text-sm text-zinc-500 tabular-nums flex items-center gap-1.5 flex-wrap">
                     <span className="text-zinc-300 font-semibold">{monthLabel}</span>
                     <span className="text-zinc-700">·</span>
-                    <span title="주행"><span className="mr-0.5">🚗</span>{mDrives.length}회</span>
+                    <span title="주행" className="inline-flex items-center gap-0.5"><Icon name="car" />{mDrives.length}회</span>
                     <span className="text-zinc-700">·</span>
-                    <span title="운행일"><span className="mr-0.5">📅</span>{dayCount}일</span>
+                    <span title="운행일" className="inline-flex items-center gap-0.5"><Icon name="calendar" />{dayCount}일</span>
                     {totalMin > 0 && (
                       <>
                         <span className="text-zinc-700">·</span>
-                        <span title="운전"><span className="mr-0.5">🛣️</span>{formatHm(Math.round(totalMin))}</span>
+                        <span title="운전" className="inline-flex items-center gap-0.5"><Icon name="road" />{formatHm(Math.round(totalMin))}</span>
                       </>
                     )}
                   </p>
@@ -382,7 +386,7 @@ function HistoryInner() {
                   </p>
                   {topDests.length > 0 && (
                     <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
-                      <span className="flex-shrink-0">⭐</span>
+                      <Icon name="star" className="w-4 h-4 flex-shrink-0 text-amber-400" />
                       {topDests.map(([addr, n], i) => (
                         <span key={addr} className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 truncate max-w-[140px]">
                           <span className="text-zinc-600 mr-1">{i + 1}</span>{addr}<span className="text-zinc-500 ml-1 tabular-nums">{n}</span>
@@ -419,17 +423,17 @@ function HistoryInner() {
                   <p className="text-sm text-zinc-500 tabular-nums flex items-center gap-1.5 flex-wrap">
                     <span>{formatTimeRange(first.start_date, last.end_date)}</span>
                     <span className="text-zinc-700">·</span>
-                    <span title="주행"><span className="mr-0.5">🚗</span>{dayDrives.length}회</span>
+                    <span title="주행" className="inline-flex items-center gap-0.5"><Icon name="car" />{dayDrives.length}회</span>
                     {totalMin > 0 && (
                       <>
                         <span className="text-zinc-700">·</span>
-                        <span title="운전"><span className="mr-0.5">🛣️</span>{formatHm(Math.round(totalMin))}</span>
+                        <span title="운전" className="inline-flex items-center gap-0.5"><Icon name="road" />{formatHm(Math.round(totalMin))}</span>
                       </>
                     )}
                     {stayMin > 0 && (
                       <>
                         <span className="text-zinc-700">·</span>
-                        <span title="정차"><span className="mr-0.5">🅿️</span>{formatHm(Math.round(stayMin))}</span>
+                        <span title="정차" className="inline-flex items-center gap-0.5"><Icon name="park" />{formatHm(Math.round(stayMin))}</span>
                       </>
                     )}
                   </p>
@@ -611,19 +615,17 @@ function HistoryInner() {
         </div>
       )}
 
-      {/* 목록 모드 */}
-      <div className="flex-1 min-h-0 flex flex-col px-4 pt-3" style={{ display: viewMode === 'list' ? 'flex' : 'none' }}>
-          <div className="flex-1 min-h-0 bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-            <div className="h-full overflow-y-auto">
-              <DriveListView
-                drives={drives}
-                loadingDrives={loadingDrives}
-                error={error}
-                onDayClick={goToDay}
-                onMonthClick={goToMonth}
-                driveDayStr={driveDayStr}
-              />
-            </div>
+      {/* 목록 모드 — 카드는 content-fit, 스크롤은 wrapper. 짧은 리스트도 카드 빈 영역 없음. */}
+      <div className="px-4 pt-3 pb-3" style={{ display: viewMode === 'list' ? 'block' : 'none' }}>
+          <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
+            <DriveListView
+              drives={drives}
+              loadingDrives={loadingDrives}
+              error={error}
+              onDayClick={goToDay}
+              onMonthClick={goToMonth}
+              driveDayStr={driveDayStr}
+            />
           </div>
         </div>
 

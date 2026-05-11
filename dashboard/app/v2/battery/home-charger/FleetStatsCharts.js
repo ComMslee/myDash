@@ -1,5 +1,6 @@
 // FleetStatsPopup 내부에서 재사용되는 차트 프리미티브
 import { DOW_LABELS } from './fleet-stats-utils';
+import { Icon } from '../../../lib/Icons';
 
 // 누적치 대응 — 1.2k / 34k / 1.2M 축약. title/호버엔 원본값 유지.
 function compact(n) {
@@ -164,8 +165,8 @@ export function HourlyChart({ hourly }) {
       </div>
       {max > 0 && (
         <div className="mt-1.5 text-[10px] text-zinc-400 flex flex-wrap gap-x-2 gap-y-0.5 tabular-nums">
-          <span title={`${max}회`}>🔥 피크 {peakHour}시 ({compact(max)}회)</span>
-          {minHour >= 0 && <span title={`${minNonZero}회`}>💤 한산 {minHour}시 ({compact(minNonZero)}회)</span>}
+          <span title={`${max}회`} className="inline-flex items-center gap-1 text-orange-400/80"><Icon name="fire" />피크 {peakHour}시 ({compact(max)}회)</span>
+          {minHour >= 0 && <span title={`${minNonZero}회`} className="inline-flex items-center gap-1 text-zinc-500"><Icon name="sleep" />한산 {minHour}시 ({compact(minNonZero)}회)</span>}
           <span title={`${total}회`}>총 {compact(total)}회</span>
         </div>
       )}
@@ -196,7 +197,7 @@ export function DowChart({ dow }) {
             />
             <span className="text-[10px] text-zinc-500">{DOW_LABELS[i]}</span>
             <span className={`text-[10px] tabular-nums truncate max-w-full ${isPeak ? 'text-amber-400 font-semibold' : 'text-zinc-400'}`}>
-              {compact(v)}{isPeak ? ' 🔥' : isLow ? ' 💤' : ''}
+              {compact(v)}{isPeak ? <Icon name="fire" className="w-4 h-4 inline-block align-middle ml-0.5" /> : isLow ? <Icon name="sleep" className="w-4 h-4 inline-block align-middle ml-0.5" /> : null}
             </span>
           </div>
         );

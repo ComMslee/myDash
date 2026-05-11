@@ -70,7 +70,7 @@ myDash/
     │       ├── schema.js         # DB 스키마 정의
     │       └── usage.js          # 사용량 계산
     ├── app/
-    │   ├── layout.js             # 루트 레이아웃 (MockProvider, GlobalHeader)
+    │   ├── layout.js             # 루트 레이아웃 (MockProvider) — 전역 헤더 없음, 하단 알약(BottomNavV2)으로 상태/네비 통합
     │   ├── globals.css           # Tailwind 지시어 + Leaflet 다크 테마 오버라이드
     │   ├── page.js               # `/` → `/v2` 리다이렉트
     │   ├── login/page.js         # PIN 로그인 페이지 (`/login?next=...`) — Caddy forward_auth 미인증 리다이렉트 진입점
@@ -78,9 +78,8 @@ myDash/
     │   ├── context/
     │   │   └── mock.js           # MockProvider + MOCK_DATA (개발용 가상 데이터)
     │   ├── lib/
-    │   │   └── useScrollShrink.js  # 스크롤 임계점 기반 축소 토글 훅 — GlobalHeader/BottomNavV2 공용
+    │   │   └── useScrollShrink.js  # 스크롤 임계점 기반 축소 토글 훅 (BottomNavV2 전용 — 60px down→축소 / 30px up→펼침 히스테리시스)
     │   ├── components/           # 공용 컴포넌트 (v1·v2 공유)
-    │   │   ├── GlobalHeader.js   # 차량 상태/배터리/충전 상태 헤더 (sticky)
     │   │   ├── PageLayout.js     # Spinner 공유 컴포넌트
     │   │   ├── ChartWidgets.js   # HourlyHeatmap, WeekdayBars 차트
     │   │   ├── DriveMap.js       # Leaflet 주행 경로 지도 — positions(단일) / routes(다중, 일 합계) / highlightLatLng(포인트) / highlightRouteId(다중 모드 한 구간 강조 + zoom)
@@ -90,7 +89,7 @@ myDash/
     │   │   ├── layout.js         # v2 레이아웃 (BottomNavV2 포함)
     │   │   ├── page.js           # `/v2` → `/v2/drives` 리다이렉트
     │   │   ├── components/
-    │   │   │   ├── BottomNavV2.js    # 하단 탭 (주행/이력/배터리/충전소) — 스크롤 시 캡슐 축소 (useScrollShrink)
+    │   │   │   ├── BottomNavV2.js    # 하단 알약(BottomNav + 헤더 흡수) — 좌측 ⚙️ | 4탭(주행/이력/배터리/충전소) · SOC fill 배경(충전=노랑/그 외=초록) · 정보 행(상태 chip + 온라인 dot + 경과/충전 상세/예측 km·%) · ⚙️ 시트(텔레그램/API상태/인증) · /api/car + /api/charging-status 30초 폴링 · 스크롤 시 축소(useScrollShrink)
     │   │   │   └── RankingsSheet.js  # 랭킹 바텀시트
     │   │   ├── drives/
     │   │   │   ├── page.js                   # 주행 분석 — 차량 KPI + 인사이트 + 연간 히트맵 + 패턴 + TOP50 + 연도별 월간
@@ -131,7 +130,7 @@ myDash/
     │   │   │   ├── _parts/ReportPanel.js # 활용도 라이브 리포트 컴포넌트 (KPI · 주별 추이 · 동별)
     │   │   │   └── report/page.js        # 활용도 리포트 단독 페이지 (외부 캡처/공유)
     │   │   ├── tg/page.js            # 텔레그램 봇 관리 (권한·방송·학습로그·가이드)
-    │   │   └── dev/                  # 개발/진단 도구 (하단 탭·헤더 미노출, URL 직접)
+    │   │   └── dev/                  # 개발/진단 도구 (하단 알약 미노출, URL 직접)
     │   │       ├── api-status/
     │   │       │   └── page.js       # 29개 라우트 가용성 체크 + 서버/충전/폴링 진단 통합
     │   │       └── auth/
@@ -189,5 +188,5 @@ myDash/
 | `/v2/chargers` | 집충전기 실시간 + Top 순위 + 활용도 리포트 (인라인) | 충전소 |
 | `/v2/chargers/report` | 활용도 리포트 단독 페이지 (외부 캡처/공유) | — (URL 직접) |
 | `/v2/tg` | 텔레그램 봇 관리 (권한 · 방송 · 학습로그 · 가이드) | — (URL 직접) |
-| `/v2/dev/api-status` | API 가용성 + 서버/진단 (개발자용, URL 직접) | — (헤더·탭 미노출) |
-| `/v2/dev/auth` | 로그인 PIN 변경 (헤더 우측 ⚙️ 시트에서 진입) | — (헤더·탭 미노출) |
+| `/v2/dev/api-status` | API 가용성 + 서버/진단 (개발자용, URL 직접) | — (하단 알약 미노출) |
+| `/v2/dev/auth` | 로그인 PIN 변경 (하단 알약 좌측 ⚙️ 시트에서 진입) | — (하단 알약 미노출) |

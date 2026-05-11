@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { RenderErrorBoundary } from './_components/RenderErrorBoundary';
 import { RouteRow } from './_components/RouteRow';
 import { ServerStatusCard } from './_components/ServerStatusCard';
+import { Icon } from '@/app/lib/Icons';
 
 // ── 라우트 메타데이터 ─────────────────────────────────────────
 // dashboard: 펼침 시 raw peek 위에 추가로 보여줄 대시보드 ('server' | 'charging' | 'poll')
@@ -279,7 +280,7 @@ export default function ApiStatusPage() {
             }`}
           >
             서버
-            {serverErr && <span className="ml-1.5 text-rose-400">⚠</span>}
+            {serverErr && <Icon name="warn" className="w-4 h-4 inline-block align-middle ml-1.5 text-rose-400" />}
           </button>
           <button
             onClick={() => setTab('api')}
@@ -288,8 +289,8 @@ export default function ApiStatusPage() {
             }`}
           >
             API 테스트
-            {counts.fail > 0 && <span className="ml-1.5 text-rose-400 text-[11px] tabular-nums">✕{counts.fail}</span>}
-            {counts.fail === 0 && counts.slow > 0 && <span className="ml-1.5 text-amber-400 text-[11px] tabular-nums">⚠{counts.slow}</span>}
+            {counts.fail > 0 && <span className="ml-1.5 text-rose-400 text-[11px] tabular-nums inline-flex items-center gap-0.5"><Icon name="x" className="w-4 h-4" />{counts.fail}</span>}
+            {counts.fail === 0 && counts.slow > 0 && <span className="ml-1.5 text-amber-400 text-[11px] tabular-nums inline-flex items-center gap-0.5"><Icon name="warn" className="w-4 h-4" />{counts.slow}</span>}
           </button>
         </div>
 
@@ -316,15 +317,15 @@ export default function ApiStatusPage() {
                 <div className="flex items-center gap-3.5 min-w-0">
                   <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
                     <span className={`absolute inset-0 rounded-full ${cfg.halo} ${cfg.pulse ? 'animate-pulse' : ''}`} />
-                    <span className={`relative w-3 h-3 rounded-full ${cfg.dot}`} />
+                    <span className={`relative w-4 h-4 rounded-full ${cfg.dot}`} />
                   </div>
                   <div className="min-w-0">
                     <div className="text-2xl font-light tracking-tight">{cfg.label}</div>
                     <div className="text-[11px] text-zinc-500 tabular-nums mt-0.5">
                       <span className="text-zinc-300">{counts.ok}</span>
                       <span className="text-zinc-600"> / {ROUTES.length} OK</span>
-                      {counts.slow > 0 && <span className="ml-2.5 text-amber-400">⚠ {counts.slow}</span>}
-                      {counts.fail > 0 && <span className="ml-2.5 text-rose-400">✕ {counts.fail}</span>}
+                      {counts.slow > 0 && <span className="ml-2.5 text-amber-400 inline-flex items-center gap-1"><Icon name="warn" className="w-4 h-4" />{counts.slow}</span>}
+                      {counts.fail > 0 && <span className="ml-2.5 text-rose-400 inline-flex items-center gap-1"><Icon name="x" className="w-4 h-4" />{counts.fail}</span>}
                       {counts.idle > 0 && counts.idle < ROUTES.length && <span className="ml-2.5 text-zinc-600">○ {counts.idle}</span>}
                     </div>
                   </div>

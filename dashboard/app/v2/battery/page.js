@@ -35,7 +35,7 @@ export default function V2BatteryPage() {
 
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white">
-      <div className="max-w-2xl mx-auto px-4 py-4 pb-16 flex flex-col gap-3">
+      <div className="max-w-2xl mx-auto px-4 py-4 pb-3 flex flex-col gap-3">
         {loading ? (
           <Spinner />
         ) : error ? (

@@ -101,6 +101,6 @@
 
 - **Next.js `unstable_cache`**: 무거운 집계 라우트(year-heatmap, monthly-history, charge-all-time, rankings, heatmap, insights) 60s 서버 캐시
 - **클라이언트 모듈 캐시**: drives, frequent-places (60s TTL · mock toggle 시 invalidate · stale-while-revalidate)
-- **GlobalHeader 단기 캐시**: car 5분, charging-status 15s + tab `visibilitychange` 폴링 정지
+- **BottomNavV2 단기 캐시**: car 5분, charging-status 15s + tab `visibilitychange` 폴링 정지 (현재는 30초 setInterval만)
 - **Kakao 쿼리 batch SELECT**: `batchReverseGeocode`가 좌표별 SELECT 1회씩 → `coord_key IN (...)` 1회로 통합
 - **DB 인덱스 점검**: `positions(drive_id, date)`, `drives(car_id, start_date DESC)` (TeslaMate 기본 스키마 확인 필요)

@@ -5,6 +5,7 @@ import { formatHours } from '@/lib/format';
 import { formatHM, toKstDate } from '@/lib/kst';
 import { CLIMATE_BG, SENTRY_BG, dropTextClass, dropBarBg } from './colors';
 import { dropSharePct, sumSpansMin } from './compute';
+import { Icon } from '../../../lib/Icons';
 
 export default function DayTimeline({ dayKey, dayData, chargingSessions, fmtDrop, formatDateLabel }) {
   const { items, dayIdleH, dayDrop, dayClimateMin, daySentryMin, dayClimatePct, daySentryPct, sentrySpansList } = dayData;
@@ -23,7 +24,7 @@ export default function DayTimeline({ dayKey, dayData, chargingSessions, fmtDrop
                 className="text-sky-700 mr-1 opacity-80"
                 title={`공조 작동 추정 ${Math.round(dayClimateMin)}분`}
               >
-                <span aria-hidden="true">🌀</span>{dayClimatePct}%
+                <Icon name="climate" className="w-4 h-4 inline-block align-middle mr-0.5" />{dayClimatePct}%
               </span>
             )}
             {daySentryPct != null && (
@@ -31,7 +32,7 @@ export default function DayTimeline({ dayKey, dayData, chargingSessions, fmtDrop
                 className="text-fuchsia-400 mr-1 opacity-80"
                 title={`센트리 의심(공조 제외 온라인) 추정 ${Math.round(daySentryMin)}분`}
               >
-                <span aria-hidden="true">🛡</span>{daySentryPct}%
+                <Icon name="shield" className="w-4 h-4 inline-block align-middle mr-0.5" />{daySentryPct}%
               </span>
             )}
             {formatHours(dayIdleH)}
@@ -146,7 +147,7 @@ export default function DayTimeline({ dayKey, dayData, chargingSessions, fmtDrop
                 style={{ left: `${leftPct}%`, width: `${widthPct}%`, background: 'rgba(234,179,8,0.9)' }}
                 title={`충전 ${formatHM(c.start)}~${formatHM(c.end)} · ${formatHours(c.hours)} · ${c.soc_start}→${c.soc_end}% (+${c.soc_added}%)`}
               >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="#18181b" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="#18181b" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round">
                   <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                 </svg>
               </div>

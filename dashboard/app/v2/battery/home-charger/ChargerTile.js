@@ -2,6 +2,7 @@
 
 import { ID_OFFSET, OVERDUE_THRESHOLD_H, STAT_META, STATUS_ORDER } from './constants';
 import { chargingFillPct, chargingHours, elapsedLabel } from './utils';
+import { Icon } from '../../../lib/Icons';
 
 // 상태별 카운트 배지 — 헤더/요약에서 공용
 // size: 'md'(헤더) | 'sm'(P3 요약)
@@ -87,10 +88,11 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
     highlight?.tier === 'top10' ? 'ring-4 ring-amber-400/60' :
     '';
 
-  const medal =
-    highlight?.rank === 1 ? '🥇' :
-    highlight?.rank === 2 ? '🥈' :
-    highlight?.rank === 3 ? '🥉' : null;
+  // 1/2/3위 메달 — 색상으로 등급 구분(gold/silver/bronze).
+  const medalColor =
+    highlight?.rank === 1 ? 'text-yellow-300' :
+    highlight?.rank === 2 ? 'text-zinc-300' :
+    highlight?.rank === 3 ? 'text-amber-600' : null;
 
   // 하단 info 텍스트 — 충전중 경과시간 / 장애 '–' 만 표시.
   // 누적 카운트는 정보 과부하라 제거 (툴팁/사용 순위에서 확인).
@@ -119,9 +121,9 @@ export function UnifiedCell({ c, highlight, count, hourly, now, numberPrefix = '
           />
         </div>
       )}
-      {medal && (
-        <div className="absolute -top-3 -right-3 z-20 text-[26px] leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-          {medal}
+      {medalColor && (
+        <div className={`absolute -top-2.5 -right-2.5 z-20 ${medalColor} drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]`}>
+          <Icon name="medal" filled className="w-6 h-6" />
         </div>
       )}
       <div className={`relative z-10 pt-1 text-center text-lg font-bold tabular-nums ${meta.num}`}>

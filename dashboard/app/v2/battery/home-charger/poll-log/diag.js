@@ -1,5 +1,7 @@
 'use client';
 
+import { Icon } from '../../../../lib/Icons';
+
 // ms 단위 — lib/format.js::formatDuration(minutes)과 다름
 function formatDuration(ms) {
   if (!ms || ms < 0) return '-';
@@ -51,7 +53,7 @@ export function WarmDiagCard({ diag }) {
         </div>
       </div>
       {tickStale && (
-        <div className="mt-1 text-[10px] text-rose-400">⚠️ 2분 tick 정체</div>
+        <div className="mt-1 text-[10px] text-rose-400 inline-flex items-center gap-1"><Icon name="warn" />2분 tick 정체</div>
       )}
     </div>
   );

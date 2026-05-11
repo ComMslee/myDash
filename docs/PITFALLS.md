@@ -36,11 +36,11 @@
 
 이 인스턴스 TeslaMate 엔 `charge_limit_soc` (`bb46127`), `time_to_full_charge` (`eb142e4`) 컬럼이 없음. `/api/charging-status` SELECT 에서 제외하고 응답에서는 `null` 로 반환.
 
-**증상이 까다로운 이유** — 충전 미진행 시엔 폴백 분기만 타서 안 터지다가, `charging_processes` 가 열리는 순간(=실제 충전 시작) active 분기 SELECT 가 `column does not exist` 500 으로 떨어지고 `GlobalHeader` 의 `.catch(() => null)` 이 에러를 삼켜 `charging=false` 로 보임 ("처음엔 됐는데 안 됨" 회귀 패턴). 즉 **충전 중일 때만 깨지므로 일반 동작 확인으론 안 잡힘**. `charges` 신규 컬럼 SELECT 추가 시 반드시 컬럼 존재 여부 확인. 디버그용 `/api/debug/charging` 엔드포인트로 raw 덤프 확인 가능.
+**증상이 까다로운 이유** — 충전 미진행 시엔 폴백 분기만 타서 안 터지다가, `charging_processes` 가 열리는 순간(=실제 충전 시작) active 분기 SELECT 가 `column does not exist` 500 으로 떨어지고 `BottomNavV2` 의 `.catch(() => null)` 이 에러를 삼켜 `charging=false` 로 보임 ("처음엔 됐는데 안 됨" 회귀 패턴). 즉 **충전 중일 때만 깨지므로 일반 동작 확인으론 안 잡힘**. `charges` 신규 컬럼 SELECT 추가 시 반드시 컬럼 존재 여부 확인. 디버그용 `/api/debug/charging` 엔드포인트로 raw 덤프 확인 가능.
 
 ## 프런트 `fetch().catch(() => null)` 가 500 무음 처리
 
-`GlobalHeader` 의 `Promise.all([fetch('/api/...').catch(() => null), ...])` 패턴은 HTTP 500 을 reject 로 만들지 않으므로(`fetch` 는 4xx/5xx 도 resolve), 응답 JSON 파싱 단계에서나 catch 가 걸림 → 결과적으로 데이터 없음=정상 false 인지 백엔드 에러인지 구분 안 됨. 신규 백엔드 변경 후 "값이 안 뜸" 보고 받으면 **API 응답 status 부터 확인**. 가능하면 `r.ok` 체크 후 throw 하는 패턴(`/api/route-map` 케이스 `9ea3ebb`)을 쓰는 게 안전.
+`BottomNavV2` 의 `Promise.all([fetch('/api/...').then(r=>r.json()).catch(() => null), ...])` 패턴은 HTTP 500 을 reject 로 만들지 않으므로(`fetch` 는 4xx/5xx 도 resolve), 응답 JSON 파싱 단계에서나 catch 가 걸림 → 결과적으로 데이터 없음=정상 false 인지 백엔드 에러인지 구분 안 됨. 신규 백엔드 변경 후 "값이 안 뜸" 보고 받으면 **API 응답 status 부터 확인**. 가능하면 `r.ok` 체크 후 throw 하는 패턴(`/api/route-map` 케이스 `9ea3ebb`)을 쓰는 게 안전.
 
 ## `pg` 응답 숫자 타입
 

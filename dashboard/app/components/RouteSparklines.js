@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useRef } from 'react';
+import { Icon } from '../lib/Icons';
 
 const W = 400;
 const ROW_H = 24;
@@ -9,9 +10,9 @@ const PAD_Y = 3;
 
 // 3행 지표 설정 — 순서 = 표시 순서
 const METRICS = [
-  { key: 'speed', color: '#38bdf8', unit: 'km/h', emoji: '🚗', emojiClass: 'text-sky-400',   fmtSel: v => `${Math.round(v)}` },
-  { key: 'elev',  color: '#a3e635', unit: 'm',    emoji: '⛰', emojiClass: 'text-lime-400',  fmtSel: v => `${Math.round(v)}` },
-  { key: 'temp',  color: '#fb923c', unit: '°C',   emoji: '🌡', emojiClass: 'text-orange-400', fmtSel: v => (Math.round(v * 10) / 10).toFixed(1) },
+  { key: 'speed', color: '#38bdf8', unit: 'km/h', iconName: 'car',         iconClass: 'text-sky-400',    fmtSel: v => `${Math.round(v)}` },
+  { key: 'elev',  color: '#a3e635', unit: 'm',    iconName: 'mountain',    iconClass: 'text-lime-400',   fmtSel: v => `${Math.round(v)}` },
+  { key: 'temp',  color: '#fb923c', unit: '°C',   iconName: 'thermometer', iconClass: 'text-orange-400', fmtSel: v => (Math.round(v * 10) / 10).toFixed(1) },
 ];
 
 function computeStats(vals) {
@@ -166,11 +167,11 @@ export default function RouteSparklines({ routes, selectedIdx, onSelect }) {
 
   return (
     <div className="px-3 pt-2 pb-2 border-t border-white/[0.04] flex items-start gap-2">
-      {/* 좌: 이모지 */}
+      {/* 좌: 지표 아이콘 */}
       <div className="flex flex-col flex-shrink-0 text-[11px] leading-none">
         {METRICS.map(m => (
-          <span key={m.key} className={`${m.emojiClass} flex items-center`} style={{ height: ROW_H }}>
-            {m.emoji}
+          <span key={m.key} className={`${m.iconClass} flex items-center`} style={{ height: ROW_H }}>
+            <Icon name={m.iconName} className="w-4 h-4" />
           </span>
         ))}
       </div>

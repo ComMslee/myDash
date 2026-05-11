@@ -2,7 +2,6 @@ import './globals.css';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { MockProvider } from './context/mock';
-import GlobalHeader from './components/GlobalHeader';
 import { readAuth } from '@/lib/auth-store';
 import { COOKIE } from '@/lib/auth-helper';
 
@@ -36,9 +35,11 @@ export default async function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className="bg-[#0f0f0f] text-white min-h-screen pb-20">
+      <body
+        className="bg-[#0f0f0f] text-white min-h-screen"
+        style={{ paddingBottom: 'calc(3.5rem + env(safe-area-inset-bottom))' }}
+      >
         <MockProvider>
-          <GlobalHeader />
           {children}
         </MockProvider>
       </body>
