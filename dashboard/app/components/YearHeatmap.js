@@ -81,33 +81,6 @@ export default function YearHeatmap({
 
   const unitSuffix = metric === 'kwh' ? 'kWh' : 'km';
 
-  // 월별 합계 — 각 주 컬럼을 해당 월 강도로 칠해 시즌성 밴드 생성
-  // deps 는 data?.days 직접 — `daysMap = data?.days || {}` 는 매 렌더 새 객체라 메모 무효화 발생.
-  const monthlyTotals = useMemo(() => {
-    const totals = {};
-    for (const [key, d] of Object.entries(data?.days || {})) {
-      const ym = key.slice(0, 7);
-      const v = metric === 'kwh' ? (d.kwh || 0) : (d.km || 0);
-      totals[ym] = (totals[ym] || 0) + v;
-    }
-    return totals;
-  }, [data?.days, metric]);
-  const monthMax = Math.max(0, ...Object.values(monthlyTotals));
-
-  // 주(週) → 월 귀속: 7일 중 다수 점유 월로 결정 (월 경계 주의 misattribution 방지)
-  const weekMonth = (week) => {
-    const counts = {};
-    for (const { date } of week) {
-      const ym = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
-      counts[ym] = (counts[ym] || 0) + 1;
-    }
-    let bestYm = null, bestN = -1;
-    for (const [ym, n] of Object.entries(counts)) {
-      if (n > bestN) { bestN = n; bestYm = ym; }
-    }
-    return bestYm;
-  };
-
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-3">
       {loading ? (
@@ -164,23 +137,6 @@ export default function YearHeatmap({
                   })}
                 </div>
               ))}
-            </div>
-            {/* 시즌성 밴드 — 각 주 컬럼을 해당 월의 합계 강도로 채색 */}
-            <div className="flex gap-[3px] pl-[36px] mt-1.5">
-              {weeks.map((week, wi) => {
-                const ym = weekMonth(week);
-                const total = monthlyTotals[ym] || 0;
-                const op = heatmapIntensity(total, monthMax);
-                const cellStyle = op > 0 ? { background: color, opacity: op } : {};
-                return (
-                  <div
-                    key={wi}
-                    title={`${ym} 합계 ${Math.round(total).toLocaleString()}${unitSuffix}`}
-                    className="w-[15px] h-[8px] rounded-[1px] bg-zinc-800/40"
-                    style={cellStyle}
-                  />
-                );
-              })}
             </div>
           </div>
         </div>
