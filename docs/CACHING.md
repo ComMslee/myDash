@@ -79,7 +79,6 @@
 | `/api/home-charger/groups` | charger_usage, home_charger_snapshot | — | 없음 (constants.js 매핑) |
 | `/api/home-charger/report` | charger_usage, home_charger_snapshot | — | `getCache()` 의 모듈 캐시 활용 (콜드 스타트 시 DB observed_chargers 폴백) |
 | `/api/home-charger/poll-log` | (메모리 진단) | — | 없음 |
-| `/api/year-heatmap` | charging_processes | — | 없음 |
 | `/api/monthly-history` | charging_processes | — | 없음 |
 | `/api/charge-all-time` | charging_processes | — | 없음 |
 | `/api/heatmap` | drives | — | 없음 |
@@ -99,7 +98,7 @@
 
 ## 추후 개선 후보 (기능 영향 검토 필요)
 
-- **Next.js `unstable_cache`**: 무거운 집계 라우트(year-heatmap, monthly-history, charge-all-time, rankings, heatmap, insights) 60s 서버 캐시
+- **Next.js `unstable_cache`**: 무거운 집계 라우트(monthly-history, charge-all-time, rankings, heatmap, insights) 60s 서버 캐시
 - **클라이언트 모듈 캐시**: drives, frequent-places (60s TTL · mock toggle 시 invalidate · stale-while-revalidate)
 - **BottomNavV2 단기 캐시**: car 5분, charging-status 15s + tab `visibilitychange` 폴링 정지 (현재는 30초 setInterval만)
 - **Kakao 쿼리 batch SELECT**: `batchReverseGeocode`가 좌표별 SELECT 1회씩 → `coord_key IN (...)` 1회로 통합
