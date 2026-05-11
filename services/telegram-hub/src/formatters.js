@@ -2,17 +2,17 @@
 
 export function fmtElapsed(min) {
   if (!Number.isFinite(min) || min < 0) return '?';
-  return min >= 60
-    ? `${Math.floor(min / 60)}시간 ${min % 60}분`
-    : `${min}분`;
+  if (min < 60) return `${min}m`;
+  const r = min % 60;
+  return r === 0 ? `${Math.floor(min / 60)}h` : `${Math.floor(min / 60)}h ${r}m`;
 }
 
 export function fmtSecHm(sec) {
   if (!Number.isFinite(sec) || sec <= 0) return '?';
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
-  if (h >= 1) return m > 0 ? `${h}시간 ${m}분` : `${h}시간`;
-  return `${m}분`;
+  if (h >= 1) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  return `${m}m`;
 }
 
 export function ymdKstNow(offsetDays = 0) {

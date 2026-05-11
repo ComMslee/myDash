@@ -7,19 +7,28 @@ export const dynamic = 'force-dynamic';
 const TG_HUB_URL = process.env.TELEGRAM_HUB_URL || 'http://telegram-hub:3000';
 const HUB_SECRET = process.env.HUB_SHARED_SECRET || '';
 
-async function notifyChat(chatId, text) {
+async function notifyChat(chatId, text, opts = {}) {
   try {
     const headers = { 'content-type': 'application/json' };
     if (HUB_SECRET) headers.authorization = `Bearer ${HUB_SECRET}`;
+    const payload = { chat_id: chatId, text };
+    if (opts.reply_markup) payload.reply_markup = opts.reply_markup;
+    if (opts.disable_notification) payload.disable_notification = true;
     await fetch(`${TG_HUB_URL}/notify`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ chat_id: chatId, text }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(3000),
     });
   } catch (e) {
     console.error('[tg/action] notify failed', e?.message);
   }
+}
+
+const DASH_PUBLIC = process.env.DASHBOARD_PUBLIC_URL || '';
+function inlineButton(label, path) {
+  if (!DASH_PUBLIC) return undefined;
+  return { inline_keyboard: [[{ text: label, url: `${DASH_PUBLIC}${path}` }]] };
 }
 
 function bad(msg, status = 400) {
@@ -216,7 +225,108 @@ export async function POST(req) {
       for (const r of recipients) await notifyChat(r, text);
       return Response.json({ ok: true, sent: recipients.length });
     }
+    case 'test_notify': {
+      const kind = String(body.kind || '').trim();
+      const sample = TEST_SAMPLES[kind];
+      if (!sample) return bad('unknown kind');
+      // root 사용자에게만 발송 — 가족 broadcast 방지.
+      const r = await pool.query("SELECT chat_id::text FROM hub_users WHERE role='root'");
+      const recipients = r.rows.map((x) => x.chat_id);
+      if (!recipients.length && process.env.TELEGRAM_CHAT_ID) {
+        recipients.push(String(process.env.TELEGRAM_CHAT_ID));
+      }
+
+      // 주행 샘플은 실제 최근 drive id 로 deep-link → 클릭 시 그 주행이 선택된 상태로 열림.
+      let buttonPath = sample.button?.path;
+      if (buttonPath === '/v2/history' && (kind === 'drive_end' || kind === 'drive_end_long')) {
+        try {
+          const lastDrive = await pool.query(
+            "SELECT id FROM drives WHERE end_date IS NOT NULL ORDER BY id DESC LIMIT 1",
+          );
+          if (lastDrive.rowCount) buttonPath = `/v2/history?id=${lastDrive.rows[0].id}`;
+        } catch {}
+      }
+
+      const opts = (sample.button && buttonPath)
+        ? { reply_markup: inlineButton(sample.button.label, buttonPath) }
+        : {};
+      for (const c of recipients) await notifyChat(c, sample.text, opts);
+      return Response.json({
+        ok: true, sent: recipients.length, kind,
+        has_button: !!opts.reply_markup, button_path: buttonPath,
+      });
+    }
     default:
       return bad('unknown action');
   }
 }
+
+// poller.js / digest.js 가 실제 렌더하는 포맷과 1:1 일치해야 의미 있음.
+// 포맷 변경 시 여기도 동기화. button 은 prod 와 동일한 inline 버튼 prop.
+const TEST_SAMPLES = {
+  charge_start: { text: '⚡ <b>충전 시작</b> 25% · 📍 집' },
+
+  charge_end_slow_full: {
+    text:
+      '✅ 30→100% (+70%p, 41.20kWh, 274km)\n' +
+      '🔌 완속 📍 집\n' +
+      '⏱️ 6h 5m · 📈 6.8kW',
+    button: { label: '🔋 배터리 상세', path: '/v2/battery' },
+  },
+
+  charge_end_fast_quick: {
+    text:
+      '✅ 35→78% (+43%p, 25.30kWh, 168km)\n' +
+      '⚡ 급속 📍 강남 슈퍼차저\n' +
+      '⏱️ 25m · 📈 60.7kW',
+    button: { label: '🔋 배터리 상세', path: '/v2/battery' },
+  },
+
+  charge_end_topup: {
+    text:
+      '✅ 65→72% (+7%p, 4.20kWh, 28km)\n' +
+      '🔌 완속 📍 집\n' +
+      '⏱️ 35m · 📈 7.2kW',
+    button: { label: '🔋 배터리 상세', path: '/v2/battery' },
+  },
+
+  charge_end_zero: {
+    text:
+      '✅ 80→80% (+0%p)\n' +
+      '🔌 완속 📍 집\n' +
+      '⏱️ 2m',
+    button: { label: '🔋 배터리 상세', path: '/v2/battery' },
+  },
+
+  drive_end: {
+    text:
+      '🚗 집 → 회사\n' +
+      '🛣️ 28.4km · ⏱️ 42m\n' +
+      '⚡ 138Wh/km · 7.2km/kWh',
+    button: { label: '🗺️ 지도 보기', path: '/v2/history' },
+  },
+
+  drive_end_long: {
+    text:
+      '🚗 부산 → 서울\n' +
+      '🛣️ 350.5km · ⏱️ 4h 12m\n' +
+      '⚡ 145Wh/km · 6.9km/kWh',
+    button: { label: '🗺️ 지도 보기', path: '/v2/history' },
+  },
+
+  weekdays_digest: {
+    text:
+      '📅 <b>주간 요약 (월~금)</b>\n' +
+      '🚗 12회 · 🛣️ 312.4km · ⏱️ 8h 30m\n' +
+      '⚡ 142Wh/km · 7.0km/kWh\n' +
+      '🔋 3회 · ⚡ +90.0kWh',
+  },
+
+  weekend_digest: {
+    text:
+      '📅 <b>주말 요약 (토·일)</b>\n' +
+      '🚗 4회 · 🛣️ 128.6km · ⏱️ 3h 10m\n' +
+      '⚡ 138Wh/km · 7.2km/kWh\n' +
+      '🔋 1회 · ⚡ +25.0kWh',
+  },
+};

@@ -12,9 +12,9 @@ export function formatKst(d) {
 
 export function formatDur(min) {
   const n = Number(min || 0);
-  if (n <= 0) return '0분';
-  if (n < 60) return `${n}분`;
+  if (n <= 0) return '0m';
+  if (n < 60) return `${n}m`;
   const h = Math.floor(n / 60);
   const r = n % 60;
-  return r === 0 ? `${h}시간` : `${h}시간 ${r}분`;
+  return r === 0 ? `${h}h` : `${h}h ${r}m`;
 }

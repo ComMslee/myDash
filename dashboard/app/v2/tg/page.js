@@ -575,6 +575,10 @@ function BroadcastPane({ userGroups, unmatched, action, busy }) {
         <Broadcast userGroups={userGroups} action={action} busy={busy} />
       </Section>
 
+      <Section title="🧪 알림 포맷 테스트 (root 한정)">
+        <TestNotify action={action} busy={busy} />
+      </Section>
+
       <Section title={`🔍 못 알아들은 입력 ${unmatched.length ? `(${unmatched.length})` : ''}`}>
         {!unmatched.length ? (
           <div className="text-[12px] text-zinc-500">없음 ✨</div>
@@ -583,6 +587,40 @@ function BroadcastPane({ userGroups, unmatched, action, busy }) {
         )}
       </Section>
     </>
+  );
+}
+
+const TEST_KINDS = [
+  { key: 'charge_start',         label: '⚡ 충전 시작' },
+  { key: 'charge_end_slow_full', label: '✅ 충전 완료 (집·완속·풀)' },
+  { key: 'charge_end_fast_quick',label: '✅ 충전 완료 (외부·급속)' },
+  { key: 'charge_end_topup',     label: '✅ 충전 완료 (짧은 보충)' },
+  { key: 'charge_end_zero',      label: '✅ 충전 완료 (0kWh 취소성)' },
+  { key: 'drive_end',            label: '🚗 주행 종료 (단거리)' },
+  { key: 'drive_end_long',       label: '🚗 주행 종료 (장거리)' },
+  { key: 'weekdays_digest',      label: '📅 주간 요약 (토 09:00, 월~금)' },
+  { key: 'weekend_digest',       label: '📅 주말 요약 (월 09:00, 토·일)' },
+];
+
+function TestNotify({ action, busy }) {
+  return (
+    <div>
+      <p className="text-[11px] text-zinc-500 mb-3">
+        본인(root) 텔레그램으로 샘플 메시지 발송. 가족엔 가지 않음.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {TEST_KINDS.map((t) => (
+          <button
+            key={t.key}
+            disabled={busy}
+            onClick={() => action({ action: 'test_notify', kind: t.key })}
+            className="text-left px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-zinc-200 hover:bg-white/[0.08] disabled:opacity-30"
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -748,7 +786,40 @@ function GuidePane() {
       </div>
 
       <div>
-        <div className="font-medium mb-1">6. 응답 후속 액션</div>
+        <div className="font-medium mb-1">6. 🔔 자동 알림 — 이벤트 push</div>
+        <div className="text-zinc-400 text-[11px] space-y-1">
+          <div>각 알림은 해당 <b>기능그룹 권한자 전원</b>에 자동 발송. 그룹 권한 없으면 받지 않음.</div>
+          <div className="font-semibold text-zinc-300 mt-1">🚗 car 그룹 (차량 이벤트, poller 5초 폴링)</div>
+          <ul className="list-disc list-inside space-y-0.5 ml-1">
+            <li><b>⚡ 충전 시작</b> — SOC + 위치</li>
+            <li><b>✅ 충전 완료</b> — SOC델타·kWh·환산km / ⚡급속·🔌완속 / ⏱️시간·📈평균kW · 위치</li>
+            <li><b>🚗 주행 종료</b> — 시작→끝 / km · 시간 / Wh/km · km/kWh</li>
+            <li><b>📅 주간 요약 (월~금)</b> — 매주 <b>토 09:00 KST</b></li>
+            <li><b>📅 주말 요약 (토·일)</b> — 매주 <b>월 09:00 KST</b></li>
+          </ul>
+          <div className="font-semibold text-zinc-300 mt-2">🏠 family 그룹</div>
+          <ul className="list-disc list-inside space-y-0.5 ml-1 text-zinc-500">
+            <li>비/눈 1~2시간 전 자동 broadcast (예정)</li>
+            <li>등록 일정 알림 (예정)</li>
+          </ul>
+          <div className="font-semibold text-zinc-300 mt-2">📝 sns 그룹</div>
+          <ul className="list-disc list-inside space-y-0.5 ml-1 text-zinc-500">
+            <li>발행 결과 통보 (mock)</li>
+          </ul>
+          <div className="mt-1">
+            <b>야간 매너모드</b>: 23~06시 KST 알림은 <code className="text-blue-300">disable_notification</code> 자동 적용 — 메시지는 도착하지만 소리/진동 OFF.
+          </div>
+          <div>
+            <b>인라인 버튼</b> (env <code className="text-blue-300">DASHBOARD_PUBLIC_URL</code> 설정 시): 주행 종료 → 🗺️ 지도 보기, 충전 완료 → 🔋 배터리 상세.
+          </div>
+          <div className="text-zinc-500">
+            "알림" 탭의 <b>🧪 알림 포맷 테스트</b> 에서 10종 샘플 발송 가능 (root 한정).
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div className="font-medium mb-1">7. 응답 후속 액션</div>
         <div className="text-zinc-400 text-[11px]">
           데이터 명령 응답 끝에 inline 버튼 자동 동봉:
           <span className="ml-1 px-1.5 py-0.5 bg-zinc-800 rounded">🔄</span> (새로고침),
@@ -758,7 +829,7 @@ function GuidePane() {
       </div>
 
       <div>
-        <div className="font-medium mb-1">7. 공통 명령 (누구나)</div>
+        <div className="font-medium mb-1">8. 공통 명령 (누구나)</div>
         <ul className="text-zinc-400 list-disc list-inside space-y-0.5">
           <li><code className="text-blue-300">/help</code> — 본인 권한 기준 도움말 + Reply 키보드</li>
           <li><code className="text-blue-300">/whoami</code> — 이름·역할·권한 (root 만 chat_id)</li>
@@ -767,7 +838,7 @@ function GuidePane() {
       </div>
 
       <div>
-        <div className="font-medium mb-1">8. 자연어 — 미지원</div>
+        <div className="font-medium mb-1">9. 자연어 — 미지원</div>
         <div className="text-zinc-400 text-[11px]">
           정규식 기반 자연어 매칭은 정확도 부족으로 제거. 슬래시 명령 또는 키보드 버튼만 동작.
           잘못된 입력은 친근한 안내로 폴백 + 학습 로그(<code className="text-blue-300">hub_unmatched_inputs</code>) 적재.
@@ -775,7 +846,7 @@ function GuidePane() {
       </div>
 
       <div>
-        <div className="font-medium mb-1">9. 활용도 리포트 (대시보드)</div>
+        <div className="font-medium mb-1">10. 활용도 리포트 (대시보드)</div>
         <div className="text-zinc-400 text-[11px]">
           <code className="text-blue-300">/v2/chargers</code> 하단의 라이브 패널 — 단지 충전기 활용도 한 화면 요약 (외부 근거자료용). KPI · 주별 추이 · 동별 가동률.
         </div>

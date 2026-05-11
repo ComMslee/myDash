@@ -1,6 +1,7 @@
 import { loadState } from './state.js';
 import { startHttpServer } from './notify.js';
 import { startDbPoller } from './poller.js';
+import { startDigestScheduler } from './digest.js';
 import { startTelegramPoller } from './tg_poller.js';
 import { bootstrapRoot, grantPermission, syncMissingNames } from './auth.js';
 import { ensureCategoriesSchema } from './categories.js';
@@ -42,6 +43,7 @@ try {
 
 startHttpServer();
 startDbPoller();
+startDigestScheduler();
 startTelegramPoller();
 
 console.log('[boot] telegram-hub ready');

@@ -64,6 +64,7 @@ services:
       - HOME_CHARGER_STAT_IDS=${HOME_CHARGER_STAT_IDS:-PI795111,PI313299,PIH01089}
       - TELEGRAM_HUB_URL=${TELEGRAM_HUB_URL:-http://telegram-hub:3000}
       - HUB_SHARED_SECRET=${HUB_SHARED_SECRET:-}
+      - DASHBOARD_PUBLIC_URL=${DASHBOARD_PUBLIC_URL:-}
     volumes:
       - dashboard-data:/data
       - /var/run/docker.sock:/var/run/docker.sock:ro  # 컨테이너별 stats 조회용 (api-status 페이지)
@@ -86,6 +87,7 @@ services:
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - HUB_SHARED_SECRET=${HUB_SHARED_SECRET:-}
       - DASHBOARD_URL=${DASHBOARD_URL:-http://dashboard:5000}
+      - DASHBOARD_PUBLIC_URL=${DASHBOARD_PUBLIC_URL:-}
       - DB_POLL_MS=${TG_HUB_DB_POLL_MS:-5000}
     volumes:
       - telegram-hub-data:/data
