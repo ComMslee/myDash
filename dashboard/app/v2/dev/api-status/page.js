@@ -35,7 +35,6 @@ const ROUTES = [
       { key: 'detail',  sample: '' },
     ] },
   { path: '/api/heatmap',          label: '히트맵',         desc: '전체 위치 좌표 다운샘플링 → 빈도 히트맵 입력', category: '주행' },
-  { path: '/api/year-heatmap',     label: '연간 히트맵',    desc: '최근 1년 일별 주행/충전 집계 (캘린더 셀)', category: '주행' },
   { path: '/api/monthly-history',  label: '월간 이력',      desc: '월별 주행거리/충전량/효율 집계', category: '주행' },
   { path: '/api/frequent-places',  label: '자주 가는 곳',   desc: '지오펜스 도착 빈도 + 카카오 reverse geocode (집/회사 우선 핀)', category: '주행' },
   { path: '/api/resolve-address',  label: '좌표→주소',      desc: 'lat/lng → 한국어 라벨 (Kakao 역지오코딩, DB 캐시) — 봇 알림 주소 폴백', category: '주행',

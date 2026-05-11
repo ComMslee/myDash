@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useMock, MOCK_DATA } from '@/app/context/mock';
 import { Spinner } from '@/app/components/PageLayout';
 import { HourDowHeatmap } from '@/app/components/ChartWidgets';
-import YearHeatmap from '@/app/components/YearHeatmap';
 import VehicleKpiCard from './_parts/VehicleKpiCard';
 import MonthInsightsCard from './_parts/MonthInsightsCard';
 import RecordsCardV2 from './_parts/RecordsCardV2';
@@ -16,19 +15,17 @@ export default function V2DrivesPage() {
 
   const [drives, setDrives] = useState(null);
   const [insights, setInsights] = useState(null);
-  const [yearHeatmap, setYearHeatmap] = useState(null);
   const [monthlyHistory, setMonthlyHistory] = useState(null);
   const [car, setCar] = useState(null);
-  const [loading, setLoading] = useState({ drives: true, insights: true, heatmap: true, history: true, car: true });
+  const [loading, setLoading] = useState({ drives: true, insights: true, history: true, car: true });
 
   useEffect(() => {
     if (isMock) {
       setDrives(MOCK_DATA.drives);
       setInsights({ ...MOCK_DATA.insights, allTime: { ...MOCK_DATA.insights.sixMonth, avg_speed: 42.3, max_day_distance: 248.7, max_day_duration: 320 } });
-      setYearHeatmap(MOCK_DATA.yearHeatmap || null);
       setMonthlyHistory(MOCK_DATA.monthlyHistory || null);
       setCar(null);
-      setLoading({ drives: false, insights: false, heatmap: false, history: false, car: false });
+      setLoading({ drives: false, insights: false, history: false, car: false });
       return;
     }
 
@@ -39,10 +36,6 @@ export default function V2DrivesPage() {
     fetch('/api/insights').then(r => r.json())
       .then(d => { setInsights(d); setLoading(p => ({ ...p, insights: false })); })
       .catch(() => setLoading(p => ({ ...p, insights: false })));
-
-    fetch('/api/year-heatmap').then(r => r.json())
-      .then(d => { setYearHeatmap(d); setLoading(p => ({ ...p, heatmap: false })); })
-      .catch(() => setLoading(p => ({ ...p, heatmap: false })));
 
     fetch('/api/monthly-history').then(r => r.json())
       .then(d => { setMonthlyHistory(d); setLoading(p => ({ ...p, history: false })); })
@@ -98,18 +91,7 @@ export default function V2DrivesPage() {
         {/* 2. 이번달 인사이트 */}
         {!loading.insights && <MonthInsightsCard insights={insights} />}
 
-        {/* 4. 연간 히트맵 */}
-        <YearHeatmap
-          data={yearHeatmap}
-          loading={loading.heatmap}
-          title=""
-          metric="km"
-          color="#3b82f6"
-          legendLabel="주행"
-          latestLeft
-        />
-
-        {/* 5. 주행 패턴 — 시간×요일 히트맵 */}
+        {/* 4. 주행 패턴 — 시간×요일 히트맵 */}
         {insights?.hour_dow && (
           <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
             <div className="px-3 py-2 border-b border-white/[0.06]">
