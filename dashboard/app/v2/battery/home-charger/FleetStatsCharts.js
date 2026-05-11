@@ -133,7 +133,7 @@ export function HeatmapChart({ heatmap }) {
   );
 }
 
-// 24시간 오파시티 바 (주행 탭 패턴 스타일) + 시간별 카운트 표시
+// 24시간 progress-bar 차트 (셀별 막대 높이로 카운트 표현)
 export function HourlyChart({ hourly }) {
   const max = Math.max(1, ...hourly);
   const peakHour = hourly.indexOf(max);
@@ -147,16 +147,20 @@ export function HourlyChart({ hourly }) {
         {hourly.map((v, h) => {
           const ratio = v / max;
           const isPeak = h === peakHour && v > 0;
+          const fillPct = v > 0 ? Math.max(12, ratio * 100) : 0;
           return (
             <div
               key={h}
-              className="flex-1 rounded-[3px]"
-              style={{
-                background: isPeak ? '#f59e0b' : '#3b82f6',
-                opacity: v === 0 ? 0.08 : 0.18 + ratio * 0.82,
-              }}
+              className="flex-1 relative bg-zinc-800/30 rounded-[3px] overflow-hidden"
               title={`${h}시: ${v}회`}
-            />
+            >
+              {v > 0 && (
+                <div
+                  className="absolute left-0 right-0 bottom-0"
+                  style={{ background: isPeak ? '#f59e0b' : '#3b82f6', height: `${fillPct}%` }}
+                />
+              )}
+            </div>
           );
         })}
       </div>
@@ -174,7 +178,7 @@ export function HourlyChart({ hourly }) {
   );
 }
 
-// 요일별 오파시티 바 (주행 탭 WeekdayBars 스타일) + 카운트 표시
+// 요일별 progress-bar 차트 + 카운트 표시
 export function DowChart({ dow }) {
   const max = Math.max(1, ...dow);
   const peakIdx = dow.indexOf(max);
@@ -186,15 +190,17 @@ export function DowChart({ dow }) {
         const ratio = v / max;
         const isPeak = i === peakIdx && v > 0;
         const isLow = v === minVal && v > 0 && v < max;
+        const fillPct = v > 0 ? Math.max(12, ratio * 100) : 0;
         return (
           <div key={i} className="flex-1 flex flex-col items-center gap-1 min-w-0" title={`${DOW_LABELS[i]}: ${v}회`}>
-            <div
-              className="w-full h-4 rounded-[3px]"
-              style={{
-                background: isPeak ? '#f59e0b' : '#3b82f6',
-                opacity: v === 0 ? 0.08 : 0.18 + ratio * 0.82,
-              }}
-            />
+            <div className="w-full h-4 relative bg-zinc-800/30 rounded-[3px] overflow-hidden">
+              {v > 0 && (
+                <div
+                  className="absolute left-0 right-0 bottom-0"
+                  style={{ background: isPeak ? '#f59e0b' : '#3b82f6', height: `${fillPct}%` }}
+                />
+              )}
+            </div>
             <span className="text-[10px] text-zinc-500">{DOW_LABELS[i]}</span>
             <span className={`text-[10px] tabular-nums truncate max-w-full ${isPeak ? 'text-amber-400 font-semibold' : 'text-zinc-400'}`}>
               {compact(v)}{isPeak ? <Icon name="fire" className="w-4 h-4 inline-block align-middle ml-0.5" /> : isLow ? <Icon name="sleep" className="w-4 h-4 inline-block align-middle ml-0.5" /> : null}
