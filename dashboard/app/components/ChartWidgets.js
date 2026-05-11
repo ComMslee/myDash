@@ -23,7 +23,7 @@ export function HourDowHeatmap({ data, hexColor = '#3b82f6' }) {
         <div
           key={d}
           className="grid items-center"
-          style={{ gridTemplateColumns: '18px repeat(6, 0.5fr) repeat(18, 1fr)', gap: '1px', marginBottom: '1px' }}
+          style={{ gridTemplateColumns: '24px repeat(6, 0.5fr) repeat(18, 1fr)', gap: '1px', marginBottom: '1px' }}
         >
           <div className="text-[9px] text-zinc-500 text-center">{lab}</div>
           {data[d].map((v, h) => {
@@ -50,7 +50,7 @@ export function HourDowHeatmap({ data, hexColor = '#3b82f6' }) {
       ))}
       <div
         className="grid text-[9px] text-zinc-500 tabular-nums mt-1 whitespace-nowrap"
-        style={{ gridTemplateColumns: '18px repeat(6, 0.5fr) repeat(18, 1fr)', gap: '1px' }}
+        style={{ gridTemplateColumns: '24px repeat(6, 0.5fr) repeat(18, 1fr)', gap: '1px' }}
       >
         <div />
         <div className="font-semibold" style={{ gridColumn: 2 }}>0시</div>
