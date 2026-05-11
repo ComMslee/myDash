@@ -80,22 +80,32 @@ export async function GET() {
           return monthStats(ms, me).then(s => ({ year: ms.getFullYear(), month: ms.getMonth() + 1, ...s }));
         })
       ),
-      // 주행 (요일 × 시간) joint — 전체 기간
+      // 주행 (요일 × 시간) joint — 전체 기간, 시작~종료 모든 시간 슬롯에 +1
       pool.query(
-        `SELECT EXTRACT(DOW  FROM (start_date + INTERVAL '9 hours'))::int AS dow,
-                EXTRACT(HOUR FROM (start_date + INTERVAL '9 hours'))::int AS hour,
+        `SELECT EXTRACT(DOW  FROM ts)::int AS dow,
+                EXTRACT(HOUR FROM ts)::int AS hour,
                 COUNT(*)::int AS count
-         FROM drives
+         FROM drives,
+              LATERAL generate_series(
+                date_trunc('hour', start_date + INTERVAL '9 hours'),
+                date_trunc('hour', COALESCE(end_date, start_date) + INTERVAL '9 hours'),
+                INTERVAL '1 hour'
+              ) AS ts
          WHERE car_id = $1
          GROUP BY dow, hour`,
         [carId]
       ),
-      // 충전 (요일 × 시간) joint — 전체 기간
+      // 충전 (요일 × 시간) joint — 전체 기간, 시작~종료 모든 시간 슬롯에 +1
       pool.query(
-        `SELECT EXTRACT(DOW  FROM (start_date + INTERVAL '9 hours'))::int AS dow,
-                EXTRACT(HOUR FROM (start_date + INTERVAL '9 hours'))::int AS hour,
+        `SELECT EXTRACT(DOW  FROM ts)::int AS dow,
+                EXTRACT(HOUR FROM ts)::int AS hour,
                 COUNT(*)::int AS count
-         FROM charging_processes
+         FROM charging_processes,
+              LATERAL generate_series(
+                date_trunc('hour', start_date + INTERVAL '9 hours'),
+                date_trunc('hour', COALESCE(end_date, start_date) + INTERVAL '9 hours'),
+                INTERVAL '1 hour'
+              ) AS ts
          WHERE car_id = $1
            AND charge_energy_added IS NOT NULL
          GROUP BY dow, hour`,
