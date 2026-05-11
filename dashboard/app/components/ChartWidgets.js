@@ -111,7 +111,7 @@ export function WeekdayBars({ data, hexColor, valueKey = 'count' }) {
   );
 }
 
-const DOW_LABELS_KO = ['일', '월', '화', '수', '목', '금', '토'];
+const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function hexToRgb(hex) {
   const h = hex.replace('#', '');
@@ -141,7 +141,7 @@ export function HourDowHeatmap({ data, hexColor = '#3b82f6', hourSoc = null }) {
 
   return (
     <div>
-      {DOW_LABELS_KO.map((lab, d) => (
+      {DOW_LABELS.map((lab, d) => (
         <div
           key={d}
           className="grid items-center"
@@ -207,7 +207,7 @@ export function HourDowHeatmap({ data, hexColor = '#3b82f6', hourSoc = null }) {
       </div>
       {peakVal > 0 && (
         <div className="flex flex-wrap items-center gap-x-2 mt-1.5 text-[10px] text-zinc-500 tabular-nums">
-          <span className="inline-flex items-center gap-1 text-orange-400/80"><Icon name="fire" />피크 {DOW_LABELS_KO[peakDow]} {peakHour}시 ({peakVal}회)</span>
+          <span className="inline-flex items-center gap-1 text-orange-400/80"><Icon name="fire" />피크 {DOW_LABELS[peakDow]} {peakHour}시 ({peakVal}회)</span>
           <span className="ml-auto">총 {total}회</span>
         </div>
       )}
