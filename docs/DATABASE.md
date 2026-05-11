@@ -53,8 +53,6 @@ TeslaMate가 관리하는 PostgreSQL 16 스키마. 직접 쿼리만 사용 (ORM 
 | `EV_CHARGER_API_KEY` | 공공데이터포털 환경공단 EvCharger 일반 인증키 (64-hex). 없으면 집충전기 카드 비표시 — [EV_CHARGER_API.md](./EV_CHARGER_API.md) |
 | `HOME_CHARGER_STAT_ID` | 환경공단 단일 스테이션 ID (기본값: `PI795111`) |
 | `HOME_CHARGER_STAT_IDS` | 환경공단 멀티 스테이션 ID (쉼표 구분, 예: `PI795111,PI313299,PIH01089`) |
-| `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | Spotify Developer App 자격 증명. 없으면 `/v2/spotify` 와 `/api/spotify/*` 5xx |
-| `SPOTIFY_REFRESH_TOKEN` | 본인 Spotify refresh_token. **`scripts/spotify-bootstrap.mjs` 1회 실행으로 발급** → 영원히 자동 갱신. 없으면 호출 시 `SPOTIFY_REFRESH_TOKEN 필요` 에러 |
 
 ## 공용 상수 (`dashboard/lib/constants.js`)
 
