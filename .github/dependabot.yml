@@ -16,6 +16,17 @@ updates:
     groups:
       dashboard-minor-patch:
         update-types: ['minor', 'patch']
+    # next 14 ↔ react 18 peer 호환 — major 업그레이드는 수동만.
+    # tailwindcss 4 도 PostCSS 플러그인 변경 등 breaking.
+    ignore:
+      - dependency-name: 'next'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'react'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'react-dom'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'tailwindcss'
+        update-types: ['version-update:semver-major']
 
   # telegram-hub (node-telegram-bot-api 등)
   - package-ecosystem: npm
