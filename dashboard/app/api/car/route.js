@@ -2,6 +2,7 @@ import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { toKstDate } from '@/lib/kst';
+import { withCache } from '@/lib/server-cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,15 +20,18 @@ const DEFAULT_THRESHOLD_PCT = 20;      // 학습 실패 시 기본값
 const CONFIDENCE_HIGH_DAYS = 7;        // 운행일 ≥ 이 수 = high
 const CONFIDENCE_MID_DAYS = 3;         // 운행일 ≥ 이 수 = medium, 미만 = low
 
-export async function GET() {
+export async function GET(request) {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
+  const force = new URL(request.url).searchParams.get('refresh') === '1';
   try {
     const car = await getDefaultCar();
     if (!car) {
       return Response.json({ error: 'No car found' }, { status: 404 });
     }
     const carId = car.id;
+
+    return Response.json(await withCache(`car:${carId}`, 15_000, async () => {
 
     const [
       posResult,
@@ -167,7 +171,7 @@ export async function GET() {
       }
     }
 
-    return Response.json({
+    return {
       id: carId,
       name: car.name,
       battery_level: currentBattery,
@@ -187,7 +191,8 @@ export async function GET() {
         location: lastChargeResult.rows[0].geofence_name || null,
       } : null,
       estimated_charge: estimatedCharge,
-    });
+    };
+    }, { force }));
   } catch (err) {
     console.error('/api/car error:', err);
     return Response.json({ error: 'DB error' }, { status: 500 });
