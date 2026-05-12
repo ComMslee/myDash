@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
+import { withCache } from '@/lib/server-cache';
 import { KWH_PER_KM, RATED_RANGE_MAX_KM } from '@/lib/constants';
 import { KST_OFFSET_MS } from '@/lib/kst';
 import {
@@ -31,13 +32,16 @@ function getISOWeekNumber(mondayUTC) {
   return { week: Math.round((mondayUTC.getTime() - week1Mon.getTime()) / (7 * 86400000)) + 1, year };
 }
 
-export async function GET() {
+export async function GET(request) {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
+  const force = new URL(request.url).searchParams.get('refresh') === '1';
   try {
     const car = await getDefaultCar();
     if (!car) return Response.json({ error: 'No car found' }, { status: 404 });
     const carId = car.id;
+
+    return Response.json(await withCache(`battery:${carId}`, 180_000, async () => {
 
     const KST = KST_OFFSET_MS;
     const now = new Date();
@@ -197,7 +201,7 @@ export async function GET() {
     const isLFP = true; // Model Y RWD/SR = LFP (향후 DB 기반 자동 판별 가능)
     const health = computeHealth(socDistResult.rows, { isLFP });
 
-    return Response.json({
+    return {
       weekly,
       daily_records: {
         all: fmtRecordBlock(dailyRecords.all),
@@ -263,7 +267,8 @@ export async function GET() {
         soc_added: parseInt(r.soc_added),
         duration_hours: parseFloat(r.duration_hours),
       })),
-    });
+    };
+    }, { force }));
   } catch (err) {
     console.error('/api/battery error:', err);
     return Response.json({ error: 'DB error', detail: err.message }, { status: 500 });
