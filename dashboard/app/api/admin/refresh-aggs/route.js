@@ -9,6 +9,8 @@ import {
   bootstrapIfEmpty,
 } from '@/lib/dash-agg';
 import { invalidate } from '@/lib/server-cache';
+import { KST_OFFSET_MS } from '@/lib/kst';
+import { AGG_SCOPE_KEYS } from '@/lib/agg-scopes';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +30,9 @@ export async function POST(request) {
     const daysRaw = body.days ?? url.searchParams.get('days');
     const days = Math.max(1, parseInt(daysRaw ?? '7', 10) || 7);
     const scope = (body.scope ?? url.searchParams.get('scope') ?? 'all').toLowerCase();
+    if (!AGG_SCOPE_KEYS.includes(scope)) {
+      return Response.json({ error: 'invalid_scope', allowed: AGG_SCOPE_KEYS }, { status: 400 });
+    }
     const monthsBack = Math.max(1, parseInt(body.monthsBack ?? url.searchParams.get('monthsBack') ?? '24', 10) || 24);
 
     let carId = body.carId ?? url.searchParams.get('carId');
@@ -38,8 +43,7 @@ export async function POST(request) {
       carId = car.id;
     }
 
-    const nowUtcMs = Date.now();
-    const kstNow = new Date(nowUtcMs + 9 * 60 * 60 * 1000);
+    const kstNow = new Date(Date.now() + KST_OFFSET_MS);
     const todayKst = new Date(Date.UTC(
       kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()
     ));

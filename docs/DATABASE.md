@@ -88,6 +88,9 @@ TeslaMate가 관리하는 PostgreSQL 16 스키마. 직접 쿼리만 사용 (ORM 
 | `formatKorDate(iso)` | ISO → "YY/MM/DD" 또는 "MM/DD" (올해면 연도 생략) |
 | `formatKorDateTime(iso)` | ISO → "YY/MM/DD HH:MM" (올해면 연도 생략) |
 | `formatKorDay(day)` | "YYYY-MM-DD" → "M/D (요일)" |
+| `formatMs(n)` | ms → "Xms" 또는 "X.Ys" (개발/진단 카드 공유) |
+| `formatBytes(n)` | bytes → "XB"/"X.YK"/"X.YM" (server-cache 사이즈 등) |
+| `formatRelativeTime(iso)` | ISO → "N초/분/시간/일 전" (사전집계 freshness 등) |
 
 ## KST 헬퍼 (`dashboard/lib/kst.js`)
 

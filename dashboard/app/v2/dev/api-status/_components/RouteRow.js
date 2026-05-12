@@ -2,12 +2,7 @@ import { WarmDiagCard } from '@/app/v2/battery/home-charger/poll-log/diag';
 import { ServerStatusCard } from './ServerStatusCard';
 import { ChargingDiagPanel } from './ChargingDiagPanel';
 import { Icon } from '@/app/lib/Icons';
-
-function fmtMs(n) {
-  if (n == null) return '—';
-  if (n < 1000) return `${Math.round(n)}ms`;
-  return `${(n / 1000).toFixed(2)}s`;
-}
+import { formatMs } from '@/lib/format';
 
 export function RouteRow({ route, result, values, setValue, expanded, onToggleExpand, editing, onToggleEdit, onRun }) {
   const state = result?.state || 'idle';
@@ -54,7 +49,7 @@ export function RouteRow({ route, result, values, setValue, expanded, onToggleEx
             {state === 'running' ? (
               <span className="text-[11px] text-blue-400 tabular-nums">…</span>
             ) : state !== 'idle' ? (
-              <span className={`text-[11px] tabular-nums ${msCls}`}>{fmtMs(result.ms)}</span>
+              <span className={`text-[11px] tabular-nums ${msCls}`}>{formatMs(result.ms)}</span>
             ) : missingRequired ? (
               <span className="text-[10px] text-amber-500/70">파라미터 필요</span>
             ) : null}

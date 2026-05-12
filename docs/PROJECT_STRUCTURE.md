@@ -45,8 +45,17 @@ myDash/
     │   └── search-by-name.js        # 충전소 이름 검색 유틸
     ├── lib/
     │   ├── db.js                 # PostgreSQL 커넥션 풀 (싱글턴)
-    │   ├── server-cache.js       # 모듈 스코프 Map + per-key TTL + inflight dedup — `withCache(key, ttlMs, fn)` / `invalidate(prefix)`
-    │   ├── dash-agg.js           # 사전 집계 6 테이블(dash_daily_*·dash_monthly_insights·dash_top_drives_cache·dash_place_clusters·dash_place_geo) — ensureSchema/bootstrapIfEmpty/refreshRange/refreshMonthlyInsights/refreshTopDrivesCache/refreshPlaceClusters/readHourDow
+    │   ├── server-cache.js       # 모듈 스코프 Map + per-key TTL + inflight dedup — `withCache(key, ttlMs, fn)` / `invalidate(prefix)` / `cacheStats()`
+    │   ├── agg-scopes.js         # 사전집계 scope 메타(`AGG_SCOPES`, `AGG_SCOPE_KEYS`) — refresh-aggs 라우트 + 집계 탭 카드가 공유
+    │   ├── dash-agg/             # 사전 집계 6 테이블 — barrel(index.js) 통해 `@/lib/dash-agg` 단일 import
+    │   │   ├── index.js          # 공개 API barrel re-exports
+    │   │   ├── schema.js         # ensureSchema (idempotent tableReady 플래그)
+    │   │   ├── bootstrap.js      # bootstrapIfEmpty — 컨테이너 라이프타임당 1회 풀 백필 (4 empty 체크 병렬)
+    │   │   ├── daily.js          # refreshRange + readHourDow (dash_daily_*_agg)
+    │   │   ├── monthly.js        # refreshMonthlyInsights (21 컬럼 + best long/eff drive)
+    │   │   ├── top.js            # refreshTopDrivesCache (8 메트릭 × TOP 50 truncate-replace)
+    │   │   ├── places.js         # refreshPlaceClusters (0.0005° bin + top origin)
+    │   │   └── _txn.js           # withTxn(fn) — BEGIN/COMMIT/ROLLBACK/release 보일러플레이트 헬퍼
     │   ├── constants.js          # KWH_PER_KM, RATED_RANGE_MAX_KM
     │   ├── format.js             # formatDuration, formatHm, formatHours, formatDate, shortAddr, formatKorDate, formatKorDateTime, formatKorDay
     │   ├── kst.js                # KST(UTC+9) 시간 변환 헬퍼
@@ -132,9 +141,9 @@ myDash/
     │   │   ├── tg/page.js            # 텔레그램 봇 관리 (권한·방송·학습로그·가이드)
     │   │   └── dev/                  # 개발/진단 도구 (하단 알약 미노출, URL 직접)
     │   │       ├── api-status/
-    │   │       │   ├── page.js       # 3탭(서버/API 테스트/집계) — 28개 라우트 가용성 체크 + 서버/충전/폴링 진단 + 사전집계 상태/scope 갱신 통합
+    │   │       │   ├── page.js       # 3탭(서버/API 테스트/집계) — 28개 라우트 가용성 체크 + 서버/충전/폴링 진단 + 사전집계 상태/scope 갱신 통합 · 서버 폴링은 '서버' 탭 활성일 때만
     │   │       │   └── _components/
-    │   │       │       ├── AggStatusCard.js   # 집계 탭 — dash_* 6 테이블 진단 + scope 별 refresh-aggs POST 트리거 + server-cache 메모리 상태
+    │   │       │       ├── AggStatusCard.js   # 집계 탭 — dash_* 6 테이블 진단 + AGG_SCOPES (공유) 별 refresh-aggs POST 트리거 + server-cache 메모리 상태
     │   │       │       ├── ServerStatusCard.js
     │   │       │       ├── RouteRow.js
     │   │       │       ├── RenderErrorBoundary.js

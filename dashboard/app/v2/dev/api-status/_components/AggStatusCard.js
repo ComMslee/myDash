@@ -1,37 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Icon } from '@/app/lib/Icons';
-
-const SCOPES = [
-  { key: 'all',     label: '전체',   hint: '4 테이블 모두' },
-  { key: 'daily',   label: '일별',   hint: 'dash_daily_*' },
-  { key: 'monthly', label: '월별',   hint: 'dash_monthly_insights' },
-  { key: 'top',     label: 'TOP',    hint: 'dash_top_drives_cache' },
-  { key: 'places',  label: '장소',   hint: 'dash_place_clusters' },
-];
-
-function fmtAge(iso) {
-  if (!iso) return '—';
-  const ageMs = Date.now() - new Date(iso).getTime();
-  if (ageMs < 60_000) return `${Math.floor(ageMs / 1000)}초 전`;
-  if (ageMs < 3_600_000) return `${Math.floor(ageMs / 60_000)}분 전`;
-  if (ageMs < 86_400_000) return `${Math.floor(ageMs / 3_600_000)}시간 전`;
-  return `${Math.floor(ageMs / 86_400_000)}일 전`;
-}
-
-function fmtMs(ms) {
-  if (ms == null) return '—';
-  if (ms < 1000) return `${Math.round(ms)}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
-function fmtBytes(n) {
-  if (n == null || n < 0) return '—';
-  if (n < 1024) return `${n}B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)}K`;
-  return `${(n / 1024 / 1024).toFixed(1)}M`;
-}
+import { formatBytes, formatMs, formatRelativeTime } from '@/lib/format';
+import { AGG_SCOPES } from '@/lib/agg-scopes';
 
 function metaSummary(t) {
   if (t.meta?.max_day) {
@@ -43,7 +14,7 @@ function metaSummary(t) {
   }
   if (t.meta?.latest) {
     const extra = t.meta.total_visits != null ? ` · ${t.meta.total_visits.toLocaleString()}회 방문` : '';
-    return `최근 ${fmtAge(t.meta.latest)}${extra}`;
+    return `최근 ${formatRelativeTime(t.meta.latest)}${extra}`;
   }
   return '—';
 }
@@ -153,7 +124,7 @@ export function AggStatusCard() {
           <div>
             <div className="text-[10px] text-zinc-500 mb-1.5">갱신 (POST /api/admin/refresh-aggs)</div>
             <div className="flex flex-wrap gap-1.5">
-              {SCOPES.map(s => {
+              {AGG_SCOPES.map(s => {
                 const busy = refreshing === s.key;
                 const anyBusy = refreshing != null;
                 return (
@@ -187,7 +158,7 @@ export function AggStatusCard() {
               <div className="flex items-center justify-between mb-1 tabular-nums">
                 <span>
                   scope=<span className="font-mono">{lastRefresh.scope}</span>
-                  <span className="ml-2 text-zinc-500">{fmtMs(lastRefresh.ms)}</span>
+                  <span className="ml-2 text-zinc-500">{formatMs(lastRefresh.ms)}</span>
                 </span>
                 <span className="text-zinc-600">{new Date(lastRefresh.ts).toLocaleTimeString('ko-KR', { hour12: false })}</span>
               </div>
@@ -209,7 +180,7 @@ export function AggStatusCard() {
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.fresh ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
                     <span className="font-mono text-zinc-300 flex-1 min-w-0 truncate">{c.key}</span>
                     <span className="text-zinc-500 shrink-0">{Math.floor(c.ageMs / 1000)}s / {Math.floor(c.ttlMs / 1000)}s</span>
-                    <span className="text-zinc-600 shrink-0">{fmtBytes(c.sizeApprox)}</span>
+                    <span className="text-zinc-600 shrink-0">{formatBytes(c.sizeApprox)}</span>
                   </div>
                 ))}
               </div>
