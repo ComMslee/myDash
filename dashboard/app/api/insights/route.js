@@ -84,11 +84,17 @@ export async function GET(request) {
           return monthStats(ms, me).then(s => ({ year: ms.getFullYear(), month: ms.getMonth() + 1, ...s }));
         })
       ),
-      // 주행 (요일 × 시간) joint — 전체 기간, 10분 wall-clock 틱 카운트
+      // 주행 (요일 × 시간) — 시간 슬롯 내 점유 분 ÷ 10 올림 = ceil(overlap_min / 10)
+      // 0~10분 → 1, 11~20분 → 2, ..., 51~60분 → 6. 슬롯 최대 6.
       pool.query(
-        `SELECT EXTRACT(DOW  FROM ts)::int AS dow,
-                EXTRACT(HOUR FROM ts)::int AS hour,
-                COUNT(*)::int AS count
+        `SELECT EXTRACT(DOW  FROM hour_start)::int AS dow,
+                EXTRACT(HOUR FROM hour_start)::int AS hour,
+                SUM(CEIL(
+                  EXTRACT(EPOCH FROM (
+                    LEAST(el, hour_start + INTERVAL '1 hour')
+                    - GREATEST(sl, hour_start)
+                  )) / 600.0
+                ))::int AS count
          FROM (
            SELECT start_date + INTERVAL '9 hours' AS sl,
                   COALESCE(end_date, start_date) + INTERVAL '9 hours' AS el
@@ -96,18 +102,23 @@ export async function GET(request) {
          ) d
          CROSS JOIN LATERAL generate_series(
            date_trunc('hour', sl),
-           el,
-           INTERVAL '10 minutes'
-         ) AS ts
-         WHERE ts >= sl
+           date_trunc('hour', el),
+           INTERVAL '1 hour'
+         ) AS hour_start
+         WHERE LEAST(el, hour_start + INTERVAL '1 hour') > GREATEST(sl, hour_start)
          GROUP BY dow, hour`,
         [carId]
       ),
-      // 충전 (요일 × 시간) joint — 전체 기간
+      // 충전 (요일 × 시간) — 동일 ceil 의미
       pool.query(
-        `SELECT EXTRACT(DOW  FROM ts)::int AS dow,
-                EXTRACT(HOUR FROM ts)::int AS hour,
-                COUNT(*)::int AS count
+        `SELECT EXTRACT(DOW  FROM hour_start)::int AS dow,
+                EXTRACT(HOUR FROM hour_start)::int AS hour,
+                SUM(CEIL(
+                  EXTRACT(EPOCH FROM (
+                    LEAST(el, hour_start + INTERVAL '1 hour')
+                    - GREATEST(sl, hour_start)
+                  )) / 600.0
+                ))::int AS count
          FROM (
            SELECT start_date + INTERVAL '9 hours' AS sl,
                   COALESCE(end_date, start_date) + INTERVAL '9 hours' AS el
@@ -116,10 +127,10 @@ export async function GET(request) {
          ) c
          CROSS JOIN LATERAL generate_series(
            date_trunc('hour', sl),
-           el,
-           INTERVAL '10 minutes'
-         ) AS ts
-         WHERE ts >= sl
+           date_trunc('hour', el),
+           INTERVAL '1 hour'
+         ) AS hour_start
+         WHERE LEAST(el, hour_start + INTERVAL '1 hour') > GREATEST(sl, hour_start)
          GROUP BY dow, hour`,
         [carId]
       ),

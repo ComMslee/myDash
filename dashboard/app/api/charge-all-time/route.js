@@ -35,11 +35,16 @@ export async function GET(request) {
         ) sub
       `, [carId]),
 
-      // 충전 (요일 × 시간) — 전체 기간, 10분 wall-clock 틱 카운트
+      // 충전 (요일 × 시간) — 슬롯 내 점유 분 ÷ 10 올림 (0~10→1, 11~20→2, ..., 51~60→6)
       pool.query(`
-        SELECT EXTRACT(DOW  FROM ts)::int AS dow,
-               EXTRACT(HOUR FROM ts)::int AS hour,
-               COUNT(*)::int AS count
+        SELECT EXTRACT(DOW  FROM hour_start)::int AS dow,
+               EXTRACT(HOUR FROM hour_start)::int AS hour,
+               SUM(CEIL(
+                 EXTRACT(EPOCH FROM (
+                   LEAST(el, hour_start + INTERVAL '1 hour')
+                   - GREATEST(sl, hour_start)
+                 )) / 600.0
+               ))::int AS count
         FROM (
           SELECT start_date + INTERVAL '9 hours' AS sl,
                  COALESCE(end_date, start_date) + INTERVAL '9 hours' AS el
@@ -48,10 +53,10 @@ export async function GET(request) {
         ) c
         CROSS JOIN LATERAL generate_series(
           date_trunc('hour', sl),
-          el,
-          INTERVAL '10 minutes'
-        ) AS ts
-        WHERE ts >= sl
+          date_trunc('hour', el),
+          INTERVAL '1 hour'
+        ) AS hour_start
+        WHERE LEAST(el, hour_start + INTERVAL '1 hour') > GREATEST(sl, hour_start)
         GROUP BY dow, hour
       `, [carId]),
     ]);
