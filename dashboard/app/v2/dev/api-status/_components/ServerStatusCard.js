@@ -244,9 +244,9 @@ export function ServerStatusCard({ data, latencyMs, history }) {
           </div>
         </div>
 
-        {/* ─── 우리서비스 (대시보드) ─── */}
+        {/* ─── 대시보드 ─── */}
         <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-2.5 space-y-1.5 min-w-0">
-          <SectionHeader title="우리서비스 (대시보드)" />
+          <SectionHeader title="대시보드" />
           <Row
             label={dash ? 'CPU (컨테이너)' : 'CPU (프로세스 누적)'}
             value={dash?.cpuPct != null ? `${dash.cpuPct.toFixed(1)}%`
