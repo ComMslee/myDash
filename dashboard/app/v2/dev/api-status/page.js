@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { RenderErrorBoundary } from './_components/RenderErrorBoundary';
 import { RouteRow } from './_components/RouteRow';
 import { ServerStatusCard } from './_components/ServerStatusCard';
+import { AggStatusCard } from './_components/AggStatusCard';
 import { Icon } from '@/app/lib/Icons';
 
 // ── 라우트 메타데이터 ─────────────────────────────────────────
@@ -19,9 +20,13 @@ const ROUTES = [
       { key: 'from', sample: '' },
       { key: 'to',   sample: '' },
     ] },
-  { path: '/api/insights',         label: '인사이트',       desc: '누적 거리·kWh·평균효율·요약 통계 (cache 600s · dash_monthly_insights 위임)', category: '차량' },
+  { path: '/api/insights',         label: '인사이트',       desc: '누적 거리·kWh·평균효율·요약 통계 (cache 600s · dash_monthly_insights 위임)', category: '차량',
+    params: [{ key: 'refresh', sample: '' }] },
   { path: '/api/summary',          label: '일자 요약',      desc: 'drives+charges 집계 + 전비(eff_wh_km). range=today|yesterday|week|this-week|last-week|month|last-month|multi — 봇 /period (cache 120s · historical 범위는 dash_daily_*_agg 위임)', category: '차량',
-    params: [{ key: 'range', sample: 'multi' }] },
+    params: [
+      { key: 'range', sample: 'multi' },
+      { key: 'refresh', sample: '' },
+    ] },
   { path: '/api/home-charger/groups', label: '충전기 그룹',  desc: '동별 그룹 카운트 (구성 = constants.js) — 봇 /chargers', category: '집충전기' },
   { path: '/api/home-charger/report', label: '활용도 리포트', desc: '월별 점유율·시간대×요일 히트맵·KPI — /v2/chargers/report 페이지', category: '집충전기',
     dashboard: 'report' },
@@ -35,8 +40,10 @@ const ROUTES = [
       { key: 'detail',  sample: '' },
     ] },
   { path: '/api/heatmap',          label: '히트맵',         desc: '전체 위치 좌표 다운샘플링 → 빈도 히트맵 입력 (cache 300s)', category: '주행' },
-  { path: '/api/monthly-history',  label: '월간 이력',      desc: '월별 주행거리/충전량/효율 집계 (cache 300s · dash_monthly_insights 위임)', category: '주행' },
-  { path: '/api/frequent-places',  label: '자주 가는 곳',   desc: '지오펜스 도착 빈도 + 카카오 reverse geocode (집/회사 우선 핀) (cache 300s · dash_place_clusters 위임)', category: '주행' },
+  { path: '/api/monthly-history',  label: '월간 이력',      desc: '월별 주행거리/충전량/효율 집계 (cache 300s · dash_monthly_insights 위임)', category: '주행',
+    params: [{ key: 'refresh', sample: '' }] },
+  { path: '/api/frequent-places',  label: '자주 가는 곳',   desc: '지오펜스 도착 빈도 + 카카오 reverse geocode (집/회사 우선 핀) (cache 300s · dash_place_clusters 위임)', category: '주행',
+    params: [{ key: 'refresh', sample: '' }] },
   { path: '/api/resolve-address',  label: '좌표→주소',      desc: 'lat/lng → 한국어 라벨 (Kakao 역지오코딩, DB 캐시) — 봇 알림 주소 폴백', category: '주행',
     params: [
       { key: 'lat', required: true, sample: '37.5665' },
@@ -47,13 +54,17 @@ const ROUTES = [
     params: [
       { key: 'type',  sample: 'drive_distance' },
       { key: 'limit', sample: '30' },
+      { key: 'refresh', sample: '' },
     ] },
 
   // 배터리
-  { path: '/api/battery',          label: '배터리',         desc: 'SOC 종합 — 용량·체류 분포·주간/월간 충방전·추정 잔여 (cache 180s)', category: '배터리' },
-  { path: '/api/battery-trend',    label: '배터리 추이',    desc: 'SOC 시계열 (라인 차트용 다운샘플링) (cache 600s)', category: '배터리' },
+  { path: '/api/battery',          label: '배터리',         desc: 'SOC 종합 — 용량·체류 분포·주간/월간 충방전·추정 잔여 (cache 180s)', category: '배터리',
+    params: [{ key: 'refresh', sample: '' }] },
+  { path: '/api/battery-trend',    label: '배터리 추이',    desc: 'SOC 시계열 (라인 차트용 다운샘플링) (cache 600s)', category: '배터리',
+    params: [{ key: 'refresh', sample: '' }] },
   { path: '/api/charges',          label: '충전 기록',      desc: '최근 충전 세션 목록 (시작 SOC → 종료 SOC, kWh, 위치)', category: '배터리' },
-  { path: '/api/charge-all-time',  label: '충전 전기간',    desc: '전기간 누적 충전 통계 (총 kWh, 횟수, 평균) (cache 600s · dash_daily_charge_agg 단독)', category: '배터리' },
+  { path: '/api/charge-all-time',  label: '충전 전기간',    desc: '전기간 누적 충전 통계 (총 kWh, 횟수, 평균) (cache 600s · dash_daily_charge_agg 단독)', category: '배터리',
+    params: [{ key: 'refresh', sample: '' }] },
   { path: '/api/charging-status',  label: '충전 상태',      desc: '현재 충전 중 여부 + power/level 신호 + 폴백 진단', category: '배터리', dashboard: 'charging' },
   { path: '/api/fast-charges',     label: '급속 기록',      desc: 'DC 급속(>50kW) 충전 세션 필터 (cache 180s)', category: '배터리' },
   { path: '/api/slow-charges',     label: '완속 기록',      desc: 'AC 완속 충전 세션 필터 (cache 180s)', category: '배터리' },
@@ -274,7 +285,7 @@ export default function ApiStatusPage() {
         <div className="flex gap-1 bg-[#161618] border border-white/[0.06] rounded-2xl p-1">
           <button
             onClick={() => setTab('server')}
-            className={`flex-1 px-4 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
+            className={`flex-1 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
               tab === 'server' ? 'bg-white/[0.06] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
@@ -283,13 +294,21 @@ export default function ApiStatusPage() {
           </button>
           <button
             onClick={() => setTab('api')}
-            className={`flex-1 px-4 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
+            className={`flex-1 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
               tab === 'api' ? 'bg-white/[0.06] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
             API 테스트
             {counts.fail > 0 && <span className="ml-1.5 text-rose-400 text-[11px] tabular-nums inline-flex items-center gap-0.5"><Icon name="x" className="w-4 h-4" />{counts.fail}</span>}
             {counts.fail === 0 && counts.slow > 0 && <span className="ml-1.5 text-amber-400 text-[11px] tabular-nums inline-flex items-center gap-0.5"><Icon name="warn" className="w-4 h-4" />{counts.slow}</span>}
+          </button>
+          <button
+            onClick={() => setTab('agg')}
+            className={`flex-1 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
+              tab === 'agg' ? 'bg-white/[0.06] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            집계
           </button>
         </div>
 
@@ -371,6 +390,15 @@ export default function ApiStatusPage() {
             ) : (
               <div className="text-[11px] text-zinc-500">로딩 중…</div>
             )}
+          </div>
+        )}
+
+        {/* 집계 탭 */}
+        {tab === 'agg' && (
+          <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-4">
+            <RenderErrorBoundary>
+              <AggStatusCard />
+            </RenderErrorBoundary>
           </div>
         )}
 

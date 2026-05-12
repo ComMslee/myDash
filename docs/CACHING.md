@@ -120,7 +120,8 @@
 | `/api/charge-all-time` | dash_daily_charge_agg | — | server-cache 600s + 일별 사전 집계 |
 | `/api/heatmap` | drives | — | server-cache 300s |
 | `/api/insights` | dash_monthly_insights + drives (현재 월 + hour×dow + 베스트 드라이브 라이브) | — | server-cache 600s + 월별 사전 집계 |
-| `/api/admin/refresh-aggs` | dash_daily_*, dash_monthly_insights, dash_top_drives_cache, dash_place_clusters (upsert / truncate-replace) | — | 없음 (POST · HUB_SHARED_SECRET 인증, GHA cron 매일 04:00 KST, scope=all\|daily\|monthly\|top\|places) |
+| `/api/admin/refresh-aggs` | dash_daily_*, dash_monthly_insights, dash_top_drives_cache, dash_place_clusters (upsert / truncate-replace) | — | 없음 (POST · requireAuth, GHA cron 매일 04:00 KST, scope=all\|daily\|monthly\|top\|places) |
+| `/api/admin/agg-status` | dash_daily_*, dash_monthly_insights, dash_top_drives_cache, dash_place_clusters, dash_place_geo (read-only) | — | 없음 (GET · requireAuth · `cacheStats()` 메모리 dump 포함 — `/v2/dev/api-status` 집계 탭이 사용) |
 | `/api/rankings` | dash_top_drives_cache + drives (JOIN 메타) | Kakao Local | server-cache 300s (per type·limit) + TOP 50 사전 캐시 |
 | `/api/fast-charges` | charging_processes | — | server-cache 180s |
 | `/api/slow-charges` | charging_processes | — | server-cache 180s |

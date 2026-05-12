@@ -132,11 +132,18 @@ myDash/
     │   │   ├── tg/page.js            # 텔레그램 봇 관리 (권한·방송·학습로그·가이드)
     │   │   └── dev/                  # 개발/진단 도구 (하단 알약 미노출, URL 직접)
     │   │       ├── api-status/
-    │   │       │   └── page.js       # 28개 라우트 가용성 체크 + 서버/충전/폴링 진단 통합
+    │   │       │   ├── page.js       # 3탭(서버/API 테스트/집계) — 28개 라우트 가용성 체크 + 서버/충전/폴링 진단 + 사전집계 상태/scope 갱신 통합
+    │   │       │   └── _components/
+    │   │       │       ├── AggStatusCard.js   # 집계 탭 — dash_* 6 테이블 진단 + scope 별 refresh-aggs POST 트리거 + server-cache 메모리 상태
+    │   │       │       ├── ServerStatusCard.js
+    │   │       │       ├── RouteRow.js
+    │   │       │       ├── RenderErrorBoundary.js
+    │   │       │       └── ChargingDiagPanel.js
     │   │       └── auth/
     │   │           └── page.js       # 로그인 PIN 변경 (단일 사용자)
     │   └── api/                  # 서버사이드 API 라우트 (모두 GET, force-dynamic)
-    │       ├── admin/refresh-aggs/route.js  # 사전 집계 갱신 (POST · HUB_SHARED_SECRET · scope=daily|monthly|top|places|all · bootstrap-on-empty) — 매일 04:00 KST GHA cron
+    │       ├── admin/refresh-aggs/route.js  # 사전 집계 갱신 (POST · requireAuth · scope=daily|monthly|top|places|all · bootstrap-on-empty) — 매일 04:00 KST GHA cron
+    │       ├── admin/agg-status/route.js    # 사전 집계 진단 (GET · requireAuth) — dash_* 6 테이블 rows/freshness + server-cache 메모리 상태 → /v2/dev/api-status 집계 탭
     │       ├── car/route.js              # 차량 기본 정보 + 배터리 + 상태
     │       ├── charging-status/route.js  # 현재 충전 상태
     │       ├── drives/route.js           # 주행 통계(오늘/주/월) + 최근 주행 목록
@@ -188,5 +195,5 @@ myDash/
 | `/v2/chargers` | 집충전기 실시간 + Top 순위 + 활용도 리포트 (인라인) | 충전소 |
 | `/v2/chargers/report` | 활용도 리포트 단독 페이지 (외부 캡처/공유) | — (URL 직접) |
 | `/v2/tg` | 텔레그램 봇 관리 (권한 · 방송 · 학습로그 · 가이드) | — (URL 직접) |
-| `/v2/dev/api-status` | API 가용성 + 서버/진단 (개발자용, URL 직접) | — (하단 알약 미노출) |
+| `/v2/dev/api-status` | 3탭 (서버 / API 테스트 / 집계) — API 가용성 + 서버 진단 + 사전집계 상태/갱신 (개발자용, URL 직접) | — (하단 알약 미노출) |
 | `/v2/dev/auth` | 로그인 PIN 변경 (하단 알약 좌측 ⚙️ 시트에서 진입) | — (하단 알약 미노출) |
