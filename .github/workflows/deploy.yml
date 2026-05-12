@@ -46,3 +46,19 @@ jobs:
               echo "[deploy] TELEGRAM_BOT_TOKEN/CHAT_ID 미설정 — telegram-hub 스킵"
             fi
             sudo docker image prune -f
+
+            # 캐시 warm-up — 컨테이너 재기동 후 server-cache / dash-agg 모듈 상태 휘발.
+            # 핵심 라우트를 한 번씩 호출해서 첫 사용자 진입 시 cold path 제거.
+            echo "[deploy] warming caches..."
+            SECRET=$(grep "^HUB_SHARED_SECRET=" .env 2>/dev/null | cut -d= -f2)
+            # 컨테이너 부팅 대기 (next 첫 요청 30초 이내 응답 보장 못 함)
+            for i in 1 2 3 4 5; do
+              if curl -sf -o /dev/null --max-time 5 -H "x-hub-secret: $SECRET" http://localhost:5000/api/car; then
+                break
+              fi
+              sleep 6
+            done
+            for R in /api/car /api/insights /api/drives /api/charge-all-time /api/battery /api/battery-trend /api/monthly-history "/api/summary?range=multi"; do
+              T=$(curl -s -o /dev/null -w '%{time_total}s' -H "x-hub-secret: $SECRET" --max-time 30 "http://localhost:5000${R}")
+              echo "  ${R}  ${T}"
+            done

@@ -1,0 +1,34 @@
+name: Stale Branches Cleanup
+
+# 매주 일요일 05:00 KST — 머지된 브랜치 자동 삭제.
+# master 와 보호 브랜치는 제외. PR 머지 후 깜빡한 브랜치 정리.
+
+on:
+  schedule:
+    - cron: '0 20 * * 6'
+  workflow_dispatch:
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete merged branches (origin/* 제외 master)
+        run: |
+          git fetch --all --prune
+          for B in $(git branch -r --merged origin/master | grep -v 'origin/master' | sed 's|origin/||' | xargs); do
+            case "$B" in
+              HEAD|master|main|develop|release/*)
+                echo "skip: $B"
+                ;;
+              *)
+                echo "delete: $B"
+                git push origin --delete "$B" || true
+                ;;
+            esac
+          done
