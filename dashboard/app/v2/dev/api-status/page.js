@@ -5,141 +5,10 @@ import { RenderErrorBoundary } from './_components/RenderErrorBoundary';
 import { RouteRow } from './_components/RouteRow';
 import { ServerStatusCard } from './_components/ServerStatusCard';
 import { AggStatusCard } from './_components/AggStatusCard';
-import { Icon } from '@/app/lib/Icons';
-
-// ── 라우트 메타데이터 ─────────────────────────────────────────
-// dashboard: 펼침 시 raw peek 위에 추가로 보여줄 대시보드 ('server' | 'charging' | 'poll')
-// params[].sample 의 'auto:firstDriveId' 는 마운트 시 /api/drives 응답에서 자동 픽
-// /api/server-status 는 ROUTES 에서 제외 — 상단 항상-표시 카드(`서버` 섹션)
-// 가 동일 엔드포인트를 30초 자동 갱신해 그림. 카테고리 행으로 또 두면 중복.
-
-// server-cache TTL 우회 (?refresh=1) 가 필요한 라우트가 공유하는 파라미터 정의.
-const REFRESH_PARAM = Object.freeze({ key: 'refresh', sample: '' });
-
-const ROUTES = [
-  // 차량
-  { path: '/api/car',              label: '차량',           desc: '현재 상태(주차/주행/충전) + SOC·범위·위치 + 추천 충전일', category: '차량' },
-  { path: '/api/drives',           label: '주행 요약',      desc: '최근 주행 목록 + 거리/시간/효율 (from·to 로 기간 필터)', category: '차량',
-    params: [
-      { key: 'from', sample: '' },
-      { key: 'to',   sample: '' },
-    ] },
-  { path: '/api/insights',         label: '인사이트',       desc: '누적 거리·kWh·평균효율·요약 통계 (cache 600s · dash_monthly_insights 위임)', category: '차량',
-    params: [REFRESH_PARAM] },
-  { path: '/api/summary',          label: '일자 요약',      desc: 'drives+charges 집계 + 전비(eff_wh_km). range=today|yesterday|week|this-week|last-week|month|last-month|multi — 봇 /period (cache 120s · historical 범위는 dash_daily_*_agg 위임)', category: '차량',
-    params: [
-      { key: 'range', sample: 'multi' },
-      REFRESH_PARAM,
-    ] },
-  { path: '/api/home-charger/groups', label: '충전기 그룹',  desc: '동별 그룹 카운트 (구성 = constants.js) — 봇 /chargers', category: '집충전기' },
-  { path: '/api/home-charger/report', label: '활용도 리포트', desc: '월별 점유율·시간대×요일 히트맵·KPI — /v2/chargers/report 페이지', category: '집충전기',
-    dashboard: 'report' },
-  { path: '/api/parked',           label: '주차 정보',      desc: '마지막 종료 drive 위치·경과 (driving=true 면 진행 중) — 봇 /where 의 정차/주행 분기에 사용', category: '차량' },
-  { path: '/api/location',         label: '현재 좌표',      desc: '최신 positions 의 lat/lng/date — 봇 /where 공용', category: '차량' },
-
-  // 주행
-  { path: '/api/route-map',        label: '경로 지도',      desc: '단일 주행의 polyline + start/end + 통계 (driveId 필수)', category: '주행',
-    params: [
-      { key: 'driveId', required: true, sample: 'auto:firstDriveId' },
-      { key: 'detail',  sample: '' },
-    ] },
-  { path: '/api/heatmap',          label: '히트맵',         desc: '전체 위치 좌표 다운샘플링 → 빈도 히트맵 입력 (cache 300s)', category: '주행' },
-  { path: '/api/monthly-history',  label: '월간 이력',      desc: '월별 주행거리/충전량/효율 집계 (cache 300s · dash_monthly_insights 위임)', category: '주행',
-    params: [REFRESH_PARAM] },
-  { path: '/api/frequent-places',  label: '자주 가는 곳',   desc: '지오펜스 도착 빈도 + 카카오 reverse geocode (집/회사 우선 핀) (cache 300s · dash_place_clusters 위임)', category: '주행',
-    params: [REFRESH_PARAM] },
-  { path: '/api/resolve-address',  label: '좌표→주소',      desc: 'lat/lng → 한국어 라벨 (Kakao 역지오코딩, DB 캐시) — 봇 알림 주소 폴백', category: '주행',
-    params: [
-      { key: 'lat', required: true, sample: '37.5665' },
-      { key: 'lng', required: true, sample: '126.9780' },
-    ] },
-  { path: '/api/long-stay-places', label: '오래 머문 곳',   desc: '체류 시간(다음 주행 시작-종료 갭) 누적 — 10분 미만 노이즈 필터 (cache 300s)', category: '주행' },
-  { path: '/api/rankings',         label: '랭킹',           desc: '주행/일자별 TOP N (type=거리·시간·평속·효율) (cache 300s/type·limit · dash_top_drives_cache 위임)', category: '주행',
-    params: [
-      { key: 'type',  sample: 'drive_distance' },
-      { key: 'limit', sample: '30' },
-      REFRESH_PARAM,
-    ] },
-
-  // 배터리
-  { path: '/api/battery',          label: '배터리',         desc: 'SOC 종합 — 용량·체류 분포·주간/월간 충방전·추정 잔여 (cache 180s)', category: '배터리',
-    params: [REFRESH_PARAM] },
-  { path: '/api/battery-trend',    label: '배터리 추이',    desc: 'SOC 시계열 (라인 차트용 다운샘플링) (cache 600s)', category: '배터리',
-    params: [REFRESH_PARAM] },
-  { path: '/api/charges',          label: '충전 기록',      desc: '최근 충전 세션 목록 (시작 SOC → 종료 SOC, kWh, 위치)', category: '배터리' },
-  { path: '/api/charge-all-time',  label: '충전 전기간',    desc: '전기간 누적 충전 통계 (총 kWh, 횟수, 평균) (cache 600s · dash_daily_charge_agg 단독)', category: '배터리',
-    params: [REFRESH_PARAM] },
-  { path: '/api/charging-status',  label: '충전 상태',      desc: '현재 충전 중 여부 + power/level 신호 + 폴백 진단', category: '배터리', dashboard: 'charging' },
-  { path: '/api/fast-charges',     label: '급속 기록',      desc: 'DC 급속(>50kW) 충전 세션 필터 (cache 180s)', category: '배터리' },
-  { path: '/api/slow-charges',     label: '완속 기록',      desc: 'AC 완속 충전 세션 필터 (cache 180s)', category: '배터리' },
-  { path: '/api/debug/charging',   label: '디버그 · 충전',  desc: '충전 감지 raw 신호 (positions.power, charges 행, states)', category: '배터리' },
-
-  // 집충전기
-  { path: '/api/home-charger',                  label: '집충전기',         desc: '환경공단 API 사용량 (캐시 우선, refresh=1로 강제 갱신)', category: '집충전기',
-    params: [REFRESH_PARAM] },
-  { path: '/api/home-charger/fleet-stats',      label: '집충전기 누적',    desc: '등록된 모든 집충전기 월별 누적 (months 로 기간)', category: '집충전기',
-    params: [{ key: 'months', sample: '' }] },
-  { path: '/api/home-charger/poll-log',         label: '집충전기 로그',    desc: '폴링 루프 로그 + warm 진단 (view=hourly/daily/raw)', category: '집충전기', dashboard: 'poll',
-    params: [
-      { key: 'view', sample: 'hourly' },
-      { key: 'days', sample: '' },
-      { key: 'date', sample: '' },
-    ] },
-  { path: '/api/find-nearby-chargers',          label: '주변 충전소',      desc: '좌표/주소 기반 주변 충전소 탐색 (1회성 조사)', category: '집충전기',
-    params: [
-      { key: 'radius', sample: '' },
-      { key: 'count',  sample: '' },
-      { key: 'addr',   sample: '' },
-      { key: 'name',   sample: '' },
-    ] },
-
-  // 가족
-  { path: '/api/family/festivals', label: '축제',           desc: '한국관광공사 TourAPI(searchFestival2) 래핑 — 봇 /festivals (가족)', category: '가족',
-    params: [
-      { key: 'from',     sample: '' },
-      { key: 'to',       sample: '' },
-      { key: 'areaCode', sample: '' },
-      { key: 'size',     sample: '' },
-    ] },
-
-];
-
-const CATEGORIES = ['차량', '주행', '배터리', '집충전기', '가족'];
-
-const SLOW_MS = 1500;
-
-function buildQS(params, values) {
-  if (!params?.length) return '';
-  const usp = new URLSearchParams();
-  for (const p of params) {
-    const v = values?.[p.key];
-    if (v != null && v !== '') usp.set(p.key, v);
-  }
-  const s = usp.toString();
-  return s ? `?${s}` : '';
-}
-
-function summarizePayload(text) {
-  if (!text) return { kind: 'empty', hint: '—', peek: '', parsed: null };
-  let parsed;
-  try { parsed = JSON.parse(text); } catch {
-    return { kind: 'text', hint: `${text.length}자`, peek: text.slice(0, 500), parsed: null };
-  }
-  let hint = '';
-  if (Array.isArray(parsed)) {
-    hint = `${parsed.length}행`;
-  } else if (parsed && typeof parsed === 'object') {
-    const keys = Object.keys(parsed);
-    if ('error' in parsed) hint = `error: ${String(parsed.error).slice(0, 40)}`;
-    else hint = `${keys.length}키`;
-  } else {
-    hint = String(parsed).slice(0, 30);
-  }
-  let peek;
-  try { peek = JSON.stringify(parsed, null, 2).slice(0, 800); }
-  catch { peek = text.slice(0, 800); }
-  return { kind: 'json', hint, peek, parsed };
-}
+import { HeroCard } from './_components/HeroCard';
+import { TabBar } from './_components/TabBar';
+import { ROUTES, CATEGORIES } from './_routes';
+import { SLOW_MS, buildQS, summarizePayload } from './_lib';
 
 export default function ApiStatusPage() {
   const [results, setResults] = useState({});
@@ -152,11 +21,11 @@ export default function ApiStatusPage() {
   const [serverData, setServerData] = useState(null);
   const [serverLatency, setServerLatency] = useState(null);
   const [serverErr, setServerErr] = useState(null);
-  const runIdRef = useRef(0);
   const [tab, setTab] = useState('server');
+  const runIdRef = useRef(0);
 
-  // 서버 상태 — '서버' 탭 활성일 때만 폴링. 다른 탭에서는 cleanup.
-  // history 는 서버측 ring buffer(/api/server-status 응답.history) 를 그대로 사용.
+  // '서버' 탭 활성일 때만 30초 폴링 — 다른 탭에선 cleanup.
+  // history 는 /api/server-status 응답의 ring buffer 그대로 사용.
   useEffect(() => {
     if (tab !== 'server') return;
     let alive = true;
@@ -168,9 +37,8 @@ export default function ApiStatusPage() {
         let data = null;
         try { data = JSON.parse(text); } catch {}
         if (!alive) return;
-        if (!res.ok) {
-          setServerErr(data?.error || `HTTP ${res.status}`);
-        } else {
+        if (!res.ok) setServerErr(data?.error || `HTTP ${res.status}`);
+        else {
           setServerData(data);
           setServerLatency(performance.now() - t0);
           setServerErr(null);
@@ -184,7 +52,7 @@ export default function ApiStatusPage() {
     return () => { alive = false; clearInterval(id); };
   }, [tab]);
 
-  // 마운트 시 driveId 자동 픽
+  // 마운트 시 driveId 자동 픽 (route-map 등 driveId 필수 라우트에 sample 제공)
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -236,8 +104,7 @@ export default function ApiStatusPage() {
     const myRun = ++runIdRef.current;
     setResults(prev => ({ ...prev, [route.path]: { state: 'running' } }));
 
-    const qs = buildQS(route.params, paramValues[route.path]);
-    const url = route.path + qs;
+    const url = route.path + buildQS(route.params, paramValues[route.path]);
     const t0 = performance.now();
     try {
       const res = await fetch(url, { cache: 'no-store' });
@@ -246,31 +113,17 @@ export default function ApiStatusPage() {
       const sum = summarizePayload(text);
       const ok = res.ok && !(sum.parsed && typeof sum.parsed === 'object' && 'error' in sum.parsed);
       const state = !ok ? 'fail' : (dt >= SLOW_MS ? 'slow' : 'ok');
-      const result = {
-        state,
-        status: res.status,
-        ms: dt,
-        bytes: text.length,
-        url,
-        hint: sum.hint,
-        peek: sum.peek,
-        parsed: sum.parsed,
-      };
-      setResults(prev => prev[route.path]?.runId && prev[route.path].runId > myRun ? prev : { ...prev, [route.path]: { ...result, runId: myRun } });
+      const result = { state, status: res.status, ms: dt, bytes: text.length, url, hint: sum.hint, peek: sum.peek, parsed: sum.parsed };
+      setResults(prev => prev[route.path]?.runId && prev[route.path].runId > myRun
+        ? prev
+        : { ...prev, [route.path]: { ...result, runId: myRun } });
     } catch (e) {
       const dt = performance.now() - t0;
       setResults(prev => ({
         ...prev,
         [route.path]: {
-          state: 'fail',
-          status: null,
-          ms: dt,
-          bytes: null,
-          url,
-          hint: 'fetch 실패',
-          peek: String(e?.message || e).slice(0, 800),
-          parsed: null,
-          runId: myRun,
+          state: 'fail', status: null, ms: dt, bytes: null, url,
+          hint: 'fetch 실패', peek: String(e?.message || e).slice(0, 800), parsed: null, runId: myRun,
         },
       }));
     }
@@ -285,104 +138,18 @@ export default function ApiStatusPage() {
     <main className="min-h-screen bg-[#0f0f0f] text-white">
       <div className="max-w-2xl mx-auto px-4 py-5 pb-8 flex flex-col gap-4">
 
-        {/* Tab bar */}
-        <div className="flex gap-1 bg-[#161618] border border-white/[0.06] rounded-2xl p-1">
-          <button
-            onClick={() => setTab('server')}
-            className={`flex-1 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
-              tab === 'server' ? 'bg-white/[0.06] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            서버
-            {serverErr && <Icon name="warn" className="w-4 h-4 inline-block align-middle ml-1.5 text-rose-400" />}
-          </button>
-          <button
-            onClick={() => setTab('api')}
-            className={`flex-1 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
-              tab === 'api' ? 'bg-white/[0.06] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            API 테스트
-            {counts.fail > 0 && <span className="ml-1.5 text-rose-400 text-[11px] tabular-nums inline-flex items-center gap-0.5"><Icon name="x" className="w-4 h-4" />{counts.fail}</span>}
-            {counts.fail === 0 && counts.slow > 0 && <span className="ml-1.5 text-amber-400 text-[11px] tabular-nums inline-flex items-center gap-0.5"><Icon name="warn" className="w-4 h-4" />{counts.slow}</span>}
-          </button>
-          <button
-            onClick={() => setTab('agg')}
-            className={`flex-1 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
-              tab === 'agg' ? 'bg-white/[0.06] text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            집계
-          </button>
-        </div>
+        <TabBar tab={tab} onChange={setTab} serverErr={serverErr} counts={counts} />
 
-        {/* Hero — API 탭 */}
-        {tab === 'api' && (() => {
-          const overall =
-            counts.fail > 0 ? 'fail'
-            : counts.slow > 0 ? 'slow'
-            : counts.running > 0 ? 'running'
-            : counts.idle === ROUTES.length ? 'idle'
-            : counts.idle > 0 ? 'partial'
-            : 'ok';
-          const cfg = {
-            ok:      { label: '정상',   dot: 'bg-emerald-400', halo: 'bg-emerald-500/15', pulse: true },
-            slow:    { label: '느림',   dot: 'bg-amber-400',   halo: 'bg-amber-500/15',   pulse: false },
-            fail:    { label: '오류',   dot: 'bg-rose-400',    halo: 'bg-rose-500/15',    pulse: false },
-            running: { label: '실행 중', dot: 'bg-blue-400',    halo: 'bg-blue-500/15',    pulse: true },
-            partial: { label: '부분',   dot: 'bg-zinc-400',    halo: 'bg-zinc-500/15',    pulse: false },
-            idle:    { label: '대기',   dot: 'bg-zinc-600',    halo: 'bg-zinc-700/30',    pulse: false },
-          }[overall];
-          return (
-            <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
-                    <span className={`absolute inset-0 rounded-full ${cfg.halo} ${cfg.pulse ? 'animate-pulse' : ''}`} />
-                    <span className={`relative w-4 h-4 rounded-full ${cfg.dot}`} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-2xl font-light tracking-tight">{cfg.label}</div>
-                    <div className="text-[11px] text-zinc-500 tabular-nums mt-0.5">
-                      <span className="text-zinc-300">{counts.ok}</span>
-                      <span className="text-zinc-600"> / {ROUTES.length} OK</span>
-                      {counts.slow > 0 && <span className="ml-2.5 text-amber-400 inline-flex items-center gap-1"><Icon name="warn" className="w-4 h-4" />{counts.slow}</span>}
-                      {counts.fail > 0 && <span className="ml-2.5 text-rose-400 inline-flex items-center gap-1"><Icon name="x" className="w-4 h-4" />{counts.fail}</span>}
-                      {counts.idle > 0 && counts.idle < ROUTES.length && <span className="ml-2.5 text-zinc-600">○ {counts.idle}</span>}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-1.5 shrink-0">
-                  <button
-                    onClick={runAll}
-                    className="px-3 py-1.5 rounded-full bg-white/[0.05] hover:bg-white/[0.08] active:bg-white/[0.10] text-zinc-300 text-[11px] font-medium flex items-center gap-1.5"
-                  >
-                    <span className="text-[13px]">↻</span>
-                    <span>재실행</span>
-                  </button>
-                  <span className="text-[10px] text-zinc-600 tabular-nums">
-                    {lastRun ? new Date(lastRun).toLocaleTimeString('ko-KR', { hour12: false }) : '미실행'}
-                  </span>
-                </div>
-              </div>
+        {tab === 'api' && (
+          <HeroCard
+            counts={counts}
+            total={ROUTES.length}
+            lastRun={lastRun}
+            autoErr={autoErr}
+            onRunAll={runAll}
+          />
+        )}
 
-              {/* 진행 바 — OK / slow / fail / idle 비율 */}
-              <div className="mt-4 h-1 rounded-full bg-white/[0.04] overflow-hidden flex">
-                {counts.ok   > 0 && <div className="h-full bg-emerald-500/70" style={{ width: `${(counts.ok   / ROUTES.length) * 100}%` }} />}
-                {counts.slow > 0 && <div className="h-full bg-amber-500/70"   style={{ width: `${(counts.slow / ROUTES.length) * 100}%` }} />}
-                {counts.fail > 0 && <div className="h-full bg-rose-500/70"    style={{ width: `${(counts.fail / ROUTES.length) * 100}%` }} />}
-              </div>
-
-              {autoErr && (
-                <div className="mt-3 text-[10px] text-zinc-600">
-                  driveId: <span className="text-rose-400">{autoErr}</span>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {/* 서버 탭 */}
         {tab === 'server' && (
           <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
             {serverData ? (
@@ -397,7 +164,6 @@ export default function ApiStatusPage() {
           </div>
         )}
 
-        {/* 집계 탭 */}
         {tab === 'agg' && (
           <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-4">
             <RenderErrorBoundary>
@@ -406,7 +172,6 @@ export default function ApiStatusPage() {
           </div>
         )}
 
-        {/* 카테고리별 — API 탭 */}
         {tab === 'api' && CATEGORIES.map(cat => {
           const list = ROUTES.filter(r => r.category === cat);
           return (
