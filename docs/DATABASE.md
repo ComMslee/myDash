@@ -28,6 +28,12 @@ TeslaMate가 관리하는 PostgreSQL 16 스키마. 직접 쿼리만 사용 (ORM 
 | `family_festivals` | TourAPI 축제 폴링 결과 `(id PK, title, start_date, end_date, addr, area_code, sigungu_code, lat, lng, image, thumbnail, tel, fetched_at)` · GHA cron(월·수·금 03:00 KST)이 `/api/family/festivals/refresh` 통해 upsert · GET 라우트는 SELECT 만 | `lib/queries/family-festivals.js::ensureSchema()` |
 | `hub_user_groups` | 텔레그램 봇 사용자 그룹 정의 `(group_key PK, label, description, is_root)` · `/v2/tg` 권한관리 탭에서 CRUD | `lib/tg-user-groups.js` |
 | `hub_user_group_features` | 사용자 그룹 ↔ 기능(카테고리) 매핑 `(group_key, feature)` · 가입 승인 시 `hub_permissions` 로 일괄 복사 | `lib/tg-user-groups.js` |
+| `dash_daily_drive_agg` | 일·시간 단위 주행 사전 집계 `(car_id, day, dow, hour, ticks_10min, distance_km, duration_min, drive_count, used_km)` PK `(car_id, day, hour)` · `day` = KST 날짜 · `/api/summary` (historical) · `/api/insights` (hour×dow) 위임 소스 | `lib/dash-agg.js::ensureSchema()` |
+| `dash_daily_charge_agg` | 일·시간 단위 충전 사전 집계 `(car_id, day, dow, hour, ticks_10min, energy_kwh, charge_count, home_count, fast_count)` PK `(car_id, day, hour)` · `/api/charge-all-time` (단독) · `/api/summary` (historical) 위임 소스 | `lib/dash-agg.js::ensureSchema()` |
+| `dash_monthly_insights` | 월별 주행/충전 인사이트 사전 집계 (21컬럼: distance/duration/drive_count + max_*+ kwh + home/other/fast/slow_charges + best_long_drive_* + best_eff_drive_*) PK `(car_id, year, month)` · `/api/insights` (과거 11개월 + allTime SUM) · `/api/monthly-history` (24개월) 위임 소스 | `lib/dash-agg.js::ensureSchema()` |
+| `dash_top_drives_cache` | 8 메트릭 × TOP 50 캐시 `(car_id, metric, rank, drive_id, value, start_date)` PK `(car_id, metric, rank)` · refresh 시 truncate-replace · `/api/rankings` 위임 소스 (drive_id 로 drives JOIN) | `lib/dash-agg.js::ensureSchema()` |
+| `dash_place_clusters` | 주행 끝점 0.0005° (~55m) bin 클러스터 `(car_id, bin_lat numeric(7,4), bin_lon numeric(7,4), visit_count, top_origin_lat, top_origin_lon, last_visited_at)` PK `(car_id, bin_lat, bin_lon)` · `/api/frequent-places` TOP-N 위임 소스 | `lib/dash-agg.js::ensureSchema()` |
+| `dash_place_geo` | 클러스터 좌표 → 한글 라벨 캐시 `(coord_key TEXT PK, label, updated_at)` · `kakao_address_cache` 와 별개로 클러스터 라벨 전용 | `lib/dash-agg.js::ensureSchema()` |
 
 > 텔레그램 hub 가 자체 관리하는 `hub_users`, `hub_permissions`, `hub_unmatched_inputs`, `hub_categories` 는 `services/telegram-hub` 가 idempotent 로 생성한다 ([`telegram-bot/README.md`](./telegram-bot/README.md) 참조).
 

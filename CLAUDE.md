@@ -29,7 +29,7 @@ docker compose build dashboard && docker compose up -d dashboard
 - [`docs/DATABASE.md`](./docs/DATABASE.md) — PostgreSQL 테이블 · 환경 변수 · 공용 상수/유틸
 - [`docs/CACHING.md`](./docs/CACHING.md) — DB·캐시 흐름도 · API↔테이블↔캐시 매핑
 - [`docs/CODE_CONVENTIONS.md`](./docs/CODE_CONVENTIONS.md) — UI/데이터/컴포넌트 규칙 · 커밋 스타일
-- [`docs/PITFALLS.md`](./docs/PITFALLS.md) — 알려진 함정 9건 (수정 전 필독)
+- [`docs/PITFALLS.md`](./docs/PITFALLS.md) — 알려진 함정 11건 (수정 전 필독)
 
 운영·외부 API 등 전체 인덱스: [`docs/README.md`](./docs/README.md)
 

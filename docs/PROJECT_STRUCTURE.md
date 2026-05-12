@@ -45,6 +45,8 @@ myDash/
     │   └── search-by-name.js        # 충전소 이름 검색 유틸
     ├── lib/
     │   ├── db.js                 # PostgreSQL 커넥션 풀 (싱글턴)
+    │   ├── server-cache.js       # 모듈 스코프 Map + per-key TTL + inflight dedup — `withCache(key, ttlMs, fn)` / `invalidate(prefix)`
+    │   ├── dash-agg.js           # 사전 집계 6 테이블(dash_daily_*·dash_monthly_insights·dash_top_drives_cache·dash_place_clusters·dash_place_geo) — ensureSchema/bootstrapIfEmpty/refreshRange/refreshMonthlyInsights/refreshTopDrivesCache/refreshPlaceClusters/readHourDow
     │   ├── constants.js          # KWH_PER_KM, RATED_RANGE_MAX_KM
     │   ├── format.js             # formatDuration, formatHm, formatHours, formatDate, shortAddr, formatKorDate, formatKorDateTime, formatKorDay
     │   ├── kst.js                # KST(UTC+9) 시간 변환 헬퍼
@@ -134,20 +136,21 @@ myDash/
     │   │       └── auth/
     │   │           └── page.js       # 로그인 PIN 변경 (단일 사용자)
     │   └── api/                  # 서버사이드 API 라우트 (모두 GET, force-dynamic)
+    │       ├── admin/refresh-aggs/route.js  # 사전 집계 갱신 (POST · HUB_SHARED_SECRET · scope=daily|monthly|top|places|all · bootstrap-on-empty) — 매일 04:00 KST GHA cron
     │       ├── car/route.js              # 차량 기본 정보 + 배터리 + 상태
     │       ├── charging-status/route.js  # 현재 충전 상태
     │       ├── drives/route.js           # 주행 통계(오늘/주/월) + 최근 주행 목록
     │       ├── charges/route.js          # 충전 이력 + 월간/전체 비용
-    │       ├── fast-charges/route.js     # 급속 충전 기록
-    │       ├── slow-charges/route.js     # 완속 충전 기록
-    │       ├── insights/route.js         # 6개월 집계 + 시간대/요일 패턴
-    │       ├── monthly-history/route.js  # 24개월 월별 주행/충전/효율
-    │       ├── battery/route.js          # 배터리 건강 + 히스토그램 + 대기 소모
-    │       ├── battery-trend/route.js    # 배터리 용량/습관 월별 트렌드
-    │       ├── charge-all-time/route.js  # 누적 충전 비용
-    │       ├── frequent-places/route.js  # 자주 방문 장소 랭킹
+    │       ├── fast-charges/route.js     # 급속 충전 기록 (server-cache 180s)
+    │       ├── slow-charges/route.js     # 완속 충전 기록 (server-cache 180s)
+    │       ├── insights/route.js         # 12개월 집계 + 시간대/요일 패턴 (server-cache 600s · dash_monthly_insights 위임, 현재월 라이브)
+    │       ├── monthly-history/route.js  # 24개월 월별 주행/충전/효율 (server-cache 300s · dash_monthly_insights 위임)
+    │       ├── battery/route.js          # 배터리 건강 + 히스토그램 + 대기 소모 (server-cache 180s)
+    │       ├── battery-trend/route.js    # 배터리 용량/습관 월별 트렌드 (server-cache 600s)
+    │       ├── charge-all-time/route.js  # 누적 충전 비용 (server-cache 600s · dash_daily_charge_agg 단독)
+    │       ├── frequent-places/route.js  # 자주 방문 장소 랭킹 (server-cache 300s · dash_place_clusters 위임)
     │       ├── long-stay-places/route.js # 오래 머문 장소 랭킹 (drives LEAD 윈도우로 dwell 산출, ≥10분만)
-    │       ├── rankings/route.js         # 랭킹 페이지 데이터
+    │       ├── rankings/route.js         # 랭킹 페이지 데이터 (server-cache 300s · dash_top_drives_cache 위임 + drives JOIN)
     │       ├── route-map/route.js        # 특정 주행의 GPS 경로
     │       ├── heatmap/route.js          # 히트맵 데이터
     │       ├── home-charger/route.js              # 집충전기 실시간 (환경공단 EvCharger API + 시간대별 캐시)
@@ -155,7 +158,7 @@ myDash/
     │       ├── home-charger/groups/route.js       # 동별 그룹 카운트 (constants.js 매핑) — 봇 /chargers
     │       ├── home-charger/report/route.js       # 활용도 리포트 (KPI·주별·동별) — /v2/chargers/report 페이지
     │       ├── home-charger/poll-log/route.js     # 폴링 로그 조회
-    │       ├── summary/route.js                   # drives+charges 일자 집계 (range=multi 등) — 봇 /period
+    │       ├── summary/route.js                   # drives+charges 일자 집계 (range=multi 등) — 봇 /period (server-cache 120s · historical 범위는 dash_daily_*_agg 위임)
     │       ├── parked/route.js                    # 마지막 주차/주행중 — 봇 /where
     │       ├── location/route.js                  # 최신 좌표 — 봇 /where
     │       ├── sns/blog/route.js                  # 네이버 블로그 발행 mock (POST) — 봇 /post 채널 검증

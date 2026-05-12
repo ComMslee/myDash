@@ -114,7 +114,7 @@ const today = await pool.query(`SELECT ... FROM drives WHERE start_date >= date_
 |---|---|---|
 | Tier 1 stale 응답 (60s) | 갓 끝난 주행이 1분 안 보임 | `?refresh=1` 강제 갱신 옵션, `WarmDiagCard` 에 캐시 상태 표시 |
 | Tier 2 집계 누락 (cron 실패) | 어제 데이터 빠짐 | `/v2/dev/api-status` 에 마지막 집계 시각 표시 + 단순 self-heal: `days=7` 항상 upsert (멱등) |
-| TeslaMate 스키마 변경 | `start_rated_range_km` 등 컬럼 부재 | PITFALLS.md 함정 9건 패턴 — refresh 핸들러 안에 `IF column exists` 가드 |
+| TeslaMate 스키마 변경 | `start_rated_range_km` 등 컬럼 부재 | PITFALLS.md 함정 11건 패턴 — refresh 핸들러 안에 `IF column exists` 가드 |
 | dash_ 테이블이 TeslaMate 백업·복원에 섞임 | 운영 부담 | 명시적 prefix `dash_` 로 자체 마이그레이션 폴더 분리, README 명시 |
 
 ## 5. 측정 지표

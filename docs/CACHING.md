@@ -41,14 +41,15 @@
 
 ### 3. 분석 라우트 메모리 TTL 캐시 (server-cache)
 - **위치**: `dashboard/lib/server-cache.js` (모듈 스코프 Map + inflight dedup)
-- **적용 라우트** (Tier 1):
-  - `/api/insights` (180s), `/api/charge-all-time` (180s)
-  - `/api/monthly-history` (300s), `/api/rankings` (300s, key 에 type·limit 포함)
-  - `/api/heatmap` (300s), `/api/frequent-places` (300s), `/api/long-stay-places` (300s)
-  - `/api/fast-charges` (180s), `/api/slow-charges` (180s)
-  - `/api/summary` (120s, `range=multi` 및 fully-historical 범위만)
+- **적용 라우트**:
+  - `/api/insights` (600s · Tier 2 위임), `/api/charge-all-time` (600s · Tier 2 위임)
+  - `/api/battery-trend` (600s)
+  - `/api/monthly-history` (300s · Tier 2 위임), `/api/rankings` (300s · Tier 2 위임, key 에 type·limit 포함)
+  - `/api/heatmap` (300s), `/api/frequent-places` (300s · Tier 2 위임), `/api/long-stay-places` (300s)
+  - `/api/fast-charges` (180s), `/api/slow-charges` (180s), `/api/battery` (180s)
+  - `/api/summary` (120s · Tier 2 위임, `range=multi` 및 fully-historical 범위만)
 - **키**: `${route}:${carId}[:${queryParams}]`
-- **무효화**: TTL 만료 또는 `?refresh=1`
+- **무효화**: TTL 만료, `?refresh=1`, 또는 `/api/admin/refresh-aggs` 성공 시 사전집계 의존 프리픽스 일괄 invalidate (`insights:` / `charge-all-time:` / `monthly-history:` / `summary:` / `rankings:` / `frequent-places:`)
 - **재시작 시 휘발**: 컨테이너 재시작 = 자연 무효화
 - **inflight dedup**: 만료 직후 동시 요청 → 1회만 DB 쿼리
 
@@ -104,8 +105,8 @@
 
 | 라우트 | 주 테이블 | 외부 호출 | 서버 캐시 |
 |--------|----------|----------|----------|
-| `/api/battery` | charging_processes, drives, positions, battery_health | — | 없음 |
-| `/api/battery-trend` | charging_processes, drives | — | 없음 |
+| `/api/battery` | charging_processes, drives, positions, battery_health | — | server-cache 180s |
+| `/api/battery-trend` | charging_processes, drives | — | server-cache 600s |
 | `/api/drives` | drives, addresses, geofences, positions | Kakao Local | kakao_address_cache (30일) |
 | `/api/route-map` | positions | — | 모듈 LRU (200, 휘발) |
 | `/api/frequent-places` | dash_place_clusters + drives/addresses/geofences (메타) + dash_place_geo | Kakao Local | server-cache 300s + 클러스터/라벨 사전 집계 |
