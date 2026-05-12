@@ -2,6 +2,7 @@ import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
+import { withCache } from '@/lib/server-cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -121,9 +122,13 @@ async function aggregateRange(carId, start, end) {
   };
 }
 
+// Ranges that are fully in the past — safe to cache.
+const CACHEABLE_RANGES = new Set(['multi', 'last-week', 'last-month', 'prev-rolling-4w', 'yesterday']);
+
 export async function GET(req) {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
+  const force = new URL(req.url).searchParams.get('refresh') === '1';
   try {
     const { searchParams } = new URL(req.url);
     const range = (searchParams.get('range') || 'today').toLowerCase();
@@ -134,19 +139,30 @@ export async function GET(req) {
     const today = kstStartOfTodayUtc();
 
     if (range === 'multi') {
-      const ranges = ['today', 'this-week', 'last-week', 'rolling-4w', 'prev-rolling-4w'];
-      const out = {};
-      await Promise.all(ranges.map(async (r) => {
-        const b = rangeBounds(r, today);
-        if (!b) return;
-        // 키 변환: 'rolling-4w' → 'rolling_4w' 등 (단 prev-rolling-4w → prev_rolling_4w).
-        out[r.replace(/-/g, '_')] = await aggregateRange(car.id, b[0], b[1]);
-      }));
-      return Response.json({ range: 'multi', ...out });
+      const cacheKey = `summary:${car.id}:multi`;
+      return Response.json(await withCache(cacheKey, 120_000, async () => {
+        const ranges = ['today', 'this-week', 'last-week', 'rolling-4w', 'prev-rolling-4w'];
+        const out = {};
+        await Promise.all(ranges.map(async (r) => {
+          const b = rangeBounds(r, today);
+          if (!b) return;
+          // 키 변환: 'rolling-4w' → 'rolling_4w' 등 (단 prev-rolling-4w → prev_rolling_4w).
+          out[r.replace(/-/g, '_')] = await aggregateRange(car.id, b[0], b[1]);
+        }));
+        return { range: 'multi', ...out };
+      }, { force }));
     }
 
     const b = rangeBounds(range, today);
     if (!b) return Response.json({ error: 'bad range' }, { status: 400 });
+
+    if (CACHEABLE_RANGES.has(range)) {
+      const cacheKey = `summary:${car.id}:${range}`;
+      return Response.json(await withCache(cacheKey, 120_000, async () => {
+        const agg = await aggregateRange(car.id, b[0], b[1]);
+        return { range, ...agg };
+      }, { force }));
+    }
 
     const agg = await aggregateRange(car.id, b[0], b[1]);
     return Response.json({ range, ...agg });

@@ -2,18 +2,22 @@ import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
+import { withCache } from '@/lib/server-cache';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request) {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
+  const force = new URL(request.url).searchParams.get('refresh') === '1';
   try {
     const car = await getDefaultCar();
     if (!car) {
       return Response.json({ error: 'No car found' }, { status: 404 });
     }
     const carId = car.id;
+
+    return Response.json(await withCache(`insights:${carId}`, 180_000, async () => {
 
     const now = new Date();
     const nextStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -363,7 +367,8 @@ export async function GET() {
         for (const r of chargeHourDowQ.rows) grid[r.dow][r.hour] = r.count;
         return grid;
       })(),
-    });
+    };
+    }, { force }));
   } catch (err) {
     console.error('/api/insights error:', err);
     return Response.json({ error: 'DB error' }, { status: 500 });

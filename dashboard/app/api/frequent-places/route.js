@@ -2,21 +2,25 @@ import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { batchReverseGeocode } from '@/lib/kakao-geo';
+import { withCache } from '@/lib/server-cache';
 
 export const dynamic = 'force-dynamic';
 
 // 지오펜스 이름이 아래와 일치하면 "자주 가는 곳" 목록에서 분리해 상단 pin으로 표시
 const PINNED_GEOFENCE_NAMES = ['집', '회사', 'Home', 'Work'];
 
-export async function GET() {
+export async function GET(request) {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
+  const force = new URL(request.url).searchParams.get('refresh') === '1';
   try {
     const car = await getDefaultCar();
     if (!car) {
       return Response.json({ places: [] });
     }
     const carId = car.id;
+
+    return Response.json(await withCache(`frequent-places:${carId}`, 300_000, async () => {
 
     // 좌표 0.0005° bin (~55m)로 그룹핑, Kakao 질의는 그룹 내 실좌표 평균 사용
     const result = await pool.query(
@@ -146,7 +150,8 @@ export async function GET() {
       PINNED_GEOFENCE_NAMES.indexOf(b.geofence_name)
     );
 
-    return Response.json({ places: [...normal, ...pinned] });
+    return { places: [...normal, ...pinned] };
+    }, { force }));
   } catch (err) {
     console.error('/api/frequent-places error:', err);
     return Response.json({ error: 'DB error', detail: err.message }, { status: 500 });

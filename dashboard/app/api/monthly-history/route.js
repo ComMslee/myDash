@@ -2,12 +2,14 @@ import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
+import { withCache } from '@/lib/server-cache';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request) {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
+  const force = new URL(request.url).searchParams.get('refresh') === '1';
   try {
     const car = await getDefaultCar();
     if (!car) {
@@ -15,6 +17,7 @@ export async function GET() {
     }
     const carId = car.id;
 
+    return Response.json(await withCache(`monthly-history:${carId}`, 300_000, async () => {
     const [drivesResult, chargesResult, effResult, driveDaysResult, seasonalResult] = await Promise.all([
       pool.query(
         `SELECT
@@ -130,7 +133,8 @@ export async function GET() {
       if (row.wh_per_km != null) seasonalEff[row.season] = parseFloat(row.wh_per_km.toFixed(1));
     }
 
-    return Response.json({ months, driveDaysByYear, seasonalEff });
+    return { months, driveDaysByYear, seasonalEff };
+    }, { force }));
   } catch (err) {
     console.error('/api/monthly-history error:', err);
     return Response.json({ error: 'DB error', detail: err.message }, { status: 500 });

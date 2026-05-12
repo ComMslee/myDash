@@ -39,7 +39,20 @@
 - **예외**: `driveId` 미지정(latest drive 자동 선택) 케이스는 캐시하지 않음
 - **무효화**: 서버 재시작 (Postgres에서 positions를 사후 변경하지 않는다는 가정)
 
-### 3. 집충전기 (환경공단 EvCharger) 캐시
+### 3. 분석 라우트 메모리 TTL 캐시 (server-cache)
+- **위치**: `dashboard/lib/server-cache.js` (모듈 스코프 Map + inflight dedup)
+- **적용 라우트** (Tier 1):
+  - `/api/insights` (180s), `/api/charge-all-time` (180s)
+  - `/api/monthly-history` (300s), `/api/rankings` (300s, key 에 type·limit 포함)
+  - `/api/heatmap` (300s), `/api/frequent-places` (300s), `/api/long-stay-places` (300s)
+  - `/api/fast-charges` (180s), `/api/slow-charges` (180s)
+  - `/api/summary` (120s, `range=multi` 및 fully-historical 범위만)
+- **키**: `${route}:${carId}[:${queryParams}]`
+- **무효화**: TTL 만료 또는 `?refresh=1`
+- **재시작 시 휘발**: 컨테이너 재시작 = 자연 무효화
+- **inflight dedup**: 만료 직후 동시 요청 → 1회만 DB 쿼리
+
+### 4. 집충전기 (환경공단 EvCharger) 캐시
 - **위치**: `dashboard/lib/home-charger-cache.js` (코어) + `dashboard/lib/home-charger/{schema,poll-log,usage,fleet-stats}.js` (분리 모듈)
 - **메모리 캐시**: 모듈 변수 `cache = { ts, data }`, `inflight` (동시 요청 dedup)
 - **TTL (정적)**: KST 시간대별 5~12분 (`CACHE_TIERS`). 저녁 피크(18~22시) 5분, 오후 12분 등
@@ -72,27 +85,27 @@
 | `/api/battery-trend` | charging_processes, drives | — | 없음 |
 | `/api/drives` | drives, addresses, geofences, positions | Kakao Local | kakao_address_cache (30일) |
 | `/api/route-map` | positions | — | 모듈 LRU (200, 휘발) |
-| `/api/frequent-places` | drives, addresses, geofences | — | 없음 |
+| `/api/frequent-places` | drives, addresses, geofences | — | server-cache 300s |
 | `/api/charging-status` | car, charging_processes, positions | — | 없음 (라이브) |
 | `/api/home-charger` | home_charger_snapshot | 환경공단 EvCharger | 모듈 메모리 + DB 스냅샷 |
 | `/api/home-charger/fleet-stats` | charger_usage, home_charger_snapshot | — | 없음 |
 | `/api/home-charger/groups` | charger_usage, home_charger_snapshot | — | 없음 (constants.js 매핑) |
 | `/api/home-charger/report` | charger_usage, home_charger_snapshot | — | `getCache()` 의 모듈 캐시 활용 (콜드 스타트 시 DB observed_chargers 폴백) |
 | `/api/home-charger/poll-log` | (메모리 진단) | — | 없음 |
-| `/api/monthly-history` | charging_processes | — | 없음 |
-| `/api/charge-all-time` | charging_processes | — | 없음 |
-| `/api/heatmap` | drives | — | 없음 |
-| `/api/insights` | drives | — | 없음 |
-| `/api/rankings` | drives | — | 없음 |
-| `/api/fast-charges` | charging_processes | — | 없음 |
-| `/api/slow-charges` | charging_processes | — | 없음 |
+| `/api/monthly-history` | charging_processes | — | server-cache 300s |
+| `/api/charge-all-time` | charging_processes | — | server-cache 180s |
+| `/api/heatmap` | drives | — | server-cache 300s |
+| `/api/insights` | drives | — | server-cache 180s |
+| `/api/rankings` | drives | — | server-cache 300s (per type·limit) |
+| `/api/fast-charges` | charging_processes | — | server-cache 180s |
+| `/api/slow-charges` | charging_processes | — | server-cache 180s |
 | `/api/find-nearby-chargers` | — | 환경공단 EvCharger | 없음 |
 | `/api/car` | cars | — | 없음 |
 | `/api/charges` | charging_processes, geofences | — | 없음 |
-| `/api/summary` | drives, charging_processes | — | 없음 (range=multi 등 봇 `/period` 용) |
+| `/api/summary` | drives, charging_processes | — | server-cache 120s (multi/historical 범위만) |
 | `/api/parked` | drives, states | — | 없음 (라이브 — 봇 `/where`) |
 | `/api/location` | positions | — | 없음 (라이브 최신 좌표 — 봇 `/where`) |
-| `/api/long-stay-places` | drives, addresses, geofences | — | 없음 (LEAD 윈도우로 dwell 산출) |
+| `/api/long-stay-places` | drives, addresses, geofences | — | server-cache 300s |
 | `/api/family/festivals` | family_festivals | — | DB 자체가 캐시 (GHA cron 주 3회 갱신, stale 임계 4일) — [TOUR_API.md](./TOUR_API.md) |
 | `/api/family/festivals/refresh` | family_festivals (upsert) | TourAPI searchFestival2 | 없음 (POST · HUB_SHARED_SECRET 인증) |
 

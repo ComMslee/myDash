@@ -3,6 +3,7 @@ import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
 import { batchReverseGeocode } from '@/lib/kakao-geo';
+import { withCache } from '@/lib/server-cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +11,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request) {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
+  const force = new URL(request.url).searchParams.get('refresh') === '1';
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'drive_distance';
@@ -20,6 +22,11 @@ export async function GET(request) {
       return Response.json({ error: 'No car found' }, { status: 404 });
     }
     const carId = car.id;
+
+    const validTypes = ['drive_distance','drive_duration','drive_avg_speed','drive_eff','day_distance','day_duration','day_avg_speed','day_eff'];
+    if (!validTypes.includes(type)) return Response.json({ error: 'Invalid type' }, { status: 400 });
+
+    return Response.json(await withCache(`rankings:${carId}:${type}:${limit}`, 300_000, async () => {
 
     if (type === 'drive_distance' || type === 'drive_duration' || type === 'drive_avg_speed' || type === 'drive_eff') {
       // 단일 주행 기준 정렬 컬럼
@@ -67,7 +74,7 @@ export async function GET(request) {
         batchReverseGeocode(endCoords),
       ]);
 
-      return Response.json({
+      return {
         type,
         items: drives.map((d, i) => {
           const dist = d.distance ? parseFloat(parseFloat(d.distance).toFixed(1)) : 0;
@@ -91,7 +98,7 @@ export async function GET(request) {
             end_address:   d.end_geofence_name   || kakaoEnds[i]   || d.end_osm   || null,
           };
         }),
-      });
+      };
     }
 
     if (type === 'day_distance' || type === 'day_duration' || type === 'day_avg_speed' || type === 'day_eff') {
@@ -130,7 +137,7 @@ export async function GET(request) {
         [carId, limit]
       );
 
-      return Response.json({
+      return {
         type,
         items: rows.rows.map(r => {
           const dist = parseFloat(r.total_distance.toFixed(1));
@@ -147,10 +154,9 @@ export async function GET(request) {
             drive_count: r.drive_count,
           };
         }),
-      });
+      };
     }
-
-    return Response.json({ error: 'Invalid type' }, { status: 400 });
+    }, { force }));
   } catch (err) {
     console.error('/api/rankings error:', err);
     return Response.json({ error: 'DB error' }, { status: 500 });

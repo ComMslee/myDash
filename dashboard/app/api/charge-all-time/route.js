@@ -1,17 +1,20 @@
 import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
+import { withCache } from '@/lib/server-cache';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request) {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
+  const force = new URL(request.url).searchParams.get('refresh') === '1';
   try {
     const car = await getDefaultCar();
     if (!car) return Response.json({ error: 'No car found' }, { status: 404 });
     const carId = car.id;
 
+    return Response.json(await withCache(`charge-all-time:${carId}`, 180_000, async () => {
     const [statsResult, hourDowResult] = await Promise.all([
       pool.query(`
         SELECT
@@ -67,7 +70,8 @@ export async function GET() {
       fast_charges: s.fast_charges,
       slow_charges: s.slow_charges,
       charge_hour_dow: hourDow,
-    });
+    };
+    }, { force }));
   } catch (err) {
     console.error('/api/charge-all-time error:', err);
     return Response.json({ error: 'DB error' }, { status: 500 });
