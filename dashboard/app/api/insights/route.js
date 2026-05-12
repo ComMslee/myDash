@@ -80,34 +80,50 @@ export async function GET() {
           return monthStats(ms, me).then(s => ({ year: ms.getFullYear(), month: ms.getMonth() + 1, ...s }));
         })
       ),
-      // 주행 (요일 × 시간) joint — 전체 기간, 시작~종료 모든 시간 슬롯에 +1
+      // 주행 (요일 × 시간) joint — 전체 기간, 시작~종료 사이 각 시간 슬롯에 실제 점유 분(min) 합산
       pool.query(
-        `SELECT EXTRACT(DOW  FROM ts)::int AS dow,
-                EXTRACT(HOUR FROM ts)::int AS hour,
-                COUNT(*)::int AS count
-         FROM drives,
-              LATERAL generate_series(
-                date_trunc('hour', start_date + INTERVAL '9 hours'),
-                date_trunc('hour', COALESCE(end_date, start_date) + INTERVAL '9 hours'),
-                INTERVAL '1 hour'
-              ) AS ts
-         WHERE car_id = $1
+        `SELECT EXTRACT(DOW  FROM hour_start)::int AS dow,
+                EXTRACT(HOUR FROM hour_start)::int AS hour,
+                SUM(
+                  EXTRACT(EPOCH FROM (
+                    LEAST(el, hour_start + INTERVAL '1 hour')
+                    - GREATEST(sl, hour_start)
+                  )) / 60.0
+                )::float AS count
+         FROM (
+           SELECT start_date + INTERVAL '9 hours' AS sl,
+                  COALESCE(end_date, start_date) + INTERVAL '9 hours' AS el
+           FROM drives WHERE car_id = $1
+         ) d,
+         LATERAL generate_series(
+           date_trunc('hour', sl),
+           date_trunc('hour', el),
+           INTERVAL '1 hour'
+         ) AS hour_start
          GROUP BY dow, hour`,
         [carId]
       ),
-      // 충전 (요일 × 시간) joint — 전체 기간, 시작~종료 모든 시간 슬롯에 +1
+      // 충전 (요일 × 시간) joint — 전체 기간, 시작~종료 사이 각 시간 슬롯에 실제 점유 분(min) 합산
       pool.query(
-        `SELECT EXTRACT(DOW  FROM ts)::int AS dow,
-                EXTRACT(HOUR FROM ts)::int AS hour,
-                COUNT(*)::int AS count
-         FROM charging_processes,
-              LATERAL generate_series(
-                date_trunc('hour', start_date + INTERVAL '9 hours'),
-                date_trunc('hour', COALESCE(end_date, start_date) + INTERVAL '9 hours'),
-                INTERVAL '1 hour'
-              ) AS ts
-         WHERE car_id = $1
-           AND charge_energy_added IS NOT NULL
+        `SELECT EXTRACT(DOW  FROM hour_start)::int AS dow,
+                EXTRACT(HOUR FROM hour_start)::int AS hour,
+                SUM(
+                  EXTRACT(EPOCH FROM (
+                    LEAST(el, hour_start + INTERVAL '1 hour')
+                    - GREATEST(sl, hour_start)
+                  )) / 60.0
+                )::float AS count
+         FROM (
+           SELECT start_date + INTERVAL '9 hours' AS sl,
+                  COALESCE(end_date, start_date) + INTERVAL '9 hours' AS el
+           FROM charging_processes
+           WHERE car_id = $1 AND charge_energy_added IS NOT NULL
+         ) c,
+         LATERAL generate_series(
+           date_trunc('hour', sl),
+           date_trunc('hour', el),
+           INTERVAL '1 hour'
+         ) AS hour_start
          GROUP BY dow, hour`,
         [carId]
       ),
