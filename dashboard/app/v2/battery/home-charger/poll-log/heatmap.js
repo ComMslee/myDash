@@ -47,7 +47,7 @@ export function HeatmapXAxis({ primaryLabel = '합', secondaryLabel = '피크' }
     <div className="flex items-center gap-1.5 text-[9px] text-zinc-600 tabular-nums">
       <span className="w-12 shrink-0" />
       <div className="flex-1 flex justify-between px-px">
-        <span className="font-semibold">0시</span><span>6</span><span>12</span><span>18</span><span>23시</span>
+        <span className="font-semibold">0</span><span>6</span><span>12</span><span>18</span><span>23</span>
       </div>
       <span className="w-8 shrink-0 text-right">{primaryLabel}</span>
       <span className="w-10 shrink-0 text-right">{secondaryLabel}</span>
