@@ -5,11 +5,11 @@ import { withCache } from '@/lib/server-cache';
 
 export const dynamic = 'force-dynamic';
 
-// 직선/도로 거리 보정 계수 — 도시 평균 (직선 N km ≈ 도로 N/계수 km 운행 가능)
-const ROAD_FACTOR = 0.65;
+// 직선/도로 거리 보정 계수 — est 기반(이미 현실치) 이므로 보수적 0.8
+const ROAD_FACTOR = 0.8;
 
-// 현 위치 + SOC + rated km → 잔여 주행 가능 반경 (편도/왕복).
-// 지도 오버레이용 — /v2/battery 최상단 카드에서 호출.
+// 현 위치 + 예상 주행거리(est_battery_range_km) → 잔여 주행 가능 반경 (편도/왕복).
+// est 결측 시 rated 폴백. 지도 오버레이용 — /v2/battery 최상단 카드에서 호출.
 export async function GET() {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
@@ -40,20 +40,26 @@ export async function GET() {
         [carId]
       );
       const r = rows[0] || {};
-      if (r.lat == null || r.lng == null || r.rated_km == null) {
+      // est 우선, est 결측 시 rated 폴백 — 둘 다 없으면 표시 불가
+      const baseKm = r.est_km != null ? Number(r.est_km)
+                   : r.rated_km != null ? Number(r.rated_km)
+                   : null;
+      if (r.lat == null || r.lng == null || baseKm == null) {
         return { available: false };
       }
 
-      const ratedKm = Number(r.rated_km);
-      const oneWayKm = ratedKm * ROAD_FACTOR;
+      const basis = r.est_km != null ? 'est' : 'rated';
+      const oneWayKm = baseKm * ROAD_FACTOR;
       const roundTripKm = oneWayKm / 2;
 
       return {
         available: true,
         position: { lat: r.lat, lng: r.lng, ts: r.pos_ts },
         soc: r.soc,
-        rated_km: Math.round(ratedKm),
+        basis,                                  // 'est' | 'rated'
+        base_km: Math.round(baseKm),            // 계산 기준 km
         est_km: r.est_km != null ? Math.round(Number(r.est_km)) : null,
+        rated_km: r.rated_km != null ? Math.round(Number(r.rated_km)) : null,
         road_factor: ROAD_FACTOR,
         one_way_km: Math.round(oneWayKm),
         round_trip_km: Math.round(roundTripKm),

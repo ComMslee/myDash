@@ -79,7 +79,8 @@ export default function RangeMapCard() {
       <div className="px-4 pt-3 pb-2 flex items-baseline gap-2 flex-wrap">
         <span className="text-xs text-zinc-400">잔여 거리</span>
         <span className={`text-lg font-bold tabular-nums ${tone}`}>{data.soc}%</span>
-        <span className="text-sm text-zinc-300 tabular-nums">· {data.rated_km}km</span>
+        <span className="text-sm text-zinc-300 tabular-nums">· {data.base_km}km</span>
+        <span className="text-[10px] text-zinc-500">{data.basis === 'est' ? '예상' : 'rated'}</span>
         {data.is_charging && <span className="text-[10px] text-amber-400 ml-1">⚡ 충전 중</span>}
         <span className="ml-auto text-[10px] text-zinc-500">×{data.road_factor} 도로 보정</span>
       </div>
@@ -97,7 +98,7 @@ export default function RangeMapCard() {
         </div>
       </div>
       <div className="px-4 py-2 text-[10px] text-zinc-500">
-        직선거리 추정 · rated km 기준 · 마지막 위치
+        직선거리 추정 · {data.basis === 'est' ? '예상 주행거리' : 'rated km'} 기준 · 마지막 위치
       </div>
     </div>
   );
