@@ -6,6 +6,7 @@ import {
   refreshMonthlyInsights,
   refreshTopDrivesCache,
   refreshPlaceClusters,
+  bootstrapIfEmpty,
 } from '@/lib/dash-agg';
 import { invalidate } from '@/lib/server-cache';
 
@@ -53,8 +54,10 @@ export async function POST(request) {
     const monthlyFromStr = monthlyFromKst.toISOString().slice(0, 10);
 
     await ensureSchema();
+    // 비어 있으면 풀 백필 (첫 배포 직후 수동 트리거 시 핵심) — 이미 채워져 있으면 즉시 통과
+    const bootstrap = await bootstrapIfEmpty(carId);
 
-    const out = { ok: true, car_id: carId, scope, from: fromStr, to: toStr };
+    const out = { ok: true, car_id: carId, scope, from: fromStr, to: toStr, bootstrap };
 
     if (scope === 'all' || scope === 'daily') {
       const r = await refreshRange(carId, fromStr, toStr);
