@@ -4,8 +4,9 @@ import { Icon } from '../lib/Icons';
 
 const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-// 7×24 시간×요일 progress-bar 히트맵 — data: 7×24 number[][] (dow x hour)
-// 셀별 막대 높이로 카운트 강도 표현 — 피크(>0.75)는 amber 강조
+// 7×24 시간×요일 컬러 히트맵 — data: 7×24 number[][] (dow x hour)
+// 셀별 색 농도(opacity)로 카운트 강도 표현 — 피크(>0.75)는 amber 강조
+// 데이터는 활동 시작~종료에 걸친 모든 시간 슬롯에 +1 (백엔드 generate_series)
 export function HourDowHeatmap({ data, hexColor = '#3b82f6' }) {
   if (!data || data.length !== 7) return null;
   const flat = data.flat();
@@ -29,21 +30,20 @@ export function HourDowHeatmap({ data, hexColor = '#3b82f6' }) {
           {data[d].map((v, h) => {
             const ratio = v / max;
             const isPeak = ratio > 0.75;
-            // ratio < 12% 라도 값이 있으면 막대가 시각적으로 보이도록 floor
-            const fillPct = v > 0 ? Math.max(12, ratio * 100) : 0;
+            // 값이 있으면 최소 0.18 opacity 로 보장 — 옅은 활동도 시각적으로 인지
+            const opacity = v > 0 ? Math.max(0.18, ratio) : 0;
             return (
               <div
                 key={h}
-                className="h-5 relative bg-zinc-800/30 rounded-[1px] overflow-hidden"
+                className="h-5 rounded-[1px]"
+                style={{
+                  background: v > 0
+                    ? (isPeak ? '#f59e0b' : hexColor)
+                    : 'rgba(63, 63, 70, 0.3)',
+                  opacity: v > 0 ? opacity : 1,
+                }}
                 title={`${lab} ${h}시: ${v}회`}
-              >
-                {v > 0 && (
-                  <div
-                    className="absolute left-0 right-0 bottom-0"
-                    style={{ background: isPeak ? '#f59e0b' : hexColor, height: `${fillPct}%` }}
-                  />
-                )}
-              </div>
+              />
             );
           })}
         </div>
