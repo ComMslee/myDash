@@ -83,6 +83,7 @@
 - 모듈 캐시 없음. 페이지 진입마다 fetch (현재 의식적인 정책)
 - **요청 취소**: `useDriveData.js`에서 `AbortController` 로 selectedDrive·dayMode·monthMode 변경 시 직전 요청 취소
 - **동시성 제한**: `fetchInChunks(items, fn, concurrency=6)` — dayRoutes/monthRoutes 다수 fetch가 브라우저 connection pool을 초과하지 않도록 6 워커로 직렬화
+- **BottomNavV2 visibility-aware 폴링** — `/api/car`·`/api/charging-status` 30s 폴링과 1분 tick 모두 `document.hidden` 시 정지, 복귀 시 즉시 1회 fetch + 인터벌 재개 (불필요 백그라운드 요청 차단)
 
 ## 응답 페이로드 다운샘플
 
