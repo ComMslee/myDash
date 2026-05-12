@@ -83,8 +83,9 @@ export default function V2DrivesPage() {
     <main className="min-h-screen bg-[#0f0f0f] text-white">
       <div className="max-w-2xl mx-auto px-4 py-5 pb-3 space-y-5">
 
-        {/* 1. 차량 요약 — 누적·효율 + 기간별 통계 */}
-        {loading.car || loading.insights || loading.drives ? <Spinner /> : (
+        {/* 1. 차량 요약 — 누적·효율 + 기간별 통계
+            drives 는 점진 로드 — 카드는 즉시 렌더, 기간 표는 도착할 때 채워짐 */}
+        {loading.car || loading.insights ? <Spinner /> : (
           <VehicleKpiCard car={car} insights={insights} drives={drives} />
         )}
 
