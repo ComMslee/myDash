@@ -10,8 +10,10 @@ const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 function fmtMin(m) {
   if (m < 1) return `${(m * 60).toFixed(0)}초`;
   if (m < 60) return `${m.toFixed(0)}분`;
-  const h = Math.floor(m / 60), r = Math.round(m - h * 60);
-  return r ? `${h}시간 ${r}분` : `${h}시간`;
+  const h = m / 60;
+  if (h < 10) return `${h.toFixed(1)}시간`;
+  if (h < 1000) return `${Math.round(h)}시간`;
+  return `${(h / 24).toFixed(0)}일`;
 }
 export function HourDowHeatmap({ data, hexColor = '#3b82f6' }) {
   if (!data || data.length !== 7) return null;
