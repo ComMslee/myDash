@@ -52,20 +52,27 @@
 - **재시작 시 휘발**: 컨테이너 재시작 = 자연 무효화
 - **inflight dedup**: 만료 직후 동시 요청 → 1회만 DB 쿼리
 
-### 4. 일별 사전 집계 (dash_daily_*) — TeslaMate DB 테이블
+### 4. 사전 집계 (dash_*) — TeslaMate DB 테이블 (Tier 2 풀)
 
 - **위치**: `dashboard/lib/dash-agg.js` (TeslaMate DB 에 `dash_` prefix 테이블 보유, TeslaMate 스키마 자체는 무수정)
 - **테이블**:
   - `dash_daily_drive_agg(car_id, day, dow, hour, ticks_10min, distance_km, duration_min, drive_count, used_km)` — PK `(car_id, day, hour)`
   - `dash_daily_charge_agg(car_id, day, dow, hour, ticks_10min, energy_kwh, charge_count, home_count, fast_count)` — PK `(car_id, day, hour)`
+  - `dash_monthly_insights(car_id, year, month, distance_km, drive_count, duration_min, used_km, max_*, total_kwh, charge_count, avg_kwh, home/other/fast/slow_charges, best_long/eff_drive_*)` — PK `(car_id, year, month)`
+  - `dash_top_drives_cache(car_id, metric, rank, drive_id, value, start_date)` — PK `(car_id, metric, rank)` — 8 메트릭 × TOP 50
+  - `dash_place_clusters(car_id, bin_lat numeric(7,4), bin_lon numeric(7,4), visit_count, top_origin_lat, top_origin_lon, last_visited_at)` — PK `(car_id, bin_lat, bin_lon)` — drive 끝점 0.0005° (~55m) bin
+  - `dash_place_geo(coord_key TEXT PK, label, updated_at)` — 클러스터 라벨 캐시 (kakao_address_cache 와 별개)
   - `day` 는 KST 날짜 (`start_date + INTERVAL '9 hours' :: date`).
-- **갱신**: `POST /api/admin/refresh-aggs` (HUB_SHARED_SECRET) — 매일 KST 04:00 GHA cron (`.github/workflows/refresh-aggs.yml`). 최근 7일 항상 upsert → 어제 누락/cron 실패 self-heal.
-- **읽기 패턴** (insights / charge-all-time):
-  - 과거(완결일) = `readHourDow(carId, kind)` 로 `SUM(ticks_10min) GROUP BY dow,hour`
-  - 오늘 = 기존 `generate_series` 라이브 쿼리 (`start_date >= KST today 00:00` 으로 제한)
-  - 두 그리드 element-wise 합산
-- **첫 cron 전(콜드)**: 사전 집계 비어 있어도 오늘 라이브만 잡힘 → 다음 cron 후 자동 복구. 별도 폴백 없음.
-- **무효화**: refresh-aggs 성공 시 `server-cache` 의 `insights:` / `charge-all-time:` / `monthly-history:` 프리픽스 일괄 invalidate.
+- **갱신**: `POST /api/admin/refresh-aggs?scope=daily|monthly|top|places|all` (HUB_SHARED_SECRET) — 매일 KST 04:00 GHA cron (`.github/workflows/refresh-aggs.yml`). 최근 7일 daily upsert + monthly N개월(기본 24) + top 전체 truncate-replace + places 전체 재계산.
+- **읽기 패턴**:
+  - `/api/insights`: 11개 과거 월 = `dash_monthly_insights`, 현재 월 = 라이브 단일 쿼리. allTime = monthly SUM + 현재 월. hour×dow = 라이브 (`generate_series`).
+  - `/api/charge-all-time`: 전체 = `dash_daily_charge_agg` SUM. hour×dow = `SUM(ticks_10min)`.
+  - `/api/monthly-history`: 과거 월 = `dash_monthly_insights`, 현재 월 라이브. 계절 효율도 사전집계 + 현재 월.
+  - `/api/rankings`: `dash_top_drives_cache` 에서 ID 추출 후 drives JOIN. day 메트릭은 캐시된 KST date 로 drives 그룹 재조회.
+  - `/api/summary`: 과거 범위(yesterday/last-week/last-month/prev-rolling-4w/weekend) = `dash_daily_*_agg` SUM. 오늘 포함 범위는 라이브.
+  - `/api/frequent-places`: `dash_place_clusters` TOP-N 후 라벨/지오펜스 메타는 라이브 보충 + `dash_place_geo` 캐시.
+- **부트스트랩 (콜드)**: `ensureSchema()` 후 `bootstrapIfEmpty(carId)` — 디폴트 차량의 집계가 비어 있으면 전체 히스토리 백필 (컨테이너 라이프타임당 1회, inflight Promise dedup). 첫 요청 10–60초, 이후 빠름.
+- **무효화**: refresh-aggs 성공 시 `server-cache` 의 `insights:` / `charge-all-time:` / `monthly-history:` / `summary:` / `rankings:` / `frequent-places:` 프리픽스 일괄 invalidate.
 
 ### 5. 집충전기 (환경공단 EvCharger) 캐시
 - **위치**: `dashboard/lib/home-charger-cache.js` (코어) + `dashboard/lib/home-charger/{schema,poll-log,usage,fleet-stats}.js` (분리 모듈)
@@ -101,25 +108,25 @@
 | `/api/battery-trend` | charging_processes, drives | — | 없음 |
 | `/api/drives` | drives, addresses, geofences, positions | Kakao Local | kakao_address_cache (30일) |
 | `/api/route-map` | positions | — | 모듈 LRU (200, 휘발) |
-| `/api/frequent-places` | drives, addresses, geofences | — | server-cache 300s |
+| `/api/frequent-places` | dash_place_clusters + drives/addresses/geofences (메타) + dash_place_geo | Kakao Local | server-cache 300s + 클러스터/라벨 사전 집계 |
 | `/api/charging-status` | car, charging_processes, positions | — | 없음 (라이브) |
 | `/api/home-charger` | home_charger_snapshot | 환경공단 EvCharger | 모듈 메모리 + DB 스냅샷 |
 | `/api/home-charger/fleet-stats` | charger_usage, home_charger_snapshot | — | 없음 |
 | `/api/home-charger/groups` | charger_usage, home_charger_snapshot | — | 없음 (constants.js 매핑) |
 | `/api/home-charger/report` | charger_usage, home_charger_snapshot | — | `getCache()` 의 모듈 캐시 활용 (콜드 스타트 시 DB observed_chargers 폴백) |
 | `/api/home-charger/poll-log` | (메모리 진단) | — | 없음 |
-| `/api/monthly-history` | charging_processes | — | server-cache 300s |
-| `/api/charge-all-time` | charging_processes + dash_daily_charge_agg | — | server-cache 600s + 일별 사전 집계 |
+| `/api/monthly-history` | dash_monthly_insights + drives (현재 월 라이브) | — | server-cache 300s + 월별 사전 집계 |
+| `/api/charge-all-time` | dash_daily_charge_agg | — | server-cache 600s + 일별 사전 집계 |
 | `/api/heatmap` | drives | — | server-cache 300s |
-| `/api/insights` | drives + dash_daily_drive_agg (+ dash_daily_charge_agg) | — | server-cache 600s + 일별 사전 집계 |
-| `/api/admin/refresh-aggs` | dash_daily_drive_agg, dash_daily_charge_agg (upsert) | — | 없음 (POST · HUB_SHARED_SECRET 인증, GHA cron 매일 04:00 KST) |
-| `/api/rankings` | drives | — | server-cache 300s (per type·limit) |
+| `/api/insights` | dash_monthly_insights + drives (현재 월 + hour×dow + 베스트 드라이브 라이브) | — | server-cache 600s + 월별 사전 집계 |
+| `/api/admin/refresh-aggs` | dash_daily_*, dash_monthly_insights, dash_top_drives_cache, dash_place_clusters (upsert / truncate-replace) | — | 없음 (POST · HUB_SHARED_SECRET 인증, GHA cron 매일 04:00 KST, scope=all\|daily\|monthly\|top\|places) |
+| `/api/rankings` | dash_top_drives_cache + drives (JOIN 메타) | Kakao Local | server-cache 300s (per type·limit) + TOP 50 사전 캐시 |
 | `/api/fast-charges` | charging_processes | — | server-cache 180s |
 | `/api/slow-charges` | charging_processes | — | server-cache 180s |
 | `/api/find-nearby-chargers` | — | 환경공단 EvCharger | 없음 |
 | `/api/car` | cars | — | 없음 |
 | `/api/charges` | charging_processes, geofences | — | 없음 |
-| `/api/summary` | drives, charging_processes | — | server-cache 120s (multi/historical 범위만) |
+| `/api/summary` | drives, charging_processes, dash_daily_*_agg (과거 범위) | — | server-cache 120s (multi/historical 범위만) + 일별 사전 집계 |
 | `/api/parked` | drives, states | — | 없음 (라이브 — 봇 `/where`) |
 | `/api/location` | positions | — | 없음 (라이브 최신 좌표 — 봇 `/where`) |
 | `/api/long-stay-places` | drives, addresses, geofences | — | server-cache 300s |

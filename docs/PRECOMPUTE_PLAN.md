@@ -97,8 +97,16 @@ const today = await pool.query(`SELECT ... FROM drives WHERE start_date >= date_
 4. insights / charge-all-time 핸들러 = 과거(`readHourDow` 테이블 합산) + 오늘(기존 `generate_series` 쿼리 `start_date >= KST today 00:00` 제한) 머지. monthly-history 는 후속.
 5. Tier 1 캐시 TTL 조정 — insights/charge-all-time 만 180s → 600s 로 상향 (사전 집계로 무거운 작업 분할상환됨).
 
-### PR3 (옵션) — 검증 후
-- 나머지 라우트 Tier 2 확장 또는 Tier 3 클라이언트 캐시
+### PR3 (Tier 2 풀 확장) — ✅ 완료
+1. `dash_monthly_insights` — 월별 주행/충전 + best long/eff drive. `/api/insights`, `/api/monthly-history` 위임.
+2. `dash_top_drives_cache(metric, rank, drive_id, value, start_date)` — 8 메트릭 × TOP 50 truncate-replace. `/api/rankings` 위임.
+3. `dash_place_clusters` (0.0005° bin) + `dash_place_geo` (라벨 캐시). `/api/frequent-places` 위임.
+4. `/api/summary` 의 historical 범위(yesterday/last-week/last-month/prev-rolling-4w/weekend) → `dash_daily_*_agg` SUM.
+5. `/api/charge-all-time` 의 전체 통계/그리드 → `dash_daily_charge_agg` 단독.
+6. `/api/admin/refresh-aggs?scope=daily|monthly|top|places|all` — 4 테이블 모두 갱신. cron 그대로 (scope=all 디폴트).
+7. **bootstrap-on-empty** — `ensureSchema()` 호출 후 `bootstrapIfEmpty(carId)` 가 디폴트 차량의 4종 집계가 비어 있는지 체크해 전체 히스토리 백필 (컨테이너당 1회). 첫 요청 10–60초, 이후 빠름.
+
+**주의 (이전 시도에서 빠진 함정)**: `withCache(...)` 콜백은 반드시 plain 객체 반환. `return Response.json(...)` 금지 — 외부 `Response.json(await withCache(...))` 가 직렬화 담당.
 
 ## 4. 리스크 & 대응
 

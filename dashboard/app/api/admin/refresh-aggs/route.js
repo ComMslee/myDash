@@ -1,15 +1,20 @@
 import { requireAuth } from '@/lib/auth-helper';
 import { getDefaultCar } from '@/lib/queries/car';
-import { ensureSchema, refreshRange } from '@/lib/dash-agg';
+import {
+  ensureSchema,
+  refreshRange,
+  refreshMonthlyInsights,
+  refreshTopDrivesCache,
+  refreshPlaceClusters,
+} from '@/lib/dash-agg';
 import { invalidate } from '@/lib/server-cache';
 
 export const dynamic = 'force-dynamic';
 
-// POST /api/admin/refresh-aggs
-// Body/query: days (default 7), carId (default = getDefaultCar().id)
+// POST /api/admin/refresh-aggs?scope=daily|monthly|top|places|all
+// Body/query: days (default 7), carId, scope (default 'all'), monthsBack (default 24)
 //
-// 매일 KST 04:00 GHA cron 으로 호출 (refresh-aggs.yml). 최근 7일을 항상 reprocess →
-// 어제 누락 / cron 실패 시 self-heal. 오늘 데이터까지 포함 upsert (다음 cron 이 다시 덮어쓰므로 OK).
+// 매일 KST 04:00 GHA cron 으로 호출 (refresh-aggs.yml). scope=all 이면 4 테이블 모두 갱신.
 export async function POST(request) {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
@@ -21,6 +26,8 @@ export async function POST(request) {
 
     const daysRaw = body.days ?? url.searchParams.get('days');
     const days = Math.max(1, parseInt(daysRaw ?? '7', 10) || 7);
+    const scope = (body.scope ?? url.searchParams.get('scope') ?? 'all').toLowerCase();
+    const monthsBack = Math.max(1, parseInt(body.monthsBack ?? url.searchParams.get('monthsBack') ?? '24', 10) || 24);
 
     let carId = body.carId ?? url.searchParams.get('carId');
     if (carId != null) carId = parseInt(carId, 10);
@@ -30,8 +37,6 @@ export async function POST(request) {
       carId = car.id;
     }
 
-    // KST 기준 today (00:00 KST = UTC 15:00 전날). day 컬럼은 KST date 이므로
-    // JS Date 의 UTC 기준을 보정해서 KST 날짜 산출.
     const nowUtcMs = Date.now();
     const kstNow = new Date(nowUtcMs + 9 * 60 * 60 * 1000);
     const todayKst = new Date(Date.UTC(
@@ -39,28 +44,42 @@ export async function POST(request) {
     ));
     const fromKst = new Date(todayKst.getTime() - days * 24 * 60 * 60 * 1000);
     const toKst   = new Date(todayKst.getTime() + 1 * 24 * 60 * 60 * 1000); // 오늘+1 (제외)
+    const monthlyFromKst = new Date(Date.UTC(
+      kstNow.getUTCFullYear(), kstNow.getUTCMonth() - (monthsBack - 1), 1
+    ));
 
     const fromStr = fromKst.toISOString().slice(0, 10);
     const toStr   = toKst.toISOString().slice(0, 10);
+    const monthlyFromStr = monthlyFromKst.toISOString().slice(0, 10);
 
     await ensureSchema();
-    const result = await refreshRange(carId, fromStr, toStr);
+
+    const out = { ok: true, car_id: carId, scope, from: fromStr, to: toStr };
+
+    if (scope === 'all' || scope === 'daily') {
+      const r = await refreshRange(carId, fromStr, toStr);
+      out.daily = r;
+    }
+    if (scope === 'all' || scope === 'monthly') {
+      const r = await refreshMonthlyInsights(carId, monthlyFromStr, toStr, monthsBack + 1);
+      out.monthly = { ...r, from: monthlyFromStr };
+    }
+    if (scope === 'all' || scope === 'top') {
+      out.top = await refreshTopDrivesCache(carId);
+    }
+    if (scope === 'all' || scope === 'places') {
+      out.places = await refreshPlaceClusters(carId);
+    }
 
     // 사전 집계가 갱신됐으므로 관련 라우트 캐시 일괄 무효화
     invalidate('insights:');
     invalidate('charge-all-time:');
     invalidate('monthly-history:');
+    invalidate('summary:');
+    invalidate('rankings:');
+    invalidate('frequent-places:');
 
-    return Response.json({
-      ok: true,
-      car_id: carId,
-      days,
-      from: fromStr,
-      to: toStr,
-      drive_rows: result.drive_rows,
-      charge_rows: result.charge_rows,
-      ms: result.ms,
-    });
+    return Response.json(out);
   } catch (err) {
     console.error('/api/admin/refresh-aggs error:', err);
     return Response.json({ error: 'refresh_failed', message: err.message }, { status: 500 });
