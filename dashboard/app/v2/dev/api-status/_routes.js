@@ -56,6 +56,7 @@ export const ROUTES = [
   // 배터리
   { path: '/api/battery',          label: '배터리',         desc: 'SOC 종합 — 용량·체류 분포·주간/월간 충방전·추정 잔여 (cache 180s)', category: '배터리',
     params: [REFRESH_PARAM] },
+  { path: '/api/range-radius',     label: '잔여 거리 반경',  desc: '현 위치 + SOC × rated km × 0.65 → 편도/왕복 반경 (cache 60s) — /v2/battery 상단 지도', category: '배터리' },
   { path: '/api/battery-trend',    label: '배터리 추이',    desc: 'SOC 시계열 (라인 차트용 다운샘플링) (cache 600s)', category: '배터리',
     params: [REFRESH_PARAM] },
   { path: '/api/charges',          label: '충전 기록',      desc: '최근 충전 세션 목록 (시작 SOC → 종료 SOC, kWh, 위치)', category: '배터리' },

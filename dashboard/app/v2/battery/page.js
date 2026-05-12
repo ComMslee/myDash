@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import RangeMapCard from '@/app/v2/battery/RangeMapCard';
 import HealthScoreCard from '@/app/v2/battery/HealthScoreCard';
 import IdleDrainCard from '@/app/v2/battery/IdleDrainCard';
 import MonthlyChargeCard from '@/app/v2/battery/MonthlyChargeCard';
@@ -43,6 +44,7 @@ export default function V2BatteryPage() {
           </div>
         ) : data ? (
           <>
+            <RangeMapCard />
             <HealthScoreCard data={data.health} trend={trend} />
             <IdleDrainCard records={data.idle_drain} chargingSessions={data.charging_sessions} />
             <MonthlyChargeCard />
