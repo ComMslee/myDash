@@ -4,13 +4,15 @@ import { Icon } from '../lib/Icons';
 
 const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-// 7×24 시간×요일 컬러 히트맵 — data: 7×24 number[][] (dow x hour, 단위: 분)
-// 셀별 색 농도(opacity)로 점유 시간 강도 표현 — 피크(>0.75)는 amber 강조
-// 데이터는 활동 시작~종료의 각 시간 슬롯 실제 점유 분(min) 합산 (백엔드 generate_series + overlap)
-function fmtMin(m) {
-  if (m < 1) return `${(m * 60).toFixed(0)}초`;
-  if (m < 60) return `${m.toFixed(0)}분`;
-  const h = m / 60;
+// 7×24 시간×요일 컬러 히트맵 — data: 7×24 number[][] (dow x hour, 단위: 10분 틱 카운트)
+// 셀별 색 농도(opacity)로 점유 빈도 강도 표현 — 피크(>0.75)는 amber 강조
+// 데이터는 활동 시작~종료 구간에 포함되는 10분 wall-clock 틱(:00,:10,..,:50) 카운트 합산
+function fmtTicks(ticks) {
+  // 1 tick = 10 min
+  if (ticks <= 0) return '0';
+  const min = ticks * 10;
+  if (min < 60) return `${min}분`;
+  const h = min / 60;
   if (h < 10) return `${h.toFixed(1)}시간`;
   if (h < 1000) return `${Math.round(h)}시간`;
   return `${(h / 24).toFixed(0)}일`;
@@ -50,7 +52,7 @@ export function HourDowHeatmap({ data, hexColor = '#3b82f6' }) {
                     : 'rgba(63, 63, 70, 0.3)',
                   opacity: v > 0 ? opacity : 1,
                 }}
-                title={`${lab} ${h}시: ${fmtMin(v)}`}
+                title={`${lab} ${h}시: ${fmtTicks(v)}`}
               />
             );
           })}
@@ -69,8 +71,8 @@ export function HourDowHeatmap({ data, hexColor = '#3b82f6' }) {
       </div>
       {peakVal > 0 && (
         <div className="flex flex-wrap items-center gap-x-2 mt-1.5 text-[10px] text-zinc-500 tabular-nums">
-          <span className="inline-flex items-center gap-1 text-orange-400/80"><Icon name="fire" />피크 {DOW_LABELS[peakDow]} {peakHour}시 ({fmtMin(peakVal)})</span>
-          <span className="ml-auto">총 {fmtMin(total)}</span>
+          <span className="inline-flex items-center gap-1 text-orange-400/80"><Icon name="fire" />피크 {DOW_LABELS[peakDow]} {peakHour}시 ({fmtTicks(peakVal)})</span>
+          <span className="ml-auto">총 {fmtTicks(total)}</span>
         </div>
       )}
     </div>

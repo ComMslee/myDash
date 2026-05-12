@@ -32,27 +32,23 @@ export async function GET() {
         ) sub
       `, [carId]),
 
-      // 충전 활성 구간(start~end)을 시간 슬롯별 실제 점유 분(min) 으로 가중 — 부분 점유는 부분 가중
+      // 충전 (요일 × 시간) — 10분 단위 wall-clock 틱(:00,:10,..,:50)이 시작~종료 구간에 포함될 때마다 +1
       pool.query(`
-        SELECT EXTRACT(DOW  FROM hour_start)::int AS dow,
-               EXTRACT(HOUR FROM hour_start)::int AS hour,
-               SUM(
-                 EXTRACT(EPOCH FROM (
-                   LEAST(el, hour_start + INTERVAL '1 hour')
-                   - GREATEST(sl, hour_start)
-                 )) / 60.0
-               )::float AS count
+        SELECT EXTRACT(DOW  FROM ts)::int AS dow,
+               EXTRACT(HOUR FROM ts)::int AS hour,
+               COUNT(*)::int AS count
         FROM (
           SELECT start_date + INTERVAL '9 hours' AS sl,
                  COALESCE(end_date, start_date) + INTERVAL '9 hours' AS el
           FROM charging_processes
           WHERE car_id = $1 AND charge_energy_added IS NOT NULL
-        ) c,
-        LATERAL generate_series(
+        ) c
+        CROSS JOIN LATERAL generate_series(
           date_trunc('hour', sl),
-          date_trunc('hour', el),
-          INTERVAL '1 hour'
-        ) AS hour_start
+          el,
+          INTERVAL '10 minutes'
+        ) AS ts
+        WHERE ts >= sl
         GROUP BY dow, hour
       `, [carId]),
     ]);
