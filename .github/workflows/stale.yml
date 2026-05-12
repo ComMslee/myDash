@@ -1,0 +1,36 @@
+name: Mark stale issues & PRs
+
+# 매일 09:00 KST — 오래 활동 없는 이슈/PR 자동 표시 및 닫기.
+# pinned/security 라벨은 제외.
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 00:00 UTC = 09:00 KST
+  workflow_dispatch:
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/stale@v9
+        with:
+          days-before-issue-stale: 60
+          days-before-issue-close: 7
+          days-before-pr-stale: 30
+          days-before-pr-close: 7
+          stale-issue-label: 'stale'
+          stale-pr-label: 'stale'
+          exempt-issue-labels: 'pinned,security,help-wanted'
+          exempt-pr-labels: 'pinned,security,wip'
+          stale-issue-message: |
+            60일간 활동이 없어 stale 처리됩니다. 7일 내 활동이 없으면 자동 종료됩니다.
+          close-issue-message: |
+            오랜 활동 부재로 종료. 필요 시 다시 열어주세요.
+          stale-pr-message: |
+            30일간 활동이 없어 stale 처리됩니다. 7일 내 활동이 없으면 자동 종료됩니다.
+          close-pr-message: |
+            오랜 활동 부재로 종료. 필요 시 다시 열어주세요.
+          operations-per-run: 50
