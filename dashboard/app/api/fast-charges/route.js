@@ -1,17 +1,21 @@
 import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
+import { withCache } from '@/lib/server-cache';
+import { TTL_180S } from '@/lib/cache-ttls';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request) {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
+  const force = new URL(request.url).searchParams.get('refresh') === '1';
   try {
     const car = await getDefaultCar();
     if (!car) return Response.json({ records: [] });
     const carId = car.id;
 
+    return Response.json(await withCache(`fast-charges:${carId}`, TTL_180S, async () => {
     const result = await pool.query(
       `SELECT
          cp.id,
@@ -45,7 +49,7 @@ export async function GET() {
       [carId]
     );
 
-    return Response.json({
+    return {
       records: result.rows.map(r => ({
         id: r.id,
         start_date: r.start_date,
@@ -59,7 +63,8 @@ export async function GET() {
         charger_brand: r.charger_brand || null,
         charger_type: r.charger_type || null,
       })),
-    });
+    };
+    }, { force }));
   } catch (err) {
     console.error('/api/fast-charges error:', err);
     return Response.json({ error: 'DB error', detail: err.message }, { status: 500 });

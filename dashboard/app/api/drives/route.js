@@ -5,6 +5,8 @@ import { KWH_PER_KM } from '@/lib/constants';
 import { KST_OFFSET_MS } from '@/lib/kst';
 import { batchReverseGeocode } from '@/lib/kakao-geo';
 import { classifyDrives } from '@/lib/drive-classify';
+import { withCache } from '@/lib/server-cache';
+import { TTL_180S } from '@/lib/cache-ttls';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,12 +17,15 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const from = searchParams.get('from'); // 선택: YYYY-MM-DD 형식 시작일
     const to   = searchParams.get('to');   // 선택: YYYY-MM-DD 형식 종료일 (exclusive)
+    const force = searchParams.get('refresh') === '1';
 
     const car = await getDefaultCar();
     if (!car) {
       return Response.json({ error: 'No car found' }, { status: 404 });
     }
     const carId = car.id;
+
+    return Response.json(await withCache(`drives:${carId}:${from || ''}:${to || ''}`, TTL_180S, async () => {
 
     const now = new Date();
     // KST(UTC+9) 기준 자정 계산
@@ -102,7 +107,7 @@ export async function GET(request) {
     // chain 식별 + tag (이동주차 / 일반 / 외출). UI 가 검토용 prefix 배지로 사용.
     const tagsById = classifyDrives(drives);
 
-    return Response.json({
+    return {
       today_distance:       parseFloat(todayResult.rows[0].distance.toFixed(1)),
       today_energy_kwh:     toKwh(todayResult.rows[0].range_used),
       week_distance:        parseFloat(weekResult.rows[0].distance.toFixed(1)),
@@ -135,7 +140,8 @@ export async function GET(request) {
           absorbed_by: t?.absorbed_by ?? null,
         };
       }),
-    });
+    };
+    }, { force }));
   } catch (err) {
     console.error('/api/drives error:', err);
     return Response.json({ error: 'DB error' }, { status: 500 });

@@ -1,0 +1,42 @@
+name: DB Maintenance (VACUUM ANALYZE)
+
+# 주 1회 — 매주 일요일 02:00 KST = UTC 토 17:00.
+# TeslaMate + dash_* 테이블 통계 갱신 → 쿼리 플래너 정확도 유지.
+# 데이터 증가에 따라 인덱스 선택이 빗나가는 것 방지.
+
+on:
+  schedule:
+    - cron: '0 17 * * 6'
+  workflow_dispatch:
+
+jobs:
+  vacuum:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: db-maintenance
+      cancel-in-progress: false
+
+    steps:
+      - name: VACUUM ANALYZE via SSH
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          timeout: 30s
+          command_timeout: 10m
+          script: |
+            set -e
+            cd ~/myDash
+            echo "[vacuum] before — bloat top 10:"
+            sudo docker compose exec -T database psql -U teslamate teslamate -c "
+              SELECT relname,
+                     pg_size_pretty(pg_relation_size(relid)) AS size,
+                     n_dead_tup AS dead_rows
+              FROM pg_stat_user_tables
+              ORDER BY n_dead_tup DESC NULLS LAST
+              LIMIT 10;
+            "
+            echo "[vacuum] running VACUUM ANALYZE..."
+            sudo docker compose exec -T database psql -U teslamate teslamate -c "VACUUM ANALYZE;"
+            echo "[vacuum] done."

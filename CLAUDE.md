@@ -29,7 +29,7 @@ docker compose build dashboard && docker compose up -d dashboard
 - [`docs/DATABASE.md`](./docs/DATABASE.md) — PostgreSQL 테이블 · 환경 변수 · 공용 상수/유틸
 - [`docs/CACHING.md`](./docs/CACHING.md) — DB·캐시 흐름도 · API↔테이블↔캐시 매핑
 - [`docs/CODE_CONVENTIONS.md`](./docs/CODE_CONVENTIONS.md) — UI/데이터/컴포넌트 규칙 · 커밋 스타일
-- [`docs/PITFALLS.md`](./docs/PITFALLS.md) — 알려진 함정 9건 (수정 전 필독)
+- [`docs/PITFALLS.md`](./docs/PITFALLS.md) — 알려진 함정 11건 (수정 전 필독)
 
 운영·외부 API 등 전체 인덱스: [`docs/README.md`](./docs/README.md)
 
@@ -68,7 +68,7 @@ docker compose build dashboard && docker compose up -d dashboard
 
 ## 디버깅
 
-이슈 보고·회귀 검증·서버 헬스 확인은 **`/v2/dev/api-status` 부터** — 29개 라우트 가용성 + 서버/충전/폴링 진단 통합 뷰. 코드만 읽으면 안 보이는 라이브 상태(폴링 루프, DB freshness, 충전 감지 신호) 한 화면.
+이슈 보고·회귀 검증·서버 헬스 확인은 **`/v2/dev/api-status` 부터** — 3탭(서버/API 테스트/집계). 28개 라우트 가용성 + 서버/충전/폴링 진단 + 사전집계 상태/scope별 수동 갱신 통합 뷰. 코드만 읽으면 안 보이는 라이브 상태(폴링 루프, DB freshness, 충전 감지 신호, dash_* 테이블 rows/freshness, server-cache 메모리) 한 화면.
 
 - 증상별 1차 진단 매핑 + WarmDiagCard 와의 역할 분리: [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md#1차-진단--v2devapi-status)
 - 새 API 라우트 추가 시 `dashboard/app/v2/dev/api-status/page.js` 의 `ROUTES` 배열에도 등록.

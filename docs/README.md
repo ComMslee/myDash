@@ -35,7 +35,7 @@ AWS Lightsail 기반 TeslaMate Dashboard 운영 문서.
 - [DATABASE.md](./DATABASE.md) — PostgreSQL 테이블·환경 변수·공용 상수/유틸
 - [CACHING.md](./CACHING.md) — DB·캐시 흐름도, 서버/클라 캐시 정책, API↔테이블↔캐시 매핑
 - [CODE_CONVENTIONS.md](./CODE_CONVENTIONS.md) — UI/데이터/컴포넌트 규칙·파일 분할 기준·커밋 스타일
-- [PITFALLS.md](./PITFALLS.md) — 알려진 함정 9건 (수정 전 필독)
+- [PITFALLS.md](./PITFALLS.md) — 알려진 함정 11건 (수정 전 필독)
 
 ### 외부 API
 - [EV_CHARGER_API.md](./EV_CHARGER_API.md) — 환경공단 전기차 충전소 정보 API

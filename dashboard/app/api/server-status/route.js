@@ -29,7 +29,7 @@ async function readMemInfo() {
 }
 
 // telegram-hub /health — docker network 내부 호출. 미가동/미설정 시 ok:false.
-const TG_HUB_URL = process.env.TELEGRAM_HUB_URL || 'http://telegram-hub:3000';
+import { TG_HUB_URL } from '@/lib/internal-urls';
 async function fetchTgHubHealth() {
   try {
     const r = await fetch(`${TG_HUB_URL}/health`, {

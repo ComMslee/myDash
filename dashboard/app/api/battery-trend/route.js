@@ -1,15 +1,20 @@
 import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
+import { withCache } from '@/lib/server-cache';
+import { TTL_600S } from '@/lib/cache-ttls';
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request) {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
+  const force = new URL(request.url).searchParams.get('refresh') === '1';
   try {
     const car = await getDefaultCar();
     if (!car) return Response.json({ error: 'No car' }, { status: 404 });
     const carId = car.id;
+
+    return Response.json(await withCache(`battery-trend:${carId}`, TTL_600S, async () => {
 
     // 월별 추정 배터리 용량 (충전 세션 역산)
     const capacityResult = await pool.query(`
@@ -43,7 +48,7 @@ export async function GET() {
       ORDER BY month
     `, [carId]);
 
-    return Response.json({
+    return {
       capacity_trend: capacityResult.rows.map(r => ({
         month: r.month,
         est_capacity_kwh: parseFloat(Number(r.est_capacity_kwh).toFixed(1)),
@@ -55,7 +60,8 @@ export async function GET() {
         avg_end: parseFloat(Number(r.avg_end).toFixed(1)),
         charge_count: r.charge_count,
       })),
-    });
+    };
+    }, { force }));
   } catch (err) {
     console.error('/api/battery-trend error:', err);
     return Response.json({ error: 'DB error' }, { status: 500 });

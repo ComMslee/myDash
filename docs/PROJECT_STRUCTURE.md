@@ -45,6 +45,19 @@ myDash/
     │   └── search-by-name.js        # 충전소 이름 검색 유틸
     ├── lib/
     │   ├── db.js                 # PostgreSQL 커넥션 풀 (싱글턴)
+    │   ├── server-cache.js       # 모듈 스코프 Map + per-key TTL + inflight dedup — `withCache(key, ttlMs, fn)` / `invalidate(prefix)` / `cacheStats()`
+    │   ├── cache-ttls.js         # TTL 상수 단일 소스 — `TTL_120S` / `TTL_180S` / `TTL_300S` / `TTL_600S` (12 라우트 공유)
+    │   ├── internal-urls.js      # 내부 서비스 URL — `TG_HUB_URL` (telegram-hub 도커 네트워크)
+    │   ├── agg-scopes.js         # 사전집계 scope 메타(`AGG_SCOPES`, `AGG_SCOPE_KEYS`) — refresh-aggs 라우트 + 집계 탭 카드가 공유
+    │   ├── dash-agg/             # 사전 집계 6 테이블 — barrel(index.js) 통해 `@/lib/dash-agg` 단일 import
+    │   │   ├── index.js          # 공개 API barrel re-exports
+    │   │   ├── schema.js         # ensureSchema (idempotent tableReady 플래그)
+    │   │   ├── bootstrap.js      # bootstrapIfEmpty — 컨테이너 라이프타임당 1회 풀 백필 (4 empty 체크 병렬)
+    │   │   ├── daily.js          # refreshRange + readHourDow (dash_daily_*_agg)
+    │   │   ├── monthly.js        # refreshMonthlyInsights (21 컬럼 + best long/eff drive)
+    │   │   ├── top.js            # refreshTopDrivesCache (8 메트릭 × TOP 50 truncate-replace)
+    │   │   ├── places.js         # refreshPlaceClusters (0.0005° bin + top origin)
+    │   │   └── _txn.js           # withTxn(fn) — BEGIN/COMMIT/ROLLBACK/release 보일러플레이트 헬퍼
     │   ├── constants.js          # KWH_PER_KM, RATED_RANGE_MAX_KM
     │   ├── format.js             # formatDuration, formatHm, formatHours, formatDate, shortAddr, formatKorDate, formatKorDateTime, formatKorDay
     │   ├── kst.js                # KST(UTC+9) 시간 변환 헬퍼
@@ -81,10 +94,9 @@ myDash/
     │   │   └── useScrollShrink.js  # 스크롤 임계점 기반 축소 토글 훅 (BottomNavV2 전용 — 60px down→축소 / 30px up→펼침 히스테리시스)
     │   ├── components/           # 공용 컴포넌트 (v1·v2 공유)
     │   │   ├── PageLayout.js     # Spinner 공유 컴포넌트
-    │   │   ├── ChartWidgets.js   # HourlyHeatmap, WeekdayBars 차트
+    │   │   ├── ChartWidgets.js   # HourDowHeatmap — 시간×요일 progress-bar (셀별 막대 fill, 피크 amber)
     │   │   ├── DriveMap.js       # Leaflet 주행 경로 지도 — positions(단일) / routes(다중, 일 합계) / highlightLatLng(포인트) / highlightRouteId(다중 모드 한 구간 강조 + zoom)
-    │   │   ├── RouteSparklines.js # 속도/고도/온도 3행 스파크라인 + 포인터 스크럽 선택
-    │   │   └── YearHeatmap.js    # 연간 히트맵 (GitHub 스타일)
+    │   │   └── RouteSparklines.js # 속도/고도/온도 3행 스파크라인 + 포인터 스크럽 선택
     │   ├── v2/                   # v2 앱 (현재 메인)
     │   │   ├── layout.js         # v2 레이아웃 (BottomNavV2 포함)
     │   │   ├── page.js           # `/v2` → `/v2/drives` 리다이렉트
@@ -92,7 +104,7 @@ myDash/
     │   │   │   ├── BottomNavV2.js    # 하단 알약(BottomNav + 헤더 흡수) — 좌측 ⚙️ | 4탭(주행/이력/배터리/충전소) · SOC fill 배경(충전=노랑/그 외=초록) · 정보 행(상태 chip + 온라인 dot + 경과/충전 상세/예측 km·%) · ⚙️ 시트(텔레그램/API상태/인증) · /api/car + /api/charging-status 30초 폴링 · 스크롤 시 축소(useScrollShrink)
     │   │   │   └── RankingsSheet.js  # 랭킹 바텀시트
     │   │   ├── drives/
-    │   │   │   ├── page.js                   # 주행 분석 — 차량 KPI + 인사이트 + 연간 히트맵 + 패턴 + TOP50 + 연도별 월간
+    │   │   │   ├── page.js                   # 주행 분석 — 차량 KPI + 인사이트 + 시간×요일 패턴 + TOP50 + 연도별 월간
     │   │   │   └── _parts/
     │   │   │       ├── VehicleKpiCard.js     # 차량 누적·효율·주행 KPI (전기간 인라인)
     │   │   │       ├── MonthInsightsCard.js  # 이번달 인사이트 (4주 롤링)
@@ -100,7 +112,7 @@ myDash/
     │   │   │       ├── MonthlyHistoryByYear.js # 연도별 월간 통계 막대
     │   │   │       └── SeasonalEffGrid.js    # 계절별 효율 그리드
     │   │   ├── battery/
-    │   │   │   ├── page.js                   # 배터리 — 건강/대기 소모/충전 습관/월간·히트맵/급속·완속
+    │   │   │   ├── page.js                   # 배터리 — 건강/대기 소모/충전 습관/월간(시간×요일 그래프)/급속·완속
     │   │   │   ├── HealthScoreCard.js        # 점수(등급)·평균 SOC·용량 추이 + SOC 체류 분포
     │   │   │   ├── IdleDrainCard.js          # 대기 소모 24h 타임라인
     │   │   │   ├── useIdleDrainDays.js       # 대기 소모 일자별 데이터 훅
@@ -117,8 +129,7 @@ myDash/
     │   │   │   │   ├── FleetStatsCharts.js   # 집단 통계 차트
     │   │   │   │   ├── PollLogPopup.js       # 폴링 로그 팝업
     │   │   │   │   └── fleet-stats-utils.js  # 통계 집계 유틸
-    │   │   │   ├── MonthlyChargeCard.js      # 집/외부·완/급속 비율 + 시간×요일 히트맵 (24열 SOC 시작→종료 띠 동봉)
-    │   │   │   ├── ChargeHeatmap.js
+    │   │   │   ├── MonthlyChargeCard.js      # 집/외부·완/급속 비율 + 시간×요일 progress-bar (충전 활성 구간 모든 시간 슬롯 +1)
     │   │   │   ├── FastChargeCard.js
     │   │   │   └── SlowChargeCard.js
     │   │   ├── history/
@@ -132,33 +143,40 @@ myDash/
     │   │   ├── tg/page.js            # 텔레그램 봇 관리 (권한·방송·학습로그·가이드)
     │   │   └── dev/                  # 개발/진단 도구 (하단 알약 미노출, URL 직접)
     │   │       ├── api-status/
-    │   │       │   └── page.js       # 29개 라우트 가용성 체크 + 서버/충전/폴링 진단 통합
+    │   │       │   ├── page.js       # 3탭(서버/API 테스트/집계) — 28개 라우트 가용성 체크 + 서버/충전/폴링 진단 + 사전집계 상태/scope 갱신 통합 · 서버 폴링은 '서버' 탭 활성일 때만
+    │   │       │   └── _components/
+    │   │       │       ├── AggStatusCard.js   # 집계 탭 — dash_* 6 테이블 진단 + AGG_SCOPES (공유) 별 refresh-aggs POST 트리거 + server-cache 메모리 상태
+    │   │       │       ├── ServerStatusCard.js
+    │   │       │       ├── RouteRow.js
+    │   │       │       ├── RenderErrorBoundary.js
+    │   │       │       └── ChargingDiagPanel.js
     │   │       └── auth/
     │   │           └── page.js       # 로그인 PIN 변경 (단일 사용자)
     │   └── api/                  # 서버사이드 API 라우트 (모두 GET, force-dynamic)
+    │       ├── admin/refresh-aggs/route.js  # 사전 집계 갱신 (POST · requireAuth · scope=daily|monthly|top|places|all · bootstrap-on-empty) — 매일 04:00 KST GHA cron
+    │       ├── admin/agg-status/route.js    # 사전 집계 진단 (GET · requireAuth) — dash_* 6 테이블 rows/freshness + server-cache 메모리 상태 → /v2/dev/api-status 집계 탭
     │       ├── car/route.js              # 차량 기본 정보 + 배터리 + 상태
     │       ├── charging-status/route.js  # 현재 충전 상태
     │       ├── drives/route.js           # 주행 통계(오늘/주/월) + 최근 주행 목록
     │       ├── charges/route.js          # 충전 이력 + 월간/전체 비용
-    │       ├── fast-charges/route.js     # 급속 충전 기록
-    │       ├── slow-charges/route.js     # 완속 충전 기록
-    │       ├── insights/route.js         # 6개월 집계 + 시간대/요일 패턴
-    │       ├── monthly-history/route.js  # 24개월 월별 주행/충전/효율
-    │       ├── battery/route.js          # 배터리 건강 + 히스토그램 + 대기 소모
-    │       ├── battery-trend/route.js    # 배터리 용량/습관 월별 트렌드
-    │       ├── charge-all-time/route.js  # 누적 충전 비용
-    │       ├── frequent-places/route.js  # 자주 방문 장소 랭킹
+    │       ├── fast-charges/route.js     # 급속 충전 기록 (server-cache 180s)
+    │       ├── slow-charges/route.js     # 완속 충전 기록 (server-cache 180s)
+    │       ├── insights/route.js         # 12개월 집계 + 시간대/요일 패턴 (server-cache 600s · dash_monthly_insights 위임, 현재월 라이브)
+    │       ├── monthly-history/route.js  # 24개월 월별 주행/충전/효율 (server-cache 300s · dash_monthly_insights 위임)
+    │       ├── battery/route.js          # 배터리 건강 + 히스토그램 + 대기 소모 (server-cache 180s)
+    │       ├── battery-trend/route.js    # 배터리 용량/습관 월별 트렌드 (server-cache 600s)
+    │       ├── charge-all-time/route.js  # 누적 충전 비용 (server-cache 600s · dash_daily_charge_agg 단독)
+    │       ├── frequent-places/route.js  # 자주 방문 장소 랭킹 (server-cache 300s · dash_place_clusters 위임)
     │       ├── long-stay-places/route.js # 오래 머문 장소 랭킹 (drives LEAD 윈도우로 dwell 산출, ≥10분만)
-    │       ├── rankings/route.js         # 랭킹 페이지 데이터
+    │       ├── rankings/route.js         # 랭킹 페이지 데이터 (server-cache 300s · dash_top_drives_cache 위임 + drives JOIN)
     │       ├── route-map/route.js        # 특정 주행의 GPS 경로
     │       ├── heatmap/route.js          # 히트맵 데이터
-    │       ├── year-heatmap/route.js     # 연간 히트맵 데이터
     │       ├── home-charger/route.js              # 집충전기 실시간 (환경공단 EvCharger API + 시간대별 캐시)
     │       ├── home-charger/fleet-stats/route.js  # 집충전기 단지 통계
     │       ├── home-charger/groups/route.js       # 동별 그룹 카운트 (constants.js 매핑) — 봇 /chargers
     │       ├── home-charger/report/route.js       # 활용도 리포트 (KPI·주별·동별) — /v2/chargers/report 페이지
     │       ├── home-charger/poll-log/route.js     # 폴링 로그 조회
-    │       ├── summary/route.js                   # drives+charges 일자 집계 (range=multi 등) — 봇 /period
+    │       ├── summary/route.js                   # drives+charges 일자 집계 (range=multi 등) — 봇 /period (server-cache 120s · historical 범위는 dash_daily_*_agg 위임)
     │       ├── parked/route.js                    # 마지막 주차/주행중 — 봇 /where
     │       ├── location/route.js                  # 최신 좌표 — 봇 /where
     │       ├── sns/blog/route.js                  # 네이버 블로그 발행 mock (POST) — 봇 /post 채널 검증
@@ -182,11 +200,11 @@ myDash/
 | 경로 | 설명 | 하단 탭 |
 |------|------|---------|
 | `/` | `/v2/drives`로 리다이렉트 | — |
-| `/v2/drives` | 차량 KPI · 인사이트 · 연간 히트맵 · 시간×요일 패턴 · TOP50 · 연도별 월간/계절 효율 | 주행 |
-| `/v2/battery` | 건강 점수 + 대기 소모 + 충전 습관 + 월간 충전 + 히트맵 + 급속/완속 기록 | 배터리 |
+| `/v2/drives` | 차량 KPI · 인사이트 · 시간×요일 패턴 · TOP50 · 연도별 월간/계절 효율 | 주행 |
+| `/v2/battery` | 건강 점수 + 대기 소모 + 충전 습관 + 월간 충전(시간×요일 그래프) + 급속/완속 기록 | 배터리 |
 | `/v2/history` | 일 카드 리스트 → 일 상세(지도 + 그날 주행 strip 하이라이트) / 월 합계(monthMode) | 이력 |
 | `/v2/chargers` | 집충전기 실시간 + Top 순위 + 활용도 리포트 (인라인) | 충전소 |
 | `/v2/chargers/report` | 활용도 리포트 단독 페이지 (외부 캡처/공유) | — (URL 직접) |
 | `/v2/tg` | 텔레그램 봇 관리 (권한 · 방송 · 학습로그 · 가이드) | — (URL 직접) |
-| `/v2/dev/api-status` | API 가용성 + 서버/진단 (개발자용, URL 직접) | — (하단 알약 미노출) |
+| `/v2/dev/api-status` | 3탭 (서버 / API 테스트 / 집계) — API 가용성 + 서버 진단 + 사전집계 상태/갱신 (개발자용, URL 직접) | — (하단 알약 미노출) |
 | `/v2/dev/auth` | 로그인 PIN 변경 (하단 알약 좌측 ⚙️ 시트에서 진입) | — (하단 알약 미노출) |

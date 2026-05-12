@@ -2,6 +2,8 @@ import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { batchReverseGeocode } from '@/lib/kakao-geo';
+import { withCache } from '@/lib/server-cache';
+import { TTL_300S } from '@/lib/cache-ttls';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,15 +17,18 @@ const PINNED_GEOFENCE_NAMES = ['집', '회사', 'Home', 'Work'];
 // 오래 머문 곳 — drives 의 종료 시각과 다음 drives 의 시작 시각 간 갭을 dwell 로 산출.
 // LEAD 윈도우 함수로 다음 주행 start_date 끌어오고, 마지막 주행은 NOW() 로 대체해
 // 현재 진행 중인 체류도 포함. 좌표 0.0005° bin(~55m) 단위로 그룹핑(자주가는곳과 동일).
-export async function GET() {
+export async function GET(request) {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
+  const force = new URL(request.url).searchParams.get('refresh') === '1';
   try {
     const car = await getDefaultCar();
     if (!car) {
       return Response.json({ places: [] });
     }
     const carId = car.id;
+
+    return Response.json(await withCache(`long-stay-places:${carId}`, TTL_300S, async () => {
 
     const result = await pool.query(
       `WITH dwells AS (
@@ -113,7 +118,8 @@ export async function GET() {
       PINNED_GEOFENCE_NAMES.indexOf(b.geofence_name)
     );
 
-    return Response.json({ places: [...normal, ...pinned], min_dwell_sec: MIN_DWELL_SEC });
+    return { places: [...normal, ...pinned], min_dwell_sec: MIN_DWELL_SEC };
+    }, { force }));
   } catch (err) {
     console.error('/api/long-stay-places error:', err);
     return Response.json({ error: 'DB error', detail: err.message }, { status: 500 });

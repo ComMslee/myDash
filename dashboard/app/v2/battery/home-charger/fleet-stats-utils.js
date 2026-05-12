@@ -6,7 +6,7 @@ import {
   ID_OFFSET,
 } from './constants';
 
-export const DOW_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
+export const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // chgerId → 차지비 앱 번호 (예: '04' → 14)
 export function appNumberOf(chgerId) {

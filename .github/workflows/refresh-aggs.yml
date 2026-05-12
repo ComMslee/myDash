@@ -1,0 +1,46 @@
+name: Refresh Dash Aggregates (dash_daily_*)
+
+# 매일 04:00 KST = UTC 19:00 (전날).
+# Lightsail SSH → 내부 curl POST /api/admin/refresh-aggs (HUB_SHARED_SECRET 인증).
+# 최근 7일을 항상 upsert → 어제 누락/cron 실패 self-heal.
+
+on:
+  schedule:
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: refresh-aggs
+      cancel-in-progress: false
+
+    steps:
+      - name: Trigger refresh via SSH
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          timeout: 30s
+          command_timeout: 10m
+          script: |
+            set -e
+            cd ~/myDash
+            SECRET=$(grep "^HUB_SHARED_SECRET=" .env | cut -d= -f2)
+            if [ -z "$SECRET" ]; then
+              echo "HUB_SHARED_SECRET 미설정" >&2
+              exit 1
+            fi
+            HTTP_CODE=$(curl -sS -o /tmp/refresh-aggs.json -w "%{http_code}" \
+              -X POST \
+              -H "x-hub-secret: $SECRET" \
+              "http://localhost:5000/api/admin/refresh-aggs")
+            echo "HTTP $HTTP_CODE"
+            cat /tmp/refresh-aggs.json
+            echo
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "Refresh 실패" >&2
+              exit 1
+            fi

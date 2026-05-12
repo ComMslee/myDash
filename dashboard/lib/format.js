@@ -69,3 +69,29 @@ export function formatKorDay(day) {
   const [y, m, d] = String(day).split('-');
   return `${y.slice(2)}/${parseInt(m)}/${parseInt(d)}`;
 }
+
+/** ms → "Xms" 또는 "X.Ys" */
+export function formatMs(n) {
+  if (n == null) return '—';
+  if (n < 1000) return `${Math.round(n)}ms`;
+  return `${(n / 1000).toFixed(2)}s`;
+}
+
+/** bytes → "XB" / "X.YK" / "X.YM" */
+export function formatBytes(n) {
+  if (n == null || n < 0) return '—';
+  if (n < 1024) return `${n}B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)}K`;
+  return `${(n / 1024 / 1024).toFixed(1)}M`;
+}
+
+/** ISO 시각 → "N초/분/시간/일 전" (한국어 상대시간) */
+export function formatRelativeTime(iso) {
+  if (!iso) return '—';
+  const ageMs = Date.now() - new Date(iso).getTime();
+  if (ageMs < 0) return '방금';
+  if (ageMs < 60_000) return `${Math.floor(ageMs / 1000)}초 전`;
+  if (ageMs < 3_600_000) return `${Math.floor(ageMs / 60_000)}분 전`;
+  if (ageMs < 86_400_000) return `${Math.floor(ageMs / 3_600_000)}시간 전`;
+  return `${Math.floor(ageMs / 86_400_000)}일 전`;
+}

@@ -2,20 +2,11 @@ import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
+import { withCache } from '@/lib/server-cache';
+import { TTL_120S } from '@/lib/cache-ttls';
+import { ensureSchema, bootstrapIfEmpty } from '@/lib/dash-agg';
 
 export const dynamic = 'force-dynamic';
-
-// drives + charging_processes 일자 집계 — 봇 /period 공용.
-// drives 응답에 efficiency_wh_km(전비) 도 같이 — (range_used) * KWH_PER_KM / distance * 1000.
-// range:
-//   today        오늘 (KST 자정~)
-//   yesterday    어제 (KST)
-//   week         지난 7일 (오늘 포함)
-//   this-week    이번 주 (KST 월요일~오늘)
-//   last-week    지난 주 (KST 월요일~일요일)
-//   month        이번 달 (KST 1일~오늘)
-//   last-month   지난 달 (KST 1일~말일)
-//   multi        today + this-week + month + last-month 한 번에 — 봇 /period 용.
 
 const KST_OFFSET_MS = 9 * 3600 * 1000;
 
@@ -69,16 +60,13 @@ function rangeBounds(range, today) {
     }
     case 'month':           return [kstStartOfThisMonthUtc(), null];
     case 'last-month':      return [kstStartOfLastMonthUtc(), kstStartOfThisMonthUtc()];
-    // 캘린더 월은 월초 빈약 → 최근 4주(28일) 롤링 + 그 직전 4주.
     case 'rolling-4w':      return [new Date(today.getTime() - 28 * 86_400_000), null];
     case 'prev-rolling-4w': return [new Date(today.getTime() - 56 * 86_400_000), new Date(today.getTime() - 28 * 86_400_000)];
-    // 평일 5일 요약 (이번 주 월~금) — 토요일 09:00 KST 텔레그램 봇 발송용.
     case 'weekdays': {
       const mon = kstStartOfThisWeekUtc();
       const sat = new Date(mon.getTime() + 5 * 86_400_000);
       return [mon, sat];
     }
-    // 주말 2일 요약 (직전 토·일) — 월요일 09:00 KST 발송용.
     case 'weekend': {
       const thisMon = kstStartOfThisWeekUtc();
       const lastSat = new Date(thisMon.getTime() - 2 * 86_400_000);
@@ -88,7 +76,47 @@ function rangeBounds(range, today) {
   }
 }
 
-async function aggregateRange(carId, start, end) {
+// UTC Date → KST 'YYYY-MM-DD'
+function kstDayString(utcDate) {
+  const k = new Date(utcDate.getTime() + KST_OFFSET_MS);
+  return `${k.getUTCFullYear()}-${String(k.getUTCMonth() + 1).padStart(2, '0')}-${String(k.getUTCDate()).padStart(2, '0')}`;
+}
+
+// 사전 집계 SUM — [fromDayKst, toDayKst) (toDay=null => 오늘 포함)
+async function aggregateFromDaily(carId, fromUtc, endUtc, todayUtc) {
+  // KST day 범위 계산
+  const fromDay = kstDayString(fromUtc);
+  // endUtc null → today 포함이므로 +1 일 (오늘 KST date+1)
+  const toDay = endUtc ? kstDayString(endUtc) : kstDayString(new Date(todayUtc.getTime() + 86_400_000));
+  const [drive, charge] = await Promise.all([
+    pool.query(
+      `SELECT COALESCE(SUM(drive_count), 0)::int  AS n,
+              COALESCE(SUM(distance_km), 0)::float AS km,
+              COALESCE(SUM(duration_min), 0)::int  AS dur,
+              COALESCE(SUM(used_km), 0)::float     AS range_used
+         FROM dash_daily_drive_agg
+        WHERE car_id = $1 AND day >= $2::date AND day < $3::date`,
+      [carId, fromDay, toDay]
+    ),
+    pool.query(
+      `SELECT COALESCE(SUM(charge_count), 0)::int AS n,
+              COALESCE(SUM(energy_kwh), 0)::float AS kwh
+         FROM dash_daily_charge_agg
+        WHERE car_id = $1 AND day >= $2::date AND day < $3::date`,
+      [carId, fromDay, toDay]
+    ),
+  ]);
+  const d = drive.rows[0];
+  const c = charge.rows[0];
+  const eff = d.km >= 1 ? (d.range_used * KWH_PER_KM / d.km * 1000) : 0;
+  return {
+    drives: { n: d.n, km: d.km, dur: d.dur, eff_wh_km: Math.round(eff) },
+    charges: { n: c.n, kwh: c.kwh },
+  };
+}
+
+// 라이브 라우트 (오늘/이번주/롤링4w 처럼 오늘 미포함되면 안 되는 범위)
+async function aggregateLive(carId, start, end) {
   const where = end ? 'start_date >= $2 AND start_date < $3' : 'start_date >= $2';
   const params = end ? [carId, start, end] : [carId, start];
   const [drives, charges] = await Promise.all([
@@ -108,22 +136,30 @@ async function aggregateRange(carId, start, end) {
     ),
   ]);
   const d = drives.rows[0];
-  // 전비 (Wh/km) — range_used 기반. 노이즈 방지 위해 km>=1 일 때만.
   const eff = d.km >= 1 ? (d.range_used * KWH_PER_KM / d.km * 1000) : 0;
   return {
-    drives: {
-      n: d.n,
-      km: d.km,
-      dur: d.dur,
-      eff_wh_km: Math.round(eff),
-    },
+    drives: { n: d.n, km: d.km, dur: d.dur, eff_wh_km: Math.round(eff) },
     charges: charges.rows[0],
   };
 }
 
+// 사전 집계가 안전한 범위 — 모두 과거 (오늘 비포함)
+const HISTORICAL_RANGES = new Set(['yesterday', 'last-week', 'last-month', 'prev-rolling-4w', 'weekend']);
+
+async function aggregateRange(carId, start, end, today) {
+  // end != null 이고 end <= today 면 historical (오늘 비포함) → daily-agg 가능
+  if (end && end.getTime() <= today.getTime()) {
+    return aggregateFromDaily(carId, start, end, today);
+  }
+  return aggregateLive(carId, start, end);
+}
+
+const CACHEABLE_RANGES = new Set(['multi', 'last-week', 'last-month', 'prev-rolling-4w', 'yesterday']);
+
 export async function GET(req) {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
+  const force = new URL(req.url).searchParams.get('refresh') === '1';
   try {
     const { searchParams } = new URL(req.url);
     const range = (searchParams.get('range') || 'today').toLowerCase();
@@ -133,22 +169,35 @@ export async function GET(req) {
 
     const today = kstStartOfTodayUtc();
 
+    await ensureSchema();
+    await bootstrapIfEmpty(car.id);
+
     if (range === 'multi') {
-      const ranges = ['today', 'this-week', 'last-week', 'rolling-4w', 'prev-rolling-4w'];
-      const out = {};
-      await Promise.all(ranges.map(async (r) => {
-        const b = rangeBounds(r, today);
-        if (!b) return;
-        // 키 변환: 'rolling-4w' → 'rolling_4w' 등 (단 prev-rolling-4w → prev_rolling_4w).
-        out[r.replace(/-/g, '_')] = await aggregateRange(car.id, b[0], b[1]);
-      }));
-      return Response.json({ range: 'multi', ...out });
+      const cacheKey = `summary:${car.id}:multi`;
+      return Response.json(await withCache(cacheKey, TTL_120S, async () => {
+        const ranges = ['today', 'this-week', 'last-week', 'rolling-4w', 'prev-rolling-4w'];
+        const out = {};
+        await Promise.all(ranges.map(async (r) => {
+          const b = rangeBounds(r, today);
+          if (!b) return;
+          out[r.replace(/-/g, '_')] = await aggregateRange(car.id, b[0], b[1], today);
+        }));
+        return { range: 'multi', ...out };
+      }, { force }));
     }
 
     const b = rangeBounds(range, today);
     if (!b) return Response.json({ error: 'bad range' }, { status: 400 });
 
-    const agg = await aggregateRange(car.id, b[0], b[1]);
+    if (CACHEABLE_RANGES.has(range)) {
+      const cacheKey = `summary:${car.id}:${range}`;
+      return Response.json(await withCache(cacheKey, TTL_120S, async () => {
+        const agg = await aggregateRange(car.id, b[0], b[1], today);
+        return { range, ...agg };
+      }, { force }));
+    }
+
+    const agg = await aggregateRange(car.id, b[0], b[1], today);
     return Response.json({ range, ...agg });
   } catch (e) {
     console.error('/api/summary error:', e);

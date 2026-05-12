@@ -145,10 +145,18 @@ export default function BottomNavV2() {
   // dev 도구 + tg 어드민에서는 탭 자체를 숨김 — 탐색 가치 없음
   const hidden = pathname?.startsWith('/dev') || pathname?.startsWith('/tg');
 
-  // 1분 tick — 경과/시각 라벨 자동 갱신
+  // 1분 tick — 경과/시각 라벨 자동 갱신 (탭 숨김 시 정지)
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 60_000);
-    return () => clearInterval(id);
+    let id = null;
+    const start = () => {
+      if (id != null) return;
+      id = setInterval(() => setTick(t => t + 1), 60_000);
+    };
+    const stop = () => { if (id != null) { clearInterval(id); id = null; } };
+    const onVis = () => { if (document.hidden) stop(); else { setTick(t => t + 1); start(); } };
+    if (!document.hidden) start();
+    document.addEventListener('visibilitychange', onVis);
+    return () => { stop(); document.removeEventListener('visibilitychange', onVis); };
   }, []);
 
   // 라우트 변경 시 시트 자동 닫기
@@ -162,7 +170,8 @@ export default function BottomNavV2() {
     return () => window.removeEventListener('keydown', onKey);
   }, [settingsOpen]);
 
-  // 차량/충전 데이터 30초 폴링 — mock 모드에선 MOCK_DATA 사용
+  // 차량/충전 데이터 30초 폴링 — mock 모드에선 MOCK_DATA 사용.
+  // 탭 숨김 시 폴링 정지, 복귀 시 즉시 1회 fetch + 인터벌 재개 (불필요한 백그라운드 요청 차단).
   const activeMockData = mockData || MOCK_DATA;
   useEffect(() => {
     if (hidden) return;
@@ -171,6 +180,7 @@ export default function BottomNavV2() {
       setCharging(isMockCharging ? activeMockData.chargingStatus : null);
       return;
     }
+    let id = null;
     const fetchData = () =>
       Promise.all([
         fetch('/api/car').then(r => r.json()).catch(() => null),
@@ -179,9 +189,16 @@ export default function BottomNavV2() {
         if (carData) setCar(carData);
         setCharging(chargingData?.charging ? chargingData : null);
       });
-    fetchData();
-    const id = setInterval(fetchData, 30000);
-    return () => clearInterval(id);
+    const start = () => {
+      if (id != null) return;
+      fetchData();
+      id = setInterval(fetchData, 30_000);
+    };
+    const stop = () => { if (id != null) { clearInterval(id); id = null; } };
+    const onVis = () => { if (document.hidden) stop(); else start(); };
+    if (!document.hidden) start();
+    document.addEventListener('visibilitychange', onVis);
+    return () => { stop(); document.removeEventListener('visibilitychange', onVis); };
   }, [hidden, isMock, isMockCharging, activeMockData]);
 
   if (hidden) return null;
