@@ -90,5 +90,15 @@ export async function ensureSchema() {
       updated_at timestamptz DEFAULT now()
     )
   `);
+
+  // TeslaMate 기본 스키마에는 positions(car_id, date DESC) 복합 인덱스가 없어,
+  // /api/car · /api/location · /api/parked · /api/charging-status 등 다수 라우트의
+  // `WHERE car_id=$1 ORDER BY date DESC LIMIT 1` 패턴이 2초+ 걸렸음.
+  // dash_ prefix 인덱스 추가 — 멱등, TeslaMate INSERT 비용 영향 미미 (46MB 테이블).
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS dash_positions_car_id_date_desc
+      ON positions (car_id, date DESC)
+  `);
+
   tableReady = true;
 }
