@@ -1,0 +1,54 @@
+name: PR CI
+
+# 머지 전 빌드 사전 검증 — syntax/import 에러를 master push 전에 차단.
+# 과거 사례: dashboard/app/api/insights/route.js 의 `};` 누락으로 master deploy 가 빌드 실패.
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'dashboard/**'
+      - 'services/**'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
+
+jobs:
+  dashboard-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install deps
+        working-directory: dashboard
+        run: npm ci --no-audit --no-fund
+
+      - name: Next.js build (syntax + import 검증)
+        working-directory: dashboard
+        env:
+          # 빌드 타임 DB 접속 회피 — force-dynamic 라우트들이 prerender 시도하지 않도록.
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: npm run build
+
+  hub-syntax:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: telegram-hub syntax check
+        working-directory: services/telegram-hub
+        run: |
+          for f in src/*.js src/**/*.js; do
+            [ -f "$f" ] || continue
+            node --check "$f"
+          done

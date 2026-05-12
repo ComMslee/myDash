@@ -1,0 +1,78 @@
+name: Health Check (30min)
+
+# 30분마다 핵심 라우트 핑 — 실패(HTTP != 200) 또는 임계(SLOW_MS) 초과 시
+# telegram-hub /notify (Bearer HUB_SHARED_SECRET) 로 Telegram 알림.
+#
+# 워크플로 자체 비용 절감을 위해 한 번의 SSH 세션에서 모든 체크를 수행.
+# Lightsail 인스턴스에 의존 (외부에서 직접 핑하지 않음 — 보안/내부 캐시 분리).
+# GHA 무료 한도 보호: 30min × 30s 추정 = ~720분/월.
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: health-check
+      cancel-in-progress: true
+
+    steps:
+      - name: Probe via SSH + alert on degradation
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          timeout: 30s
+          command_timeout: 3m
+          script: |
+            set -euo pipefail
+            cd ~/myDash
+            SECRET=$(grep "^HUB_SHARED_SECRET=" .env | cut -d= -f2)
+            if [ -z "$SECRET" ]; then
+              echo "HUB_SHARED_SECRET 미설정 — 알림 비활성화"
+            fi
+            SLOW_MS=5000  # 5초 초과 = 비정상
+            ROUTES="/api/server-status /api/car /api/charging-status /api/location"
+            FAILS=""
+            SLOWS=""
+            for ROUTE in $ROUTES; do
+              T0=$(date +%s%3N)
+              CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                -H "x-hub-secret: $SECRET" \
+                --max-time 15 \
+                "http://localhost:5000${ROUTE}" || echo "000")
+              T1=$(date +%s%3N)
+              DT=$((T1 - T0))
+              echo "$ROUTE  HTTP $CODE  ${DT}ms"
+              if [ "$CODE" != "200" ]; then
+                FAILS="${FAILS}\n• ${ROUTE} → HTTP ${CODE}"
+              elif [ "$DT" -gt "$SLOW_MS" ]; then
+                SLOWS="${SLOWS}\n• ${ROUTE} → ${DT}ms"
+              fi
+            done
+
+            if [ -n "$FAILS" ] || [ -n "$SLOWS" ]; then
+              if [ -z "$SECRET" ]; then
+                echo "ALERT (no SECRET, skipping notify):"
+                [ -n "$FAILS" ] && printf '실패:%b\n' "$FAILS"
+                [ -n "$SLOWS" ] && printf '느림(>%dms):%b\n' "$SLOW_MS" "$SLOWS"
+                exit 1
+              fi
+              MSG="⚠️ 대시보드 헬스체크"
+              [ -n "$FAILS" ] && MSG="${MSG}\n\n❌ 실패:${FAILS}"
+              [ -n "$SLOWS" ] && MSG="${MSG}\n\n🐌 느림 (>${SLOW_MS}ms):${SLOWS}"
+              # hub /notify (Bearer)
+              BODY=$(printf '{"text":"%s"}' "$(printf '%b' "$MSG" | sed 's/"/\\"/g')")
+              curl -sS -X POST \
+                -H "Authorization: Bearer $SECRET" \
+                -H "Content-Type: application/json" \
+                --max-time 10 \
+                -d "$BODY" \
+                "http://localhost:3000/notify" || echo "notify 실패"
+              exit 1
+            fi
+            echo "OK"

@@ -1,0 +1,38 @@
+name: Docker Cleanup (Lightsail)
+
+# 주 1회 — 매주 일요일 04:30 KST = UTC 토 19:30.
+# Docker build cache + 미사용 이미지 정리. 9.2GB 누적되던 사례 방지 (디스크 40GB 인스턴스).
+
+on:
+  schedule:
+    - cron: '30 19 * * 6'
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: docker-cleanup
+      cancel-in-progress: false
+
+    steps:
+      - name: Prune via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          timeout: 30s
+          command_timeout: 5m
+          script: |
+            set -e
+            echo "[cleanup] before:"
+            df -h /
+            sudo docker system df
+            echo "---"
+            sudo docker builder prune -af
+            sudo docker image prune -af
+            echo "---"
+            echo "[cleanup] after:"
+            df -h /
+            sudo docker system df
