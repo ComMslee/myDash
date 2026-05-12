@@ -2,7 +2,6 @@ import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { withCache } from '@/lib/server-cache';
-import { ensureSchema as ensureAggSchema, readHourDow } from '@/lib/dash-agg';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +15,6 @@ export async function GET(request) {
     const carId = car.id;
 
     return Response.json(await withCache(`charge-all-time:${carId}`, 600_000, async () => {
-    await ensureAggSchema();
     const [statsResult, hourDowResult] = await Promise.all([
       pool.query(`
         SELECT
@@ -37,7 +35,7 @@ export async function GET(request) {
         ) sub
       `, [carId]),
 
-      // 충전 (요일 × 시간) — 오늘만 라이브. 과거는 dash_daily_charge_agg 에서 별도 합산.
+      // 충전 (요일 × 시간) — 전체 기간, 10분 wall-clock 틱 카운트
       pool.query(`
         SELECT EXTRACT(DOW  FROM ts)::int AS dow,
                EXTRACT(HOUR FROM ts)::int AS hour,
@@ -47,7 +45,6 @@ export async function GET(request) {
                  COALESCE(end_date, start_date) + INTERVAL '9 hours' AS el
           FROM charging_processes
           WHERE car_id = $1 AND charge_energy_added IS NOT NULL
-            AND start_date >= (date_trunc('day', (NOW() AT TIME ZONE 'Asia/Seoul')) AT TIME ZONE 'Asia/Seoul')
         ) c
         CROSS JOIN LATERAL generate_series(
           date_trunc('hour', sl),
@@ -61,11 +58,10 @@ export async function GET(request) {
 
     const s = statsResult.rows[0];
 
-    // 과거(완결일) = 사전 집계, 오늘 = 라이브 머지. 첫 cron 전 = 오늘만 잡힘.
-    const hourDow = await readHourDow(carId, 'charge');
-    for (const r of hourDowResult.rows) hourDow[r.dow][r.hour] += r.count;
+    const hourDow = Array.from({ length: 7 }, () => Array(24).fill(0));
+    for (const r of hourDowResult.rows) hourDow[r.dow][r.hour] = r.count;
 
-    return Response.json({
+    return {
       charge_count: s.charge_count,
       total_kwh: parseFloat(Number(s.total_kwh).toFixed(1)),
       avg_kwh: parseFloat(Number(s.avg_kwh).toFixed(1)),
@@ -74,7 +70,7 @@ export async function GET(request) {
       fast_charges: s.fast_charges,
       slow_charges: s.slow_charges,
       charge_hour_dow: hourDow,
-    });
+    };
     }, { force }));
   } catch (err) {
     console.error('/api/charge-all-time error:', err);
