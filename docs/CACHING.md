@@ -52,7 +52,22 @@
 - **재시작 시 휘발**: 컨테이너 재시작 = 자연 무효화
 - **inflight dedup**: 만료 직후 동시 요청 → 1회만 DB 쿼리
 
-### 4. 집충전기 (환경공단 EvCharger) 캐시
+### 4. 일별 사전 집계 (dash_daily_*) — TeslaMate DB 테이블
+
+- **위치**: `dashboard/lib/dash-agg.js` (TeslaMate DB 에 `dash_` prefix 테이블 보유, TeslaMate 스키마 자체는 무수정)
+- **테이블**:
+  - `dash_daily_drive_agg(car_id, day, dow, hour, ticks_10min, distance_km, duration_min, drive_count, used_km)` — PK `(car_id, day, hour)`
+  - `dash_daily_charge_agg(car_id, day, dow, hour, ticks_10min, energy_kwh, charge_count, home_count, fast_count)` — PK `(car_id, day, hour)`
+  - `day` 는 KST 날짜 (`start_date + INTERVAL '9 hours' :: date`).
+- **갱신**: `POST /api/admin/refresh-aggs` (HUB_SHARED_SECRET) — 매일 KST 04:00 GHA cron (`.github/workflows/refresh-aggs.yml`). 최근 7일 항상 upsert → 어제 누락/cron 실패 self-heal.
+- **읽기 패턴** (insights / charge-all-time):
+  - 과거(완결일) = `readHourDow(carId, kind)` 로 `SUM(ticks_10min) GROUP BY dow,hour`
+  - 오늘 = 기존 `generate_series` 라이브 쿼리 (`start_date >= KST today 00:00` 으로 제한)
+  - 두 그리드 element-wise 합산
+- **첫 cron 전(콜드)**: 사전 집계 비어 있어도 오늘 라이브만 잡힘 → 다음 cron 후 자동 복구. 별도 폴백 없음.
+- **무효화**: refresh-aggs 성공 시 `server-cache` 의 `insights:` / `charge-all-time:` / `monthly-history:` 프리픽스 일괄 invalidate.
+
+### 5. 집충전기 (환경공단 EvCharger) 캐시
 - **위치**: `dashboard/lib/home-charger-cache.js` (코어) + `dashboard/lib/home-charger/{schema,poll-log,usage,fleet-stats}.js` (분리 모듈)
 - **메모리 캐시**: 모듈 변수 `cache = { ts, data }`, `inflight` (동시 요청 dedup)
 - **TTL (정적)**: KST 시간대별 5~12분 (`CACHE_TIERS`). 저녁 피크(18~22시) 5분, 오후 12분 등
@@ -93,9 +108,10 @@
 | `/api/home-charger/report` | charger_usage, home_charger_snapshot | — | `getCache()` 의 모듈 캐시 활용 (콜드 스타트 시 DB observed_chargers 폴백) |
 | `/api/home-charger/poll-log` | (메모리 진단) | — | 없음 |
 | `/api/monthly-history` | charging_processes | — | server-cache 300s |
-| `/api/charge-all-time` | charging_processes | — | server-cache 180s |
+| `/api/charge-all-time` | charging_processes + dash_daily_charge_agg | — | server-cache 600s + 일별 사전 집계 |
 | `/api/heatmap` | drives | — | server-cache 300s |
-| `/api/insights` | drives | — | server-cache 180s |
+| `/api/insights` | drives + dash_daily_drive_agg (+ dash_daily_charge_agg) | — | server-cache 600s + 일별 사전 집계 |
+| `/api/admin/refresh-aggs` | dash_daily_drive_agg, dash_daily_charge_agg (upsert) | — | 없음 (POST · HUB_SHARED_SECRET 인증, GHA cron 매일 04:00 KST) |
 | `/api/rankings` | drives | — | server-cache 300s (per type·limit) |
 | `/api/fast-charges` | charging_processes | — | server-cache 180s |
 | `/api/slow-charges` | charging_processes | — | server-cache 180s |

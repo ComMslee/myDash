@@ -3,6 +3,7 @@ import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
 import { withCache } from '@/lib/server-cache';
+import { ensureSchema as ensureAggSchema, readHourDow } from '@/lib/dash-agg';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,8 @@ export async function GET(request) {
     }
     const carId = car.id;
 
-    return Response.json(await withCache(`insights:${carId}`, 180_000, async () => {
+    return Response.json(await withCache(`insights:${carId}`, 600_000, async () => {
+    await ensureAggSchema();
 
     const now = new Date();
     const nextStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -84,7 +86,8 @@ export async function GET(request) {
           return monthStats(ms, me).then(s => ({ year: ms.getFullYear(), month: ms.getMonth() + 1, ...s }));
         })
       ),
-      // 주행 (요일 × 시간) joint — 10분 단위 wall-clock 틱(:00,:10,..,:50)이 시작~종료 구간에 포함될 때마다 +1
+      // 주행 (요일 × 시간) — 오늘만 라이브 (KST today 00:00 이후 시작 분).
+      // 과거는 dash_daily_drive_agg 에서 readHourDow 로 별도 합산.
       pool.query(
         `SELECT EXTRACT(DOW  FROM ts)::int AS dow,
                 EXTRACT(HOUR FROM ts)::int AS hour,
@@ -92,7 +95,9 @@ export async function GET(request) {
          FROM (
            SELECT start_date + INTERVAL '9 hours' AS sl,
                   COALESCE(end_date, start_date) + INTERVAL '9 hours' AS el
-           FROM drives WHERE car_id = $1
+           FROM drives
+           WHERE car_id = $1
+             AND start_date >= (date_trunc('day', (NOW() AT TIME ZONE 'Asia/Seoul')) AT TIME ZONE 'Asia/Seoul')
          ) d
          CROSS JOIN LATERAL generate_series(
            date_trunc('hour', sl),
@@ -103,7 +108,7 @@ export async function GET(request) {
          GROUP BY dow, hour`,
         [carId]
       ),
-      // 충전 (요일 × 시간) joint — 10분 단위 wall-clock 틱이 시작~종료 구간에 포함될 때마다 +1
+      // 충전 (요일 × 시간) — 오늘만 라이브
       pool.query(
         `SELECT EXTRACT(DOW  FROM ts)::int AS dow,
                 EXTRACT(HOUR FROM ts)::int AS hour,
@@ -113,6 +118,7 @@ export async function GET(request) {
                   COALESCE(end_date, start_date) + INTERVAL '9 hours' AS el
            FROM charging_processes
            WHERE car_id = $1 AND charge_energy_added IS NOT NULL
+             AND start_date >= (date_trunc('day', (NOW() AT TIME ZONE 'Asia/Seoul')) AT TIME ZONE 'Asia/Seoul')
          ) c
          CROSS JOIN LATERAL generate_series(
            date_trunc('hour', sl),
@@ -312,6 +318,15 @@ export async function GET(request) {
     const bestLongRow = monthBestLongResult.rows[0];
     const bestEffRow = monthBestEffResult.rows[0];
 
+    // hour_dow / charge_hour_dow: 과거(완결일) = dash_daily_* 사전 집계,
+    // 오늘 = 라이브 generate_series 머지. 첫 cron 전이면 사전 집계가 비어 오늘만 잡힘 → 다음 cron 후 복구.
+    const [pastDriveGrid, pastChargeGrid] = await Promise.all([
+      readHourDow(carId, 'drive'),
+      readHourDow(carId, 'charge'),
+    ]);
+    for (const r of driveHourDowQ.rows)  pastDriveGrid[r.dow][r.hour]  += r.count;
+    for (const r of chargeHourDowQ.rows) pastChargeGrid[r.dow][r.hour] += r.count;
+
     return Response.json({
       current: {
         distance: parseFloat(current.distance.toFixed(1)),
@@ -357,17 +372,9 @@ export async function GET(request) {
         total_kwh: parseFloat(m.total_kwh.toFixed(1)),
         charge_count: m.charge_count,
       })),
-      hour_dow: (() => {
-        const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
-        for (const r of driveHourDowQ.rows) grid[r.dow][r.hour] = r.count;
-        return grid;
-      })(),
-      charge_hour_dow: (() => {
-        const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
-        for (const r of chargeHourDowQ.rows) grid[r.dow][r.hour] = r.count;
-        return grid;
-      })(),
-    };
+      hour_dow: pastDriveGrid,
+      charge_hour_dow: pastChargeGrid,
+    });
     }, { force }));
   } catch (err) {
     console.error('/api/insights error:', err);

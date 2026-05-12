@@ -90,12 +90,12 @@ const today = await pool.query(`SELECT ... FROM drives WHERE start_date >= date_
 3. CACHING.md 갱신 (라우트 표에 TTL 컬럼 추가)
 4. master push → 자동 배포 → 응답 시간 측정
 
-### PR2 (Tier 2 핵심 3개) — 다음 주
-1. `dash_daily_*` 마이그레이션 (`dashboard/db/migrations/` 신규)
-2. `/api/admin/refresh-aggs` POST 라우트 (HUB_SHARED_SECRET)
-3. cron 등록 (GHA scheduled — repo 의존성 0)
-4. insights/charge-all-time/monthly-history 핸들러 = 과거(테이블) + 오늘(라이브) 머지
-5. Tier 1 캐시 TTL 축소 (5min → 30s) — 데이터 신선도 vs 응답속도 균형
+### PR2 (Tier 2 핵심 3개) — 다음 주 — ✅ 완료
+1. `dash_daily_*` 테이블 자체 마이그레이션 (`dashboard/lib/dash-agg.js` `ensureSchema()` — `kakao-geo.js` 처럼 모듈 플래그 idempotent CREATE TABLE IF NOT EXISTS)
+2. `/api/admin/refresh-aggs` POST 라우트 — HUB_SHARED_SECRET (requireAuth 통과). 최근 7일 항상 upsert (멱등 self-heal).
+3. GHA cron 등록 — `.github/workflows/refresh-aggs.yml`, 매일 04:00 KST = UTC 19:00.
+4. insights / charge-all-time 핸들러 = 과거(`readHourDow` 테이블 합산) + 오늘(기존 `generate_series` 쿼리 `start_date >= KST today 00:00` 제한) 머지. monthly-history 는 후속.
+5. Tier 1 캐시 TTL 조정 — insights/charge-all-time 만 180s → 600s 로 상향 (사전 집계로 무거운 작업 분할상환됨).
 
 ### PR3 (옵션) — 검증 후
 - 나머지 라우트 Tier 2 확장 또는 Tier 3 클라이언트 캐시
