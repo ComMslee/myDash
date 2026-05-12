@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth-helper';
-import { pool } from '@/lib/db';
+import pool from '@/lib/db';
 import { ensureSchema } from '@/lib/dash-agg';
 import { cacheStats } from '@/lib/server-cache';
 
