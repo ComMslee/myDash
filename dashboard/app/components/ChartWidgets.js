@@ -8,14 +8,8 @@ const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 // 셀별 색 농도(opacity)로 점유 빈도 강도 표현 — 피크(>0.75)는 amber 강조
 // 데이터는 활동 시작~종료 구간에 포함되는 10분 wall-clock 틱(:00,:10,..,:50) 카운트 합산
 function fmtTicks(ticks) {
-  // 1 tick = 10 min
-  if (ticks <= 0) return '0';
-  const min = ticks * 10;
-  if (min < 60) return `${min}분`;
-  const h = min / 60;
-  if (h < 10) return `${h.toFixed(1)}시간`;
-  if (h < 1000) return `${Math.round(h)}시간`;
-  return `${(h / 24).toFixed(0)}일`;
+  // 1 tick = 10 min — 단위 환산 없이 카운트 그대로 표시
+  return `${ticks}회`;
 }
 export function HourDowHeatmap({ data, hexColor = '#3b82f6' }) {
   if (!data || data.length !== 7) return null;
