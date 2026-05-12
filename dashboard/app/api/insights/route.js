@@ -3,6 +3,7 @@ import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
 import { withCache } from '@/lib/server-cache';
+import { TTL_600S } from '@/lib/cache-ttls';
 import { ensureSchema, bootstrapIfEmpty } from '@/lib/dash-agg';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +22,7 @@ export async function GET(request) {
     await ensureSchema();
     await bootstrapIfEmpty(carId);
 
-    return Response.json(await withCache(`insights:${carId}`, 600_000, async () => {
+    return Response.json(await withCache(`insights:${carId}`, TTL_600S, async () => {
 
     const now = new Date();
     // 최근 12개월 — 현재 월 포함, 11개월 전까지

@@ -3,6 +3,7 @@ import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
 import { withCache } from '@/lib/server-cache';
+import { TTL_300S } from '@/lib/cache-ttls';
 import { ensureSchema, bootstrapIfEmpty } from '@/lib/dash-agg';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +22,7 @@ export async function GET(request) {
     await ensureSchema();
     await bootstrapIfEmpty(carId);
 
-    return Response.json(await withCache(`monthly-history:${carId}`, 300_000, async () => {
+    return Response.json(await withCache(`monthly-history:${carId}`, TTL_300S, async () => {
     const now = new Date();
     const curYear = now.getFullYear();
     const curMonth = now.getMonth() + 1;

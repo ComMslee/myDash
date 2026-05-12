@@ -2,6 +2,7 @@ import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { withCache } from '@/lib/server-cache';
+import { TTL_600S } from '@/lib/cache-ttls';
 import { ensureSchema, bootstrapIfEmpty } from '@/lib/dash-agg';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +19,7 @@ export async function GET(request) {
     await ensureSchema();
     await bootstrapIfEmpty(carId);
 
-    return Response.json(await withCache(`charge-all-time:${carId}`, 600_000, async () => {
+    return Response.json(await withCache(`charge-all-time:${carId}`, TTL_600S, async () => {
     const [statsResult, hourDowResult] = await Promise.all([
       // 사전 집계 SUM — 전체 기간 (오늘 포함, 같은 cron 으로 갱신)
       pool.query(`

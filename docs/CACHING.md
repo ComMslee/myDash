@@ -41,6 +41,7 @@
 
 ### 3. 분석 라우트 메모리 TTL 캐시 (server-cache)
 - **위치**: `dashboard/lib/server-cache.js` (모듈 스코프 Map + inflight dedup)
+- **TTL 상수**: `dashboard/lib/cache-ttls.js` 단일 소스 (`TTL_120S`/`TTL_180S`/`TTL_300S`/`TTL_600S`) — 정책 변경 시 한 곳만 수정
 - **적용 라우트**:
   - `/api/insights` (600s · Tier 2 위임), `/api/charge-all-time` (600s · Tier 2 위임)
   - `/api/battery-trend` (600s)

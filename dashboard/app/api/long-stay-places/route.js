@@ -3,6 +3,7 @@ import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { batchReverseGeocode } from '@/lib/kakao-geo';
 import { withCache } from '@/lib/server-cache';
+import { TTL_300S } from '@/lib/cache-ttls';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,7 @@ export async function GET(request) {
     }
     const carId = car.id;
 
-    return Response.json(await withCache(`long-stay-places:${carId}`, 300_000, async () => {
+    return Response.json(await withCache(`long-stay-places:${carId}`, TTL_300S, async () => {
 
     const result = await pool.query(
       `WITH dwells AS (

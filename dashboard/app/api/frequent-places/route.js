@@ -3,6 +3,7 @@ import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { batchReverseGeocode } from '@/lib/kakao-geo';
 import { withCache } from '@/lib/server-cache';
+import { TTL_300S } from '@/lib/cache-ttls';
 import { ensureSchema, bootstrapIfEmpty } from '@/lib/dash-agg';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +25,7 @@ export async function GET(request) {
     await ensureSchema();
     await bootstrapIfEmpty(carId);
 
-    return Response.json(await withCache(`frequent-places:${carId}`, 300_000, async () => {
+    return Response.json(await withCache(`frequent-places:${carId}`, TTL_300S, async () => {
 
     // dash_place_clusters 에서 TOP-N
     const clusters = await pool.query(

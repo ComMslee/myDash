@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { withCache } from '@/lib/server-cache';
+import { TTL_180S } from '@/lib/cache-ttls';
 import { KWH_PER_KM, RATED_RANGE_MAX_KM } from '@/lib/constants';
 import { KST_OFFSET_MS } from '@/lib/kst';
 import {
@@ -41,7 +42,7 @@ export async function GET(request) {
     if (!car) return Response.json({ error: 'No car found' }, { status: 404 });
     const carId = car.id;
 
-    return Response.json(await withCache(`battery:${carId}`, 180_000, async () => {
+    return Response.json(await withCache(`battery:${carId}`, TTL_180S, async () => {
 
     const KST = KST_OFFSET_MS;
     const now = new Date();

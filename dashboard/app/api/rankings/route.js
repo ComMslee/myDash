@@ -4,6 +4,7 @@ import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
 import { batchReverseGeocode } from '@/lib/kakao-geo';
 import { withCache } from '@/lib/server-cache';
+import { TTL_300S } from '@/lib/cache-ttls';
 import { ensureSchema, bootstrapIfEmpty } from '@/lib/dash-agg';
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +31,7 @@ export async function GET(request) {
     await ensureSchema();
     await bootstrapIfEmpty(carId);
 
-    return Response.json(await withCache(`rankings:${carId}:${type}:${limit}`, 300_000, async () => {
+    return Response.json(await withCache(`rankings:${carId}:${type}:${limit}`, TTL_300S, async () => {
 
     if (type === 'drive_distance' || type === 'drive_duration' || type === 'drive_avg_speed' || type === 'drive_eff') {
       // dash_top_drives_cache 에서 TOP-N drive_id 추출 후 drives 메타 JOIN

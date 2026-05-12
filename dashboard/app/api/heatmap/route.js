@@ -2,6 +2,7 @@ import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { withCache } from '@/lib/server-cache';
+import { TTL_300S } from '@/lib/cache-ttls';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ export async function GET(request) {
     }
     const carId = car.id;
 
-    return Response.json(await withCache(`heatmap:${carId}`, 300_000, async () => {
+    return Response.json(await withCache(`heatmap:${carId}`, TTL_300S, async () => {
     const posResult = await pool.query(
       `SELECT latitude, longitude
        FROM positions

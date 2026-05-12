@@ -4,7 +4,7 @@ import { ensureUserGroupsSchema } from '@/lib/tg-user-groups';
 
 export const dynamic = 'force-dynamic';
 
-const TG_HUB_URL = process.env.TELEGRAM_HUB_URL || 'http://telegram-hub:3000';
+import { TG_HUB_URL } from '@/lib/internal-urls';
 
 async function fetchHubHealth() {
   try {

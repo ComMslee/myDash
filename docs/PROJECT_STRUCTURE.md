@@ -46,6 +46,8 @@ myDash/
     ├── lib/
     │   ├── db.js                 # PostgreSQL 커넥션 풀 (싱글턴)
     │   ├── server-cache.js       # 모듈 스코프 Map + per-key TTL + inflight dedup — `withCache(key, ttlMs, fn)` / `invalidate(prefix)` / `cacheStats()`
+    │   ├── cache-ttls.js         # TTL 상수 단일 소스 — `TTL_120S` / `TTL_180S` / `TTL_300S` / `TTL_600S` (12 라우트 공유)
+    │   ├── internal-urls.js      # 내부 서비스 URL — `TG_HUB_URL` (telegram-hub 도커 네트워크)
     │   ├── agg-scopes.js         # 사전집계 scope 메타(`AGG_SCOPES`, `AGG_SCOPE_KEYS`) — refresh-aggs 라우트 + 집계 탭 카드가 공유
     │   ├── dash-agg/             # 사전 집계 6 테이블 — barrel(index.js) 통해 `@/lib/dash-agg` 단일 import
     │   │   ├── index.js          # 공개 API barrel re-exports

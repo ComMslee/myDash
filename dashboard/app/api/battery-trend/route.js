@@ -2,6 +2,7 @@ import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { withCache } from '@/lib/server-cache';
+import { TTL_600S } from '@/lib/cache-ttls';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
@@ -13,7 +14,7 @@ export async function GET(request) {
     if (!car) return Response.json({ error: 'No car' }, { status: 404 });
     const carId = car.id;
 
-    return Response.json(await withCache(`battery-trend:${carId}`, 600_000, async () => {
+    return Response.json(await withCache(`battery-trend:${carId}`, TTL_600S, async () => {
 
     // 월별 추정 배터리 용량 (충전 세션 역산)
     const capacityResult = await pool.query(`

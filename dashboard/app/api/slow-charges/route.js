@@ -2,6 +2,7 @@ import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { withCache } from '@/lib/server-cache';
+import { TTL_180S } from '@/lib/cache-ttls';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ export async function GET(request) {
     if (!car) return Response.json({ records: [] });
     const carId = car.id;
 
-    return Response.json(await withCache(`slow-charges:${carId}`, 180_000, async () => {
+    return Response.json(await withCache(`slow-charges:${carId}`, TTL_180S, async () => {
     const result = await pool.query(
       `SELECT
          cp.id,

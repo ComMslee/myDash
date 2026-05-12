@@ -3,6 +3,7 @@ import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
 import { KWH_PER_KM } from '@/lib/constants';
 import { withCache } from '@/lib/server-cache';
+import { TTL_120S } from '@/lib/cache-ttls';
 import { ensureSchema, bootstrapIfEmpty } from '@/lib/dash-agg';
 
 export const dynamic = 'force-dynamic';
@@ -173,7 +174,7 @@ export async function GET(req) {
 
     if (range === 'multi') {
       const cacheKey = `summary:${car.id}:multi`;
-      return Response.json(await withCache(cacheKey, 120_000, async () => {
+      return Response.json(await withCache(cacheKey, TTL_120S, async () => {
         const ranges = ['today', 'this-week', 'last-week', 'rolling-4w', 'prev-rolling-4w'];
         const out = {};
         await Promise.all(ranges.map(async (r) => {
@@ -190,7 +191,7 @@ export async function GET(req) {
 
     if (CACHEABLE_RANGES.has(range)) {
       const cacheKey = `summary:${car.id}:${range}`;
-      return Response.json(await withCache(cacheKey, 120_000, async () => {
+      return Response.json(await withCache(cacheKey, TTL_120S, async () => {
         const agg = await aggregateRange(car.id, b[0], b[1], today);
         return { range, ...agg };
       }, { force }));
