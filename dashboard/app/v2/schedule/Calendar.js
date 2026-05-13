@@ -108,7 +108,7 @@ export default function Calendar({
   const totalDays = daysInMonth(y, m);
   const firstWday = firstDow(y, m);
   const today = todayStr();
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState(today);
 
   const cells = useMemo(() => {
     const arr = [];
@@ -230,12 +230,11 @@ export default function Calendar({
       </div>
 
       {selectedCell && (
-        <DaySheet
+        <DayPanel
           cell={selectedCell}
           schedules={schedules}
-          onClose={() => setSelected(null)}
-          onAddSchedule={() => { setSelected(null); onAddSchedule?.(selectedCell.dateStr); }}
-          onEditSchedule={(s) => { setSelected(null); onEditSchedule?.(s); }}
+          onAddSchedule={() => onAddSchedule?.(selectedCell.dateStr)}
+          onEditSchedule={(s) => onEditSchedule?.(s)}
           onDeleteSchedule={(s) => onDeleteSchedule?.(s)}
           onToggleEnabled={onToggleEnabled}
           onRunNow={onRunNow}
@@ -245,7 +244,7 @@ export default function Calendar({
   );
 }
 
-function DaySheet({ cell, schedules, onClose, onAddSchedule, onEditSchedule, onDeleteSchedule, onToggleEnabled, onRunNow }) {
+function DayPanel({ cell, schedules, onAddSchedule, onEditSchedule, onDeleteSchedule, onToggleEnabled, onRunNow }) {
   const dow = WEEKDAY_KO[cell.dayOfWeek];
   const isPast = cell.isPast;
   const isToday = cell.isToday;
@@ -253,21 +252,17 @@ function DaySheet({ cell, schedules, onClose, onAddSchedule, onEditSchedule, onD
   const actualCost = cell.execs.reduce((s, e) => s + (Number(e.cost_estimate) || 0), 0);
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div
-        className="absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto bg-[#0f0f0f] border-t border-white/[0.10] rounded-t-2xl p-4 space-y-3"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-bold text-zinc-100 tabular-nums">
-              {cell.dateStr} <span className="text-zinc-500 text-sm font-normal">({dow})</span>
-            </h3>
-            {cell.holidayName && <p className="text-[11px] text-rose-400 mt-0.5">{cell.holidayName}</p>}
-            {cell.paused && <p className="text-[11px] text-amber-400 mt-0.5">✈️ 휴무 모드 적용</p>}
-          </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 flex items-center justify-center">✕</button>
+    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-bold text-zinc-100 tabular-nums">
+            {cell.dateStr} <span className="text-zinc-500 text-xs font-normal">({dow})</span>
+            {isToday && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">오늘</span>}
+          </h3>
+          {cell.holidayName && <span className="text-[11px] text-rose-400">· {cell.holidayName}</span>}
+          {cell.paused && <span className="text-[11px] text-amber-400 ml-1">· ✈️ 휴무</span>}
         </div>
+      </div>
 
         {/* 예약된 작업 — 미래/오늘 */}
         {(!isPast || isToday) && cell.planned.length > 0 && (
@@ -322,21 +317,14 @@ function DaySheet({ cell, schedules, onClose, onAddSchedule, onEditSchedule, onD
           </section>
         )}
 
-        {cell.planned.length === 0 && cell.execs.length === 0 && (
-          <p className="text-[11px] text-zinc-600 text-center py-4">예약·이력 없음</p>
-        )}
+      {cell.planned.length === 0 && cell.execs.length === 0 && (
+        <p className="text-[11px] text-zinc-600 text-center py-3">예약·이력 없음</p>
+      )}
 
-        <div className="flex gap-2 pt-2 border-t border-white/[0.04]">
-          <button
-            onClick={onAddSchedule}
-            className="flex-1 text-xs py-2 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-400 hover:bg-blue-500/25"
-          >+ 이 날짜에 새 스케줄</button>
-          <button
-            onClick={onClose}
-            className="px-4 text-xs py-2 rounded-lg bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
-          >닫기</button>
-        </div>
-      </div>
+      <button
+        onClick={onAddSchedule}
+        className="w-full text-xs py-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20"
+      >+ 이 날짜에 새 스케줄</button>
     </div>
   );
 }
