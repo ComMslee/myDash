@@ -53,7 +53,7 @@ export default function RangeMapCard() {
 
       // 초기 size 0 회피 — invalidateSize + animate:false fitBounds (DriveMap 함정 패턴 차용)
       // 줌은 편도 원 × 0.75 영역에 맞춤 (전체 원 그대로 fit 하면 너무 멀리서 보임)
-      const FIT_SCALE = 0.75;
+      const FIT_SCALE = 0.5;
       setTimeout(() => {
         map.invalidateSize();
         const fitBounds = L.latLng(lat, lng).toBounds(oneWayM * FIT_SCALE * 2);
