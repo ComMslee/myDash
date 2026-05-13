@@ -75,10 +75,14 @@ export default function SchedulePage() {
   const fetchCalendarData = useCallback(async (month) => {
     try {
       const [y] = month.split('-');
-      const hr = await fetch(`/api/holidays?year=${y}`);
-      const hj = hr.ok ? await hr.json() : null;
+      const yNum = parseInt(y, 10);
+      // ±1 년 공휴일 (월 달력 모달에서 인접 연도 이동 가능)
+      const years = [yNum - 1, yNum, yNum + 1];
       const hmap = new Map();
-      for (const h of hj?.holidays || []) hmap.set(h.dateymd, h.name);
+      const holidayResults = await Promise.all(years.map((yy) => fetch(`/api/holidays?year=${yy}`).then((r) => r.ok ? r.json() : null).catch(() => null)));
+      for (const hj of holidayResults) {
+        for (const h of hj?.holidays || []) hmap.set(h.dateymd, h.name);
+      }
       setHolidayMap(hmap);
 
       const er = await fetch('/api/schedules/executions?limit=500');
@@ -88,7 +92,6 @@ export default function SchedulePage() {
         const d = new Date(e.triggered_at);
         const kst = new Date(d.getTime() + 9 * 3600 * 1000);
         const key = `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}-${String(kst.getUTCDate()).padStart(2, '0')}`;
-        if (!key.startsWith(month)) continue;
         if (!exMap.has(key)) exMap.set(key, []);
         exMap.get(key).push(e);
       }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import MonthCalendar from './MonthCalendar';
 
 // 세로 타임라인 — 월 grid 제거. 위: 과거 이력 · 가운데: 오늘 · 아래: 미래 예약.
 // 진입 시 오늘 row 가 viewport 중앙으로 자동 스크롤.
@@ -101,9 +102,9 @@ export default function Calendar({
   const WINDOW = 14; // 고정 — 픽한 날짜를 중심으로 슬라이드 (누적 확장 X)
   const [center, setCenter] = useState(today);
   const [target, setTarget] = useState(null);
+  const [monthCalOpen, setMonthCalOpen] = useState(false);
   const centerRef = useRef(null);
   const containerRef = useRef(null);
-  const dateInputRef = useRef(null);
 
   const nowKstHHMM = useMemo(() => {
     const t = new Date(Date.now() + 9 * 3600 * 1000);
@@ -179,19 +180,11 @@ export default function Calendar({
     setCenter(today);
   };
 
-  const openDatePicker = () => {
-    const el = dateInputRef.current;
-    if (!el) return;
-    if (typeof el.showPicker === 'function') el.showPicker();
-    else el.click();
-  };
-
-  const onPickDate = (e) => {
-    const val = e.target.value;
-    e.target.value = '';
-    if (!val) return;
-    setCenter(val);
-    setTarget(val === today ? null : val);
+  const onPickDate = (dateStr) => {
+    if (!dateStr) return;
+    setCenter(dateStr);
+    setTarget(dateStr === today ? null : dateStr);
+    setMonthCalOpen(false);
   };
 
   return (
@@ -225,18 +218,22 @@ export default function Calendar({
             className="text-[10px] px-2 py-0.5 rounded bg-blue-500/15 text-blue-300 hover:bg-blue-500/25"
           >오늘로</button>
           <button
-            onClick={openDatePicker}
+            onClick={() => setMonthCalOpen(true)}
             className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
           >📅 더보기</button>
-          <input
-            ref={dateInputRef}
-            type="date"
-            onChange={onPickDate}
-            className="sr-only"
-            tabIndex={-1}
-          />
         </div>
       </div>
+
+      <MonthCalendar
+        open={monthCalOpen}
+        onClose={() => setMonthCalOpen(false)}
+        onPick={onPickDate}
+        schedules={schedules}
+        executionsByDate={executionsByDate}
+        holidayMap={holidayMap}
+        pausePeriods={pausePeriods}
+        initialMonth={center.slice(0, 7)}
+      />
     </div>
   );
 }
