@@ -46,6 +46,66 @@ function isValidDateStr(s) {
   return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
 
+// positions(array) → speed/elev/temp 각각의 min/max/avg (+ elev gain) 1패스 집계
+function routePosStats(positions) {
+  if (!positions || positions.length === 0) return null;
+  const keys = ['speed', 'elev', 'temp'];
+  const out = {};
+  for (const k of keys) {
+    let min = null, max = null, sum = 0, cnt = 0;
+    for (const p of positions) {
+      const v = p[k];
+      if (v == null) continue;
+      if (min == null || v < min) min = v;
+      if (max == null || v > max) max = v;
+      sum += v;
+      cnt++;
+    }
+    out[k] = cnt > 0 ? { min, max, avg: sum / cnt } : null;
+  }
+  if (out.elev) {
+    const elevs = positions.map(p => p.elev).filter(v => v != null);
+    out.elev.gain = elevs.length >= 2 ? elevs[elevs.length - 1] - elevs[0] : null;
+  }
+  return out;
+}
+
+function DriveStatsLine({ stats }) {
+  if (!stats) return null;
+  const sp = stats.speed, el = stats.elev, tp = stats.temp;
+  if (!sp && !el && !tp) return null;
+  const fmt0 = v => Math.round(v);
+  const fmt1 = v => (Math.round(v * 10) / 10).toFixed(1);
+  return (
+    <div className="flex items-center gap-x-2 gap-y-0.5 flex-wrap text-[10px] tabular-nums text-zinc-500 pl-7 mt-0.5">
+      {sp && (
+        <span className="inline-flex items-center gap-1">
+          <Icon name="car" className="w-3 h-3 text-sky-400" />
+          <span>{fmt0(sp.min)}·<span className="text-zinc-300 font-semibold">{fmt0(sp.avg)}</span>·{fmt0(sp.max)}<span className="text-zinc-600 ml-0.5">km/h</span></span>
+        </span>
+      )}
+      {el && (
+        <span className="inline-flex items-center gap-1">
+          <Icon name="mountain" className="w-3 h-3 text-lime-400" />
+          <span>{fmt0(el.min)}·<span className="text-zinc-300 font-semibold">{fmt0(el.avg)}</span>·{fmt0(el.max)}<span className="text-zinc-600 ml-0.5">m</span>
+            {el.gain != null && (
+              <span className={(el.gain >= 0 ? 'text-emerald-400' : 'text-rose-400') + ' ml-0.5'}>
+                ({el.gain >= 0 ? '+' : ''}{Math.round(el.gain)})
+              </span>
+            )}
+          </span>
+        </span>
+      )}
+      {tp && (
+        <span className="inline-flex items-center gap-1">
+          <Icon name="thermometer" className="w-3 h-3 text-orange-400" />
+          <span>{fmt1(tp.min)}·<span className="text-zinc-300 font-semibold">{fmt1(tp.avg)}</span>·{fmt1(tp.max)}<span className="text-zinc-600 ml-0.5">°C</span></span>
+        </span>
+      )}
+    </div>
+  );
+}
+
 function HistoryInner() {
   const { isMock, refreshSignal } = useMock();
   const searchParams = useSearchParams();
@@ -512,7 +572,7 @@ function HistoryInner() {
             {dayMode ? (() => {
               // 리스트 영역 — 모바일(<=768px) 3행 / 데스크톱 5행 고정. 행수 초과 시 내부 스크롤.
               // 높이 = HEADER + N*ITEM + (N-1)*GAP. 지도는 남은 공간 flex-1.
-              const ITEM_PX = 32; // py-1.5 + 배지 w-5(20px) → 32px
+              const ITEM_PX = 50; // py-1.5 + 상단 행(~28px) + 통계 행(~16-22px, wrap 가능)
               const GAP_PX = 22;  // 정차 gap 행: py-1 + text-[10px]
               const HEADER_PX = 24;
               const FIXED_ROWS = isMobile ? 3 : 5; // 모바일(<=768px) 3행, 데스크톱 5행
@@ -565,26 +625,30 @@ function HistoryInner() {
                               </div>
                             );
                           }
+                          const driveStats = routePosStats(r.positions);
                           nodes.push(
                             <button
                               key={r.id}
                               type="button"
                               onClick={() => setSelectedDayDriveId(prev => prev === r.id ? null : r.id)}
-                              className={`w-full text-left flex items-center gap-2 px-3 py-1.5 border-b border-white/[0.04] last:border-0 transition-colors ${
+                              className={`w-full text-left block px-3 py-1.5 border-b border-white/[0.04] last:border-0 transition-colors ${
                                 isSelected ? 'bg-blue-500/15' : 'hover:bg-white/[0.025] active:bg-blue-500/10'
                               }`}
                             >
-                              <span
-                                className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-                                style={{ backgroundColor: r.color }}
-                              >{label}</span>
-                              <span className="text-[11px] text-zinc-500 tabular-nums flex-shrink-0">{time}</span>
-                              <span className="flex-1 text-xs text-zinc-300 truncate">
-                                {shortAddr(drive.start_address) || '?'}<span className="text-zinc-600 mx-1">→</span>{shortAddr(drive.end_address) || '?'}
-                              </span>
-                              <span className="text-xs font-bold text-blue-400 tabular-nums flex-shrink-0">
-                                {drive.distance}<span className="text-[10px] text-zinc-600 ml-0.5">km</span>
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                                  style={{ backgroundColor: r.color }}
+                                >{label}</span>
+                                <span className="text-[11px] text-zinc-500 tabular-nums flex-shrink-0">{time}</span>
+                                <span className="flex-1 text-xs text-zinc-300 truncate">
+                                  {shortAddr(drive.start_address) || '?'}<span className="text-zinc-600 mx-1">→</span>{shortAddr(drive.end_address) || '?'}
+                                </span>
+                                <span className="text-xs font-bold text-blue-400 tabular-nums flex-shrink-0">
+                                  {drive.distance}<span className="text-[10px] text-zinc-600 ml-0.5">km</span>
+                                </span>
+                              </div>
+                              <DriveStatsLine stats={driveStats} />
                             </button>
                           );
                           return nodes;
