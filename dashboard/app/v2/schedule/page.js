@@ -6,31 +6,20 @@ import NowPanel from './NowPanel';
 import ScheduleList from './ScheduleList';
 import ScheduleForm from './ScheduleForm';
 import ExecutionLog from './ExecutionLog';
-import Calendar from './Calendar';
 import PausePanel from './PausePanel';
 import GeofencesPanel from './GeofencesPanel';
 
 const TABS = [
-  { key: 'calendar', label: '📅 캘린더' },
   { key: 'schedules', label: '📋 스케줄' },
   { key: 'executions', label: '📜 이력' },
   { key: 'config', label: '⚙ 설정' },
 ];
-
-function kstMonth(d = new Date()) {
-  const t = new Date(d.getTime() + 9 * 3600 * 1000);
-  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}`;
-}
 
 export default function SchedulePage() {
   const [tab, setTab] = useState('schedules');
   const [usage, setUsage] = useState(null);
   const [schedules, setSchedules] = useState(null);
   const [geofences, setGeofences] = useState([]);
-  const [pausePeriods, setPausePeriods] = useState([]);
-  const [holidayMap, setHolidayMap] = useState(new Map());
-  const [executionsByDate, setExecutionsByDate] = useState(new Map());
-  const [calMonth, setCalMonth] = useState(() => kstMonth());
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -62,53 +51,11 @@ export default function SchedulePage() {
     } catch {}
   }, []);
 
-  const fetchPause = useCallback(async () => {
-    try {
-      const r = await fetch('/api/pause-periods');
-      if (r.ok) {
-        const j = await r.json();
-        setPausePeriods(j.pause_periods || []);
-      }
-    } catch {}
-  }, []);
-
-  // 캘린더용 — 해당 월 공휴일 + 최근 실행 이력
-  const fetchCalendarData = useCallback(async (month) => {
-    try {
-      const [y] = month.split('-');
-      const hr = await fetch(`/api/holidays?year=${y}`);
-      const hj = hr.ok ? await hr.json() : null;
-      const hmap = new Map();
-      for (const h of hj?.holidays || []) {
-        const ymd = h.dateymd;
-        const dateStr = `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`;
-        hmap.set(dateStr, h.name);
-      }
-      setHolidayMap(hmap);
-
-      const er = await fetch('/api/schedules/executions?limit=500');
-      const ej = er.ok ? await er.json() : null;
-      const exMap = new Map();
-      for (const e of ej?.executions || []) {
-        const d = new Date(e.triggered_at);
-        const kst = new Date(d.getTime() + 9 * 3600 * 1000);
-        const key = `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}-${String(kst.getUTCDate()).padStart(2, '0')}`;
-        if (!key.startsWith(month)) continue;
-        if (!exMap.has(key)) exMap.set(key, []);
-        exMap.get(key).push(e);
-      }
-      setExecutionsByDate(exMap);
-    } catch {}
-  }, []);
-
   useEffect(() => {
     fetchUsage();
     fetchSchedules();
     fetchGeofences();
-    fetchPause();
-  }, [fetchUsage, fetchSchedules, fetchGeofences, fetchPause]);
-
-  useEffect(() => { fetchCalendarData(calMonth); }, [calMonth, fetchCalendarData]);
+  }, [fetchUsage, fetchSchedules, fetchGeofences]);
 
   const onSave = async (payload) => {
     const isEdit = !!editing?.id;
@@ -194,17 +141,6 @@ export default function SchedulePage() {
               onDelete={onDelete}
             />
           </>
-        )}
-
-        {tab === 'calendar' && (
-          <Calendar
-            schedules={schedules || []}
-            holidays={holidayMap}
-            pausePeriods={pausePeriods}
-            executionsByDate={executionsByDate}
-            month={calMonth}
-            onChangeMonth={setCalMonth}
-          />
         )}
 
         {tab === 'executions' && (
