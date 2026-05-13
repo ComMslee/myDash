@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import UsageCard from './UsageCard';
-import NowPanel from './NowPanel';
 import Calendar from './Calendar';
 import SettingsSheet from './SettingsSheet';
 import ScheduleForm from './ScheduleForm';
@@ -186,7 +185,6 @@ export default function SchedulePage() {
         </header>
 
         <UsageCard usage={usage} />
-        <NowPanel onAfterRun={() => { fetchUsage(); bump(); }} />
 
         <Calendar
           schedules={schedules || []}
@@ -226,6 +224,7 @@ export default function SchedulePage() {
         onToggle={onToggle}
         onRunNow={onRunNow}
         onDelete={onDelete}
+        onAfterRun={() => { fetchUsage(); bump(); }}
       />
 
       {showForm && (

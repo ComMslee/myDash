@@ -5,11 +5,14 @@ import GeofencesPanel from './GeofencesPanel';
 import PausePanel from './PausePanel';
 import ScheduleList from './ScheduleList';
 import ExecutionLog from './ExecutionLog';
+import NowPanel from './NowPanel';
 
-// 설정 시트 — 지오펜스 / 휴무 / 전체 스케줄 / 이력 / 체크리스트.
+// 설정 시트 — 즉시실행 / 지오펜스 / 휴무 / 전체 스케줄 / 이력 / 체크리스트.
 // 캘린더 메인 뷰에서 ⚙ 아이콘으로 진입.
+// 즉시실행은 실수 클릭으로 비용 발생 방지를 위해 메인이 아닌 시트 안에 격리.
 
 const SECTIONS = [
+  { key: 'now',       label: '⚡ 즉시 실행' },
   { key: 'geofences', label: '📍 지오펜스' },
   { key: 'pause',     label: '⏸ 휴무 모드' },
   { key: 'schedules', label: '📋 전체 스케줄' },
@@ -19,7 +22,7 @@ const SECTIONS = [
 
 export default function SettingsSheet({
   open, onClose,
-  schedules, onEdit, onToggle, onRunNow, onDelete,
+  schedules, onEdit, onToggle, onRunNow, onDelete, onAfterRun,
 }) {
   const [sec, setSec] = useState('geofences');
   if (!open) return null;
@@ -47,6 +50,7 @@ export default function SettingsSheet({
           ))}
         </div>
 
+        {sec === 'now' && <NowPanel onAfterRun={onAfterRun} />}
         {sec === 'geofences' && <GeofencesPanel />}
         {sec === 'pause' && <PausePanel />}
         {sec === 'schedules' && (
