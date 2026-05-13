@@ -18,9 +18,9 @@ export default function SettingsSheet({ open, onClose, onRunNow, onAfterRun }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
       <div
-        className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto bg-[#0f0f0f] border-t border-white/[0.10] rounded-t-2xl p-4 space-y-3"
+        className="w-full max-w-md max-h-[85vh] overflow-y-auto bg-[#0f0f0f] border border-white/[0.10] rounded-2xl p-4 space-y-3"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
