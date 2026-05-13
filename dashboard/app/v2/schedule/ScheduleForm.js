@@ -342,8 +342,11 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
         </FieldRow>
 
         <div className="flex items-center justify-between">
-          <span className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">활성</span>
-          <Toggle value={s.enabled} onChange={v => set({ enabled: v })} labelOn="활성" labelOff="비활성" />
+          <div>
+            <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">스케줄 활성</p>
+            <p className="text-[11px] text-zinc-600 mt-0.5">끄면 자동 실행이 멈춥니다</p>
+          </div>
+          <Toggle value={s.enabled} onChange={v => set({ enabled: v })} labelOn="켜기" labelOff="끄기" />
         </div>
       </div>
 
@@ -420,12 +423,15 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
 
             {/* 공휴일 */}
             <div className="flex items-center justify-between">
-              <span className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">공휴일</span>
+              <div>
+                <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">공휴일에 건너뛰기</p>
+                <p className="text-[11px] text-zinc-600 mt-0.5">공휴일에는 이 스케줄을 실행하지 않습니다</p>
+              </div>
               <Toggle
-                value={!s.timeSkipHolidays}
-                onChange={v => set({ timeSkipHolidays: !v })}
-                labelOn="포함"
-                labelOff="제외"
+                value={s.timeSkipHolidays}
+                onChange={v => set({ timeSkipHolidays: v })}
+                labelOn="켜기"
+                labelOff="끄기"
               />
             </div>
 
@@ -611,14 +617,14 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
       {/* 휴무 모드 */}
       <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
         <div>
-          <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">휴무 모드 영향</p>
-          <p className="text-xs text-zinc-600 mt-0.5">휴무 모드 시 이 스케줄을 건너뜁니다</p>
+          <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">휴무 모드 따르기</p>
+          <p className="text-xs text-zinc-600 mt-0.5">휴무 기간에는 이 스케줄을 실행하지 않습니다</p>
         </div>
         <Toggle
           value={s.applyPauseMode}
           onChange={v => set({ applyPauseMode: v })}
-          labelOn="적용"
-          labelOff="무시"
+          labelOn="켜기"
+          labelOff="끄기"
         />
       </div>
 

@@ -311,29 +311,75 @@ function HotBar({ next, last, today, onJump }) {
 function DayRow({ r, today, isTodayRow, isTarget, onAddSchedule, onEditSchedule, onRunNow, onToggleSkip }) {
   const dowCls = r.dow === 0 || r.isHoliday ? 'text-rose-400' : r.dow === 6 ? 'text-sky-400' : 'text-zinc-300';
   const isPast = r.isPast;
-  const headerCls = isTodayRow
-    ? 'bg-blue-500/15 border-blue-500/40 ring-1 ring-blue-500/30'
-    : isTarget
-      ? 'bg-violet-500/10 border-violet-500/30 ring-1 ring-violet-500/30'
-      : r.paused
-        ? 'bg-amber-500/5 border-amber-500/10'
-        : 'bg-zinc-900/50 border-white/[0.04]';
+
+  // ── 오늘: 1줄 포커스 strip (탭 = 편집)
+  if (isTodayRow) {
+    const items = [
+      ...r.execs.map((e) => ({ kind: 'exec', e, sortKey: new Date(e.triggered_at).toTimeString().slice(0, 5) })),
+      ...r.planned.map((p) => ({ kind: 'plan', p, sortKey: p.time || '00:00' })),
+    ].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
+    return (
+      <div className="rounded-lg border bg-blue-500/15 border-blue-500/40 ring-1 ring-blue-500/30 px-2.5 py-2 flex items-center gap-1.5 overflow-x-auto">
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/30 text-blue-200 font-bold flex-shrink-0">오늘</span>
+        <span className={`text-xs font-bold tabular-nums ${dowCls} flex-shrink-0`}>{r.dateStr.slice(5).replace('-', '/')}</span>
+        <span className={`text-[10px] ${dowCls} flex-shrink-0`}>{WEEKDAY_KO[r.dow]}</span>
+        {r.holidayName && <span className="text-[10px] text-rose-400 flex-shrink-0">· {r.holidayName}</span>}
+        {r.paused && <span className="text-[10px] text-amber-400 flex-shrink-0">· ✈</span>}
+
+        <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto px-1">
+          {items.length === 0 ? (
+            <span className="text-[10px] text-zinc-600 flex-shrink-0">예정 없음</span>
+          ) : items.map((it, i) => {
+            if (it.kind === 'exec') {
+              const cls = CHIP_CLS[it.e.status] || CHIP_CLS.skipped;
+              const mark = it.e.status === 'success' ? '✓' : it.e.status === 'failed' ? '✗' : '◎';
+              const t = new Date(it.e.triggered_at);
+              const tStr = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+              return (
+                <span
+                  key={`e${i}`}
+                  title={`${tStr} ${ACTION_LABEL[it.e.action] || it.e.action} · ${it.e.status}`}
+                  className={`text-[10px] px-1.5 py-0.5 rounded ${cls} tabular-nums flex-shrink-0 font-mono`}
+                >{mark} {tStr}</span>
+              );
+            }
+            const { s, time, certainty, label } = it.p;
+            const cls = CHIP_CLS[certainty];
+            return (
+              <button
+                key={`p${s.id}`}
+                onClick={() => onEditSchedule?.(s)}
+                title={`${s.name} · ${label}${certainty === 'skip' ? ' · 오늘 skip' : ''}`}
+                className={`text-[10px] px-1.5 py-0.5 rounded ${cls} tabular-nums flex-shrink-0 font-mono hover:opacity-80`}
+              >{time || '—'}</button>
+            );
+          })}
+        </div>
+
+        <button
+          onClick={() => onAddSchedule?.(r.dateStr)}
+          className="text-[11px] text-zinc-400 hover:text-blue-300 flex-shrink-0 px-1"
+          title="오늘 새 스케줄"
+        >+</button>
+      </div>
+    );
+  }
+
+  // ── 과거/미래: multi-line (skip·실행·편집 컨트롤 그대로)
+  const headerCls = isTarget
+    ? 'bg-violet-500/10 border-violet-500/30 ring-1 ring-violet-500/30'
+    : r.paused
+      ? 'bg-amber-500/5 border-amber-500/10'
+      : 'bg-zinc-900/50 border-white/[0.04]';
 
   const items = isPast
     ? r.execs.map((e) => ({ kind: 'exec', e }))
     : r.planned.map((p) => ({ kind: 'plan', p }));
-  // 오늘은 plan + exec 둘 다
-  const todayItems = isTodayRow
-    ? [
-        ...r.execs.map((e) => ({ kind: 'exec', e, sortKey: new Date(e.triggered_at).toTimeString().slice(0, 5) })),
-        ...r.planned.map((p) => ({ kind: 'plan', p, sortKey: p.time || '00:00' })),
-      ].sort((a, b) => a.sortKey.localeCompare(b.sortKey))
-    : items;
 
   return (
     <div className={`rounded-lg border p-2 ${headerCls}`}>
       <div className="flex items-center gap-2 mb-1">
-        {isTodayRow && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/30 text-blue-200 font-bold">오늘</span>}
         <span className={`text-xs font-bold tabular-nums ${dowCls}`}>{r.dateStr.slice(5).replace('-', '/')}</span>
         <span className={`text-[10px] ${dowCls}`}>{WEEKDAY_KO[r.dow]}</span>
         {r.holidayName && <span className="text-[10px] text-rose-400">· {r.holidayName}</span>}
@@ -347,11 +393,11 @@ function DayRow({ r, today, isTodayRow, isTarget, onAddSchedule, onEditSchedule,
         )}
       </div>
 
-      {todayItems.length === 0 ? (
+      {items.length === 0 ? (
         <p className="text-[10px] text-zinc-700 px-1">—</p>
       ) : (
         <div className="space-y-1">
-          {todayItems.map((it, i) => {
+          {items.map((it, i) => {
             if (it.kind === 'exec') {
               const cls = CHIP_CLS[it.e.status] || CHIP_CLS.skipped;
               const t = new Date(it.e.triggered_at);
