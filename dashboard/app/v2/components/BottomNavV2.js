@@ -212,7 +212,8 @@ export default function BottomNavV2() {
   const isCharging = !!charging || car?.state === 'charging';
   const effectiveState = (isMock && isMockCharging) ? 'charging' : car?.state;
   const lvl = isCharging ? (charging?.battery_level ?? car?.battery_level ?? 0) : (car?.battery_level ?? 0);
-  const limitLvl = charging?.charge_limit_soc ?? null;
+  // charge_limit_soc / time_to_full_charge 는 TeslaMate `charges` 스키마에 없어
+  // /api/charging-status 가 항상 null 반환 (PITFALLS #3) — UI 데드 코드 제거.
   const estRange = car?.est_battery_range ?? null;
 
   const isDriving = effectiveState === 'driving' || !!car?.current_drive_start;
@@ -233,7 +234,6 @@ export default function BottomNavV2() {
     ? Math.max(0, Math.floor((Date.now() - new Date(elapsedSince).getTime()) / 60000))
     : null;
 
-  const remainMin = charging?.time_to_full_charge ? Math.round(charging.time_to_full_charge * 60) : null;
   const lastSeenLabel = car?.last_seen
     ? new Date(car.last_seen).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
     : null;
@@ -337,15 +337,6 @@ export default function BottomNavV2() {
             aria-hidden="true"
           />
         )}
-        {/* 충전 목표선 */}
-        {isCharging && limitLvl && limitLvl > lvl && (
-          <div
-            className="absolute inset-y-0 w-[3px] bg-white/50 pointer-events-none shadow-[0_0_4px_rgba(255,255,255,0.4)]"
-            style={{ left: `calc(${limitLvl}% - 1.5px)` }}
-            aria-hidden="true"
-          />
-        )}
-
         {/* 정보 행 — full 모드 전용 */}
         {showInfoRow && (
           <div className="relative px-3 py-1.5 border-b border-white/[0.06] flex items-center gap-2 text-[12px] tabular-nums whitespace-nowrap overflow-hidden">
@@ -357,13 +348,6 @@ export default function BottomNavV2() {
             {isCharging ? (
               <>
                 <span className="text-yellow-200 font-semibold">{lvl}%</span>
-                {limitLvl != null && <span className="text-zinc-300">→{limitLvl}%</span>}
-                {remainMin != null && (
-                  <>
-                    <span className="text-zinc-500">·</span>
-                    <span className="text-zinc-100">{formatDuration(remainMin)}</span>
-                  </>
-                )}
                 {charging?.charger_power != null && (
                   <>
                     <span className="text-zinc-500">·</span>

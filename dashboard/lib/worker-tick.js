@@ -19,16 +19,20 @@ export async function tick() {
     let fired = 0, skipped = 0;
     for (const d of (ev.decisions || [])) {
       if (d.fire) {
-        await executeAction({
+        const result = await executeAction({
           schedule_id: d.s.id,
           action: d.s.action,
           action_params: d.s.action_params,
           trigger_source: d.trigger_source,
         });
-        await pool.query(
-          `UPDATE dash_schedules SET last_run_at = NOW() WHERE id = $1`,
-          [d.s.id],
-        );
+        // last_run_at 은 success/dry_run 시에만 갱신 — failed 는 디바운스 미발동으로
+        // 다음 tick(1분 후) 재시도 허용. 무한 재시도는 COST_HARD_CAP_USD 가드가 차단.
+        if (result?.status === 'success' || result?.status === 'dry_run') {
+          await pool.query(
+            `UPDATE dash_schedules SET last_run_at = NOW() WHERE id = $1`,
+            [d.s.id],
+          );
+        }
         fired++;
       } else if (d.reason) {
         await skipExecution({

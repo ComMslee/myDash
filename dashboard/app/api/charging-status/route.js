@@ -76,11 +76,11 @@ export async function GET() {
          (SELECT power FROM positions
             WHERE car_id = $1 ORDER BY date DESC LIMIT 1) AS latest_power,
          (SELECT battery_level FROM positions
-            WHERE car_id = $1 AND date >= NOW() - ($2 || ' seconds')::interval
+            WHERE car_id = $1 AND date >= NOW() - make_interval(secs => $2::int)
             ORDER BY date DESC LIMIT 1) AS recent_level,
          (SELECT battery_level FROM positions
-            WHERE car_id = $1 AND date <= NOW() - ($3 || ' seconds')::interval
-              AND date >= NOW() - ($4 || ' seconds')::interval
+            WHERE car_id = $1 AND date <= NOW() - make_interval(secs => $3::int)
+              AND date >= NOW() - make_interval(secs => $4::int)
             ORDER BY date DESC LIMIT 1) AS older_level,
          (SELECT date FROM positions
             WHERE car_id = $1 ORDER BY date DESC LIMIT 1) AS latest_date,

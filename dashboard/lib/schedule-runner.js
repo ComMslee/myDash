@@ -1,4 +1,4 @@
-import { logExecution, bumpMonthlyUsage, calcCost } from '@/lib/queries/schedules';
+import { logExecution, bumpMonthlyUsage, calcCost, getMonthlyUsage, COST_HARD_CAP_USD } from '@/lib/queries/schedules';
 import { callTeslaCommand } from '@/lib/tesla-fleet';
 
 // Tesla 자동화 — 액션 1건 실행기.
@@ -43,6 +43,20 @@ export async function executeAction({ schedule_id, action, action_params, trigge
 
   const params = { ...map.params, ...(action_params || {}) };
   const enabled = process.env.TESLA_FLEET_API_ENABLED === 'true';
+
+  // 비용 가드 — $10 무료 한도 초과 시 실호출 차단 (CLAUDE.md 약속). Mock 은 누적만, 차단 안 함.
+  if (enabled) {
+    const usage = await getMonthlyUsage(monthYmd());
+    const used = Number(usage?.estimated_cost || 0);
+    if (used >= COST_HARD_CAP_USD) {
+      const reason = `monthly_budget_exceeded ($${used.toFixed(4)} >= $${COST_HARD_CAP_USD})`;
+      const row = await logExecution({
+        schedule_id, trigger_source, action, action_params,
+        status: 'skipped', reason, api_calls: {}, cost_estimate: 0,
+      });
+      return { id: row.id, status: 'skipped', reason, cost_estimate: 0 };
+    }
+  }
 
   let status, reason = null, tesla_response = null, api_calls = {};
   try {

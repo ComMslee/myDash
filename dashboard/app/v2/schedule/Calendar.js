@@ -247,10 +247,11 @@ function HotBar({ next, last, today, onJump }) {
   };
   const fmtLast = () => {
     if (!last) return null;
-    const t = new Date(last.triggered_at);
-    const hh = String(t.getHours()).padStart(2, '0');
-    const mm = String(t.getMinutes()).padStart(2, '0');
-    const ymd = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+    // KST(UTC+9) 명시 변환 — 브라우저 로컬 TZ 에 의존하지 않도록.
+    const t = new Date(new Date(last.triggered_at).getTime() + 9 * 3600 * 1000);
+    const hh = String(t.getUTCHours()).padStart(2, '0');
+    const mm = String(t.getUTCMinutes()).padStart(2, '0');
+    const ymd = `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
     const sameDay = ymd === today;
     const dStr = sameDay ? '오늘' : ymd.slice(5).replace('-', '/');
     const diffMin = Math.round((Date.now() - t.getTime()) / 60000);
@@ -322,8 +323,8 @@ function DayRow({ r, today, isTodayRow, isTarget, onAddSchedule, onEditSchedule,
             if (it.kind === 'exec') {
               const cls = CHIP_CLS[it.e.status] || CHIP_CLS.skipped;
               const mark = it.e.status === 'success' ? '✓' : it.e.status === 'failed' ? '✗' : '◎';
-              const t = new Date(it.e.triggered_at);
-              const tStr = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+              const t = new Date(new Date(it.e.triggered_at).getTime() + 9 * 3600 * 1000);
+              const tStr = `${String(t.getUTCHours()).padStart(2, '0')}:${String(t.getUTCMinutes()).padStart(2, '0')}`;
               return (
                 <span
                   key={`e${i}`}
@@ -388,8 +389,8 @@ function DayRow({ r, today, isTodayRow, isTarget, onAddSchedule, onEditSchedule,
           {items.map((it, i) => {
             if (it.kind === 'exec') {
               const cls = CHIP_CLS[it.e.status] || CHIP_CLS.skipped;
-              const t = new Date(it.e.triggered_at);
-              const tStr = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+              const t = new Date(new Date(it.e.triggered_at).getTime() + 9 * 3600 * 1000);
+              const tStr = `${String(t.getUTCHours()).padStart(2, '0')}:${String(t.getUTCMinutes()).padStart(2, '0')}`;
               return (
                 <div key={`e${i}`} className="flex items-center gap-2 px-1 text-[11px]">
                   <span className={`px-1.5 py-0.5 rounded text-[10px] ${cls} flex-shrink-0`}>{it.e.status === 'success' ? '✓' : it.e.status === 'failed' ? '✗' : it.e.status === 'dry_run' ? '◎' : '·'}</span>

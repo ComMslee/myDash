@@ -224,12 +224,8 @@ export default function SchedulePage() {
           executionsByDate={executionsByDate}
           holidayMap={holidayMap}
           pausePeriods={pausePeriods}
-          month={calMonth}
-          onChangeMonth={setCalMonth}
           onAddSchedule={openNewFormForDate}
           onEditSchedule={(s) => { setEditing(s); setPrefillDate(null); setShowForm(true); }}
-          onDeleteSchedule={onDelete}
-          onToggleEnabled={onToggle}
           onRunNow={onRunNow}
           onToggleSkip={onToggleSkip}
           refreshSignal={refreshSignal}

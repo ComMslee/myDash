@@ -43,6 +43,8 @@ export async function callTeslaCommand(command, params = {}) {
     // 첫 호출 fail + 응답이 'vehicle_unavailable' 이면 wake 후 재호출 1회.
     if (body?.error?.includes?.('unavailable') || res.status === 408 || res.status === 503) {
       const woke = await callTeslaWake().catch(() => null);
+      // wake API 호출 자체에 비용 발생 — 시도했으면 wake_required:true 로 누적 보장
+      // (성공/실패 무관 — schedule-runner 가 wakes 카운트 누적).
       if (woke?.ok) {
         // 깨운 후 재호출
         const r2 = await fetch(url, {
@@ -54,6 +56,7 @@ export async function callTeslaCommand(command, params = {}) {
         const body2 = await r2.json().catch(() => null);
         return { ok: r2.ok, status: r2.status, body: body2, wake_required: true };
       }
+      return { ok: false, status: res.status, body, error: body?.error || `HTTP ${res.status}`, wake_required: true };
     }
     return { ok: false, status: res.status, body, error: body?.error || `HTTP ${res.status}` };
   }
