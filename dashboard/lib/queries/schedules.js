@@ -28,7 +28,7 @@ export async function ensureSchema() {
       valid_from       DATE,
       valid_until      DATE,
       apply_pause_mode BOOLEAN NOT NULL DEFAULT TRUE,
-      wake_policy      TEXT NOT NULL DEFAULT 'never_wake',
+      wake_policy      TEXT NOT NULL DEFAULT 'allow_wake',
       last_run_at      TIMESTAMPTZ,
       last_run_status  TEXT,
       next_run_at      TIMESTAMPTZ,
@@ -36,8 +36,9 @@ export async function ensureSchema() {
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     -- wake_policy 신규 컬럼 보강 (기존 테이블 호환)
+    -- 기본 'allow_wake' = 자고 있어도 깨워서 실행 (스케줄 본래 의도)
     ALTER TABLE dash_schedules
-      ADD COLUMN IF NOT EXISTS wake_policy TEXT NOT NULL DEFAULT 'never_wake';
+      ADD COLUMN IF NOT EXISTS wake_policy TEXT NOT NULL DEFAULT 'allow_wake';
     CREATE INDEX IF NOT EXISTS idx_dash_schedules_enabled_next
       ON dash_schedules(enabled, next_run_at);
 

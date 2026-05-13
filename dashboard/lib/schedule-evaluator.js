@@ -83,8 +83,15 @@ export async function evaluateAll() {
   const pos = await vehicleLastPosition();
   const curPlace = await currentGeofenceKey(geofences, pos);
   const recentEvents = await recentLocationEvents({ since_minutes: 2 });
-  const vehicleState = await getVehicleState();
-  const vehicleSleeping = SLEEPING_STATES.has(vehicleState);
+
+  // 차량 상태 — lazy. never_wake 스케줄 발화 직전에 1회만 조회 (TeslaMate 로컬 DB).
+  // 기본 allow_wake 면 조회 자체를 안 함 → 일반 케이스 무료.
+  let _vehicleStateCache = null;
+  async function getStateOnce() {
+    if (_vehicleStateCache !== null) return _vehicleStateCache;
+    _vehicleStateCache = await getVehicleState();
+    return _vehicleStateCache;
+  }
 
   let fired = 0, skipped = 0;
   const decisions = [];
@@ -187,12 +194,16 @@ export async function evaluateAll() {
       }
     }
 
-    // 사전 게이팅 — wake_policy='never_wake' 인 스케줄은 차량이 잠자기/오프라인일 때 skip.
-    // (Fleet API 호출 시 wake 비용 $0.02 = 명령의 20배 — 무의미한 wake 폭주 방지.)
-    const wakePolicy = s.wake_policy || 'never_wake';
-    if (vehicleSleeping && wakePolicy === 'never_wake') {
-      decisions.push({ s, fire: false, reason: `차량 ${vehicleState} — wake 회피` });
-      skipped++; continue;
+    // 사전 게이팅 — wake_policy='never_wake' 인 스케줄만 차량 상태 체크.
+    // 기본 allow_wake (자고 있어도 깨워서 실행) 면 체크 skip — getVehicleState() 호출 안 함.
+    // TeslaMate states 테이블은 로컬 DB 라 호출 자체는 무료지만, 불필요한 DB 라운드트립 절감.
+    const wakePolicy = s.wake_policy || 'allow_wake';
+    if (wakePolicy === 'never_wake') {
+      const vstate = await getStateOnce();
+      if (SLEEPING_STATES.has(vstate)) {
+        decisions.push({ s, fire: false, reason: `차량 ${vstate} — wake 회피` });
+        skipped++; continue;
+      }
     }
 
     decisions.push({ s, fire: true, trigger_source: isEvent ? 'location_event' : 'time' });
