@@ -94,4 +94,9 @@ export const ROUTES = [
       { key: 'areaCode', sample: '' },
       { key: 'size',     sample: '' },
     ] },
+  { path: '/api/holidays',         label: '공휴일',         desc: 'KASI 특일정보 lazy 캐시 (dash_holidays · 30일 TTL) — 이력 리스트 일자 색상', category: '가족',
+    params: [
+      { key: 'year', sample: '' },
+      REFRESH_PARAM,
+    ] },
 ];
