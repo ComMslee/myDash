@@ -5,9 +5,13 @@ import UsageCard from './UsageCard';
 import Calendar from './Calendar';
 import SettingsSheet from './SettingsSheet';
 import ScheduleForm from './ScheduleForm';
+import PausePanel from './PausePanel';
+import ScheduleList from './ScheduleList';
+import ExecutionLog from './ExecutionLog';
 
-// 자동화 메인 — 캘린더 중심. 일자 클릭 → 그 날 예약/이력/편집 sheet.
-// 설정 (지오펜스 · 휴무 · 전체 스케줄 · 전체 이력 · 체크리스트) 은 ⚙ 시트로.
+// 자동화 메인 — 캘린더 중심.
+// ⚙ 시트 = 즉시실행 · 지오펜스 · 실연동 체크 (드물게 쓰는 것만).
+// 메인 인라인 = 휴무 / 전체 스케줄 / 전체 이력 (자주 보는 것).
 
 function kstMonth(d = new Date()) {
   const t = new Date(d.getTime() + 9 * 3600 * 1000);
@@ -158,12 +162,27 @@ export default function SchedulePage() {
     bump();
   };
 
+  const onUpdateSchedule = async (s, patch) => {
+    const r = await fetch(`/api/schedules/${s.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...s, ...patch }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      alert('변경 실패: ' + (err.error || r.statusText));
+      return;
+    }
+    await fetchSchedules();
+    bump();
+  };
+
   const onRunNow = async (s) => {
     const r = await fetch(`/api/schedules/${s.id}/run-now`, { method: 'POST' });
     const j = await r.json().catch(() => null);
     const status = j?.result?.status;
     alert(
-      status === 'dry_run' ? 'Dry-Run 완료 (Mock — 실제 명령 안 보냄)'
+      status === 'dry_run' ? 'Dry-Run 완료 (실제 명령 안 보냄)'
       : status === 'success' ? '실행 완료'
       : `결과: ${status} ${j?.result?.reason || ''}`,
     );
@@ -178,29 +197,21 @@ export default function SchedulePage() {
     setShowForm(true);
   };
 
-  const activeCount = (schedules || []).filter((s) => s.enabled).length;
-  const totalCount = (schedules || []).length;
-
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white pb-32">
       <div className="max-w-2xl mx-auto px-4 pt-3 space-y-3">
         <header className="flex items-center justify-between py-1">
           <h1 className="text-base font-bold text-zinc-100">자동화</h1>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-zinc-500">
-              {process.env.NEXT_PUBLIC_TESLA_FLEET_API_ENABLED === 'true' ? '실연동' : 'Mock'}
-            </span>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 flex items-center justify-center"
-              title="설정 — 지오펜스/휴무/전체 목록"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
-          </div>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 flex items-center justify-center"
+            title="설정 — 즉시실행/지오펜스/실연동 체크"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
         </header>
 
         <UsageCard usage={usage} />
@@ -221,29 +232,31 @@ export default function SchedulePage() {
           refreshSignal={refreshSignal}
         />
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { setEditing(null); setPrefillDate(null); setShowForm(true); }}
-            className="flex-1 py-2.5 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 text-sm font-semibold hover:bg-blue-500/25"
-          >+ 새 스케줄</button>
-          <button
-            onClick={() => setShowSettings(true)}
-            className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs"
-            title="전체 스케줄 목록"
-          >
-            전체 {activeCount}/{totalCount}
-          </button>
-        </div>
+        <PausePanel pausePeriods={pausePeriods} onChange={async () => { await fetchPause(); bump(); }} />
+
+        <section>
+          <p className="text-xs text-zinc-500 font-semibold tracking-wide mb-1.5 px-1">📋 전체 스케줄</p>
+          <ScheduleList
+            schedules={schedules}
+            onEdit={(s) => { setEditing(s); setPrefillDate(null); setShowForm(true); }}
+            onToggle={onToggle}
+            onRunNow={onRunNow}
+            onDelete={onDelete}
+            onUpdate={onUpdateSchedule}
+            onAdd={() => { setEditing(null); setPrefillDate(null); setShowForm(true); }}
+          />
+        </section>
+
+        <section>
+          <p className="text-xs text-zinc-500 font-semibold tracking-wide mb-1.5 px-1">📜 전체 이력</p>
+          <ExecutionLog schedules={schedules || []} />
+        </section>
       </div>
 
       <SettingsSheet
         open={showSettings}
         onClose={() => setShowSettings(false)}
-        schedules={schedules}
-        onEdit={(s) => { setEditing(s); setPrefillDate(null); setShowForm(true); }}
-        onToggle={onToggle}
         onRunNow={onRunNow}
-        onDelete={onDelete}
         onAfterRun={() => { fetchUsage(); bump(); }}
       />
 

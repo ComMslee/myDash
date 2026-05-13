@@ -210,45 +210,34 @@ export default function Calendar({
 
         <div className="grid grid-cols-7 gap-0.5">
           {cells.map((c) => {
-            if (c.blank) return <div key={c.key} className="aspect-[3/4] min-h-[64px]" />;
+            if (c.blank) return <div key={c.key} className="h-12" />;
             const dowCls = c.dayOfWeek === 0 || c.isHoliday ? 'text-rose-400' : c.dayOfWeek === 6 ? 'text-sky-400' : 'text-zinc-300';
-            const bg = c.paused ? 'bg-amber-500/5' : c.isToday ? 'bg-blue-500/10 ring-1 ring-blue-500/30' : 'bg-zinc-900/40 hover:bg-zinc-900/80';
+            const isSelected = c.dateStr === selected;
+            const bg = isSelected ? 'bg-blue-500/25 ring-1 ring-blue-400' : c.paused ? 'bg-amber-500/5' : c.isToday ? 'bg-blue-500/10 ring-1 ring-blue-500/30' : 'bg-zinc-900/40 hover:bg-zinc-900/80';
             const dim = c.paused;
+
+            const successCnt = c.execs.filter((e) => e.status === 'success' || e.status === 'dry_run').length;
+            const failedCnt = c.execs.filter((e) => e.status === 'failed').length;
+            const plannedNonSkipCnt = c.planned.filter((p) => p.certainty !== 'skip').length;
+            const upcoming = (c.isToday || !c.isPast) ? plannedNonSkipCnt : 0;
+
             return (
               <button
                 key={c.key}
                 onClick={() => setSelected(c.dateStr)}
-                className={`relative aspect-[3/4] min-h-[64px] rounded-md p-1 text-left transition-colors ${bg} ${dim ? 'opacity-60' : ''}`}
+                className={`relative h-12 rounded-md text-left transition-colors ${bg} ${dim ? 'opacity-60' : ''}`}
                 title={c.holidayName ? `${c.dateStr} · ${c.holidayName}` : c.dateStr}
               >
-                <div className="flex items-baseline gap-0.5">
+                <div className="flex flex-col items-center justify-center h-full leading-none">
                   <span className={`text-[11px] font-bold tabular-nums ${dowCls}`}>{c.d}</span>
-                  {c.holidayName && <span className="text-[8px] text-rose-400/80 truncate flex-1">·{c.holidayName.slice(0, 4)}</span>}
-                </div>
-                <div className="mt-0.5 flex flex-col gap-0.5">
-                  {(c.isPast ? c.execs.slice(0, 2) : c.planned.slice(0, 2)).map((item, i) => {
-                    if (c.isPast) {
-                      const cls = CHIP_CLS[item.status] || CHIP_CLS.skipped;
-                      const label = ACTION_LABEL[item.action] || item.action;
-                      return (
-                        <span key={`e${i}`} className={`text-[8px] px-1 py-0.5 rounded truncate ${cls}`} title={`${item.status} ${item.reason || ''}`}>
-                          {label}
-                        </span>
-                      );
-                    }
-                    const cls = CHIP_CLS[item.certainty] || CHIP_CLS.confirmed;
-                    return (
-                      <span key={`p${i}`} className={`text-[8px] px-1 py-0.5 rounded truncate ${cls}`}>
-                        {item.time ? `${item.time} ` : ''}{item.label}
-                      </span>
-                    );
-                  })}
-                  {(c.isPast ? c.execs.length : c.planned.length) > 2 && (
-                    <span className="text-[8px] text-zinc-500 text-right">+{(c.isPast ? c.execs.length : c.planned.length) - 2}</span>
-                  )}
+                  <span className="mt-0.5 flex items-center gap-0.5 text-[9px] tabular-nums">
+                    {upcoming > 0 && <span className="text-blue-300">🕐{upcoming}</span>}
+                    {successCnt > 0 && <span className="text-emerald-300">✓{successCnt}</span>}
+                    {failedCnt > 0 && <span className="text-rose-300">✗{failedCnt}</span>}
+                  </span>
                 </div>
                 {c.paused && (
-                  <span className="absolute top-0.5 right-0.5 text-[8px] text-amber-400">✈️</span>
+                  <span className="absolute top-0 right-0.5 text-[7px] text-amber-400">✈</span>
                 )}
               </button>
             );
