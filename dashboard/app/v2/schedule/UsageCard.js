@@ -28,6 +28,12 @@ export default function UsageCard({ usage }) {
         <div className={`absolute inset-y-0 left-0 ${overrun ? 'bg-rose-400/30' : 'bg-amber-400/30'}`} style={{ width: `${projectedPct}%` }} />
         <div className="absolute inset-y-0 left-0 bg-blue-400" style={{ width: `${actualPct}%` }} />
       </div>
+      <div className="flex items-center gap-x-3 gap-y-0.5 text-[10px] tabular-nums text-zinc-500 flex-wrap">
+        <span>Commands <span className="text-zinc-300 font-semibold">{usage.calls?.commands ?? 0}</span></span>
+        <span>Wakes <span className="text-amber-300 font-semibold">{usage.calls?.wakes ?? 0}</span></span>
+        <span>Data <span className="text-zinc-300 font-semibold">{usage.calls?.vehicle_data ?? 0}</span></span>
+        <span>Signals <span className="text-zinc-300 font-semibold">{usage.calls?.streaming_signals ?? 0}</span></span>
+      </div>
     </div>
   );
 }
