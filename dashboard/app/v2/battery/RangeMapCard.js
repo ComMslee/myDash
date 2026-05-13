@@ -37,7 +37,7 @@ export default function RangeMapCard() {
       mapRef.current = map;
 
       // 편도 (외곽 노랑)
-      const c1 = L.circle([lat, lng], {
+      L.circle([lat, lng], {
         radius: oneWayM, color: '#fbbf24', fillColor: '#fbbf24',
         fillOpacity: 0.06, weight: 1.5,
       }).addTo(map);
@@ -52,9 +52,12 @@ export default function RangeMapCard() {
       }).addTo(map);
 
       // 초기 size 0 회피 — invalidateSize + animate:false fitBounds (DriveMap 함정 패턴 차용)
+      // 줌은 편도 원 × 0.75 영역에 맞춤 (전체 원 그대로 fit 하면 너무 멀리서 보임)
+      const FIT_SCALE = 0.75;
       setTimeout(() => {
         map.invalidateSize();
-        map.fitBounds(c1.getBounds(), { padding: [20, 20], animate: false });
+        const fitBounds = L.latLng(lat, lng).toBounds(oneWayM * FIT_SCALE * 2);
+        map.fitBounds(fitBounds, { padding: [10, 10], animate: false });
       }, 150);
     });
     return () => {
