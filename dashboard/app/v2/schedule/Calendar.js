@@ -98,11 +98,10 @@ export default function Calendar({
   refreshSignal,
 }) {
   const today = todayStr();
-  const [backDays, setBackDays] = useState(14);
-  const [fwdDays, setFwdDays] = useState(14);
+  const WINDOW = 14; // 고정 — 픽한 날짜를 중심으로 슬라이드 (누적 확장 X)
+  const [center, setCenter] = useState(today);
   const [target, setTarget] = useState(null);
-  const todayRef = useRef(null);
-  const targetRef = useRef(null);
+  const centerRef = useRef(null);
   const containerRef = useRef(null);
   const dateInputRef = useRef(null);
 
@@ -113,8 +112,8 @@ export default function Calendar({
 
   const rows = useMemo(() => {
     const arr = [];
-    for (let i = -backDays; i <= fwdDays; i++) {
-      const dateStr = addDays(today, i);
+    for (let i = -WINDOW; i <= WINDOW; i++) {
+      const dateStr = addDays(center, i);
       const dow = dowOf(dateStr);
       const ymd = dateStr.replace(/-/g, '');
       const holidayName = holidayMap.get(ymd) || null;
@@ -134,7 +133,7 @@ export default function Calendar({
       arr.push({ dateStr, dow, isHoliday, holidayName, paused, isToday, isPast, planned, execs });
     }
     return arr;
-  }, [today, backDays, fwdDays, schedules, executionsByDate, holidayMap, pausePeriods, refreshSignal]);
+  }, [today, center, schedules, executionsByDate, holidayMap, pausePeriods, refreshSignal]);
 
   // 다음 실행 — 오늘 이후 가장 빠른 미래
   const nextRun = useMemo(() => {
@@ -163,26 +162,22 @@ export default function Calendar({
     return latest;
   }, [executionsByDate]);
 
-  // 진입 시 오늘 row 자동 스크롤 — 한 번만
-  const didScrollRef = useRef(false);
+  // center 가 바뀔 때마다 해당 row 를 viewport 중앙으로 스크롤
+  const didMountRef = useRef(false);
   useEffect(() => {
-    if (didScrollRef.current) return;
-    if (todayRef.current) {
-      todayRef.current.scrollIntoView({ block: 'center', behavior: 'auto' });
-      didScrollRef.current = true;
+    if (centerRef.current) {
+      centerRef.current.scrollIntoView({
+        block: 'center',
+        behavior: didMountRef.current ? 'smooth' : 'auto',
+      });
+      didMountRef.current = true;
     }
-  }, [rows]);
+  }, [center, rows]);
 
   const jumpToday = () => {
     setTarget(null);
-    todayRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    setCenter(today);
   };
-
-  useEffect(() => {
-    if (target && targetRef.current) {
-      targetRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }
-  }, [target, rows]);
 
   const openDatePicker = () => {
     const el = dateInputRef.current;
@@ -195,12 +190,8 @@ export default function Calendar({
     const val = e.target.value;
     e.target.value = '';
     if (!val) return;
-    const [y, m, d] = val.split('-').map((x) => parseInt(x, 10));
-    const [ty, tm, td] = today.split('-').map((x) => parseInt(x, 10));
-    const diff = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(ty, tm - 1, td)) / 86400000);
-    if (diff < 0 && Math.abs(diff) > backDays) setBackDays(Math.abs(diff) + 3);
-    if (diff > 0 && diff > fwdDays) setFwdDays(diff + 3);
-    setTarget(val);
+    setCenter(val);
+    setTarget(val === today ? null : val);
   };
 
   return (
@@ -230,7 +221,7 @@ export default function Calendar({
           {rows.map((r) => (
             <div
               key={r.dateStr}
-              ref={r.dateStr === target ? targetRef : r.isToday ? todayRef : null}
+              ref={r.dateStr === center ? centerRef : null}
             >
               <DayRow
                 r={r}
