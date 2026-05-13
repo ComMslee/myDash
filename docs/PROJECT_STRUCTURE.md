@@ -70,13 +70,16 @@ myDash/
     │   ├── tg-user-groups.js     # 텔레그램 사용자→카테고리 그룹 매핑 (대시보드 측 캐시·조회)
     │   ├── docker-stats.js       # docker.sock CPU/메모리 통계 — server-status 용
     │   ├── drive-classify.js     # 주행 분류 헬퍼 (장거리/통근/단거리 등)
+    │   ├── schedule-evaluator.js     # Tesla 자동화 트리거 판정 — 시간/장소/날씨 3축 + 휴무·skip_dates 분기
+    │   ├── schedule-runner.js        # 1분 setInterval 워커 — listSchedules → evaluate → run + 결과 로깅 (TESLA_FLEET_API_ENABLED 게이팅)
     │   ├── queries/              # 도메인별 SQL 쿼리 모듈
     │   │   ├── battery-capacity.js
     │   │   ├── battery-health.js
     │   │   ├── battery-idle.js
     │   │   ├── battery-records.js
     │   │   ├── car.js                  # getDefaultCar() — 단일 차량 조회 헬퍼 (10+ 라우트 공유)
-    │   │   └── family-festivals.js     # family_festivals 테이블 스키마/CRUD — GHA cron 폴링 결과 저장
+    │   │   ├── family-festivals.js     # family_festivals 테이블 스키마/CRUD — GHA cron 폴링 결과 저장
+    │   │   └── schedules.js            # 자동화 스키마(6테이블) + 스케줄 CRUD + 실행 로그 + 월별 사용량 누적/단가 + 휴무 + 지오펜스(TeslaMate read-only)
     │   └── home-charger/         # 집충전기 서버사이드 로직
     │       ├── fleet-stats.js    # 단지 통계 집계
     │       ├── poll-log.js       # 폴링 로그 조회
@@ -141,6 +144,17 @@ myDash/
     │   │   │   ├── _parts/ReportPanel.js # 활용도 라이브 리포트 컴포넌트 (KPI · 주별 추이 · 동별)
     │   │   │   └── report/page.js        # 활용도 리포트 단독 페이지 (외부 캡처/공유)
     │   │   ├── tg/page.js            # 텔레그램 봇 관리 (권한·방송·학습로그·가이드)
+    │   │   ├── schedule/             # Tesla 자동화 스케줄러 — 캘린더 중심 단일 페이지
+    │   │   │   ├── page.js           # 메인 — UsageCard + Calendar(세로 타임라인) + PausePanel + ScheduleList + ExecutionLog. ⚙ 시트는 즉시실행/지오펜스/실연동체크만
+    │   │   │   ├── Calendar.js       # 세로 타임라인 ±14일 (📅 더보기로 범위 확장) + HotBar(다음/마지막 실행) + DayRow(plan/exec chip + skip 토글)
+    │   │   │   ├── UsageCard.js      # 이번달 Tesla Fleet API 사용량 — 실제 + 예상 + 진행바 + Commands/Wakes/Data/Signals 카운트
+    │   │   │   ├── ScheduleList.js   # 스케줄 카드 리스트 — 인라인 요일 토글 + skip 일자 chip + ▶/편집/삭제, 마지막에 [+ 새 스케줄]
+    │   │   │   ├── ScheduleForm.js   # 신규/편집 폼 (시간·장소·날씨 3축 트리거 빌더)
+    │   │   │   ├── PausePanel.js     # 휴무 모드 — 기간(from~until) 추가/삭제. 해당 기간 자동 실행 일괄 차단
+    │   │   │   ├── ExecutionLog.js   # 전체 이력 — 최근 실행 결과 시계열
+    │   │   │   ├── SettingsSheet.js  # ⚙ 바텀시트 — 3섹션(NowPanel/GeofencesPanel/체크리스트)
+    │   │   │   ├── NowPanel.js       # 즉시 실행 — 비용 보호용 1뎁스 안쪽 (드물게 씀)
+    │   │   │   └── GeofencesPanel.js # 지오펜스 read-only 표시 (CRUD 는 TeslaMate UI)
     │   │   └── dev/                  # 개발/진단 도구 (하단 알약 미노출, URL 직접)
     │   │       ├── api-status/
     │   │       │   ├── page.js       # 3탭(서버/API 테스트/집계) — 28개 라우트 가용성 체크 + 서버/충전/폴링 진단 + 사전집계 상태/scope 갱신 통합 · 서버 폴링은 '서버' 탭 활성일 때만
@@ -192,7 +206,20 @@ myDash/
     │       ├── resolve-address/route.js           # 좌표 → 한글 주소 (Kakao 캐시 경유)
     │       ├── find-nearby-chargers/route.js  # 좌표 기반 주변 충전소 검색
     │       ├── debug/charging/route.js        # 충전 디버그 정보
-    │       └── server-status/route.js         # 호스트(/proc/meminfo · statfs) + 컨테이너(docker.sock) + DB 로그(server_health_log) + 24h 피크/한산 — /v2/dev/api-status 4열 대시보드용
+    │       ├── server-status/route.js         # 호스트(/proc/meminfo · statfs) + 컨테이너(docker.sock) + DB 로그(server_health_log) + 24h 피크/한산 — /v2/dev/api-status 4열 대시보드용
+    │       ├── schedules/route.js                       # 자동화 스케줄 CRUD (GET 목록 / POST 생성)
+    │       ├── schedules/[id]/route.js                  # 단건 GET / PUT / DELETE
+    │       ├── schedules/[id]/run-now/route.js          # 즉시 1회 실행 — dry_run 또는 실제 (TESLA_FLEET_API_ENABLED 게이팅)
+    │       ├── schedules/[id]/executions/route.js       # 해당 스케줄의 최근 실행 이력
+    │       ├── schedules/executions/route.js            # 전체 실행 이력 (캘린더·이력 패널 공통 소스)
+    │       ├── pause-periods/route.js                   # 휴무 모드 기간 CRUD (GET/POST)
+    │       ├── pause-periods/[id]/route.js              # 휴무 기간 DELETE
+    │       ├── geofences/route.js                       # 지오펜스 목록 — TeslaMate `geofences` 테이블 read-only 미러
+    │       ├── geofences/[id]/route.js                  # 405 차단 (단일 진실원: TeslaMate UI)
+    │       ├── now-command/route.js                     # 즉시 실행 (NowPanel) — schedule 없이 단발 액션
+    │       ├── usage/current-month/route.js             # 이번달 Tesla Fleet API 누적 사용량 + 예상 비용 (UsageCard)
+    │       ├── holidays/route.js                        # KASI 특일정보 캐시 (한국 공휴일 — 캘린더/이력에서 공통 사용)
+    │       └── tesla-test/ping/route.js                 # Tesla Fleet API connectivity ping — /v2/dev/api-status 자동화 카테고리
 ```
 
 ## 라우트
@@ -206,5 +233,6 @@ myDash/
 | `/v2/chargers` | 집충전기 실시간 + Top 순위 + 활용도 리포트 (인라인) | 충전소 |
 | `/v2/chargers/report` | 활용도 리포트 단독 페이지 (외부 캡처/공유) | — (URL 직접) |
 | `/v2/tg` | 텔레그램 봇 관리 (권한 · 방송 · 학습로그 · 가이드) | — (URL 직접) |
+| `/v2/schedule` | Tesla 자동화 — 사용량 + 세로 캘린더(다음/마지막 실행 핫바·일자별 plan/exec) + 휴무 + 스케줄 리스트 + 전체 이력. ⚙ 시트 = 즉시실행/지오펜스/실연동체크 | — (하단 알약 ⚙️ 시트에서 진입) |
 | `/v2/dev/api-status` | 3탭 (서버 / API 테스트 / 집계) — API 가용성 + 서버 진단 + 사전집계 상태/갱신 (개발자용, URL 직접) | — (하단 알약 미노출) |
 | `/v2/dev/auth` | 로그인 PIN 변경 (하단 알약 좌측 ⚙️ 시트에서 진입) | — (하단 알약 미노출) |

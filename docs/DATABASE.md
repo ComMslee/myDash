@@ -34,6 +34,12 @@ TeslaMate가 관리하는 PostgreSQL 16 스키마. 직접 쿼리만 사용 (ORM 
 | `dash_top_drives_cache` | 8 메트릭 × TOP 50 캐시 `(car_id, metric, rank, drive_id, value, start_date)` PK `(car_id, metric, rank)` · refresh 시 truncate-replace · `/api/rankings` 위임 소스 (drive_id 로 drives JOIN) | `lib/dash-agg.js::ensureSchema()` |
 | `dash_place_clusters` | 주행 끝점 0.0005° (~55m) bin 클러스터 `(car_id, bin_lat numeric(7,4), bin_lon numeric(7,4), visit_count, top_origin_lat, top_origin_lon, last_visited_at)` PK `(car_id, bin_lat, bin_lon)` · `/api/frequent-places` TOP-N 위임 소스 | `lib/dash-agg.js::ensureSchema()` |
 | `dash_place_geo` | 클러스터 좌표 → 한글 라벨 캐시 `(coord_key TEXT PK, label, updated_at)` · `kakao_address_cache` 와 별개로 클러스터 라벨 전용 | `lib/dash-agg.js::ensureSchema()` |
+| `dash_schedules` | Tesla 자동화 스케줄 — `(id, name, enabled, mode, action, action_params jsonb, trigger_config jsonb, skip_dates jsonb, valid_from, valid_until, apply_pause_mode, last_run_*, next_run_at)` · 트리거 3축(시간/장소/날씨) 은 모두 `trigger_config` JSONB 안 | `lib/queries/schedules.js::ensureSchema()` |
+| `dash_schedule_executions` | 실행 이력 — `(id, schedule_id FK ON DELETE SET NULL, triggered_at, trigger_source, action, action_params jsonb, status, reason, api_calls jsonb, tesla_response jsonb, cost_estimate numeric)` · `/v2/schedule` 캘린더·이력 패널 소스 | `lib/queries/schedules.js::ensureSchema()` |
+| `dash_schedule_daily_stats` | 스케줄별 일 집계 `(schedule_id FK, day, exec_count, success_count, fail_count, skip_count, cost_sum)` PK `(schedule_id, day)` | `lib/queries/schedules.js::ensureSchema()` |
+| `dash_api_usage_monthly` | Tesla Fleet API 월별 누적 `(month PK, commands_count, wakes_count, vehicle_data_count, streaming_signals_count, estimated_cost)` · 단가는 `calcCost()` 단일 소스 ($10/월 무료 한도) | `lib/queries/schedules.js::ensureSchema()` |
+| `dash_pause_periods` | 휴무 기간 `(id, from_date, until_date, reason)` · 기간 내 자동 실행 일괄 차단 (`apply_pause_mode` 가 true 인 스케줄 한정) | `lib/queries/schedules.js::ensureSchema()` |
+| `dash_location_events` | 지오펜스 진입·이탈 이벤트 `(id, geofence_id, event_type, occurred_at, lat, lng)` · 워커가 INSERT (TeslaMate `geofences.id` 직접 참조, FK 없음) | `lib/queries/schedules.js::ensureSchema()` |
 
 > 텔레그램 hub 가 자체 관리하는 `hub_users`, `hub_permissions`, `hub_unmatched_inputs`, `hub_categories` 는 `services/telegram-hub` 가 idempotent 로 생성한다 ([`telegram-bot/README.md`](./telegram-bot/README.md) 참조).
 
@@ -68,6 +74,9 @@ TeslaMate가 관리하는 PostgreSQL 16 스키마. 직접 쿼리만 사용 (ORM 
 | `EV_CHARGER_API_KEY` | 공공데이터포털 환경공단 EvCharger 일반 인증키 (64-hex). 없으면 집충전기 카드 비표시 — [EV_CHARGER_API.md](./EV_CHARGER_API.md) |
 | `HOME_CHARGER_STAT_ID` | 환경공단 단일 스테이션 ID (기본값: `PI795111`) |
 | `HOME_CHARGER_STAT_IDS` | 환경공단 멀티 스테이션 ID (쉼표 구분, 예: `PI795111,PI313299,PIH01089`) |
+| `KMA_API_KEY` | 기상청 단기예보 API 키 — 자동화 스케줄러 날씨 트리거에 사용 |
+| `TESLA_FLEET_CLIENT_ID` / `_SECRET` | Tesla Developer 앱 OAuth 자격증명 (developer.tesla.com) |
+| `TESLA_FLEET_API_ENABLED` | `true` 일 때만 실제 Fleet API 호출. 기본 `false` (dry_run) — **결제수단 미등록 권장: $10 무료 한도 초과 시 자동 차단** |
 
 ## 공용 상수 (`dashboard/lib/constants.js`)
 
