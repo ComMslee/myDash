@@ -76,10 +76,6 @@ function buildInitialState(initial) {
     skipDateInput:   '',
 
     applyPauseMode:  initial?.apply_pause_mode ?? false,
-
-    // 깨우기 허용 — 기본 ON (allow_wake). 스케줄 본래 의도 (자고 있어도 깨워서 실행).
-    // OFF 로 바꾸면 차량이 asleep/offline 일 때 silent skip (wake 비용 회피용 안전장치).
-    allowWake:       (initial?.wake_policy ?? 'allow_wake') === 'allow_wake',
   };
 }
 
@@ -268,7 +264,6 @@ function buildPayload(s) {
     valid_from:       s.validFrom  || null,
     valid_until:      s.validUntil || null,
     apply_pause_mode: s.applyPauseMode,
-    wake_policy:      s.allowWake ? 'allow_wake' : 'never_wake',
   };
 }
 
@@ -652,7 +647,7 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
       </div>
 
       {/* 휴무 모드 */}
-      <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
+      <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
         <div>
           <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">휴무 모드 따르기</p>
           <p className="text-xs text-zinc-600 mt-0.5">휴무 기간에는 이 스케줄을 실행하지 않습니다</p>
@@ -660,23 +655,6 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
         <Toggle
           value={s.applyPauseMode}
           onChange={v => set({ applyPauseMode: v })}
-          labelOn="켜기"
-          labelOff="끄기"
-        />
-      </div>
-
-      {/* 수면 중 깨우기 허용 — 기본 ON (스케줄 본래 의도). OFF 는 비용 보호용 안전장치 */}
-      <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
-        <div className="pr-2">
-          <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">수면 중에도 깨워서 실행</p>
-          <p className="text-[11px] text-zinc-600 mt-0.5">
-            기본 켜기 — 자고 있어도 깨워서 실행 (wake 시 $0.02).<br />
-            <span className="text-zinc-500">끄면 TeslaMate 상태 보고 sleep 이면 자동 스킵 (비용 0).</span>
-          </p>
-        </div>
-        <Toggle
-          value={s.allowWake}
-          onChange={v => set({ allowWake: v })}
           labelOn="켜기"
           labelOff="끄기"
         />
