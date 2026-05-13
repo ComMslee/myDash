@@ -76,6 +76,10 @@ function buildInitialState(initial) {
     skipDateInput:   '',
 
     applyPauseMode:  initial?.apply_pause_mode ?? false,
+
+    // 깨우기 허용 — 기본 OFF (never_wake). ON 으로 바꾸면 잠자는 차량을 깨워서라도 실행.
+    // 'never_wake' 일 때 차량이 asleep/offline 이면 silent skip (비용 0).
+    allowWake:       (initial?.wake_policy ?? 'never_wake') === 'allow_wake',
   };
 }
 
@@ -264,6 +268,7 @@ function buildPayload(s) {
     valid_from:       s.validFrom  || null,
     valid_until:      s.validUntil || null,
     apply_pause_mode: s.applyPauseMode,
+    wake_policy:      s.allowWake ? 'allow_wake' : 'never_wake',
   };
 }
 
@@ -647,7 +652,7 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
       </div>
 
       {/* 휴무 모드 */}
-      <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+      <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
         <div>
           <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">휴무 모드 따르기</p>
           <p className="text-xs text-zinc-600 mt-0.5">휴무 기간에는 이 스케줄을 실행하지 않습니다</p>
@@ -655,6 +660,23 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
         <Toggle
           value={s.applyPauseMode}
           onChange={v => set({ applyPauseMode: v })}
+          labelOn="켜기"
+          labelOff="끄기"
+        />
+      </div>
+
+      {/* 수면 중 깨우기 허용 — 비용 보호용 안전장치 */}
+      <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+        <div className="pr-2">
+          <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">수면 중에도 깨워서 실행</p>
+          <p className="text-[11px] text-zinc-600 mt-0.5">
+            끄면 차량이 잠자기/오프라인일 때 자동 스킵 (비용 0).<br />
+            <span className="text-amber-400/80">켜면 wake 1회 = 명령 20개 비용 ($0.02)</span>
+          </p>
+        </div>
+        <Toggle
+          value={s.allowWake}
+          onChange={v => set({ allowWake: v })}
           labelOn="켜기"
           labelOff="끄기"
         />

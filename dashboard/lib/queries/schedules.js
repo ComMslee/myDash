@@ -28,12 +28,16 @@ export async function ensureSchema() {
       valid_from       DATE,
       valid_until      DATE,
       apply_pause_mode BOOLEAN NOT NULL DEFAULT TRUE,
+      wake_policy      TEXT NOT NULL DEFAULT 'never_wake',
       last_run_at      TIMESTAMPTZ,
       last_run_status  TEXT,
       next_run_at      TIMESTAMPTZ,
       created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    -- wake_policy 신규 컬럼 보강 (기존 테이블 호환)
+    ALTER TABLE dash_schedules
+      ADD COLUMN IF NOT EXISTS wake_policy TEXT NOT NULL DEFAULT 'never_wake';
     CREATE INDEX IF NOT EXISTS idx_dash_schedules_enabled_next
       ON dash_schedules(enabled, next_run_at);
 
@@ -101,6 +105,19 @@ export async function ensureSchema() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// 차량 상태 — TeslaMate `states.state` 단일 진실원.
+// 값: 'online' | 'asleep' | 'offline' | 'driving' | 'charging' | 'unknown'
+// wake_policy='never_wake' 일 때 evaluator 가 사전 게이팅에 사용.
+
+export async function getVehicleState() {
+  await ensureSchema();
+  const r = await pool.query(
+    `SELECT state FROM states ORDER BY start_date DESC LIMIT 1`,
+  );
+  return r.rows[0]?.state || 'unknown';
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Geofences — TeslaMate `geofences` 테이블이 단일 진실원.
 // 추가/수정/삭제는 TeslaMate UI 에서 수행. 대시보드는 read-only.
 // name 패턴으로 kind 자동 분류 (집/회사/그 외 커스텀).
@@ -158,17 +175,19 @@ export async function createSchedule(input) {
     action, action_params = {}, trigger_config = {},
     skip_dates = [], valid_from = null, valid_until = null,
     apply_pause_mode = true,
+    wake_policy = 'never_wake',
   } = input;
   const r = await pool.query(
     `INSERT INTO dash_schedules
        (name, enabled, mode, action, action_params, trigger_config,
-        skip_dates, valid_from, valid_until, apply_pause_mode)
-     VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,$8,$9,$10)
+        skip_dates, valid_from, valid_until, apply_pause_mode, wake_policy)
+     VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,$8,$9,$10,$11)
      RETURNING *`,
     [
       name, enabled, mode, action,
       JSON.stringify(action_params), JSON.stringify(trigger_config),
       JSON.stringify(skip_dates), valid_from, valid_until, apply_pause_mode,
+      wake_policy,
     ],
   );
   return r.rows[0];
@@ -184,7 +203,7 @@ export async function updateSchedule(id, patch) {
         name=$2, enabled=$3, mode=$4, action=$5,
         action_params=$6::jsonb, trigger_config=$7::jsonb,
         skip_dates=$8::jsonb, valid_from=$9, valid_until=$10,
-        apply_pause_mode=$11, updated_at=NOW()
+        apply_pause_mode=$11, wake_policy=$12, updated_at=NOW()
       WHERE id=$1
       RETURNING *`,
     [
@@ -193,6 +212,7 @@ export async function updateSchedule(id, patch) {
       JSON.stringify(merged.trigger_config || {}),
       JSON.stringify(merged.skip_dates || []),
       merged.valid_from, merged.valid_until, merged.apply_pause_mode,
+      merged.wake_policy || 'never_wake',
     ],
   );
   return r.rows[0];

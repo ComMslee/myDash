@@ -1,6 +1,10 @@
 import pool from '@/lib/db';
-import { listSchedules, isPausedOn, recentLocationEvents, listGeofences } from '@/lib/queries/schedules';
+import { listSchedules, isPausedOn, recentLocationEvents, listGeofences, getVehicleState } from '@/lib/queries/schedules';
 import { getWeatherAt } from '@/lib/weather';
+
+// 차량이 깨어있지 않은 상태 — Fleet API 호출 시 wake 비용($0.02 = 명령의 20배) 발생.
+// wake_policy='never_wake' 인 스케줄은 이 상태일 때 silent skip (비용 0).
+const SLEEPING_STATES = new Set(['asleep', 'offline']);
 
 // 3축 조건 (시간/장소/날씨) 평가 + skip/공휴일/디바운스 처리.
 // 평가 단위: 매분 1회. 통과 시 executeAction 호출.
@@ -79,6 +83,8 @@ export async function evaluateAll() {
   const pos = await vehicleLastPosition();
   const curPlace = await currentGeofenceKey(geofences, pos);
   const recentEvents = await recentLocationEvents({ since_minutes: 2 });
+  const vehicleState = await getVehicleState();
+  const vehicleSleeping = SLEEPING_STATES.has(vehicleState);
 
   let fired = 0, skipped = 0;
   const decisions = [];
@@ -179,6 +185,14 @@ export async function evaluateAll() {
         decisions.push({ s, fire: false, reason: `강수 조건 ${w.precip} — 현재 없음` });
         skipped++; continue;
       }
+    }
+
+    // 사전 게이팅 — wake_policy='never_wake' 인 스케줄은 차량이 잠자기/오프라인일 때 skip.
+    // (Fleet API 호출 시 wake 비용 $0.02 = 명령의 20배 — 무의미한 wake 폭주 방지.)
+    const wakePolicy = s.wake_policy || 'never_wake';
+    if (vehicleSleeping && wakePolicy === 'never_wake') {
+      decisions.push({ s, fire: false, reason: `차량 ${vehicleState} — wake 회피` });
+      skipped++; continue;
     }
 
     decisions.push({ s, fire: true, trigger_source: isEvent ? 'location_event' : 'time' });
