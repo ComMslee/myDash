@@ -139,6 +139,25 @@ export default function SchedulePage() {
     bump();
   };
 
+  const onToggleSkip = async (s, dateStr) => {
+    const dates = Array.isArray(s.skip_dates) ? [...s.skip_dates] : [];
+    const idx = dates.indexOf(dateStr);
+    if (idx >= 0) dates.splice(idx, 1);
+    else dates.push(dateStr);
+    const r = await fetch(`/api/schedules/${s.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...s, skip_dates: dates }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      alert('skip 토글 실패: ' + (err.error || r.statusText));
+      return;
+    }
+    await fetchSchedules();
+    bump();
+  };
+
   const onRunNow = async (s) => {
     const r = await fetch(`/api/schedules/${s.id}/run-now`, { method: 'POST' });
     const j = await r.json().catch(() => null);
@@ -198,6 +217,7 @@ export default function SchedulePage() {
           onDeleteSchedule={onDelete}
           onToggleEnabled={onToggle}
           onRunNow={onRunNow}
+          onToggleSkip={onToggleSkip}
           refreshSignal={refreshSignal}
         />
 

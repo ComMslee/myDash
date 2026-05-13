@@ -102,6 +102,7 @@ export default function Calendar({
   onDeleteSchedule,
   onToggleEnabled,
   onRunNow,
+  onToggleSkip,
   refreshSignal,
 }) {
   const { y, m } = parseMonth(month);
@@ -109,6 +110,11 @@ export default function Calendar({
   const firstWday = firstDow(y, m);
   const today = todayStr();
   const [selected, setSelected] = useState(today);
+
+  const nowKstHHMM = useMemo(() => {
+    const t = new Date(Date.now() + 9 * 3600 * 1000);
+    return `${String(t.getUTCHours()).padStart(2, '0')}:${String(t.getUTCMinutes()).padStart(2, '0')}`;
+  }, [refreshSignal]);
 
   const cells = useMemo(() => {
     const arr = [];
@@ -143,6 +149,34 @@ export default function Calendar({
 
   const selectedCell = selected ? cells.find((c) => !c.blank && c.dateStr === selected) : null;
 
+  // 다음 실행 — 이번 월 내 가장 빠른 미래 예약 (HH:MM 형식만)
+  const nextRun = useMemo(() => {
+    let best = null;
+    for (const c of cells) {
+      if (c.blank) continue;
+      if (c.dateStr < today) continue;
+      for (const p of c.planned) {
+        if (p.certainty === 'skip') continue;
+        if (!/^\d{2}:\d{2}$/.test(p.time || '')) continue;
+        if (c.dateStr === today && p.time <= nowKstHHMM) continue;
+        const key = `${c.dateStr} ${p.time}`;
+        if (!best || key < best.key) best = { key, dateStr: c.dateStr, time: p.time, label: p.label, name: p.s.name, certainty: p.certainty };
+      }
+    }
+    return best;
+  }, [cells, today, nowKstHHMM]);
+
+  // 마지막 실행 — 이번 월 내 가장 최근 이력 1건
+  const lastRun = useMemo(() => {
+    let latest = null;
+    for (const [, list] of executionsByDate) {
+      for (const e of list) {
+        if (!latest || new Date(e.triggered_at) > new Date(latest.triggered_at)) latest = e;
+      }
+    }
+    return latest;
+  }, [executionsByDate]);
+
   const goPrev = () => {
     let ny = y, nm = m - 1;
     if (nm < 1) { nm = 12; ny--; }
@@ -156,6 +190,7 @@ export default function Calendar({
 
   return (
     <div className="space-y-2">
+      <HotBar next={nextRun} last={lastRun} today={today} onJump={(d) => setSelected(d)} />
       <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-3 space-y-2">
         <div className="flex items-center justify-between">
           <button onClick={goPrev} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.04] text-zinc-400">
@@ -238,13 +273,75 @@ export default function Calendar({
           onDeleteSchedule={(s) => onDeleteSchedule?.(s)}
           onToggleEnabled={onToggleEnabled}
           onRunNow={onRunNow}
+          onToggleSkip={onToggleSkip}
         />
       )}
     </div>
   );
 }
 
-function DayPanel({ cell, schedules, onAddSchedule, onEditSchedule, onDeleteSchedule, onToggleEnabled, onRunNow }) {
+function HotBar({ next, last, today, onJump }) {
+  const fmtNext = () => {
+    if (!next) return null;
+    const sameDay = next.dateStr === today;
+    const dStr = sameDay ? '오늘' : next.dateStr.slice(5).replace('-', '/');
+    return { dStr, ...next };
+  };
+  const fmtLast = () => {
+    if (!last) return null;
+    const t = new Date(last.triggered_at);
+    const kst = new Date(t.getTime());
+    const hh = String(kst.getHours()).padStart(2, '0');
+    const mm = String(kst.getMinutes()).padStart(2, '0');
+    const ymd = `${kst.getFullYear()}-${String(kst.getMonth() + 1).padStart(2, '0')}-${String(kst.getDate()).padStart(2, '0')}`;
+    const sameDay = ymd === today;
+    const dStr = sameDay ? '오늘' : ymd.slice(5).replace('-', '/');
+    const diffMin = Math.round((Date.now() - t.getTime()) / 60000);
+    const ago = diffMin < 60 ? `${diffMin}분 전` : diffMin < 1440 ? `${Math.round(diffMin / 60)}시간 전` : `${Math.round(diffMin / 1440)}일 전`;
+    return { dStr, time: `${hh}:${mm}`, status: last.status, action: last.action, ago, ymd };
+  };
+  const n = fmtNext();
+  const l = fmtLast();
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <button
+        onClick={() => n && onJump?.(n.dateStr)}
+        disabled={!n}
+        className={`text-left rounded-2xl p-2.5 border ${n ? 'bg-[#161618] border-blue-500/20 hover:bg-blue-500/5' : 'bg-[#161618] border-white/[0.04] opacity-50'}`}
+      >
+        <p className="text-[10px] text-zinc-500 font-semibold mb-0.5">⏭ 다음 실행</p>
+        {n ? (
+          <>
+            <p className="text-[11px] text-blue-300 tabular-nums font-mono">{n.dStr} {n.time}</p>
+            <p className="text-[10px] text-zinc-300 truncate" title={`${n.name} · ${n.label}`}>{n.label}</p>
+          </>
+        ) : (
+          <p className="text-[11px] text-zinc-600">예정 없음</p>
+        )}
+      </button>
+      <button
+        onClick={() => l && onJump?.(l.ymd)}
+        disabled={!l}
+        className={`text-left rounded-2xl p-2.5 border ${l ? 'bg-[#161618] border-emerald-500/20 hover:bg-emerald-500/5' : 'bg-[#161618] border-white/[0.04] opacity-50'}`}
+      >
+        <p className="text-[10px] text-zinc-500 font-semibold mb-0.5">⏮ 마지막 실행</p>
+        {l ? (
+          <>
+            <p className="text-[11px] tabular-nums font-mono">
+              <span className={l.status === 'failed' ? 'text-rose-300' : l.status === 'success' ? 'text-emerald-300' : 'text-blue-300'}>{l.dStr} {l.time}</span>
+              <span className="text-zinc-500"> · {l.ago}</span>
+            </p>
+            <p className="text-[10px] text-zinc-300 truncate">{ACTION_LABEL[l.action] || l.action} <span className="text-zinc-500">· {l.status}</span></p>
+          </>
+        ) : (
+          <p className="text-[11px] text-zinc-600">이력 없음</p>
+        )}
+      </button>
+    </div>
+  );
+}
+
+function DayPanel({ cell, schedules, onAddSchedule, onEditSchedule, onDeleteSchedule, onToggleEnabled, onRunNow, onToggleSkip }) {
   const dow = WEEKDAY_KO[cell.dayOfWeek];
   const isPast = cell.isPast;
   const isToday = cell.isToday;
@@ -273,10 +370,19 @@ function DayPanel({ cell, schedules, onAddSchedule, onEditSchedule, onDeleteSche
             <div className="space-y-1.5">
               {cell.planned.map(({ s, time, certainty, label }) => {
                 const cls = CHIP_CLS[certainty];
+                const isSkipped = certainty === 'skip';
+                const canSkip = !isPast || isToday;
                 return (
-                  <div key={s.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-zinc-900 border border-white/[0.04]">
+                  <div key={s.id} className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-zinc-900 border border-white/[0.04]">
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${cls} font-mono tabular-nums flex-shrink-0`}>{time || '—'}</span>
-                    <span className="text-xs text-zinc-200 truncate flex-1">{s.name} <span className="text-zinc-500">· {label}</span></span>
+                    <span className={`text-xs truncate flex-1 ${isSkipped ? 'text-zinc-500 line-through' : 'text-zinc-200'}`}>{s.name} <span className="text-zinc-500">· {label}</span></span>
+                    {canSkip && (
+                      <button
+                        onClick={() => onToggleSkip?.(s, cell.dateStr)}
+                        className={`text-[10px] px-1.5 py-0.5 rounded ${isSkipped ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400'}`}
+                        title={isSkipped ? '이 날만 복원' : '이 날만 skip'}
+                      >{isSkipped ? '복원' : '⏸ 이 날 skip'}</button>
+                    )}
                     <button onClick={() => onRunNow?.(s)} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300">▶</button>
                     <button onClick={() => onEditSchedule?.(s)} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300">편집</button>
                     <button onClick={() => onToggleEnabled?.(s)} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300">{s.enabled ? '끄기' : '켜기'}</button>
