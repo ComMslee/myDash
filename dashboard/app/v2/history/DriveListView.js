@@ -122,7 +122,12 @@ export default function DriveListView({
 
   // 일 카드 — 24h 막대 + 시간 범위/운전·정차 시간/총량.
   const renderDayCard = (g) => {
-    const weekday = WEEKDAY_KO[g.firstDate.getDay()];
+    const dow = g.firstDate.getDay();
+    const weekday = WEEKDAY_KO[dow];
+    const isSun = dow === 0;
+    const isSat = dow === 6;
+    const dateCls = isSun ? 'text-rose-400' : isSat ? 'text-sky-400' : 'text-zinc-200';
+    const dowCls  = isSun ? 'text-rose-400/70' : isSat ? 'text-sky-400/70' : 'text-zinc-600';
     const visible = g.items.filter(d => !d.absorbed);
     if (!visible.length) return null;
     const driveCount = visible.length;
@@ -156,9 +161,9 @@ export default function DriveListView({
         <DayBgGradient items={visible} dayStart={dayStart} dayMs={dayMs} />
         <div className="relative flex items-center justify-between gap-2">
           <div className="flex items-baseline gap-2 min-w-0 flex-shrink">
-            <span className="text-sm font-bold text-zinc-200 tabular-nums flex-shrink-0">
+            <span className={`text-sm font-bold tabular-nums flex-shrink-0 ${dateCls}`}>
               {g.firstDate.getMonth() + 1}/{g.firstDate.getDate()}
-              <span className="text-[10px] text-zinc-600 font-normal ml-0.5">({weekday})</span>
+              <span className={`text-[10px] font-normal ml-0.5 ${dowCls}`}>({weekday})</span>
             </span>
             <span className="text-[11px] text-zinc-500 tabular-nums truncate">
               {isEarly && <Icon name="moon" className="w-4 h-4 inline-block align-middle mr-0.5" />}{fmt(first.start_date)} → {fmt(last.end_date || last.start_date)}{isLateEnd && <Icon name="moon" className="w-4 h-4 inline-block align-middle ml-0.5" />}
