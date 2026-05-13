@@ -26,15 +26,15 @@ export default function RangeMapCard() {
       const L = window.L;
       if (!containerRef.current) return;
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
-      const map = L.map(containerRef.current, {
-        zoomControl: true, attributionControl: false, scrollWheelZoom: false,
-      });
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-      mapRef.current = map;
-
       const { lat, lng } = data.position;
       const oneWayM = Math.max(500, data.one_way_km * 1000);
       const roundM = Math.max(250, data.round_trip_km * 1000);
+
+      const map = L.map(containerRef.current, {
+        zoomControl: true, attributionControl: false, scrollWheelZoom: false,
+      }).setView([lat, lng], 10);   // ← setView 필수: 누락 시 tileLayer/circle 추가 실패
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+      mapRef.current = map;
 
       // 편도 (외곽 노랑)
       const c1 = L.circle([lat, lng], {
