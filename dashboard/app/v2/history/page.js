@@ -76,7 +76,7 @@ function DriveStatsLine({ stats }) {
   if (!sp && !el && !tp) return null;
   const fmt0 = v => Math.round(v);
   const fmt1 = v => (Math.round(v * 10) / 10).toFixed(1);
-  // 속도는 최저(거의 항상 0) 제외, 평균/최고만. 고도·온도는 3개 모두 + 슬래시 구분 + 평균 강조.
+  // 일자 모드는 평균만 (속도만 평균+최고). 자세한 min/avg/max 는 상단 RouteSparklines 패널 참고.
   return (
     <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-[10px] tabular-nums text-zinc-500 pl-7 mt-1">
       {sp && (
@@ -91,11 +91,7 @@ function DriveStatsLine({ stats }) {
       {el && (
         <span className="inline-flex items-center gap-1">
           <Icon name="mountain" className="w-3 h-3 text-lime-400 shrink-0" />
-          <span>{fmt0(el.min)}</span>
-          <span className="text-zinc-700">/</span>
           <span className="text-zinc-300 font-semibold">{fmt0(el.avg)}</span>
-          <span className="text-zinc-700">/</span>
-          <span>{fmt0(el.max)}</span>
           <span className="text-zinc-600">m</span>
           {el.gain != null && (
             <span className={el.gain >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
@@ -107,11 +103,7 @@ function DriveStatsLine({ stats }) {
       {tp && (
         <span className="inline-flex items-center gap-1">
           <Icon name="thermometer" className="w-3 h-3 text-orange-400 shrink-0" />
-          <span>{fmt1(tp.min)}</span>
-          <span className="text-zinc-700">/</span>
           <span className="text-zinc-300 font-semibold">{fmt1(tp.avg)}</span>
-          <span className="text-zinc-700">/</span>
-          <span>{fmt1(tp.max)}</span>
           <span className="text-zinc-600">°C</span>
         </span>
       )}
