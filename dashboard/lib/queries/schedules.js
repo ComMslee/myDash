@@ -8,17 +8,14 @@ let schemaReady = false;
 
 export async function ensureSchema() {
   if (schemaReady) return;
+  // 마이그레이션 — dash_geofences 폐기. TeslaMate `geofences` 테이블이 단일 진실원.
+  // dash_location_events.geofence_id 의 FK 도 함께 제거 (TeslaMate id 직접 참조).
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS dash_geofences (
-      id         SERIAL PRIMARY KEY,
-      name       TEXT NOT NULL,
-      kind       TEXT NOT NULL DEFAULT 'custom',
-      lat        DOUBLE PRECISION NOT NULL,
-      lng        DOUBLE PRECISION NOT NULL,
-      radius_m   INTEGER NOT NULL DEFAULT 100,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
+    ALTER TABLE IF EXISTS dash_location_events
+      DROP CONSTRAINT IF EXISTS dash_location_events_geofence_id_fkey;
+    DROP TABLE IF EXISTS dash_geofences CASCADE;
+  `);
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS dash_schedules (
       id               SERIAL PRIMARY KEY,
       name             TEXT NOT NULL,
@@ -89,7 +86,7 @@ export async function ensureSchema() {
 
     CREATE TABLE IF NOT EXISTS dash_location_events (
       id          BIGSERIAL PRIMARY KEY,
-      geofence_id INTEGER REFERENCES dash_geofences(id) ON DELETE CASCADE,
+      geofence_id INTEGER NOT NULL,
       event_type  TEXT NOT NULL,
       occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       lat         DOUBLE PRECISION,
@@ -104,42 +101,37 @@ export async function ensureSchema() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Geofences (집/회사/커스텀)
+// Geofences — TeslaMate `geofences` 테이블이 단일 진실원.
+// 추가/수정/삭제는 TeslaMate UI 에서 수행. 대시보드는 read-only.
+// name 패턴으로 kind 자동 분류 (집/회사/그 외 커스텀).
+
+function classifyKind(name) {
+  const n = String(name || '').toLowerCase();
+  if (n.includes('집') || n.includes('home') || n.includes('house')) return 'home';
+  if (n.includes('회사') || n.includes('work') || n.includes('office')) return 'work';
+  return 'custom';
+}
 
 export async function listGeofences() {
   await ensureSchema();
   const r = await pool.query(
-    `SELECT id, name, kind, lat, lng, radius_m, created_at
-       FROM dash_geofences
+    `SELECT id,
+            name,
+            latitude::float8  AS lat,
+            longitude::float8 AS lng,
+            radius::int       AS radius_m
+       FROM geofences
       ORDER BY id ASC`,
   );
-  return r.rows;
+  return r.rows.map((row) => ({ ...row, kind: classifyKind(row.name) }));
 }
 
-export async function upsertGeofence({ id, name, kind, lat, lng, radius_m }) {
-  await ensureSchema();
-  if (id) {
-    const r = await pool.query(
-      `UPDATE dash_geofences
-          SET name=$2, kind=$3, lat=$4, lng=$5, radius_m=$6
-        WHERE id=$1
-        RETURNING *`,
-      [id, name, kind || 'custom', lat, lng, radius_m || 100],
-    );
-    return r.rows[0];
-  }
-  const r = await pool.query(
-    `INSERT INTO dash_geofences (name, kind, lat, lng, radius_m)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING *`,
-    [name, kind || 'custom', lat, lng, radius_m || 100],
-  );
-  return r.rows[0];
+// 추가/수정/삭제는 TeslaMate UI 에서 처리. API 단에서도 405 로 막음.
+export async function upsertGeofence() {
+  throw new Error('지오펜스 추가/수정은 TeslaMate UI 에서 처리합니다.');
 }
-
-export async function deleteGeofence(id) {
-  await ensureSchema();
-  await pool.query(`DELETE FROM dash_geofences WHERE id=$1`, [id]);
+export async function deleteGeofence() {
+  throw new Error('지오펜스 삭제는 TeslaMate UI 에서 처리합니다.');
 }
 
 // ─────────────────────────────────────────────────────────────────────────
