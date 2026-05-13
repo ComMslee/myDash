@@ -300,11 +300,13 @@ function DayRow({ r, today, isTodayRow, onAddSchedule, onEditSchedule, onRunNow,
         <span className={`text-[10px] ${dowCls}`}>{WEEKDAY_KO[r.dow]}</span>
         {r.holidayName && <span className="text-[10px] text-rose-400">· {r.holidayName}</span>}
         {r.paused && <span className="text-[10px] text-amber-400">· ✈ 휴무</span>}
-        <button
-          onClick={() => onAddSchedule?.(r.dateStr)}
-          className="ml-auto text-[10px] text-zinc-500 hover:text-blue-300"
-          title="이 날짜 새 스케줄"
-        >+</button>
+        {!isPast && (
+          <button
+            onClick={() => onAddSchedule?.(r.dateStr)}
+            className="ml-auto text-[10px] text-zinc-500 hover:text-blue-300"
+            title="이 날짜 새 스케줄"
+          >+</button>
+        )}
       </div>
 
       {todayItems.length === 0 ? (
