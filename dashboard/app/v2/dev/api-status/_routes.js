@@ -6,7 +6,7 @@
 // server-cache TTL 우회 (?refresh=1) 가 필요한 라우트가 공유하는 파라미터 정의.
 export const REFRESH_PARAM = Object.freeze({ key: 'refresh', sample: '' });
 
-export const CATEGORIES = ['차량', '주행', '배터리', '집충전기', '가족'];
+export const CATEGORIES = ['차량', '주행', '배터리', '집충전기', '가족', '자동화'];
 
 export const ROUTES = [
   // 차량
@@ -99,4 +99,18 @@ export const ROUTES = [
       { key: 'year', sample: '' },
       REFRESH_PARAM,
     ] },
+
+  // 자동화 (Tesla 스케줄러 + 외부 API connectivity 테스트)
+  { path: '/api/weather/test',         label: '기상청 테스트',     desc: 'KMA 단기예보 connectivity — apiKeyMissing/캐시상태 노출 (기본 서울시청 좌표). cached=true 면 1시간 캐시 hit.', category: '자동화',
+    params: [
+      { key: 'lat', sample: '37.5665' },
+      { key: 'lng', sample: '126.9780' },
+    ] },
+  { path: '/api/tesla-test/ping',      label: '테슬라 테스트',     desc: 'Fleet API vehicle_data 1회 호출 ($0.002 — ENABLED=false면 실호출 0). 토큰·vehicle id 누락 명시. Mock 모드는 즉시 회신.', category: '자동화' },
+  { path: '/api/schedules',            label: '스케줄 목록',       desc: '등록된 자동화 스케줄 + 활성/조건/마지막 실행', category: '자동화' },
+  { path: '/api/schedules/executions', label: '스케줄 이력',       desc: '실행 이력 통합 (limit 최대 500). status: success/failed/skipped/dry_run', category: '자동화',
+    params: [{ key: 'limit', sample: '50' }] },
+  { path: '/api/geofences',            label: '지오펜스',          desc: '집/회사 좌표 + 반경 (위치 자동화 기준점)', category: '자동화' },
+  { path: '/api/pause-periods',        label: '휴무 모드',         desc: '날짜 범위 일시정지 등록 (apply_pause_mode 스케줄만 영향)', category: '자동화' },
+  { path: '/api/usage/current-month',  label: '이번 달 사용량',    desc: '$10 크레딧 진행률 + 실제/예상 비용 + 카테고리별 호출 수', category: '자동화' },
 ];
