@@ -146,7 +146,8 @@ myDash/
     │   │   ├── tg/page.js            # 텔레그램 봇 관리 (권한·방송·학습로그·가이드)
     │   │   ├── schedule/             # Tesla 자동화 스케줄러 — 캘린더 중심 단일 페이지
     │   │   │   ├── page.js           # 메인 — UsageCard + Calendar(세로 타임라인) + PausePanel + ScheduleList + ExecutionLog. ⚙ 시트는 즉시실행/지오펜스/실연동체크만
-    │   │   │   ├── Calendar.js       # 세로 타임라인 ±14일 (📅 더보기로 범위 확장) + HotBar(다음/마지막 실행) + DayRow(plan/exec chip + skip 토글)
+    │   │   │   ├── Calendar.js       # 세로 타임라인 ±14일 + HotBar(다음/마지막 실행) + DayRow(plan/exec chip + skip 토글) — 📅 더보기 = MonthCalendar 모달 오픈
+    │   │   │   ├── MonthCalendar.js  # 커스텀 월 달력 모달 (실행 아이콘+개수 셀, 클릭 시 Calendar 타임라인 해당 일자로 점프)
     │   │   │   ├── UsageCard.js      # 이번달 Tesla Fleet API 사용량 — 실제 + 예상 + 진행바 + Commands/Wakes/Data/Signals 카운트
     │   │   │   ├── ScheduleList.js   # 스케줄 카드 리스트 — 인라인 요일 토글 + skip 일자 chip + ▶/편집/삭제, 마지막에 [+ 새 스케줄]
     │   │   │   ├── ScheduleForm.js   # 신규/편집 폼 (시간·장소·날씨 3축 트리거 빌더)
@@ -157,7 +158,7 @@ myDash/
     │   │   │   └── GeofencesPanel.js # 지오펜스 read-only 표시 (CRUD 는 TeslaMate UI)
     │   │   └── dev/                  # 개발/진단 도구 (하단 알약 미노출, URL 직접)
     │   │       ├── api-status/
-    │   │       │   ├── page.js       # 3탭(서버/API 테스트/집계) — 28개 라우트 가용성 체크 + 서버/충전/폴링 진단 + 사전집계 상태/scope 갱신 통합 · 서버 폴링은 '서버' 탭 활성일 때만
+    │   │       │   ├── page.js       # 3탭(서버/API 테스트/집계) — 37개 라우트 가용성 체크 + 서버/충전/폴링 진단 + 사전집계 상태/scope 갱신 통합 · 서버 폴링은 '서버' 탭 활성일 때만
     │   │       │   └── _components/
     │   │       │       ├── AggStatusCard.js   # 집계 탭 — dash_* 6 테이블 진단 + AGG_SCOPES (공유) 별 refresh-aggs POST 트리거 + server-cache 메모리 상태
     │   │       │       ├── ServerStatusCard.js
@@ -184,6 +185,7 @@ myDash/
     │       ├── long-stay-places/route.js # 오래 머문 장소 랭킹 (drives LEAD 윈도우로 dwell 산출, ≥10분만)
     │       ├── rankings/route.js         # 랭킹 페이지 데이터 (server-cache 300s · dash_top_drives_cache 위임 + drives JOIN)
     │       ├── route-map/route.js        # 특정 주행의 GPS 경로
+    │       ├── range-radius/route.js     # 현 위치 + 예상 주행거리(est_km, rated 폴백) × 0.75 → 편도/왕복 반경 (server-cache 60s · /v2/battery 상단 지도)
     │       ├── heatmap/route.js          # 히트맵 데이터
     │       ├── home-charger/route.js              # 집충전기 실시간 (환경공단 EvCharger API + 시간대별 캐시)
     │       ├── home-charger/fleet-stats/route.js  # 집충전기 단지 통계
@@ -219,7 +221,8 @@ myDash/
     │       ├── now-command/route.js                     # 즉시 실행 (NowPanel) — schedule 없이 단발 액션
     │       ├── usage/current-month/route.js             # 이번달 Tesla Fleet API 누적 사용량 + 예상 비용 (UsageCard)
     │       ├── holidays/route.js                        # KASI 특일정보 캐시 (한국 공휴일 — 캘린더/이력에서 공통 사용)
-    │       └── tesla-test/ping/route.js                 # Tesla Fleet API connectivity ping — /v2/dev/api-status 자동화 카테고리
+    │       ├── tesla-test/ping/route.js                 # Tesla Fleet API connectivity ping — /v2/dev/api-status 자동화 카테고리
+    │       └── weather/test/route.js                    # KMA 단기예보 connectivity ping (apiKeyMissing/캐시 상태 노출, 기본 서울시청 좌표)
 ```
 
 ## 라우트

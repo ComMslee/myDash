@@ -56,7 +56,7 @@
 
 ### 4. 사전 집계 (dash_*) — TeslaMate DB 테이블 (Tier 2 풀)
 
-- **위치**: `dashboard/lib/dash-agg.js` (TeslaMate DB 에 `dash_` prefix 테이블 보유, TeslaMate 스키마 자체는 무수정)
+- **위치**: `dashboard/lib/dash-agg/` (barrel `index.js` + schema/bootstrap/daily/monthly/top/places — TeslaMate DB 에 `dash_` prefix 테이블 보유, TeslaMate 스키마 자체는 무수정)
 - **테이블**:
   - `dash_daily_drive_agg(car_id, day, dow, hour, ticks_10min, distance_km, duration_min, drive_count, used_km)` — PK `(car_id, day, hour)`
   - `dash_daily_charge_agg(car_id, day, dow, hour, ticks_10min, energy_kwh, charge_count, home_count, fast_count)` — PK `(car_id, day, hour)`
