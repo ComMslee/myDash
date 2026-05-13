@@ -100,8 +100,11 @@ export default function Calendar({
   const today = todayStr();
   const [backDays, setBackDays] = useState(14);
   const [fwdDays, setFwdDays] = useState(14);
+  const [target, setTarget] = useState(null);
   const todayRef = useRef(null);
+  const targetRef = useRef(null);
   const containerRef = useRef(null);
+  const dateInputRef = useRef(null);
 
   const nowKstHHMM = useMemo(() => {
     const t = new Date(Date.now() + 9 * 3600 * 1000);
@@ -171,7 +174,33 @@ export default function Calendar({
   }, [rows]);
 
   const jumpToday = () => {
+    setTarget(null);
     todayRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (target && targetRef.current) {
+      targetRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }, [target, rows]);
+
+  const openDatePicker = () => {
+    const el = dateInputRef.current;
+    if (!el) return;
+    if (typeof el.showPicker === 'function') el.showPicker();
+    else el.click();
+  };
+
+  const onPickDate = (e) => {
+    const val = e.target.value;
+    e.target.value = '';
+    if (!val) return;
+    const [y, m, d] = val.split('-').map((x) => parseInt(x, 10));
+    const [ty, tm, td] = today.split('-').map((x) => parseInt(x, 10));
+    const diff = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(ty, tm - 1, td)) / 86400000);
+    if (diff < 0 && Math.abs(diff) > backDays) setBackDays(Math.abs(diff) + 3);
+    if (diff > 0 && diff > fwdDays) setFwdDays(diff + 3);
+    setTarget(val);
   };
 
   return (
@@ -179,28 +208,35 @@ export default function Calendar({
       <HotBar next={nextRun} last={lastRun} today={today} onJump={() => jumpToday()} />
 
       <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-2">
-        <div className="flex items-center justify-between px-2 py-1">
-          <button
-            onClick={() => setBackDays((n) => n + 14)}
-            className="text-[10px] text-zinc-500 hover:text-zinc-300"
-          >↑ 더 이전</button>
+        <div className="flex items-center justify-center gap-2 px-2 py-1">
           <button
             onClick={jumpToday}
             className="text-[10px] px-2 py-0.5 rounded bg-blue-500/15 text-blue-300 hover:bg-blue-500/25"
           >오늘로</button>
           <button
-            onClick={() => setFwdDays((n) => n + 14)}
-            className="text-[10px] text-zinc-500 hover:text-zinc-300"
-          >↓ 더 이후</button>
+            onClick={openDatePicker}
+            className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+          >📅 더보기</button>
+          <input
+            ref={dateInputRef}
+            type="date"
+            onChange={onPickDate}
+            className="sr-only"
+            tabIndex={-1}
+          />
         </div>
 
         <div ref={containerRef} className="max-h-[70vh] overflow-y-auto px-1 py-1 space-y-1">
           {rows.map((r) => (
-            <div key={r.dateStr} ref={r.isToday ? todayRef : null}>
+            <div
+              key={r.dateStr}
+              ref={r.dateStr === target ? targetRef : r.isToday ? todayRef : null}
+            >
               <DayRow
                 r={r}
                 today={today}
                 isTodayRow={r.isToday}
+                isTarget={r.dateStr === target && !r.isToday}
                 onAddSchedule={onAddSchedule}
                 onEditSchedule={onEditSchedule}
                 onRunNow={onRunNow}
@@ -272,14 +308,16 @@ function HotBar({ next, last, today, onJump }) {
   );
 }
 
-function DayRow({ r, today, isTodayRow, onAddSchedule, onEditSchedule, onRunNow, onToggleSkip }) {
+function DayRow({ r, today, isTodayRow, isTarget, onAddSchedule, onEditSchedule, onRunNow, onToggleSkip }) {
   const dowCls = r.dow === 0 || r.isHoliday ? 'text-rose-400' : r.dow === 6 ? 'text-sky-400' : 'text-zinc-300';
   const isPast = r.isPast;
   const headerCls = isTodayRow
     ? 'bg-blue-500/15 border-blue-500/40 ring-1 ring-blue-500/30'
-    : r.paused
-      ? 'bg-amber-500/5 border-amber-500/10'
-      : 'bg-zinc-900/50 border-white/[0.04]';
+    : isTarget
+      ? 'bg-violet-500/10 border-violet-500/30 ring-1 ring-violet-500/30'
+      : r.paused
+        ? 'bg-amber-500/5 border-amber-500/10'
+        : 'bg-zinc-900/50 border-white/[0.04]';
 
   const items = isPast
     ? r.execs.map((e) => ({ kind: 'exec', e }))
