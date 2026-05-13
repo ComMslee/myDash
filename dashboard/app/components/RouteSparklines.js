@@ -53,12 +53,17 @@ export default function RouteSparklines({ routes }) {
           );
         }
         const showGain = s.key === 'elev' && elevGain != null;
+        const skipMin = s.key === 'speed'; // 속도 최저는 항상 0 이라 의미 없음 → 제거
         return (
           <div key={s.key} className="flex items-center gap-2">
             <span className={`shrink-0 ${s.iconClass}`}><Icon name={s.iconName} className="w-4 h-4" /></span>
-            <span className="text-zinc-500">최저</span>
-            <span className="text-zinc-300">{s.fmt(s.min)}</span>
-            <span className="text-zinc-700">·</span>
+            {!skipMin && (
+              <>
+                <span className="text-zinc-500">최저</span>
+                <span className="text-zinc-300">{s.fmt(s.min)}</span>
+                <span className="text-zinc-700">·</span>
+              </>
+            )}
             <span className="text-zinc-500">평균</span>
             <span className="text-white font-bold">{s.fmt(s.avg)}</span>
             <span className="text-zinc-700">·</span>
