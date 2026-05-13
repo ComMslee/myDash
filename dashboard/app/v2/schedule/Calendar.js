@@ -199,25 +199,7 @@ export default function Calendar({
       <HotBar next={nextRun} last={lastRun} today={today} onJump={() => jumpToday()} />
 
       <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-2">
-        <div className="flex items-center justify-center gap-2 px-2 py-1">
-          <button
-            onClick={jumpToday}
-            className="text-[10px] px-2 py-0.5 rounded bg-blue-500/15 text-blue-300 hover:bg-blue-500/25"
-          >오늘로</button>
-          <button
-            onClick={openDatePicker}
-            className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
-          >📅 더보기</button>
-          <input
-            ref={dateInputRef}
-            type="date"
-            onChange={onPickDate}
-            className="sr-only"
-            tabIndex={-1}
-          />
-        </div>
-
-        <div ref={containerRef} className="max-h-[70vh] overflow-y-auto px-1 py-1 space-y-1">
+        <div ref={containerRef} className="max-h-[45vh] overflow-y-auto px-1 py-1 space-y-1">
           {rows.map((r) => (
             <div
               key={r.dateStr}
@@ -235,6 +217,24 @@ export default function Calendar({
               />
             </div>
           ))}
+        </div>
+
+        <div className="flex items-center justify-center gap-2 px-2 py-1 pt-2 border-t border-white/[0.04] mt-1">
+          <button
+            onClick={jumpToday}
+            className="text-[10px] px-2 py-0.5 rounded bg-blue-500/15 text-blue-300 hover:bg-blue-500/25"
+          >오늘로</button>
+          <button
+            onClick={openDatePicker}
+            className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+          >📅 더보기</button>
+          <input
+            ref={dateInputRef}
+            type="date"
+            onChange={onPickDate}
+            className="sr-only"
+            tabIndex={-1}
+          />
         </div>
       </div>
     </div>
