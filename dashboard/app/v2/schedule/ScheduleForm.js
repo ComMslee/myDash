@@ -407,7 +407,7 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
 
       {/* ── 시간 트리거 ── */}
       <div className="space-y-2 pb-2 border-b border-white/[0.06]">
-        {/* 시각(시:분) + 사전실행(분) 한 줄 — 왼쪽 아이콘 ▶ 와 정렬 */}
+        {/* 시각(시:분) 한 줄 */}
         <div className="flex items-center gap-2">
           <span className="text-sm w-6 text-center">🕐</span>
           <SelectBase
@@ -434,20 +434,9 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
               <option key={mm} value={mm}>{mm}분</option>
             ))}
           </SelectBase>
-          <InputBase
-            type="number"
-            min={0}
-            max={120}
-            value={s.timeLead}
-            onChange={e => set({ timeLead: e.target.value })}
-            placeholder="0"
-            className="tabular-nums w-14 flex-shrink-0"
-            title="사전 실행 (분)"
-          />
-          <span className="text-[10px] text-zinc-500 whitespace-nowrap">분 전</span>
         </div>
 
-        {/* 요일 한 줄 — 아이콘 자리 비움 + 7개 균등 */}
+        {/* 요일 한 줄 — 7개 균등 */}
         <div className="flex items-center gap-2">
           <span className="w-6"></span>
           <div className="flex-1 flex gap-1.5">
@@ -469,6 +458,21 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
               );
             })}
           </div>
+        </div>
+
+        {/* 사전 실행 (분) — 옵션, 기본 0 */}
+        <div className="flex items-center gap-2">
+          <span className="w-6"></span>
+          <span className="text-[11px] text-zinc-500 flex-1">사전 실행 (분 일찍 발화)</span>
+          <InputBase
+            type="number"
+            min={0}
+            max={120}
+            value={s.timeLead}
+            onChange={e => set({ timeLead: e.target.value })}
+            placeholder="0"
+            className="tabular-nums w-16 flex-shrink-0 text-right"
+          />
         </div>
 
         {touched && errors.time && <ErrorHint>{errors.time}</ErrorHint>}
