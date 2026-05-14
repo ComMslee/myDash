@@ -7,6 +7,8 @@ import { useEffect, useState, useCallback } from 'react';
 export default function TeslaConnectPanel() {
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [testing, setTesting] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -29,6 +31,28 @@ export default function TeslaConnectPanel() {
       await fetch('/api/tesla/oauth/status', { method: 'DELETE' });
       await refresh();
     } finally { setBusy(false); }
+  };
+
+  const checkStatus = async () => {
+    setTesting(true); setTestResult(null);
+    try {
+      const r = await fetch('/api/tesla-test/ping');
+      const j = await r.json();
+      setTestResult({ kind: 'status', ok: r.ok, data: j });
+    } catch (e) {
+      setTestResult({ kind: 'status', ok: false, data: { error: e?.message } });
+    } finally { setTesting(false); }
+  };
+
+  const wake = async () => {
+    setTesting(true); setTestResult(null);
+    try {
+      const r = await fetch('/api/tesla-test/wake', { method: 'POST' });
+      const j = await r.json();
+      setTestResult({ kind: 'wake', ok: r.ok, data: j });
+    } catch (e) {
+      setTestResult({ kind: 'wake', ok: false, data: { error: e?.message } });
+    } finally { setTesting(false); }
   };
 
   const connected = status?.connected;
@@ -62,7 +86,17 @@ export default function TeslaConnectPanel() {
               scope: <span className="text-zinc-400">{scopes.join(', ')}</span>
             </p>
           )}
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button
+              onClick={checkStatus}
+              disabled={testing}
+              className="px-2.5 py-1 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 disabled:opacity-50"
+            >🔍 차량 상태</button>
+            <button
+              onClick={wake}
+              disabled={testing}
+              className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 disabled:opacity-50"
+            >⏰ 깨우기</button>
             <button
               onClick={connect}
               disabled={busy}
@@ -74,6 +108,36 @@ export default function TeslaConnectPanel() {
               className="px-2.5 py-1 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 disabled:opacity-50"
             >연결 해제</button>
           </div>
+
+          {testing && <p className="text-[11px] text-zinc-500 pt-1">…호출 중</p>}
+
+          {testResult && testResult.kind === 'status' && (
+            <div className="mt-2 p-2 rounded-lg bg-zinc-900/60 border border-white/[0.06] text-[11px] space-y-1">
+              <p className="font-semibold text-zinc-300">차량 상태 {testResult.ok ? '✓' : '✗'}</p>
+              {testResult.data?.summary ? (
+                <div className="space-y-0.5 text-zinc-400">
+                  <p>VIN: <span className="text-zinc-200">{testResult.data.summary.vin}</span></p>
+                  <p>상태: <span className="text-zinc-200">{testResult.data.summary.state}</span></p>
+                  <p>배터리: <span className="text-zinc-200">{testResult.data.summary.battery_level}%</span></p>
+                  <p>주행거리: <span className="text-zinc-200">{testResult.data.summary.odometer != null ? `${Math.round(testResult.data.summary.odometer * 1.609).toLocaleString()} km` : '—'}</span></p>
+                  <p>Sentry: <span className="text-zinc-200">{String(testResult.data.summary.sentry_mode)}</span></p>
+                  <p>버전: <span className="text-zinc-200">{testResult.data.summary.car_version}</span></p>
+                  <p className="text-zinc-500">비용: ~${testResult.data.cost_estimate}</p>
+                </div>
+              ) : (
+                <pre className="text-zinc-400 whitespace-pre-wrap break-all">{JSON.stringify(testResult.data, null, 2)}</pre>
+              )}
+            </div>
+          )}
+
+          {testResult && testResult.kind === 'wake' && (
+            <div className="mt-2 p-2 rounded-lg bg-zinc-900/60 border border-white/[0.06] text-[11px] space-y-1">
+              <p className="font-semibold text-zinc-300">깨우기 {testResult.ok ? '✓' : '✗'}</p>
+              <p className="text-zinc-400">상태: <span className="text-zinc-200">{testResult.data?.state || '—'}</span></p>
+              {testResult.data?.note && <p className="text-zinc-500">{testResult.data.note}</p>}
+              {testResult.data?.error && <p className="text-red-300">{testResult.data.error}</p>}
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-2 text-zinc-400">
