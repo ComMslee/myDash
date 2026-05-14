@@ -67,9 +67,12 @@ export default function StatesTodayPopup({ open, onClose }) {
 
   if (!open) return null;
 
-  const onlineSegs = (data || []).filter(s => s.state === 'online');
-  const briefWakes = onlineSegs.filter(s => s.minutes < 10);
+  const segs = data || [];
+  const onlineSegs = segs.filter(s => s.type === 'online');
+  const chargeSegs = segs.filter(s => s.type === 'charging');
   const totalOnlineMin = onlineSegs.reduce((t, s) => t + s.minutes, 0);
+  const sentryCount = onlineSegs.filter(s => s.sentry_suspect).length;
+  const climateCount = onlineSegs.filter(s => s.climate_minutes > 0).length;
 
   return (
     <div
@@ -87,7 +90,7 @@ export default function StatesTodayPopup({ open, onClose }) {
           <div>
             <h2 className="text-sm font-bold text-zinc-200">온라인</h2>
             <p className="text-[10px] text-zinc-500 mt-0.5">
-              ⚡깸 {briefWakes.length}건 · 총 {fmtDuration(totalOnlineMin)}
+              총 {fmtDuration(totalOnlineMin)} · ⚡{chargeSegs.length} · ❄{climateCount} · 🛡{sentryCount}
             </p>
           </div>
           <button
@@ -126,22 +129,34 @@ export default function StatesTodayPopup({ open, onClose }) {
         <div className="overflow-y-auto flex-1 p-2">
           {!data ? (
             <p className="text-xs text-zinc-500 text-center py-6">로딩…</p>
-          ) : onlineSegs.length === 0 ? (
+          ) : segs.length === 0 ? (
             <p className="text-xs text-zinc-500 text-center py-6">온라인 기록이 없습니다</p>
           ) : (
             <div className="space-y-1">
-              {[...onlineSegs].reverse().map((s, i) => {
-                const isBrief = s.minutes < 10;
+              {[...segs].reverse().map((s, i) => {
+                const isCharge = s.type === 'charging';
                 return (
                   <div
                     key={i}
-                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs ${isBrief ? 'bg-amber-500/[0.06] border border-amber-500/20' : ''}`}
+                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs ${
+                      isCharge
+                        ? 'bg-yellow-500/[0.06] border border-yellow-500/20'
+                        : s.sentry_suspect
+                        ? 'bg-fuchsia-500/[0.06] border border-fuchsia-500/20'
+                        : ''
+                    }`}
                   >
                     <span className="text-zinc-300 tabular-nums flex-shrink-0">
                       {fmtTime(s.start)}
                     </span>
-                    <span className="ml-auto flex items-center gap-1 flex-shrink-0">
-                      {isBrief && <span className="text-amber-400">⚡</span>}
+                    <span className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+                      {isCharge && <span className="text-yellow-400" title={`충전 +${s.soc_added}% (${s.soc_start}→${s.soc_end})`}>⚡</span>}
+                      {!isCharge && s.climate_minutes > 0 && (
+                        <span className="text-sky-300" title={`공조 ${s.climate_minutes}분`}>❄</span>
+                      )}
+                      {!isCharge && s.sentry_suspect && (
+                        <span className="text-fuchsia-300" title={`센트리 의심 — ${s.soc_drop}% 감소`}>🛡</span>
+                      )}
                       <span className="text-zinc-200 tabular-nums font-medium">
                         {fmtDuration(s.minutes)}
                       </span>
