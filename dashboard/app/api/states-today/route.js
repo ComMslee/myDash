@@ -125,9 +125,12 @@ export async function GET(request) {
       const climateMin = Math.round(climateR.rows[0]?.climate_min || 0);
       const socDrop = Math.round((socR.rows[0]?.drop || 0) * 10) / 10;
       const hours = minutes / 60;
-      const dropRate = hours > 0 ? socDrop / hours : 0; // %/hr
-      // 센트리 의심: climate 없음 + 길이 ≥30분 + drain ≥ 0.8%/hr (1%/hr 베이스라인 ± 여유)
-      const sentrySuspect = climateMin === 0 && minutes >= 30 && dropRate >= 0.8;
+      // 공조로 설명 가능한 drop 을 빼고 남은 순수 drain — 공조 작동 1분당 ~0.05% 가정 (대략)
+      const climateAttributable = (climateMin / 60) * 3; // 공조 1h ≈ 3% 소모 추정
+      const sentryDrop = Math.max(0, socDrop - climateAttributable);
+      const sentryRate = hours > 0 ? sentryDrop / hours : 0;
+      // 센트리 의심: 공조 빼고도 길이 ≥20분 + 잔여 drain ≥ 0.6%/hr
+      const sentrySuspect = minutes >= 20 && sentryRate >= 0.6;
       segments.push({
         type: 'online',
         start: startTs,
@@ -136,6 +139,7 @@ export async function GET(request) {
         is_current: sub.is_current,
         climate_minutes: climateMin,
         soc_drop: socDrop,
+        sentry_drop: Math.round(sentryDrop * 10) / 10,
         sentry_suspect: sentrySuspect,
       });
     }

@@ -164,7 +164,7 @@ export default function StatesTodayPopup({ open, onClose }) {
                         </span>
                       )}
                       {!isCharge && s.sentry_suspect && (
-                        <span className="text-fuchsia-300 inline-flex" title={`센트리 의심 — ${s.soc_drop}% 감소`}>
+                        <span className="text-fuchsia-300 inline-flex" title={`센트리 의심 — 잔여 drain ${s.sentry_drop ?? s.soc_drop}%`}>
                           <Icon name="shield" className="w-3.5 h-3.5" />
                         </span>
                       )}
