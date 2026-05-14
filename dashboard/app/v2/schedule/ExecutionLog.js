@@ -44,6 +44,8 @@ export default function ExecutionLog({ schedules }) {
     if (filterStatus !== 'all' && e.status !== filterStatus) return false;
     if (filterSchedule === 'manual') {
       if (e.schedule_id != null) return false;
+    } else if (filterSchedule === 'scheduled') {
+      if (e.schedule_id == null) return false;
     } else if (filterSchedule !== 'all' && String(e.schedule_id) !== filterSchedule) {
       return false;
     }
@@ -69,10 +71,11 @@ export default function ExecutionLog({ schedules }) {
           onChange={(e) => setFilterSchedule(e.target.value)}
           className="text-xs bg-zinc-900 border border-white/[0.06] rounded px-2 py-1 text-zinc-300 flex-1 min-w-0"
         >
-          <option value="all">전체 스케줄</option>
-          <option value="manual">⚡ 즉시 실행 / 테스트</option>
+          <option value="all">전체 (스케줄 + 즉시)</option>
+          <option value="scheduled">📅 스케줄만</option>
+          <option value="manual">⚡ 즉시 실행 / 테스트만</option>
           {schedules?.map((s) => (
-            <option key={s.id} value={String(s.id)}>{s.name}</option>
+            <option key={s.id} value={String(s.id)}>└ {s.name}</option>
           ))}
         </select>
         <span className="text-[10px] text-zinc-500 tabular-nums">{filtered.length}건</span>
