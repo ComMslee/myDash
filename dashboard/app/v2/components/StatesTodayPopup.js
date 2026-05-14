@@ -138,6 +138,8 @@ export default function StatesTodayPopup({ open, onClose }) {
             <div className="space-y-1">
               {[...segs].reverse().map((s, i) => {
                 const isCharge = s.type === 'charging';
+                const climateWins = !isCharge && s.climate_minutes > 0 && s.climate_minutes >= (s.sentry_minutes || 0);
+                const sentryWins = !isCharge && s.sentry_suspect && (s.sentry_minutes || 0) > s.climate_minutes;
                 return (
                   <div
                     key={i}
@@ -158,12 +160,12 @@ export default function StatesTodayPopup({ open, onClose }) {
                           <Icon name="bolt" className="w-3.5 h-3.5" filled />
                         </span>
                       )}
-                      {!isCharge && s.climate_minutes > 0 && (
+                      {climateWins && (
                         <span className="text-sky-300 inline-flex" title={`공조 ${s.climate_minutes}분${s.climate_pct != null ? ` · ~${s.climate_pct}%` : ''}`}>
                           <Icon name="climate" className="w-3.5 h-3.5" />
                         </span>
                       )}
-                      {!isCharge && s.sentry_suspect && (
+                      {sentryWins && (
                         <span className="text-fuchsia-300 inline-flex" title={`센트리 의심 ${s.sentry_minutes}분 · ~${s.sentry_pct}%`}>
                           <Icon name="shield" className="w-3.5 h-3.5" />
                         </span>
