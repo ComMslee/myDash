@@ -114,10 +114,22 @@ export default function TeslaConnectPanel() {
           {testResult && testResult.kind === 'status' && (
             <div className="mt-2 p-2 rounded-lg bg-zinc-900/60 border border-white/[0.06] text-[11px] space-y-1">
               <p className="font-semibold text-zinc-300">차량 상태 {testResult.ok ? '✓' : '✗'}</p>
+              {testResult.data?.state && (
+                <p className="text-zinc-400">
+                  state: <span className={
+                    testResult.data.state === 'online' ? 'text-emerald-300 font-semibold'
+                    : testResult.data.state === 'asleep' ? 'text-blue-300 font-semibold'
+                    : 'text-zinc-300 font-semibold'
+                  }>{testResult.data.state}</span>
+                  {testResult.data.display_name && <span className="text-zinc-500"> · {testResult.data.display_name}</span>}
+                </p>
+              )}
+              {testResult.data?.vin && !testResult.data?.summary && (
+                <p className="text-zinc-400">VIN: <span className="text-zinc-200">{testResult.data.vin}</span></p>
+              )}
               {testResult.data?.summary ? (
                 <div className="space-y-0.5 text-zinc-400">
                   <p>VIN: <span className="text-zinc-200">{testResult.data.summary.vin}</span></p>
-                  <p>상태: <span className="text-zinc-200">{testResult.data.summary.state}</span></p>
                   <p>배터리: <span className="text-zinc-200">{testResult.data.summary.battery_level}%</span></p>
                   <p>주행거리: <span className="text-zinc-200">{testResult.data.summary.odometer != null ? `${Math.round(testResult.data.summary.odometer * 1.609).toLocaleString()} km` : '—'}</span></p>
                   <p>Sentry: <span className="text-zinc-200">{String(testResult.data.summary.sentry_mode)}</span></p>
@@ -125,7 +137,7 @@ export default function TeslaConnectPanel() {
                   <p className="text-zinc-500">비용: ~${testResult.data.cost_estimate}</p>
                 </div>
               ) : (
-                <pre className="text-zinc-400 whitespace-pre-wrap break-all">{JSON.stringify(testResult.data, null, 2)}</pre>
+                <p className="text-zinc-500">{testResult.data?.note || '응답에 상세 정보 없음'}</p>
               )}
             </div>
           )}

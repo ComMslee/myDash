@@ -84,3 +84,9 @@ export async function callTeslaVehicleData() {
   const vid = await vehicleId();
   return teslaFetch(`/api/1/vehicles/${vid}/vehicle_data`);
 }
+
+// 차량 1대 상태만 (state: online/asleep/offline). 자는 차도 OK — 깨우지 않음. 무료.
+export async function callTeslaVehicleSummary() {
+  const vid = await vehicleId();
+  return teslaFetch(`/api/1/vehicles/${vid}`);
+}

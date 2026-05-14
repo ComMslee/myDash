@@ -1,12 +1,13 @@
 import { requireAuth } from '@/lib/auth-helper';
-import { callTeslaVehicleData, listVehicles } from '@/lib/tesla-fleet';
+import { callTeslaVehicleData, callTeslaVehicleSummary, listVehicles } from '@/lib/tesla-fleet';
 import { getConnectionStatus } from '@/lib/tesla-tokens';
 
 export const dynamic = 'force-dynamic';
 
 // GET /api/tesla-test/ping — Tesla Fleet API connectivity 테스트.
-// ENABLED=false → Mock. ENABLED=true → vehicle_data 1회 실호출 ($0.002).
-// 토큰은 DB 저장 (OAuth 통해 발급). 차량 id 는 첫 차량 자동 선택.
+// 1) listVehicles + 단일 차량 summary 로 state 확인 (asleep/online/offline) — 무료, 차 안 깨움.
+// 2) state==='online' 이면 vehicle_data 1회 실호출 ($0.002) — 배터리/주행거리/Sentry/버전 포함.
+// 3) asleep/offline 이면 vehicle_data 안 부르고 state 만 반환 — '깨우기' 버튼 안내.
 export async function GET() {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
@@ -30,8 +31,26 @@ export async function GET() {
   }
 
   try {
-    // 첫 호출: vehicles 목록 (vehicle_id 자동 저장) — 무료(목록은 단가 0 또는 매우 낮음).
     const vehicles = await listVehicles().catch(() => null);
+    const sum = await callTeslaVehicleSummary().catch(() => null);
+    const state = sum?.body?.response?.state || null;
+    const vin = sum?.body?.response?.vin || null;
+    const displayName = sum?.body?.response?.display_name || null;
+
+    // 자거나 오프라인이면 vehicle_data 호출 X — 차 안 깨움.
+    if (state !== 'online') {
+      return Response.json({
+        enabled: true, tokenMissing: false,
+        vehicles_count: vehicles?.response?.length || 0,
+        ok: true, state, vin, display_name: displayName,
+        summary: null,
+        cost_estimate: 0,
+        note: state === 'asleep' ? '차량 sleep 중 — "깨우기" 버튼 누른 후 다시 시도'
+            : state === 'offline' ? '차량 offline (전원 차단/통신 두절)'
+            : `차량 state=${state || 'unknown'} — vehicle_data 호출 안 함`,
+      });
+    }
+
     const r = await callTeslaVehicleData();
     const body = r?.body?.response || r?.body || null;
     const summary = body ? {
@@ -45,7 +64,7 @@ export async function GET() {
     return Response.json({
       enabled: true, tokenMissing: false,
       vehicles_count: vehicles?.response?.length || 0,
-      ok: r.ok, status: r.status, summary,
+      ok: r.ok, status: r.status, state, vin, display_name: displayName, summary,
       cost_estimate: r.ok ? 0.002 : 0,
     });
   } catch (e) {
