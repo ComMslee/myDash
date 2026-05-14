@@ -76,8 +76,15 @@ export async function GET(req) {
     scope: j.scope,
   });
 
-  // 성공 — state 쿠키 제거 + 설정 페이지로 리다이렉트
-  const res = NextResponse.redirect(new URL('/v2/schedule?tesla=connected', req.url), 302);
+  // 성공 — state 쿠키 제거 + 공개 URL 기준 절대 경로로 리다이렉트.
+  // req.url 은 컨테이너 내부(http://dashboard:5000) 라 그대로 쓰면 localhost 로 튐.
+  const publicOrigin =
+    process.env.DASHBOARD_PUBLIC_URL ||
+    (process.env.TESLA_FLEET_REDIRECT_URI ? new URL(process.env.TESLA_FLEET_REDIRECT_URI).origin : '');
+  const target = publicOrigin
+    ? `${publicOrigin}/v2/schedule?tesla=connected`
+    : '/v2/schedule?tesla=connected';
+  const res = NextResponse.redirect(target, 302);
   res.cookies.set('tesla_oauth_state', '', { path: '/api/tesla/oauth', maxAge: 0 });
   return res;
 }
