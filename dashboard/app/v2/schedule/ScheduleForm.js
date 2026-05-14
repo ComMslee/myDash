@@ -35,10 +35,10 @@ const WEATHER_PRECIP_OPTIONS = [
   { value: 'any',  label: '비 또는 눈' },
 ];
 
+// 장소는 시간 트리거의 '필터' 로만 사용 — 머무는 동안(at) 만 지원.
+// (이전 enter/exit 이벤트 모드는 제거 — 시간이 항상 트리거)
 const LOCATION_EVENT_OPTIONS = [
-  { value: 'at',    label: '머무는 동안' },
-  { value: 'enter', label: '도착 시' },
-  { value: 'exit',  label: '출발 시' },
+  { value: 'at', label: '머무는 동안' },
 ];
 
 // ─── 초기 상태 헬퍼 ─────────────────────────────────────────────────────────
@@ -52,8 +52,8 @@ function buildInitialState(initial) {
     action:          initial?.action          ?? 'sentry_on',
     chargePercent:   initial?.action_params?.percent ?? 80,
 
-    // 3축 트리거
-    timeEnabled:     !!tc.time,
+    // 시간 = 메인 트리거 (항상 활성). 장소/날씨 = 선택 조건(필터).
+    timeEnabled:     true,
     timeHhmm:        tc.time?.hhmm           ?? '08:00',
     timeDays:        tc.time?.days            ?? [],
     timeSkipHolidays: tc.time?.skip_holidays  ?? false,
@@ -61,7 +61,7 @@ function buildInitialState(initial) {
 
     locationEnabled: !!tc.location,
     locationPlace:   tc.location?.place       ?? 'home',
-    locationEvent:   tc.location?.event       ?? 'enter',
+    locationEvent:   'at', // 항상 'at' — 시간 트리거의 필터
     locationDebounce: tc.debounce_minutes     ?? 5,
 
     weatherEnabled:  !!tc.weather,
@@ -202,14 +202,10 @@ function ErrorHint({ children }) {
 function validate(s) {
   const errors = {};
   if (!s.name.trim()) errors.name = '이름을 입력해 주세요.';
-  if (s.timeEnabled) {
-    if (!s.timeHhmm && s.timeDays.length === 0) {
-      errors.time = '시각 또는 요일 중 하나는 설정해 주세요.';
-    }
-  }
-  if (s.locationEnabled) {
-    if (!s.locationPlace) errors.location = '장소를 선택해 주세요.';
-    if (!s.locationEvent) errors.locationEvent = '이벤트를 선택해 주세요.';
+  // 시간은 항상 트리거 — 시각 필수
+  if (!s.timeHhmm) errors.time = '시각을 설정해 주세요.';
+  if (s.locationEnabled && !s.locationPlace) {
+    errors.location = '장소를 선택해 주세요.';
   }
   return errors;
 }
@@ -231,7 +227,7 @@ function buildPayload(s) {
   if (s.locationEnabled) {
     trigger_config.location = {
       place: s.locationPlace,
-      event: s.locationEvent,
+      event: 'at', // 시간 트리거의 위치 필터로만 사용
     };
     trigger_config.debounce_minutes = Number(s.locationDebounce) || 5;
   }
@@ -410,16 +406,15 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
         )}
       </div>
 
-      {/* ── 시간 트리거 ── */}
+      {/* ── 시간 트리거 (항상 활성) ── */}
       <div className="space-y-2 pb-2 border-b border-white/[0.06]">
-        <AxisHeader
-          icon="🕐"
-          title="시간"
-          enabled={s.timeEnabled}
-          onToggle={v => set({ timeEnabled: v })}
-        />
+        <div className="flex items-center gap-2">
+          <span className="text-base">🕐</span>
+          <span className="text-sm font-medium text-zinc-300">시간</span>
+          <span className="text-[10px] text-zinc-500 px-1.5 py-0.5 rounded bg-zinc-800 border border-white/[0.06]">트리거</span>
+        </div>
 
-        {s.timeEnabled && (
+        {true && (
           <div className="pl-4 space-y-2">
             {/* 시각 */}
             <FieldRow label="시각">
@@ -486,100 +481,82 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
         )}
       </div>
 
-      {/* ── 장소 트리거 ── */}
-      <div className="space-y-2 pb-2 border-b border-white/[0.06]">
-        <AxisHeader
-          icon="📍"
-          title="장소"
-          enabled={s.locationEnabled}
-          onToggle={v => set({ locationEnabled: v })}
-        />
+      {/* ── 추가 조건 (장소·날씨 필터) ── */}
+      <div className="space-y-3 pb-2 border-b border-white/[0.06]">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-zinc-400">📋 추가 조건</span>
+          <span className="text-[10px] text-zinc-500">(시간 매칭 시 함께 충족돼야 발화)</span>
+        </div>
 
-        {s.locationEnabled && (
-          <div className="pl-4 space-y-2">
-            <FieldRow label="장소">
-              <SelectBase
-                value={s.locationPlace}
-                onChange={e => set({ locationPlace: e.target.value })}
-              >
-                {placeOptions.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </SelectBase>
-              {touched && errors.location && <ErrorHint>{errors.location}</ErrorHint>}
-            </FieldRow>
-
-            <FieldRow label="이벤트">
-              <SelectBase
-                value={s.locationEvent}
-                onChange={e => set({ locationEvent: e.target.value })}
-              >
-                {LOCATION_EVENT_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </SelectBase>
-              {touched && errors.locationEvent && <ErrorHint>{errors.locationEvent}</ErrorHint>}
-            </FieldRow>
-
-            <FieldRow label="디바운스 (분)">
-              <InputBase
-                type="number"
-                min={0}
-                max={60}
-                value={s.locationDebounce}
-                onChange={e => set({ locationDebounce: e.target.value })}
-                placeholder="5"
-                className="tabular-nums"
-              />
-            </FieldRow>
-          </div>
-        )}
-      </div>
-
-      {/* ── 날씨 트리거 ── */}
-      <div className="space-y-2 pb-2 border-b border-white/[0.06]">
-        <AxisHeader
-          icon="🌤"
-          title="날씨"
-          enabled={s.weatherEnabled}
-          onToggle={v => set({ weatherEnabled: v })}
-        />
-
-        {s.weatherEnabled && (
-          <div className="pl-4 space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <FieldRow label="외기온 최저 (°C)">
-                <InputBase
-                  type="number"
-                  value={s.weatherTempMin}
-                  onChange={e => set({ weatherTempMin: e.target.value })}
-                  placeholder="예: -5"
-                  className="tabular-nums"
-                />
-              </FieldRow>
-              <FieldRow label="외기온 최고 (°C)">
-                <InputBase
-                  type="number"
-                  value={s.weatherTempMax}
-                  onChange={e => set({ weatherTempMax: e.target.value })}
-                  placeholder="예: 35"
-                  className="tabular-nums"
-                />
+        {/* 장소 필터 */}
+        <div className="bg-zinc-900/30 border border-white/[0.04] rounded-lg p-2.5 space-y-2">
+          <AxisHeader
+            icon="📍"
+            title="장소"
+            enabled={s.locationEnabled}
+            onToggle={v => set({ locationEnabled: v })}
+          />
+          {s.locationEnabled && (
+            <div className="pl-4 space-y-2">
+              <FieldRow label="장소 (이 위치에 머물러야 발화)">
+                <SelectBase
+                  value={s.locationPlace}
+                  onChange={e => set({ locationPlace: e.target.value })}
+                >
+                  {placeOptions.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </SelectBase>
+                {touched && errors.location && <ErrorHint>{errors.location}</ErrorHint>}
               </FieldRow>
             </div>
+          )}
+        </div>
 
-            <FieldRow label="강수">
-              <SelectBase
-                value={s.weatherPrecip}
-                onChange={e => set({ weatherPrecip: e.target.value })}
-              >
-                {WEATHER_PRECIP_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </SelectBase>
-            </FieldRow>
-          </div>
-        )}
+        {/* 날씨 필터 */}
+        <div className="bg-zinc-900/30 border border-white/[0.04] rounded-lg p-2.5 space-y-2">
+          <AxisHeader
+            icon="🌤"
+            title="날씨"
+            enabled={s.weatherEnabled}
+            onToggle={v => set({ weatherEnabled: v })}
+          />
+          {s.weatherEnabled && (
+            <div className="pl-4 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <FieldRow label="외기온 최저 (°C)">
+                  <InputBase
+                    type="number"
+                    value={s.weatherTempMin}
+                    onChange={e => set({ weatherTempMin: e.target.value })}
+                    placeholder="예: -5"
+                    className="tabular-nums"
+                  />
+                </FieldRow>
+                <FieldRow label="외기온 최고 (°C)">
+                  <InputBase
+                    type="number"
+                    value={s.weatherTempMax}
+                    onChange={e => set({ weatherTempMax: e.target.value })}
+                    placeholder="예: 35"
+                    className="tabular-nums"
+                  />
+                </FieldRow>
+              </div>
+
+              <FieldRow label="강수">
+                <SelectBase
+                  value={s.weatherPrecip}
+                  onChange={e => set({ weatherPrecip: e.target.value })}
+                >
+                  {WEATHER_PRECIP_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </SelectBase>
+              </FieldRow>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 유효 기간 */}
