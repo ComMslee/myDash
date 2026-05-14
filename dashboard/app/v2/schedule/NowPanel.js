@@ -5,12 +5,17 @@ import { useState } from 'react';
 // 즉시 실행 패널 — 센트리/공조/잠금/충전 on·off + 차량 상태/깨우기 테스트.
 // 명령 클릭 → /api/now-command (Mock=dry_run, ENABLED=실호출).
 // 차량 상태/깨우기 → /api/tesla-test/{ping|wake}.
+// 단가: lib/queries/schedules.js::COST 와 동기 (2025.01.01 기준).
+
+const COST_COMMAND = 0.001;
+const COST_WAKE = 0.02;
+const COST_VEHICLE_DATA = 0.002;
 
 const ACTIONS = [
-  { key: 'sentry', label: '센트리', on: 'sentry_on', off: 'sentry_off', icon: '🛡', cost: 0.002 },
-  { key: 'climate', label: '공조', on: 'climate_on', off: 'climate_off', icon: '❄️', cost: 0.002 },
-  { key: 'lock', label: '잠금', on: 'lock', off: 'unlock', icon: '🔒', cost: 0.002 },
-  { key: 'charge', label: '충전', on: 'charge_start', off: 'charge_stop', icon: '⚡', cost: 0.002 },
+  { key: 'sentry', label: '센트리', on: 'sentry_on', off: 'sentry_off', icon: '🛡', cost: COST_COMMAND },
+  { key: 'climate', label: '공조', on: 'climate_on', off: 'climate_off', icon: '❄️', cost: COST_COMMAND },
+  { key: 'lock', label: '잠금', on: 'lock', off: 'unlock', icon: '🔒', cost: COST_COMMAND },
+  { key: 'charge', label: '충전', on: 'charge_start', off: 'charge_stop', icon: '⚡', cost: COST_COMMAND },
 ];
 
 export default function NowPanel({ onAfterRun }) {
@@ -83,6 +88,7 @@ export default function NowPanel({ onAfterRun }) {
               <span className="text-sm w-20 truncate flex flex-col">
                 <span>{a.icon} {a.label}</span>
                 <span className="text-[9px] text-zinc-500 leading-none">~${a.cost.toFixed(3)}/회</span>
+                {/* commands 단가 $0.001 — lib/queries/schedules.js::COST */}
               </span>
               <button
                 onClick={() => run(a.on)}
@@ -113,7 +119,7 @@ export default function NowPanel({ onAfterRun }) {
             className="flex flex-col items-center justify-center py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 disabled:opacity-50"
           >
             <span className="text-sm">🔍 차량 상태</span>
-            <span className="text-[9px] text-zinc-500">상태만 무료 · 풀 정보 ~$0.002</span>
+            <span className="text-[9px] text-zinc-500">~${COST_VEHICLE_DATA.toFixed(3)}/회 (online 일 때만)</span>
           </button>
           <button
             onClick={wake}
@@ -121,7 +127,7 @@ export default function NowPanel({ onAfterRun }) {
             className="flex flex-col items-center justify-center py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 disabled:opacity-50"
           >
             <span className="text-sm">⏰ 깨우기</span>
-            <span className="text-[9px] text-zinc-500">무료 · 약 30초 소요</span>
+            <span className="text-[9px] text-amber-400/70">~${COST_WAKE.toFixed(3)}/회 · 약 30초 소요</span>
           </button>
         </div>
 
@@ -150,7 +156,7 @@ export default function NowPanel({ onAfterRun }) {
                 <p>주행거리: <span className="text-zinc-200">{testResult.data.summary.odometer != null ? `${Math.round(testResult.data.summary.odometer * 1.609).toLocaleString()} km` : '—'}</span></p>
                 <p>Sentry: <span className="text-zinc-200">{String(testResult.data.summary.sentry_mode)}</span></p>
                 <p>버전: <span className="text-zinc-200">{testResult.data.summary.car_version}</span></p>
-                <p className="text-zinc-500">비용: ~${testResult.data.cost_estimate}</p>
+                <p className="text-zinc-500">비용: ~${Number(testResult.data.cost_estimate || 0).toFixed(3)}</p>
               </div>
             ) : (
               <p className="text-zinc-500">{testResult.data?.note || '응답에 상세 정보 없음'}</p>
