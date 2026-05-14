@@ -19,10 +19,11 @@ const GLOBAL_WINDOW_MS = 60_000;
 const GLOBAL_MAX = 30;
 let globalCounter = { count: 0, first: 0 };
 
-// 연속 실패 알림 — 글로벌 연속 10회 실패 시 텔레그램 알람 1회 발송.
-// 성공 1회로 0 리셋. 알림 후에도 0 리셋해 다음 10회마다 재발송.
+// 연속 실패 알림 — 단일 IP 가 누적 10회 실패 시 텔레그램 알람 1회 발송.
+// per-IP 60초 락(5회)과 별개로 누적 카운트. 락 후 풀리고 다시 시도해도 누적은 유지.
+// 성공 1회로 해당 IP 카운터 삭제. 알림 후에도 0 리셋해 다음 10회마다 재발송.
 const ALERT_THRESHOLD = 10;
-let failStreak = 0;
+const failStreakByIp = new Map();
 
 async function notifyAdminFailure({ ip, count }) {
   const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -94,17 +95,18 @@ export async function POST(req) {
     if (entry.count >= MAX_ATTEMPTS) entry.lockUntil = now + LOCK_MS;
     attempts.set(ip, entry);
     globalCounter.count += 1;
-    failStreak += 1;
-    if (failStreak >= ALERT_THRESHOLD) {
-      const reached = failStreak;
-      failStreak = 0;
-      notifyAdminFailure({ ip, count: reached }).catch(() => {});
+    const streak = (failStreakByIp.get(ip) ?? 0) + 1;
+    if (streak >= ALERT_THRESHOLD) {
+      failStreakByIp.delete(ip);
+      notifyAdminFailure({ ip, count: streak }).catch(() => {});
+    } else {
+      failStreakByIp.set(ip, streak);
     }
     return NextResponse.json({ error: 'INVALID' }, { status: 401 });
   }
 
   attempts.delete(ip);
-  failStreak = 0;
+  failStreakByIp.delete(ip);
   const res = NextResponse.json({ ok: true });
   res.cookies.set(COOKIE, auth.token, { ...authCookieOpts(req), maxAge: MAX_AGE });
   return res;
