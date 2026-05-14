@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { readAuth, pinToken } from '@/lib/auth-store';
 import { COOKIE, MAX_AGE, timingSafeEqual, assertSameOrigin } from '@/lib/auth-helper';
 import { authCookieOpts } from '@/lib/cookie-opts';
+import { TG_HUB_URL } from '@/lib/internal-urls';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -17,6 +18,31 @@ const attempts = new Map();
 const GLOBAL_WINDOW_MS = 60_000;
 const GLOBAL_MAX = 30;
 let globalCounter = { count: 0, first: 0 };
+
+// 연속 실패 알림 — 글로벌 연속 10회 실패 시 텔레그램 알람 1회 발송.
+// 성공 1회로 0 리셋. 알림 후에도 0 리셋해 다음 10회마다 재발송.
+const ALERT_THRESHOLD = 10;
+let failStreak = 0;
+
+async function notifyAdminFailure({ ip, count }) {
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!chatId) return;
+  const secret = process.env.HUB_SHARED_SECRET || '';
+  const kst = new Date(Date.now() + 9 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' KST';
+  const text = `🚨 myDash PIN 연속 ${count}회 실패\n시각: ${kst}\n최근 IP: ${ip}`;
+  try {
+    const headers = { 'content-type': 'application/json' };
+    if (secret) headers.authorization = `Bearer ${secret}`;
+    await fetch(`${TG_HUB_URL}/notify`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ chat_id: chatId, text }),
+      signal: AbortSignal.timeout(3000),
+    });
+  } catch (e) {
+    console.error('[login] alert notify failed', e?.message);
+  }
+}
 
 function clientIp(req) {
   const fwd = req.headers.get('x-forwarded-for');
@@ -68,10 +94,17 @@ export async function POST(req) {
     if (entry.count >= MAX_ATTEMPTS) entry.lockUntil = now + LOCK_MS;
     attempts.set(ip, entry);
     globalCounter.count += 1;
+    failStreak += 1;
+    if (failStreak >= ALERT_THRESHOLD) {
+      const reached = failStreak;
+      failStreak = 0;
+      notifyAdminFailure({ ip, count: reached }).catch(() => {});
+    }
     return NextResponse.json({ error: 'INVALID' }, { status: 401 });
   }
 
   attempts.delete(ip);
+  failStreak = 0;
   const res = NextResponse.json({ ok: true });
   res.cookies.set(COOKIE, auth.token, { ...authCookieOpts(req), maxAge: MAX_AGE });
   return res;
