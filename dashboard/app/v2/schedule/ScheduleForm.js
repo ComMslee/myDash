@@ -363,52 +363,46 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
         </button>
       </div>
 
-      {/* 이름 + 활성 토글 */}
+      {/* 이름 + 활성 토글 한 줄 */}
       <div className="space-y-2 pb-2 border-b border-white/[0.06]">
-        <FieldRow label="이름">
+        <div className="flex items-center gap-2">
           <InputBase
             type="text"
             placeholder="스케줄 이름"
             value={s.name}
             onChange={e => set({ name: e.target.value })}
+            className="flex-1"
           />
-          {touched && errors.name && <ErrorHint>{errors.name}</ErrorHint>}
-        </FieldRow>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">스케줄 활성</p>
-            <p className="text-[11px] text-zinc-600 mt-0.5">끄면 자동 실행이 멈춥니다</p>
-          </div>
-          <Toggle value={s.enabled} onChange={v => set({ enabled: v })} labelOn="켜기" labelOff="끄기" />
+          <Toggle value={s.enabled} onChange={v => set({ enabled: v })} labelOn="ON" labelOff="OFF" />
         </div>
+        {touched && errors.name && <ErrorHint>{errors.name}</ErrorHint>}
       </div>
 
-      {/* 액션 */}
+      {/* 액션 한 줄 */}
       <div className="space-y-2 pb-2 border-b border-white/[0.06]">
-        <FieldRow label="액션">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-zinc-500 font-semibold tracking-wide uppercase whitespace-nowrap w-12">액션</span>
           <SelectBase
             value={s.action}
             onChange={e => set({ action: e.target.value })}
+            className="flex-1"
           >
             {ACTION_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </SelectBase>
-        </FieldRow>
-
-        {s.action === 'set_charge_limit' && (
-          <FieldRow label="충전 한도 (%)">
+          {s.action === 'set_charge_limit' && (
             <InputBase
               type="number"
               min={50}
               max={100}
               value={s.chargePercent}
               onChange={e => set({ chargePercent: e.target.value })}
-              className="tabular-nums"
+              className="tabular-nums w-20 flex-shrink-0"
+              placeholder="80"
             />
-          </FieldRow>
-        )}
+          )}
+        </div>
       </div>
 
       {/* ── 시간 트리거 (항상 활성) ── */}
