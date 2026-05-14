@@ -7,6 +7,7 @@ import { useMock, MOCK_DATA } from '../../context/mock';
 import { formatDuration } from '../../../lib/format';
 import { useScrollShrink } from '../../lib/useScrollShrink';
 import { Icon } from '../../lib/Icons';
+import StatesTodayPopup from './StatesTodayPopup';
 
 const tabs = [
   {
@@ -152,6 +153,7 @@ export default function BottomNavV2() {
   const [charging, setCharging] = useState(null);
   const [, setTick] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [statesOpen, setStatesOpen] = useState(false);
 
   // 1분 tick — 경과/시각 라벨 자동 갱신
   useEffect(() => {
@@ -248,6 +250,7 @@ export default function BottomNavV2() {
 
   return (
     <>
+      <StatesTodayPopup open={statesOpen} onClose={() => setStatesOpen(false)} />
       {/* ⚙️ 설정 시트 — 알약 위로 펼침 */}
       {settingsOpen && (
         <div
@@ -341,9 +344,12 @@ export default function BottomNavV2() {
         {showInfoRow && (
           <div className="relative px-3 py-1.5 border-b border-white/[0.06] flex items-center gap-2 text-[12px] tabular-nums whitespace-nowrap overflow-hidden">
             <StateChip state={displayState} />
-            <span
-              className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isOnline ? 'bg-emerald-400 animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-zinc-500'}`}
-              aria-hidden="true"
+            <button
+              type="button"
+              onClick={() => setStatesOpen(true)}
+              className={`w-2.5 h-2.5 rounded-full flex-shrink-0 cursor-pointer hover:scale-125 transition-transform ${isOnline ? 'bg-emerald-400 animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-zinc-500'}`}
+              aria-label="오늘 차량 상태 타임라인"
+              title="오늘 차량 상태 타임라인"
             />
             {isCharging ? (
               <>
