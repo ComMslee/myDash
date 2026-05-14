@@ -69,6 +69,17 @@ services:
       - TELEGRAM_HUB_URL=${TELEGRAM_HUB_URL:-http://telegram-hub:3000}
       - HUB_SHARED_SECRET=${HUB_SHARED_SECRET:-}
       - DASHBOARD_PUBLIC_URL=${DASHBOARD_PUBLIC_URL:-}
+      # Tesla Fleet API — 토큰 발급 후에도 ENABLED=false 면 dry_run 유지.
+      - TESLA_FLEET_API_ENABLED=${TESLA_FLEET_API_ENABLED:-false}
+      - TESLA_FLEET_API_BASE=${TESLA_FLEET_API_BASE:-https://fleet-api.prd.na.vn.cloud.tesla.com}
+      - TESLA_FLEET_OAUTH_BASE=${TESLA_FLEET_OAUTH_BASE:-https://auth.tesla.com/oauth2/v3}
+      - TESLA_FLEET_AUDIENCE=${TESLA_FLEET_AUDIENCE:-https://fleet-api.prd.na.vn.cloud.tesla.com}
+      - TESLA_FLEET_CLIENT_ID=${TESLA_FLEET_CLIENT_ID:-}
+      - TESLA_FLEET_CLIENT_SECRET=${TESLA_FLEET_CLIENT_SECRET:-}
+      - TESLA_FLEET_REDIRECT_URI=${TESLA_FLEET_REDIRECT_URI:-}
+      - TESLA_FLEET_PRIVATE_KEY_PATH=${TESLA_FLEET_PRIVATE_KEY_PATH:-/app/tesla-keys/tesla-private.pem}
+      - TESLA_TOKEN_ENC_KEY=${TESLA_TOKEN_ENC_KEY:-}
+      - TESLA_VEHICLE_ID=${TESLA_VEHICLE_ID:-}
     volumes:
       - dashboard-data:/data
       - /var/run/docker.sock:/var/run/docker.sock:ro  # 컨테이너별 stats 조회용 (api-status 페이지)

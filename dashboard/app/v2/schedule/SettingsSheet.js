@@ -3,14 +3,16 @@
 import { useState } from 'react';
 import GeofencesPanel from './GeofencesPanel';
 import NowPanel from './NowPanel';
+import TeslaConnectPanel from './TeslaConnectPanel';
 
-// 설정 시트 — 드물게 쓰는 것만: 즉시 실행 / 지오펜스 / 실연동 체크.
+// 설정 시트 — 드물게 쓰는 것만: 즉시 실행 / 지오펜스 / Tesla 연결 / 체크리스트.
 // 휴무·전체 스케줄·전체 이력은 메인 인라인으로 이동했음.
 
 const SECTIONS = [
   { key: 'now',       label: '⚡ 즉시 실행' },
   { key: 'geofences', label: '📍 지오펜스' },
-  { key: 'checklist', label: '🔧 실연동 체크' },
+  { key: 'tesla',     label: '🔌 Tesla 연결' },
+  { key: 'checklist', label: '🔧 체크리스트' },
 ];
 
 export default function SettingsSheet({ open, onClose, onRunNow, onAfterRun }) {
@@ -42,6 +44,7 @@ export default function SettingsSheet({ open, onClose, onRunNow, onAfterRun }) {
 
         {sec === 'now' && <NowPanel onAfterRun={onAfterRun} />}
         {sec === 'geofences' && <GeofencesPanel />}
+        {sec === 'tesla' && <TeslaConnectPanel />}
         {sec === 'checklist' && (
           <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-3 text-[11px] text-zinc-500 space-y-1.5">
             <p className="font-semibold text-zinc-400 text-xs">실연동 체크리스트</p>
