@@ -35,11 +35,7 @@ const WEATHER_PRECIP_OPTIONS = [
   { value: 'any',  label: '비 또는 눈' },
 ];
 
-// 장소는 시간 트리거의 '필터' 로만 사용 — 머무는 동안(at) 만 지원.
-// (이전 enter/exit 이벤트 모드는 제거 — 시간이 항상 트리거)
-const LOCATION_EVENT_OPTIONS = [
-  { value: 'at', label: '머무는 동안' },
-];
+// 장소는 시간 트리거의 '필터' 로만 사용 — 머무는 동안(at) 만 저장.
 
 // ─── 초기 상태 헬퍼 ─────────────────────────────────────────────────────────
 
@@ -61,7 +57,6 @@ function buildInitialState(initial) {
 
     locationEnabled: !!tc.location,
     locationPlace:   tc.location?.place       ?? 'home',
-    locationEvent:   'at', // 항상 'at' — 시간 트리거의 필터
     locationDebounce: tc.debounce_minutes     ?? 5,
 
     weatherEnabled:  !!tc.weather,
