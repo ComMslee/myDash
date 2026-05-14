@@ -5,9 +5,24 @@
 // 차량 ID: dash_settings.tesla_vehicle_id 또는 ENV TESLA_VEHICLE_ID. 미설정 시 첫 차량 자동 선택.
 
 import { getAccessToken } from '@/lib/tesla-tokens';
-import { getSetting, setSetting } from '@/lib/queries/schedules';
+import { getSetting, setSetting, bumpMonthlyUsage } from '@/lib/queries/schedules';
 
 const TESLA_API_BASE = process.env.TESLA_FLEET_API_BASE || 'https://fleet-api.prd.na.vn.cloud.tesla.com';
+
+function monthYmd(d = new Date()) {
+  const kst = new Date(d.getTime() + 9 * 3600 * 1000);
+  return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+// path → 단가 분류 ({ commands | wakes | vehicle_data }).
+// 모든 Tesla Fleet API 호출은 한 곳(teslaFetch) 통과 → 자동 카운팅 단일 소스.
+function classifyCall(path) {
+  if (/\/wake_up$/.test(path)) return { wakes: 1 };
+  if (/\/command\//.test(path)) return { commands: 1 };
+  // /api/1/vehicles, /api/1/vehicles/{id}, /api/1/vehicles/{id}/vehicle_data — 모두 데이터 호출
+  if (/\/api\/1\/vehicles(\/.+)?$/.test(path) || /\/vehicle_data$/.test(path)) return { vehicle_data: 1 };
+  return null;
+}
 
 async function vehicleId() {
   // 우선순위: 명시 ENV > DB 저장 > 자동탐지(첫 차량)
@@ -37,6 +52,16 @@ async function teslaFetch(path, init = {}) {
     signal: AbortSignal.timeout(15_000),
   });
   const body = await res.json().catch(() => null);
+
+  // 호출 카운팅 — HTTP 응답을 받았으면(네트워크 실패 X) 분류해서 dash_api_usage_monthly 증가.
+  // Tesla 가 실패 응답도 청구하는 경우가 있어 모든 응답을 셈 (보수적).
+  const calls = classifyCall(path);
+  if (calls) {
+    bumpMonthlyUsage(monthYmd(), calls).catch((e) =>
+      console.error('[tesla-fleet] bumpMonthlyUsage failed:', e?.message),
+    );
+  }
+
   return { ok: res.ok, status: res.status, body };
 }
 

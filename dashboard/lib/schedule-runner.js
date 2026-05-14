@@ -83,8 +83,11 @@ export async function executeAction({ schedule_id, action, action_params, trigge
     schedule_id, trigger_source, action, action_params,
     status, reason, api_calls, tesla_response, cost_estimate,
   });
-  // 비용 누적 — Mock 도 추정치 누적 (UI 에서 예상 사용량 보기 위해)
-  await bumpMonthlyUsage(monthYmd(), api_calls);
+  // Mock 인 경우만 dash_api_usage_monthly 누적 — 실호출은 lib/tesla-fleet.js::teslaFetch 가 자동 카운팅.
+  // 이렇게 분리해야 ENABLED=true 일 때 schedule + tesla-test/* + now-command 모든 경로가 단일 진실원으로 모임.
+  if (!enabled) {
+    await bumpMonthlyUsage(monthYmd(), api_calls);
+  }
   return { id: row.id, status, reason, cost_estimate };
 }
 
