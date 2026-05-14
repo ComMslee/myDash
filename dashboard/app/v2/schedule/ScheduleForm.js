@@ -444,20 +444,6 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
               </div>
             </div>
 
-            {/* 공휴일 */}
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">공휴일에 건너뛰기</p>
-                <p className="text-[11px] text-zinc-600 mt-0.5">공휴일에는 이 스케줄을 실행하지 않습니다</p>
-              </div>
-              <Toggle
-                value={s.timeSkipHolidays}
-                onChange={v => set({ timeSkipHolidays: v })}
-                labelOn="켜기"
-                labelOff="끄기"
-              />
-            </div>
-
             {/* 사전 분 */}
             <FieldRow label="사전 실행 (분)">
               <InputBase
@@ -618,18 +604,33 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
         )}
       </div>
 
-      {/* 휴무 모드 */}
-      <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
-        <div>
-          <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">휴무 모드 따르기</p>
-          <p className="text-xs text-zinc-600 mt-0.5">휴무 기간에는 이 스케줄을 실행하지 않습니다</p>
+      {/* 건너뛰기 — 공휴일 / 휴무 모드 */}
+      <div className="space-y-2 pb-3 border-b border-white/[0.06]">
+        <SectionLabel>건너뛰기</SectionLabel>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-zinc-300">공휴일에 건너뛰기</p>
+            <p className="text-[11px] text-zinc-600 mt-0.5">공휴일에는 이 스케줄을 실행하지 않습니다</p>
+          </div>
+          <Toggle
+            value={s.timeSkipHolidays}
+            onChange={v => set({ timeSkipHolidays: v })}
+            labelOn="켜기"
+            labelOff="끄기"
+          />
         </div>
-        <Toggle
-          value={s.applyPauseMode}
-          onChange={v => set({ applyPauseMode: v })}
-          labelOn="켜기"
-          labelOff="끄기"
-        />
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-zinc-300">휴무 모드 따르기</p>
+            <p className="text-[11px] text-zinc-600 mt-0.5">휴무 기간에는 이 스케줄을 실행하지 않습니다</p>
+          </div>
+          <Toggle
+            value={s.applyPauseMode}
+            onChange={v => set({ applyPauseMode: v })}
+            labelOn="켜기"
+            labelOff="끄기"
+          />
+        </div>
       </div>
 
       {/* 하단 버튼 */}
