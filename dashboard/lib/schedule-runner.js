@@ -7,7 +7,7 @@ import { callTeslaCommand } from '@/lib/tesla-fleet';
 // 3) dash_api_usage_monthly 누적
 // 워커(setInterval) · 수동 실행 · 즉시 명령 모두 이 함수를 통과.
 
-const ACTION_TO_COMMAND = {
+export const ACTION_TO_COMMAND = {
   sentry_on: { command: 'set_sentry_mode', params: { on: true } },
   sentry_off: { command: 'set_sentry_mode', params: { on: false } },
   climate_on: { command: 'auto_conditioning_start', params: {} },

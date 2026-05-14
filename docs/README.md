@@ -22,7 +22,7 @@ AWS Lightsail 기반 TeslaMate Dashboard 운영 문서.
 | 서비스 | 포트 (호스트:컨테이너) | 역할 |
 |---|---|---|
 | teslamate-auth | `80:80`, `443:443`, `4000:4000` | Caddy — 외부 80/443 → dashboard, `:4000` 은 forward_auth 로 보호된 teslamate UI |
-| dashboard | `5000:5000` | Next.js 대시보드 — 외부 진입은 Caddy 경유, 호스트 `:5000` 은 디버그/우회용 |
+| dashboard | `127.0.0.1:5000:5000` | Next.js 대시보드 — 외부 진입은 Caddy 경유, 호스트 `:5000` 은 loopback 만(SSH 후 로컬 진단용) |
 | teslamate | (내부) | 데이터 수집기 — 외부 노출 없음 |
 | telegram-hub | (내부) | 텔레그램 봇 게이트웨이 — `.env` 에 `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` 있을 때만 기동 |
 | database | (내부) | PostgreSQL 16 |

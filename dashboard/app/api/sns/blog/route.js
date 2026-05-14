@@ -39,19 +39,34 @@ export async function POST(req) {
   const requestId = `mock-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const acceptedAt = new Date().toISOString();
 
-  // mock — 실제 발행 X. 서버 로그에 남겨 흐름 검증.
-  console.log(
-    '[sns/blog] mock accepted',
-    JSON.stringify({
-      request_id: requestId,
-      platform,
-      chat_id: payload.chat_id || null,
-      user_name: payload.user_name || null,
-      body_len: body.length,
-      photos: photos.length,
-      preview: body.slice(0, 80),
-    }),
-  );
+  // mock — 실제 발행 X. 서버 로그에 흐름 검증용으로만 남김.
+  // PII 노출 방지: chat_id 마스킹, user_name·preview 제거. 전체 로깅은 LOG_PII=true 게이트.
+  if (process.env.LOG_PII === 'true') {
+    console.log(
+      '[sns/blog] mock accepted (PII)',
+      JSON.stringify({
+        request_id: requestId,
+        platform,
+        chat_id: payload.chat_id || null,
+        user_name: payload.user_name || null,
+        body_len: body.length,
+        photos: photos.length,
+        preview: body.slice(0, 80),
+      }),
+    );
+  } else {
+    const chatIdMasked = payload.chat_id ? String(payload.chat_id).slice(0, 3) + '****' : null;
+    console.log(
+      '[sns/blog] mock accepted',
+      JSON.stringify({
+        request_id: requestId,
+        platform,
+        chat_id: chatIdMasked,
+        body_len: body.length,
+        photos: photos.length,
+      }),
+    );
+  }
 
   return Response.json({
     ok: true,

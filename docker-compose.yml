@@ -75,9 +75,10 @@ services:
       # Tesla Fleet API private key — 명령 서명용. read-only, dashboard 컨테이너만 접근.
       - /etc/tesla-keys/tesla-private.pem:/app/tesla-keys/tesla-private.pem:ro
     # 외부 80/443 은 teslamate-auth (Caddy) 가 담당. 내부 컨테이너 통신은 dashboard:5000.
-    # 5000 호스트 직접 노출은 디버그/우회용 (curl localhost:5000 으로 Caddy 우회 진단).
+    # 호스트 127.0.0.1 만 바인딩 — 외부 인터넷 노출 차단 (Caddy 우회 차단).
+    # 디버그는 `curl localhost:5000` 으로 SSH 후 호스트 내부에서만 가능.
     ports:
-      - 5000:5000
+      - "127.0.0.1:5000:5000"
     depends_on:
       - database
 

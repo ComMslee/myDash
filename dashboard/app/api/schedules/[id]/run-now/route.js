@@ -1,4 +1,4 @@
-import { requireAuth } from '@/lib/auth-helper';
+import { requireAuth, assertSameOrigin } from '@/lib/auth-helper';
 import { getSchedule, getAutomationEnabled } from '@/lib/queries/schedules';
 import { executeAction } from '@/lib/schedule-runner';
 
@@ -6,6 +6,8 @@ export const dynamic = 'force-dynamic';
 
 // POST /api/schedules/:id/run-now — 사용자가 즉시 1회 실행 (dry-run/실행)
 export async function POST(req, { params }) {
+  const csrf = assertSameOrigin(req);
+  if (csrf) return csrf;
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
   const id = parseInt(params.id, 10);
