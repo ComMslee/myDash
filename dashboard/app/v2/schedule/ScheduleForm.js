@@ -381,7 +381,7 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
       {/* 액션 한 줄 */}
       <div className="space-y-2 pb-2 border-b border-white/[0.06]">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-500 font-semibold tracking-wide uppercase whitespace-nowrap w-12">액션</span>
+          <span className="text-sm w-6 text-center">▶</span>
           <SelectBase
             value={s.action}
             onChange={e => set({ action: e.target.value })}
@@ -405,56 +405,52 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
         </div>
       </div>
 
-      {/* ── 시간 트리거 (항상 활성) ── */}
+      {/* ── 시간 트리거 ── */}
       <div className="space-y-2 pb-2 border-b border-white/[0.06]">
+        {/* 시각(시:분) + 사전실행(분) 한 줄 — 왼쪽 아이콘 ▶ 와 정렬 */}
         <div className="flex items-center gap-2">
-          <span className="text-base">🕐</span>
-          <span className="text-sm font-medium text-zinc-300">시간</span>
-          <span className="text-[10px] text-zinc-500 px-1.5 py-0.5 rounded bg-zinc-800 border border-white/[0.06]">트리거</span>
+          <span className="text-sm w-6 text-center">🕐</span>
+          <SelectBase
+            value={(s.timeHhmm || '08:00').split(':')[0]}
+            onChange={e => {
+              const mm = (s.timeHhmm || '08:00').split(':')[1] || '00';
+              set({ timeHhmm: `${e.target.value}:${mm}` });
+            }}
+            className="flex-1 tabular-nums"
+          >
+            {Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0')).map(hh => (
+              <option key={hh} value={hh}>{hh}시</option>
+            ))}
+          </SelectBase>
+          <SelectBase
+            value={(s.timeHhmm || '08:00').split(':')[1]}
+            onChange={e => {
+              const hh = (s.timeHhmm || '08:00').split(':')[0] || '08';
+              set({ timeHhmm: `${hh}:${e.target.value}` });
+            }}
+            className="flex-1 tabular-nums"
+          >
+            {Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0')).map(mm => (
+              <option key={mm} value={mm}>{mm}분</option>
+            ))}
+          </SelectBase>
+          <InputBase
+            type="number"
+            min={0}
+            max={120}
+            value={s.timeLead}
+            onChange={e => set({ timeLead: e.target.value })}
+            placeholder="0"
+            className="tabular-nums w-14 flex-shrink-0"
+            title="사전 실행 (분)"
+          />
+          <span className="text-[10px] text-zinc-500 whitespace-nowrap">분 전</span>
         </div>
 
-        <div className="pl-4 space-y-2">
-          {/* 시각(시:분) + 사전실행(분) 한 줄 */}
-          <div className="flex items-center gap-2">
-            <SelectBase
-              value={(s.timeHhmm || '08:00').split(':')[0]}
-              onChange={e => {
-                const mm = (s.timeHhmm || '08:00').split(':')[1] || '00';
-                set({ timeHhmm: `${e.target.value}:${mm}` });
-              }}
-              className="flex-1 tabular-nums"
-            >
-              {Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0')).map(hh => (
-                <option key={hh} value={hh}>{hh}시</option>
-              ))}
-            </SelectBase>
-            <SelectBase
-              value={(s.timeHhmm || '08:00').split(':')[1]}
-              onChange={e => {
-                const hh = (s.timeHhmm || '08:00').split(':')[0] || '08';
-                set({ timeHhmm: `${hh}:${e.target.value}` });
-              }}
-              className="flex-1 tabular-nums"
-            >
-              {Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0')).map(mm => (
-                <option key={mm} value={mm}>{mm}분</option>
-              ))}
-            </SelectBase>
-            <span className="text-[10px] text-zinc-500 whitespace-nowrap">사전</span>
-            <InputBase
-              type="number"
-              min={0}
-              max={120}
-              value={s.timeLead}
-              onChange={e => set({ timeLead: e.target.value })}
-              placeholder="0"
-              className="tabular-nums w-14 flex-shrink-0"
-            />
-            <span className="text-[10px] text-zinc-500">분</span>
-          </div>
-
-          {/* 요일 한 줄 */}
-          <div className="flex gap-1.5">
+        {/* 요일 한 줄 — 아이콘 자리 비움 + 7개 균등 */}
+        <div className="flex items-center gap-2">
+          <span className="w-6"></span>
+          <div className="flex-1 flex gap-1.5">
             {DAY_LABELS.map(({ key, label }) => {
               const active = s.timeDays.includes(key);
               return (
@@ -473,53 +469,46 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
               );
             })}
           </div>
-
-          {touched && errors.time && <ErrorHint>{errors.time}</ErrorHint>}
         </div>
+
+        {touched && errors.time && <ErrorHint>{errors.time}</ErrorHint>}
       </div>
 
-      {/* ── 추가 조건 (장소·날씨 필터) ── */}
-      <div className="space-y-3 pb-2 border-b border-white/[0.06]">
+      {/* ── 추가 조건 (장소·날씨 필터) — 시간 매칭 시 추가로 충족돼야 발화 ── */}
+      <div className="space-y-2 pb-2 border-b border-white/[0.06]">
+        {/* 장소 한 줄: 아이콘 + select (또는 OFF) + 토글 */}
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-zinc-400">📋 추가 조건</span>
-          <span className="text-[10px] text-zinc-500">(시간 매칭 시 함께 충족돼야 발화)</span>
-        </div>
-
-        {/* 장소 필터 — 한 줄 */}
-        <div className="bg-zinc-900/30 border border-white/[0.04] rounded-lg p-2 space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">📍</span>
-            <span className="text-xs text-zinc-300 flex-1">장소</span>
-            <Toggle value={s.locationEnabled} onChange={v => set({ locationEnabled: v })} labelOn="ON" labelOff="OFF" />
-          </div>
-          {s.locationEnabled && (
+          <span className="text-sm w-6 text-center">📍</span>
+          {s.locationEnabled ? (
             <SelectBase
               value={s.locationPlace}
               onChange={e => set({ locationPlace: e.target.value })}
+              className="flex-1"
             >
               {placeOptions.map(o => (
                 <option key={o.value} value={o.value}>{o.label}에 머물 때</option>
               ))}
             </SelectBase>
+          ) : (
+            <span className="flex-1 text-xs text-zinc-600">장소 조건 없음</span>
           )}
-          {touched && errors.location && <ErrorHint>{errors.location}</ErrorHint>}
+          <Toggle value={s.locationEnabled} onChange={v => set({ locationEnabled: v })} labelOn="ON" labelOff="OFF" />
         </div>
+        {touched && errors.location && (
+          <div className="flex items-center gap-2"><span className="w-6"></span><ErrorHint>{errors.location}</ErrorHint></div>
+        )}
 
-        {/* 날씨 필터 — 토글 + 외기온 min/max + 강수 한 줄 */}
-        <div className="bg-zinc-900/30 border border-white/[0.04] rounded-lg p-2 space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">🌤</span>
-            <span className="text-xs text-zinc-300 flex-1">날씨</span>
-            <Toggle value={s.weatherEnabled} onChange={v => set({ weatherEnabled: v })} labelOn="ON" labelOff="OFF" />
-          </div>
-          {s.weatherEnabled && (
-            <div className="flex items-center gap-1.5">
+        {/* 날씨 한 줄: 아이콘 + 온도/강수 (또는 OFF) + 토글 */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm w-6 text-center">🌤</span>
+          {s.weatherEnabled ? (
+            <div className="flex-1 flex items-center gap-1.5">
               <InputBase
                 type="number"
                 value={s.weatherTempMin}
                 onChange={e => set({ weatherTempMin: e.target.value })}
                 placeholder="최저°"
-                className="tabular-nums flex-1"
+                className="tabular-nums flex-1 min-w-0"
               />
               <span className="text-zinc-600 text-[10px]">~</span>
               <InputBase
@@ -527,19 +516,22 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
                 value={s.weatherTempMax}
                 onChange={e => set({ weatherTempMax: e.target.value })}
                 placeholder="최고°"
-                className="tabular-nums flex-1"
+                className="tabular-nums flex-1 min-w-0"
               />
               <SelectBase
                 value={s.weatherPrecip}
                 onChange={e => set({ weatherPrecip: e.target.value })}
-                className="flex-1"
+                className="flex-1 min-w-0"
               >
                 {WEATHER_PRECIP_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label === '없음' ? '강수 무관' : o.label}</option>
                 ))}
               </SelectBase>
             </div>
+          ) : (
+            <span className="flex-1 text-xs text-zinc-600">날씨 조건 없음</span>
           )}
+          <Toggle value={s.weatherEnabled} onChange={v => set({ weatherEnabled: v })} labelOn="ON" labelOff="OFF" />
         </div>
       </div>
 
