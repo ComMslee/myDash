@@ -37,6 +37,15 @@ const WEATHER_PRECIP_OPTIONS = [
 
 // 장소는 시간 트리거의 '필터' 로만 사용 — 머무는 동안(at) 만 저장.
 
+// 'HH:MM' 을 5분 단위로 스냅. 잘못된 값/빈값이면 null.
+function snapToFiveMin(hhmm) {
+  if (!hhmm || !/^\d{1,2}:\d{1,2}$/.test(hhmm)) return null;
+  const [h, m] = hhmm.split(':').map(Number);
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+  const snapped = Math.round(m / 5) * 5 % 60;
+  return `${String(h).padStart(2, '0')}:${String(snapped).padStart(2, '0')}`;
+}
+
 // ─── 초기 상태 헬퍼 ─────────────────────────────────────────────────────────
 
 function buildInitialState(initial) {
@@ -50,7 +59,8 @@ function buildInitialState(initial) {
 
     // 시간 = 메인 트리거 (항상 활성). 장소/날씨 = 선택 조건(필터).
     timeEnabled:     true,
-    timeHhmm:        tc.time?.hhmm           ?? '08:00',
+    // 5분 단위로 스냅 — 기존 데이터가 :03 같이 들어와도 :00 으로 정렬
+    timeHhmm:        snapToFiveMin(tc.time?.hhmm) ?? '08:00',
     timeDays:        tc.time?.days            ?? [],
     timeSkipHolidays: tc.time?.skip_holidays  ?? false,
     timeLead:        tc.time?.lead_minutes    ?? 0,
@@ -411,13 +421,35 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
 
         {true && (
           <div className="pl-4 space-y-2">
-            {/* 시각 */}
+            {/* 시각 — 5분 단위 시·분 분리 select (탭하면 네이티브 picker) */}
             <FieldRow label="시각">
-              <InputBase
-                type="time"
-                value={s.timeHhmm}
-                onChange={e => set({ timeHhmm: e.target.value })}
-              />
+              <div className="flex items-center gap-2">
+                <SelectBase
+                  value={(s.timeHhmm || '08:00').split(':')[0]}
+                  onChange={e => {
+                    const mm = (s.timeHhmm || '08:00').split(':')[1] || '00';
+                    set({ timeHhmm: `${e.target.value}:${mm}` });
+                  }}
+                  className="flex-1 tabular-nums"
+                >
+                  {Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0')).map(hh => (
+                    <option key={hh} value={hh}>{hh}시</option>
+                  ))}
+                </SelectBase>
+                <span className="text-zinc-500 text-xs">:</span>
+                <SelectBase
+                  value={(s.timeHhmm || '08:00').split(':')[1]}
+                  onChange={e => {
+                    const hh = (s.timeHhmm || '08:00').split(':')[0] || '08';
+                    set({ timeHhmm: `${hh}:${e.target.value}` });
+                  }}
+                  className="flex-1 tabular-nums"
+                >
+                  {Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0')).map(mm => (
+                    <option key={mm} value={mm}>{mm}분</option>
+                  ))}
+                </SelectBase>
+              </div>
             </FieldRow>
 
             {/* 요일 */}
