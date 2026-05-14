@@ -43,7 +43,8 @@ docker compose build dashboard && docker compose up -d dashboard
 - 단일 차량 가정: `SELECT id FROM cars LIMIT 1`
 - 커밋: `<type>: <설명>` (`feat`, `fix`, `refactor`, `tune`, `ci`, `docs`, `chore`)
 - **함정 표시 파일 수정 전**: 파일 상단에 `⚠️  수정 전 필독: /docs/PITFALLS.md "..."` 주석이 있으면 [`docs/PITFALLS.md`](./docs/PITFALLS.md) 의 해당 항목을 먼저 읽고 작업.
-- **Tesla 자동화 (`/v2/schedule`)**: 실제 Fleet API 호출은 `TESLA_FLEET_API_ENABLED=true` 일 때만(기본 dry_run). **결제수단 미등록 권장** — $10 무료 한도 초과 시 자동 차단(청구 X). 단가는 `lib/queries/schedules.js::COST` 단일 소스. 지오펜스는 TeslaMate UI 단일 진실원, 대시보드는 read-only.
+- **🚨 Tesla Fleet API 호출 범위 (중요)**: Tesla Fleet API (`lib/tesla-fleet.js` · `/api/tesla/*` · `/api/tesla-test/*` · `/api/now-command` · `lib/schedule-runner.js`) 는 **오직 자동화 페이지 (`/v2/schedule`) 에서만** 사용. 호출 1회당 실제 청구 발생 (commands $0.001 / vehicle_data $0.002 / wakes $0.02). **다른 페이지·기능·API 라우트에서 Tesla Fleet API 호출이 필요해 보이면 반드시 사용자 컨펌 받고 진행** — 자동 추가 금지. TeslaMate DB(PostgreSQL) 직접 쿼리는 무료/무제한이므로 가능하면 그쪽으로 우회.
+- **Tesla 자동화 (`/v2/schedule`)**: 실제 Fleet API 호출은 `TESLA_FLEET_API_ENABLED=true` 일 때만(기본 dry_run). **결제수단 미등록 권장** — $10 무료 한도 초과 시 자동 차단(청구 X). 단가는 `lib/queries/schedules.js::COST` 단일 소스 — 모든 호출은 `lib/tesla-fleet.js::teslaFetch` 가 path 분류로 자동 카운팅 (`dash_api_usage_monthly`). 지오펜스는 TeslaMate UI 단일 진실원, 대시보드는 read-only.
 
 ## 아키텍처 원칙 — 데이터 경로
 
