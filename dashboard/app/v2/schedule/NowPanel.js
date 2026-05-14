@@ -15,7 +15,6 @@ const ACTIONS = [
   { key: 'sentry', label: '센트리', on: 'sentry_on', off: 'sentry_off', icon: '🛡', cost: COST_COMMAND },
   { key: 'climate', label: '공조', on: 'climate_on', off: 'climate_off', icon: '❄️', cost: COST_COMMAND },
   { key: 'lock', label: '잠금', on: 'lock', off: 'unlock', icon: '🔒', cost: COST_COMMAND },
-  { key: 'charge', label: '충전', on: 'charge_start', off: 'charge_stop', icon: '⚡', cost: COST_COMMAND },
 ];
 
 export default function NowPanel({ onAfterRun }) {
