@@ -357,10 +357,10 @@ export default function BottomNavV2() {
               </>
             ) : (
               <>
-                {!isOnline && lastSeenLabel ? (
+                {elapsedMin != null ? (
+                  <span className={isOnline ? 'text-zinc-100' : 'text-zinc-300'}>{formatDuration(elapsedMin)}</span>
+                ) : !isOnline && lastSeenLabel ? (
                   <span className="text-zinc-300">{lastSeenLabel}</span>
-                ) : elapsedMin != null ? (
-                  <span className="text-zinc-100">{formatDuration(elapsedMin)}</span>
                 ) : null}
                 {/* 예측 km · % — 우측 정렬 */}
                 <span className="ml-auto flex items-center gap-2">
