@@ -2,13 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-const STATE_STYLE = {
-  online: { cls: 'bg-emerald-500/15 text-emerald-300', label: '온라인' },
-  asleep: { cls: 'bg-zinc-700/40 text-zinc-400', label: '슬립' },
-  offline: { cls: 'bg-rose-500/15 text-rose-300', label: '오프라인' },
-  unknown: { cls: 'bg-zinc-700/40 text-zinc-400', label: '알 수 없음' },
-};
-
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 function kstDateStr(ms) {
@@ -84,7 +77,7 @@ export default function StatesTodayPopup({ open, onClose }) {
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="차량 상태 타임라인"
+      aria-label="온라인 타임라인"
     >
       <div
         className="w-full max-w-md bg-[#0f0f0f] border border-white/[0.08] rounded-2xl shadow-2xl max-h-[85vh] flex flex-col"
@@ -92,9 +85,9 @@ export default function StatesTodayPopup({ open, onClose }) {
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
           <div>
-            <h2 className="text-sm font-bold text-zinc-200">차량 상태 타임라인</h2>
+            <h2 className="text-sm font-bold text-zinc-200">온라인</h2>
             <p className="text-[10px] text-zinc-500 mt-0.5">
-              짧게 깬 구간 {briefWakes.length}건 · 총 온라인 {fmtDuration(totalOnlineMin)}
+              ⚡깸 {briefWakes.length}건 · 총 {fmtDuration(totalOnlineMin)}
             </p>
           </div>
           <button
@@ -138,23 +131,21 @@ export default function StatesTodayPopup({ open, onClose }) {
           ) : (
             <div className="space-y-1">
               {[...onlineSegs].reverse().map((s, i) => {
-                const st = STATE_STYLE[s.state] || STATE_STYLE.unknown;
                 const isBrief = s.minutes < 10;
                 return (
                   <div
                     key={i}
                     className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs ${isBrief ? 'bg-amber-500/[0.06] border border-amber-500/20' : ''}`}
                   >
-                    <span className="text-[10px] text-zinc-500 tabular-nums w-20 flex-shrink-0">
-                      {fmtTime(s.start)}–{s.is_current ? '지금' : fmtTime(s.end)}
+                    <span className="text-zinc-300 tabular-nums flex-shrink-0">
+                      {fmtTime(s.start)}
                     </span>
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${st.cls} flex-shrink-0`}>
-                      {st.label}
+                    <span className="ml-auto flex items-center gap-1 flex-shrink-0">
+                      {isBrief && <span className="text-amber-400">⚡</span>}
+                      <span className="text-zinc-200 tabular-nums font-medium">
+                        {fmtDuration(s.minutes)}
+                      </span>
                     </span>
-                    <span className="text-zinc-400 tabular-nums ml-auto flex-shrink-0">
-                      {fmtDuration(s.minutes)}
-                    </span>
-                    {isBrief && <span className="text-[10px] text-amber-400 flex-shrink-0">⚡깸</span>}
                   </div>
                 );
               })}
