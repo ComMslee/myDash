@@ -44,9 +44,9 @@ export default function StatesTodayPopup({ open, onClose }) {
 
   if (!open) return null;
 
-  const wakeSegs = (data || []).filter(s => ['online', 'driving', 'charging'].includes(s.state));
-  const briefWakes = wakeSegs.filter(s => s.state === 'online' && s.minutes < 10);
-  const totalOnlineMin = wakeSegs.filter(s => s.state === 'online').reduce((t, s) => t + s.minutes, 0);
+  const onlineSegs = (data || []).filter(s => s.state === 'online');
+  const briefWakes = onlineSegs.filter(s => s.minutes < 10);
+  const totalOnlineMin = onlineSegs.reduce((t, s) => t + s.minutes, 0);
 
   return (
     <div
@@ -81,11 +81,11 @@ export default function StatesTodayPopup({ open, onClose }) {
         <div className="overflow-y-auto flex-1 p-2">
           {!data ? (
             <p className="text-xs text-zinc-500 text-center py-6">로딩…</p>
-          ) : data.length === 0 ? (
-            <p className="text-xs text-zinc-500 text-center py-6">오늘 기록이 없습니다</p>
+          ) : onlineSegs.length === 0 ? (
+            <p className="text-xs text-zinc-500 text-center py-6">오늘 온라인 기록이 없습니다</p>
           ) : (
             <div className="space-y-1">
-              {[...data].reverse().map((s, i) => {
+              {[...onlineSegs].reverse().map((s, i) => {
                 const st = STATE_STYLE[s.state] || STATE_STYLE.unknown;
                 const isBrief = s.state === 'online' && s.minutes < 10;
                 return (
