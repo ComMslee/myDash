@@ -15,7 +15,7 @@ const ACTION_LABEL = {
   lock: '잠금', unlock: '잠금해제',
   charge_start: '충전 시작', charge_stop: '충전 중지',
   set_charge_limit: '충전 한도', flash_lights: '라이트 점멸',
-  check_status: '🔍 차량 상태', wake_up: '⏰ 깨우기',
+  check_status: '차량 상태', wake_up: '깨우기',
 };
 
 function fmtTs(s) {
@@ -72,8 +72,8 @@ export default function ExecutionLog({ schedules }) {
           className="text-xs bg-zinc-900 border border-white/[0.06] rounded px-2 py-1 text-zinc-300 flex-1 min-w-0"
         >
           <option value="all">전체 (스케줄 + 즉시)</option>
-          <option value="scheduled">📅 스케줄만</option>
-          <option value="manual">⚡ 즉시 실행 / 테스트만</option>
+          <option value="scheduled">스케줄만</option>
+          <option value="manual">즉시 실행 / 테스트만</option>
           {schedules?.map((s) => (
             <option key={s.id} value={String(s.id)}>└ {s.name}</option>
           ))}

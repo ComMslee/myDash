@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { Icon } from '../../lib/Icons';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -89,8 +90,12 @@ export default function StatesTodayPopup({ open, onClose }) {
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
           <div>
             <h2 className="text-sm font-bold text-zinc-200">온라인</h2>
-            <p className="text-[10px] text-zinc-500 mt-0.5">
-              총 {fmtDuration(totalOnlineMin)} · ⚡{chargeSegs.length} · ❄{climateCount} · 🛡{sentryCount}
+            <p className="text-[10px] text-zinc-500 mt-0.5 flex items-center gap-1 flex-wrap">
+              <span>총 {fmtDuration(totalOnlineMin)}</span>
+              <span className="text-zinc-700">·</span>
+              <span className="inline-flex items-center gap-0.5 text-yellow-400"><Icon name="bolt" className="w-3 h-3" />{chargeSegs.length}</span>
+              <span className="inline-flex items-center gap-0.5 text-sky-300"><Icon name="climate" className="w-3 h-3" />{climateCount}</span>
+              <span className="inline-flex items-center gap-0.5 text-fuchsia-300"><Icon name="shield" className="w-3 h-3" />{sentryCount}</span>
             </p>
           </div>
           <button
@@ -98,9 +103,7 @@ export default function StatesTodayPopup({ open, onClose }) {
             className="text-zinc-500 hover:text-zinc-300 p-1"
             aria-label="닫기"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <Icon name="x" className="w-5 h-5" />
           </button>
         </div>
 
@@ -150,12 +153,20 @@ export default function StatesTodayPopup({ open, onClose }) {
                       {fmtTime(s.start)}
                     </span>
                     <span className="ml-auto flex items-center gap-1.5 flex-shrink-0">
-                      {isCharge && <span className="text-yellow-400" title={`충전 +${s.soc_added}% (${s.soc_start}→${s.soc_end})`}>⚡</span>}
+                      {isCharge && (
+                        <span className="text-yellow-400 inline-flex" title={`충전 +${s.soc_added}% (${s.soc_start}→${s.soc_end})`}>
+                          <Icon name="bolt" className="w-3.5 h-3.5" filled />
+                        </span>
+                      )}
                       {!isCharge && s.climate_minutes > 0 && (
-                        <span className="text-sky-300" title={`공조 ${s.climate_minutes}분`}>❄</span>
+                        <span className="text-sky-300 inline-flex" title={`공조 ${s.climate_minutes}분`}>
+                          <Icon name="climate" className="w-3.5 h-3.5" />
+                        </span>
                       )}
                       {!isCharge && s.sentry_suspect && (
-                        <span className="text-fuchsia-300" title={`센트리 의심 — ${s.soc_drop}% 감소`}>🛡</span>
+                        <span className="text-fuchsia-300 inline-flex" title={`센트리 의심 — ${s.soc_drop}% 감소`}>
+                          <Icon name="shield" className="w-3.5 h-3.5" />
+                        </span>
                       )}
                       <span className="text-zinc-200 tabular-nums font-medium">
                         {fmtDuration(s.minutes)}

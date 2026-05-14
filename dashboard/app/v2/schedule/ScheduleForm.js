@@ -128,7 +128,7 @@ function DatePicker({ value, onChange, placeholder = '연-월-일 선택' }) {
         onClick={open}
         className="w-full bg-zinc-900 border border-white/[0.06] rounded-md px-2 py-1.5 text-xs text-left flex items-center gap-1.5 hover:bg-zinc-800 transition-colors"
       >
-        <span className="text-zinc-500">📅</span>
+        <Icon name="calendar" className="w-3.5 h-3.5 text-zinc-500" />
         <span className={`flex-1 tabular-nums ${value ? 'text-zinc-200' : 'text-zinc-600'}`}>{value || placeholder}</span>
         <span className="text-zinc-600 text-[10px]">▾</span>
       </button>
@@ -409,7 +409,7 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
       <div className="space-y-2 pb-2 border-b border-white/[0.06]">
         {/* 시각(시:분) 한 줄 */}
         <div className="flex items-center gap-2">
-          <span className="text-sm w-6 text-center">🕐</span>
+          <span className="w-6 flex justify-center"><Icon name="clock" className="w-4 h-4 text-zinc-400" /></span>
           <SelectBase
             value={(s.timeHhmm || '08:00').split(':')[0]}
             onChange={e => {
@@ -482,7 +482,7 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
       <div className="space-y-2 pb-2 border-b border-white/[0.06]">
         {/* 장소 한 줄: 아이콘 + select (또는 OFF) + 토글 */}
         <div className="flex items-center gap-2">
-          <span className="text-sm w-6 text-center">📍</span>
+          <span className="w-6 flex justify-center"><Icon name="pin" className="w-4 h-4 text-zinc-400" /></span>
           {s.locationEnabled ? (
             <SelectBase
               value={s.locationPlace}
