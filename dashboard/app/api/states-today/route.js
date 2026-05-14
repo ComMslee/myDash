@@ -124,13 +124,19 @@ export async function GET(request) {
       ]);
       const climateMin = Math.round(climateR.rows[0]?.climate_min || 0);
       const socDrop = Math.round((socR.rows[0]?.drop || 0) * 10) / 10;
-      const hours = minutes / 60;
-      // 공조로 설명 가능한 drop 을 빼고 남은 순수 drain — 공조 작동 1분당 ~0.05% 가정 (대략)
-      const climateAttributable = (climateMin / 60) * 3; // 공조 1h ≈ 3% 소모 추정
-      const sentryDrop = Math.max(0, socDrop - climateAttributable);
-      const sentryRate = hours > 0 ? sentryDrop / hours : 0;
-      // 센트리 의심: 공조 빼고도 길이 ≥20분 + 잔여 drain ≥ 0.6%/hr
-      const sentrySuspect = minutes >= 20 && sentryRate >= 0.6;
+      // 배터리 손실 패널과 동일 공식 — 시간 점유율 × 드레인%
+      //   share = (minutes / totalMinutes) * drop, 0.05% 미만은 의미없음 (compute.js::dropSharePct)
+      // 센트리 = online minutes − climate minutes (3분 미만 잔여는 노이즈)
+      const SENTRY_MIN = 3;
+      const sentryMin = Math.max(0, minutes - climateMin) >= SENTRY_MIN ? minutes - climateMin : 0;
+      const sharePct = (m) => {
+        if (minutes <= 0 || socDrop <= 0) return null;
+        const v = (m / minutes) * socDrop;
+        return v < 0.05 ? null : Math.round(v * 10) / 10;
+      };
+      const climatePct = sharePct(climateMin);
+      const sentryPct = sharePct(sentryMin);
+      const sentrySuspect = sentryMin >= SENTRY_MIN && sentryPct != null;
       segments.push({
         type: 'online',
         start: startTs,
@@ -138,8 +144,10 @@ export async function GET(request) {
         minutes,
         is_current: sub.is_current,
         climate_minutes: climateMin,
+        sentry_minutes: sentryMin,
         soc_drop: socDrop,
-        sentry_drop: Math.round(sentryDrop * 10) / 10,
+        climate_pct: climatePct,
+        sentry_pct: sentryPct,
         sentry_suspect: sentrySuspect,
       });
     }
