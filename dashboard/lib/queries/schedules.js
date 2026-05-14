@@ -87,6 +87,12 @@ export async function ensureSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS dash_settings (
+      key        TEXT PRIMARY KEY,
+      value      JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS dash_location_events (
       id          BIGSERIAL PRIMARY KEY,
       geofence_id INTEGER NOT NULL,
@@ -363,6 +369,37 @@ export async function isPausedOn(dateStr) {
     [dateStr],
   );
   return r.rowCount > 0;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Global settings (key/value) — 자동화 마스터 스위치 등.
+
+export async function getSetting(key, fallback = null) {
+  await ensureSchema();
+  const r = await pool.query(`SELECT value FROM dash_settings WHERE key=$1`, [key]);
+  if (!r.rowCount) return fallback;
+  return r.rows[0].value;
+}
+
+export async function setSetting(key, value) {
+  await ensureSchema();
+  await pool.query(
+    `INSERT INTO dash_settings (key, value, updated_at)
+     VALUES ($1, $2::jsonb, NOW())
+     ON CONFLICT (key) DO UPDATE
+       SET value = EXCLUDED.value, updated_at = NOW()`,
+    [key, JSON.stringify(value)],
+  );
+}
+
+// 자동화 마스터 스위치 — 기본 ON. false 면 워커가 evaluate/execute 스킵.
+export async function getAutomationEnabled() {
+  const v = await getSetting('automation_enabled', true);
+  return v !== false;
+}
+
+export async function setAutomationEnabled(enabled) {
+  await setSetting('automation_enabled', !!enabled);
 }
 
 // ─────────────────────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import pool from '@/lib/db';
 import { evaluateAll } from '@/lib/schedule-evaluator';
 import { detectAndRecord } from '@/lib/geofence-detector';
 import { executeAction, skipExecution } from '@/lib/schedule-runner';
+import { getAutomationEnabled } from '@/lib/queries/schedules';
 
 // 1분 1회 tick — instrumentation.js 에서 setInterval 로 호출.
 // 1) 지오펜스 변화 감지 (positions → dash_location_events)
@@ -14,6 +15,9 @@ export async function tick() {
   if (running) return { skipped: 'already running' };
   running = true;
   try {
+    // 자동화 마스터 스위치 OFF — geofence 감지/스케줄 평가/실행 모두 스킵 (완전 정지).
+    const enabled = await getAutomationEnabled().catch(() => true);
+    if (!enabled) return { fired: 0, skipped: 0, evaluated: 0, paused: true };
     const geo = await detectAndRecord().catch((e) => ({ events: 0, error: e?.message }));
     const ev = await evaluateAll().catch((e) => ({ error: e?.message, decisions: [] }));
     let fired = 0, skipped = 0;

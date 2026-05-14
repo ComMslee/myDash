@@ -112,5 +112,6 @@ export const ROUTES = [
     params: [{ key: 'limit', sample: '50' }] },
   { path: '/api/geofences',            label: '지오펜스',          desc: '집/회사 좌표 + 반경 (위치 자동화 기준점)', category: '자동화' },
   { path: '/api/pause-periods',        label: '휴무 모드',         desc: '날짜 범위 일시정지 등록 (apply_pause_mode 스케줄만 영향)', category: '자동화' },
+  { path: '/api/automation-enabled',   label: '자동화 마스터 스위치', desc: '전체 ON/OFF — OFF 시 워커가 스케줄 평가/실행 스킵 (geofence 기록은 유지)', category: '자동화' },
   { path: '/api/usage/current-month',  label: '이번 달 사용량',    desc: '$10 크레딧 진행률 + 실제/예상 비용 + 카테고리별 호출 수', category: '자동화' },
 ];

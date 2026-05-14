@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth-helper';
-import { getSchedule } from '@/lib/queries/schedules';
+import { getSchedule, getAutomationEnabled } from '@/lib/queries/schedules';
 import { executeAction } from '@/lib/schedule-runner';
 
 export const dynamic = 'force-dynamic';
@@ -10,6 +10,8 @@ export async function POST(req, { params }) {
   if (__unauth) return __unauth;
   const id = parseInt(params.id, 10);
   if (!Number.isFinite(id)) return Response.json({ error: 'bad id' }, { status: 400 });
+  const enabled = await getAutomationEnabled();
+  if (!enabled) return Response.json({ error: '자동화 OFF 상태 — 마스터 스위치를 켜고 다시 시도하세요' }, { status: 409 });
   const row = await getSchedule(id);
   if (!row) return Response.json({ error: 'not found' }, { status: 404 });
   const result = await executeAction({
