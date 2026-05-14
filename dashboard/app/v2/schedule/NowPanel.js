@@ -71,23 +71,21 @@ export default function NowPanel({ onAfterRun }) {
 
   return (
     <div className="space-y-3">
-      {/* 명령 그리드 */}
+      {/* 명령 — 한 줄에 1개씩 */}
       <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-zinc-500 font-semibold tracking-wide">즉시 실행</p>
-          {toast && (
+        {toast && (
+          <div className="flex justify-end">
             <span className={`text-[10px] px-2 py-0.5 rounded ${toast.ok ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
               {toast.msg}
             </span>
-          )}
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          </div>
+        )}
+        <div className="space-y-2">
           {ACTIONS.map((a) => (
             <div key={a.key} className="flex items-center gap-2">
-              <span className="text-sm w-20 truncate flex flex-col">
+              <span className="text-sm w-24 truncate flex flex-col">
                 <span>{a.icon} {a.label}</span>
                 <span className="text-[9px] text-zinc-500 leading-none">~${a.cost.toFixed(3)}/회</span>
-                {/* commands 단가 $0.001 — lib/queries/schedules.js::COST */}
               </span>
               <button
                 onClick={() => run(a.on)}
