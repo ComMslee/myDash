@@ -15,6 +15,7 @@ const ACTION_LABEL = {
   lock: '잠금', unlock: '잠금해제',
   charge_start: '충전 시작', charge_stop: '충전 중지',
   set_charge_limit: '충전 한도', flash_lights: '라이트 점멸',
+  check_status: '🔍 차량 상태', wake_up: '⏰ 깨우기',
 };
 
 function fmtTs(s) {
