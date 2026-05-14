@@ -12,7 +12,6 @@ const SECTIONS = [
   { key: 'now',       label: '⚡ 즉시 실행' },
   { key: 'geofences', label: '📍 지오펜스' },
   { key: 'tesla',     label: '🔌 Tesla 연결' },
-  { key: 'checklist', label: '🔧 체크리스트' },
 ];
 
 export default function SettingsSheet({ open, onClose, onRunNow, onAfterRun }) {
@@ -45,17 +44,6 @@ export default function SettingsSheet({ open, onClose, onRunNow, onAfterRun }) {
         {sec === 'now' && <NowPanel onAfterRun={onAfterRun} />}
         {sec === 'geofences' && <GeofencesPanel />}
         {sec === 'tesla' && <TeslaConnectPanel />}
-        {sec === 'checklist' && (
-          <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-3 text-[11px] text-zinc-500 space-y-1.5">
-            <p className="font-semibold text-zinc-400 text-xs">실연동 체크리스트</p>
-            <p>• 기상청 API 키 → 환경변수 <span className="text-zinc-300">KMA_API_KEY</span></p>
-            <p>• Tesla Developer 앱 등록 → <span className="text-zinc-300">TESLA_FLEET_CLIENT_ID / _SECRET</span></p>
-            <p>• OAuth + Virtual Key 페어링 → access token</p>
-            <p>• <span className="text-zinc-300">TESLA_FLEET_API_ENABLED=true</span> 환경변수 토글</p>
-            <p>• 결제수단 미등록 권장 — $10 한도 초과 시 자동 차단 (청구 X)</p>
-            <p>• 지오펜스(집/회사) — TeslaMate UI 에서 추가/삭제 (단일 진실원)</p>
-          </div>
-        )}
       </div>
     </div>
   );
