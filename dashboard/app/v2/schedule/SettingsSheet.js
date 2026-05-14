@@ -20,9 +20,9 @@ export default function SettingsSheet({ open, onClose, onRunNow, onAfterRun }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
+    <div className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-start justify-center sm:items-center p-2 sm:p-3" onClick={onClose}>
       <div
-        className="w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-[#0f0f0f] border border-white/[0.10] rounded-2xl p-5 space-y-4"
+        className="w-full max-w-2xl h-[96vh] sm:h-auto sm:max-h-[92vh] overflow-y-auto bg-[#0f0f0f] border border-white/[0.10] rounded-2xl p-4 sm:p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
