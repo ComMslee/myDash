@@ -20,8 +20,8 @@ export default function UsageCard({ usage }) {
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-3 py-2 space-y-1.5">
       <div className="flex items-baseline gap-2 tabular-nums">
-        <span className="text-base font-bold text-blue-400">${actual.toFixed(2)}</span>
-        <span className={`text-xs ${overrun ? 'text-rose-400' : 'text-amber-400'}`}>예상 ${projected.toFixed(2)}</span>
+        <span className="text-base font-bold text-blue-400">${actual.toFixed(3)}</span>
+        <span className={`text-xs ${overrun ? 'text-rose-400' : 'text-amber-400'}`}>예상 ${projected.toFixed(3)}</span>
         <span className="ml-auto text-[10px] text-zinc-500">/ ${credit} · {usage.elapsed_days}/{usage.total_days}일</span>
       </div>
       <div className="relative h-1.5 bg-zinc-900 rounded-full overflow-hidden">
