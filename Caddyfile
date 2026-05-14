@@ -22,6 +22,13 @@
 # /.well-known/appspecific/com.tesla.3p.public-key.pem 은 정적 파일로 서빙 (Tesla 검증 경로).
 # 나머지 경로는 dashboard 로 프록시.
 liam-my-dash.duckdns.org {
+	# HSTS — 한 번 HTTPS 로 접속한 브라우저는 1년간 HTTP 시도 자체를 차단.
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	# 보안 헤더 — XSS/clickjacking/MIME sniffing 기본 방어.
+	header X-Content-Type-Options "nosniff"
+	header X-Frame-Options "SAMEORIGIN"
+	header Referrer-Policy "strict-origin-when-cross-origin"
+
 	handle /.well-known/appspecific/com.tesla.3p.public-key.pem {
 		root * /tesla-keys
 		rewrite * /com.tesla.3p.public-key.pem

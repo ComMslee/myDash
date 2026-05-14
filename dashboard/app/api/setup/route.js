@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readAuth, writeAuth } from '@/lib/auth-store';
 import { COOKIE, MAX_AGE, assertSameOrigin } from '@/lib/auth-helper';
+import { authCookieOpts } from '@/lib/cookie-opts';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -20,11 +21,6 @@ export async function POST(req) {
   }
   const token = await writeAuth(pin);
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(COOKIE, token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: MAX_AGE,
-  });
+  res.cookies.set(COOKIE, token, { ...authCookieOpts(req), maxAge: MAX_AGE });
   return res;
 }
