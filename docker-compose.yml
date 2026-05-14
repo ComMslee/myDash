@@ -25,6 +25,8 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+      # Tesla Fleet API public key 정적 서빙 (.well-known 경로). private key 는 마운트 X.
+      - /etc/tesla-keys/com.tesla.3p.public-key.pem:/tesla-keys/com.tesla.3p.public-key.pem:ro
     depends_on:
       - teslamate
       - dashboard
@@ -70,6 +72,8 @@ services:
     volumes:
       - dashboard-data:/data
       - /var/run/docker.sock:/var/run/docker.sock:ro  # 컨테이너별 stats 조회용 (api-status 페이지)
+      # Tesla Fleet API private key — 명령 서명용. read-only, dashboard 컨테이너만 접근.
+      - /etc/tesla-keys/tesla-private.pem:/app/tesla-keys/tesla-private.pem:ro
     # 외부 80/443 은 teslamate-auth (Caddy) 가 담당. 내부 컨테이너 통신은 dashboard:5000.
     # 5000 호스트 직접 노출은 디버그/우회용 (curl localhost:5000 으로 Caddy 우회 진단).
     ports:
