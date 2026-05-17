@@ -7,7 +7,7 @@
 //   dash_place_clusters / dash_place_geo          — frequent-places 끝점 0.0005° 빈도
 //
 // 멱등성: 각 refresh* 는 안전하게 재실행 가능 (DELETE+INSERT 또는 UPSERT). cron 실패 self-heal.
-// 스키마: docs/PRECOMPUTE_PLAN.md Tier 2 참조.
+// 스키마/캐시 흐름: docs/CACHING.md "사전 집계 (dash_*)" 절 참조. (구 PRECOMPUTE_PLAN.md → docs/archive/)
 
 export { ensureSchema } from './schema';
 export { bootstrapIfEmpty } from './bootstrap';

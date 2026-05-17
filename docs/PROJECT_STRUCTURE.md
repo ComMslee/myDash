@@ -71,7 +71,14 @@ myDash/
     │   ├── docker-stats.js       # docker.sock CPU/메모리 통계 — server-status 용
     │   ├── drive-classify.js     # 주행 분류 헬퍼 (장거리/통근/단거리 등)
     │   ├── schedule-evaluator.js     # Tesla 자동화 트리거 판정 — 시간/장소/날씨 3축 + 휴무·skip_dates 분기
-    │   ├── schedule-runner.js        # 1분 setInterval 워커 — listSchedules → evaluate → run + 결과 로깅 (TESLA_FLEET_API_ENABLED 게이팅)
+    │   ├── schedule-runner.js        # executeAction / skipExecution — Fleet API 호출 + 결과 로깅 (TESLA_FLEET_API_ENABLED 게이팅)
+    │   ├── worker-tick.js            # 1분 setInterval 진입점 — geofence-detector → evaluateAll → executeAction 시퀀스
+    │   ├── geofence-detector.js      # TeslaMate positions 매분 폴링 → 진입/이탈 비교 → `dash_location_events` INSERT
+    │   ├── tesla-fleet.js            # Fleet API 클라이언트 — DB 토큰 + 자동 refresh + path 분류 자동 카운팅 (`dash_api_usage_monthly`)
+    │   ├── tesla-tokens.js           # OAuth 토큰 저장 (AES 암호화) + 자동 refresh
+    │   ├── weather.js                # 기상청 단기예보 좌표 기반 외기온도/강수 (1h 캐시) — 자동화 날씨축
+    │   ├── geo-privacy.js            # family/SNS 외부 응답용 좌표 정밀도 축소 (소수 3자리 ≈ ±100m)
+    │   ├── cookie-opts.js            # 인증 쿠키 옵션 — X-Forwarded-Proto 기반 secure 자동 결정
     │   ├── queries/              # 도메인별 SQL 쿼리 모듈
     │   │   ├── battery-capacity.js
     │   │   ├── battery-health.js
@@ -105,7 +112,8 @@ myDash/
     │   │   ├── page.js           # `/v2` → `/v2/drives` 리다이렉트
     │   │   ├── components/
     │   │   │   ├── BottomNavV2.js    # 하단 알약(BottomNav + 헤더 흡수) — 좌측 ⚙️ | 4탭(주행/이력/배터리/충전소) · SOC fill 배경(충전=노랑/그 외=초록) · 정보 행(상태 chip + 온라인 dot + 경과/충전 상세/예측 km·%) · ⚙️ 시트(텔레그램/API상태/인증) · /api/car + /api/charging-status 30초 폴링 · 스크롤 시 축소(useScrollShrink)
-    │   │   │   └── RankingsSheet.js  # 랭킹 바텀시트
+    │   │   │   ├── RankingsSheet.js  # 랭킹 바텀시트
+    │   │   │   └── StatesTodayPopup.js  # 오늘 차량 상태 타임라인 팝업 (`/api/states-today`)
     │   │   ├── drives/
     │   │   │   ├── page.js                   # 주행 분석 — 차량 KPI + 인사이트 + 시간×요일 패턴 + TOP50 + 연도별 월간
     │   │   │   └── _parts/
@@ -143,7 +151,9 @@ myDash/
     │   │   │   ├── page.js               # 집충전기 실시간 + Top 순위 + 활용도 리포트 인라인
     │   │   │   ├── _parts/ReportPanel.js # 활용도 라이브 리포트 컴포넌트 (KPI · 주별 추이 · 동별)
     │   │   │   └── report/page.js        # 활용도 리포트 단독 페이지 (외부 캡처/공유)
-    │   │   ├── tg/page.js            # 텔레그램 봇 관리 (권한·방송·학습로그·가이드)
+    │   │   ├── tg/                   # 텔레그램 봇 관리 (권한·방송·학습로그·가이드)
+    │   │   │   ├── page.js           # 데이터 fetch + 탭 분기 (perm/broadcast/guide)
+    │   │   │   └── _components/      # PermPane / UserGroupsAdmin / BroadcastPane / GuidePane / HubStatus / Tabs / Section
     │   │   ├── schedule/             # Tesla 자동화 스케줄러 — 캘린더 중심 단일 페이지
     │   │   │   ├── page.js           # 메인 — UsageCard + Calendar(세로 타임라인) + PausePanel + ScheduleList + ExecutionLog. ⚙ 시트는 즉시실행/지오펜스/실연동체크만
     │   │   │   ├── Calendar.js       # 세로 타임라인 ±14일 + HotBar(다음/마지막 실행) + DayRow(plan/exec chip + skip 토글) — 📅 더보기 = MonthCalendar 모달 오픈
@@ -195,6 +205,7 @@ myDash/
     │       ├── summary/route.js                   # drives+charges 일자 집계 (range=multi 등) — 봇 /period (server-cache 120s · historical 범위는 dash_daily_*_agg 위임)
     │       ├── parked/route.js                    # 마지막 주차/주행중 — 봇 /where
     │       ├── location/route.js                  # 최신 좌표 — 봇 /where
+    │       ├── states-today/route.js              # 특정 일자(KST) state 타임라인 (online/asleep/offline + drive/charge 서브구간) — StatesTodayPopup 용
     │       ├── sns/blog/route.js                  # 네이버 블로그 발행 mock (POST) — 봇 /post 채널 검증
     │       ├── family/festivals/route.js          # TourAPI 축제 캐시 — 봇 /festivals
     │       ├── family/festivals/refresh/route.js  # 축제 강제 갱신 (POST)
