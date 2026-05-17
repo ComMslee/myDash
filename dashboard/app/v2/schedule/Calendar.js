@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import MonthCalendar from './MonthCalendar';
+import { formatRelativeTime } from '@/lib/format';
 
 // 세로 타임라인 — 월 grid 제거. 위: 과거 이력 · 가운데: 오늘 · 아래: 미래 예약.
 // 진입 시 오늘 row 가 viewport 중앙으로 자동 스크롤.
@@ -254,8 +255,8 @@ function HotBar({ next, last, today, onJump }) {
     const ymd = `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
     const sameDay = ymd === today;
     const dStr = sameDay ? '오늘' : ymd.slice(5).replace('-', '/');
-    const diffMin = Math.round((Date.now() - t.getTime()) / 60000);
-    const ago = diffMin < 60 ? `${diffMin}분 전` : diffMin < 1440 ? `${Math.round(diffMin / 60)}시간 전` : `${Math.round(diffMin / 1440)}일 전`;
+    // 경과시간은 원본 triggered_at (실제 epoch) 으로 계산 — t 는 KST 컴포넌트 읽기용 +9h shifted 라 시간차에 못 씀.
+    const ago = formatRelativeTime(last.triggered_at);
     return { dStr, time: `${hh}:${mm}`, status: last.status, action: last.action, ago };
   };
   const n = fmtNext();

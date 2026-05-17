@@ -80,13 +80,22 @@ export function formatBytes(n) {
   return `${(n / 1024 / 1024).toFixed(1)}M`;
 }
 
-/** ISO 시각 → "N초/분/시간/일 전" (한국어 상대시간) */
-export function formatRelativeTime(iso) {
-  if (!iso) return '—';
-  const ageMs = Date.now() - new Date(iso).getTime();
-  if (ageMs < 0) return '방금';
+/**
+ * ISO 시각 → "N초/분/시간/일 전" (한국어 상대시간).
+ * opts:
+ *   futureLabel — 미래 시각에 표시할 라벨 (기본 '방금', 진단용 '미래?')
+ *   hourUnit   — 시간 단위 표기 (기본 '시간', 컴팩트 'h')
+ *   nullLabel  — null/undefined 입력 시 라벨 (기본 '—', 빈 표시 '')
+ */
+export function formatRelativeTime(iso, opts = {}) {
+  const { futureLabel = '방금', hourUnit = '시간', nullLabel = '—' } = opts;
+  if (!iso) return nullLabel;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return nullLabel;
+  const ageMs = Date.now() - t;
+  if (ageMs < 0) return futureLabel;
   if (ageMs < 60_000) return `${Math.floor(ageMs / 1000)}초 전`;
   if (ageMs < 3_600_000) return `${Math.floor(ageMs / 60_000)}분 전`;
-  if (ageMs < 86_400_000) return `${Math.floor(ageMs / 3_600_000)}시간 전`;
+  if (ageMs < 86_400_000) return `${Math.floor(ageMs / 3_600_000)}${hourUnit} 전`;
   return `${Math.floor(ageMs / 86_400_000)}일 전`;
 }
