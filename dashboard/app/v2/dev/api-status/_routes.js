@@ -63,6 +63,8 @@ export const ROUTES = [
   { path: '/api/fast-charges',     label: '급속 기록',      desc: 'DC 급속(>50kW) 충전 세션 필터 (cache 180s)', category: '배터리/충전' },
   { path: '/api/slow-charges',     label: '완속 기록',      desc: 'AC 완속 충전 세션 필터 (cache 180s)', category: '배터리/충전' },
   { path: '/api/debug/charging',   label: '디버그 · 충전',  desc: '충전 감지 raw 신호 (positions.power, charges 행, states)', category: '배터리/충전' },
+  { path: '/api/charging-locations', label: '충전 위치',     desc: '충전 위치 클러스터링 — bin(0.001°) 그룹별 빈도·총 kWh·급속/완속 분포 (cache 300s)', category: '배터리/충전',
+    params: [REFRESH_PARAM] },
 
   // 집충전기 — 환경공단 API + 폴링
   { path: '/api/home-charger/groups', label: '충전기 그룹',  desc: '동별 그룹 카운트 (구성 = constants.js) — 봇 /chargers', category: '집충전기' },
