@@ -275,43 +275,73 @@ function DriveSummary({ drive }) {
   );
 }
 
+// 인라인 stat 그룹 — 큰 값 + 작은 라벨 (라벨/값 좌우 분리 그리드보다 시각 정리)
+function StatPill({ value, label, valueClass = 'text-zinc-300' }) {
+  return (
+    <div className="flex items-baseline gap-1">
+      <span className={`text-sm font-semibold tabular-nums ${valueClass}`}>{value}</span>
+      <span className="text-zinc-600 text-[10px]">{label}</span>
+    </div>
+  );
+}
+
 function PlaceSummary({ place }) {
   const fmtMD = (s) => { const d = new Date(s); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
   // 오래 머문 곳 (long-stay) vs 자주 가는 곳 (frequent) — dwell 필드 유무로 분기.
   const isLongStay = place.max_dwell_sec > 0 || place.avg_dwell_sec > 0;
   return (
     <div className="px-4 py-2.5 border-b border-white/[0.06] flex-shrink-0">
-      <div className="flex items-center gap-3 mb-2">
+      {/* 헤더 — 장소명 + headline metric (큰 글씨) */}
+      <div className="flex items-center gap-3">
         <span className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
-        <p className="text-base text-zinc-300 truncate flex-1">{place.label}</p>
+        <p className="text-base text-zinc-200 truncate flex-1">{place.label}</p>
         {isLongStay ? (
-          <span className="text-amber-400 text-sm font-bold tabular-nums flex-shrink-0">
-            {formatDwellSec(place.max_dwell_sec)}<span className="text-zinc-500 text-xs ml-1">최장</span>
-          </span>
+          <div className="text-right flex-shrink-0 leading-none">
+            <div className="text-amber-400 text-base font-bold tabular-nums">{formatDwellSec(place.max_dwell_sec)}</div>
+            <div className="text-zinc-600 text-[10px] mt-0.5">일 최대</div>
+          </div>
         ) : (
-          <span className="text-amber-400 text-sm font-bold tabular-nums flex-shrink-0">{place.visit_count}회 방문</span>
+          <div className="text-right flex-shrink-0 leading-none">
+            <div className="text-amber-400 text-base font-bold tabular-nums">{place.visit_count}회</div>
+            <div className="text-zinc-600 text-[10px] mt-0.5">방문</div>
+          </div>
         )}
       </div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 pl-5 text-xs">
-        {isLongStay ? (
-          <>
-            {place.max_dwell_sec > 0 && <div className="flex justify-between"><span className="text-zinc-600">일 최대</span><span className="text-amber-400 font-semibold tabular-nums">{formatDwellSec(place.max_dwell_sec)}</span></div>}
-            {place.min_dwell_sec > 0 && <div className="flex justify-between"><span className="text-zinc-600">일 최소</span><span className="text-amber-400/60 font-semibold tabular-nums">{formatDwellSec(place.min_dwell_sec)}</span></div>}
-            {place.avg_dwell_sec > 0 && <div className="flex justify-between"><span className="text-zinc-600">평균 체류</span><span className="text-amber-400/80 font-semibold tabular-nums">{formatDwellSec(place.avg_dwell_sec)}</span></div>}
-            {place.total_dwell_sec > 0 && <div className="flex justify-between"><span className="text-zinc-600">총 체류</span><span className="text-zinc-400 font-semibold tabular-nums">{formatDwellSec(place.total_dwell_sec)}</span></div>}
-            {place.visit_count > 0 && <div className="flex justify-between"><span className="text-zinc-600">방문</span><span className="text-zinc-400 font-semibold tabular-nums">{place.visit_count}회</span></div>}
-            {place.last_visit && <div className="flex justify-between"><span className="text-zinc-600">최근 방문</span><span className="text-zinc-400 tabular-nums">{fmtMD(place.last_visit)}</span></div>}
-            {place.first_visit && <div className="flex justify-between"><span className="text-zinc-600">첫 방문</span><span className="text-zinc-400 tabular-nums">{fmtMD(place.first_visit)}</span></div>}
-          </>
-        ) : (
-          <>
-            {place.first_visit && <div className="flex justify-between"><span className="text-zinc-600">첫 방문</span><span className="text-zinc-400 tabular-nums">{fmtMD(place.first_visit)}</span></div>}
-            {place.last_visit && <div className="flex justify-between"><span className="text-zinc-600">최근 방문</span><span className="text-zinc-400 tabular-nums">{fmtMD(place.last_visit)}</span></div>}
-            {place.avg_distance > 0 && <div className="flex justify-between"><span className="text-zinc-600">이동 평균</span><span className="text-blue-400/80 font-semibold tabular-nums">{place.avg_distance}km</span></div>}
-            {place.avg_duration > 0 && <div className="flex justify-between"><span className="text-zinc-600">소요시간</span><span className="text-zinc-400 font-semibold tabular-nums">{formatDuration(place.avg_duration)}</span></div>}
-          </>
-        )}
-      </div>
+
+      {isLongStay ? (
+        <>
+          {/* 보조 dwell 통계 — 인라인 (라벨/값 분리 안 함) */}
+          <div className="mt-2 pl-5 flex items-baseline gap-3 flex-wrap">
+            {place.min_dwell_sec > 0 && <StatPill value={formatDwellSec(place.min_dwell_sec)} label="최소" valueClass="text-amber-400/60" />}
+            {place.avg_dwell_sec > 0 && <StatPill value={formatDwellSec(place.avg_dwell_sec)} label="평균" valueClass="text-amber-400/80" />}
+            {place.total_dwell_sec > 0 && <StatPill value={formatDwellSec(place.total_dwell_sec)} label="총" valueClass="text-zinc-300" />}
+            {place.visit_count > 0 && <StatPill value={`${place.visit_count}회`} label="방문" valueClass="text-zinc-300" />}
+          </div>
+          {/* 메타 — 첫·최근 방문 (가장 작은 글씨) */}
+          {(place.first_visit || place.last_visit) && (
+            <div className="mt-1 pl-5 text-[11px] text-zinc-500 tabular-nums">
+              {place.first_visit && <span>{fmtMD(place.first_visit)}</span>}
+              {place.first_visit && place.last_visit && <span className="text-zinc-700 mx-1">→</span>}
+              {place.last_visit && <span>{fmtMD(place.last_visit)}</span>}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="mt-2 pl-5 flex items-baseline gap-3 flex-wrap">
+            {place.avg_distance > 0 && <StatPill value={`${place.avg_distance}km`} label="이동 평균" valueClass="text-blue-400/80" />}
+            {place.avg_duration > 0 && <StatPill value={formatDuration(place.avg_duration)} label="소요" valueClass="text-zinc-300" />}
+          </div>
+          {(place.first_visit || place.last_visit) && (
+            <div className="mt-1 pl-5 text-[11px] text-zinc-500 tabular-nums">
+              {place.first_visit && <span>{fmtMD(place.first_visit)}</span>}
+              {place.first_visit && place.last_visit && <span className="text-zinc-700 mx-1">→</span>}
+              {place.last_visit && <span>{fmtMD(place.last_visit)}</span>}
+            </div>
+          )}
+        </>
+      )}
+
       {place.origins?.length > 0 && (
         <div className="flex items-center gap-1 mt-2 pl-5 text-[11px]">
           <span className="text-zinc-600">주요 출발지</span>
