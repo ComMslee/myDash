@@ -308,12 +308,14 @@ export default function DriveListView({
     const isEarly = new Date(first.start_date).getHours() < 6;
     const isLateEnd = last.end_date && (new Date(last.end_date) - dayStart) > dayMs; // 자정 넘김 종료
     return (
+      <div key={g.key} className="flex items-stretch border-b border-white/[0.04] last:border-b-0 pl-5">
+        {/* 일 좌측 rail — 주(w-1.5 blue-500/30, pl-0)보다 한 단계 옅고 안쪽으로 들여쓰기(pl-5) → 하위 계층 표현 */}
+        <div className="w-1 bg-blue-500/15 flex-shrink-0" aria-hidden="true" />
       <button
-        key={g.key}
         type="button"
         onClick={() => onDayClick(g.dateStr)}
         title={holidayName || undefined}
-        className="relative w-full text-left flex flex-col gap-1 pl-7 pr-3 py-3 border-b border-white/[0.04] border-l-2 border-l-white/[0.04] last:border-b-0 hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
+        className="relative flex-1 text-left flex flex-col gap-1 pl-6 pr-3 py-3 hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
       >
         <DayBgGradient items={visible} dayStart={dayStart} dayMs={dayMs} />
         <div className="relative flex items-center justify-between gap-2">
@@ -357,6 +359,7 @@ export default function DriveListView({
           )}
         </div>
       </button>
+      </div>
     );
   };
 
@@ -368,10 +371,13 @@ export default function DriveListView({
     const ms = new Date(curOldest.start_date) - new Date(nextNewest.end_date);
     if (ms <= 0) return null;
     return (
-      <div key={key} className="flex items-center gap-2 px-3 py-1 bg-black/40 border-y border-white/[0.06]">
-        <div className="flex-1 h-px bg-white/[0.06]" />
-        <span className="text-[10px] text-zinc-600 tabular-nums">{formatDuration(Math.round(ms / 60000))}</span>
-        <div className="flex-1 h-px bg-white/[0.06]" />
+      <div key={key} className="flex items-stretch border-y border-white/[0.06] pl-5">
+        <div className="w-1 bg-blue-500/15 flex-shrink-0" aria-hidden="true" />
+        <div className="flex-1 flex items-center gap-2 px-3 py-1 bg-black/40">
+          <div className="flex-1 h-px bg-white/[0.06]" />
+          <span className="text-[10px] text-zinc-600 tabular-nums">{formatDuration(Math.round(ms / 60000))}</span>
+          <div className="flex-1 h-px bg-white/[0.06]" />
+        </div>
       </div>
     );
   };
