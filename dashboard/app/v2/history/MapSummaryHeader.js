@@ -286,7 +286,12 @@ function StatPill({ value, label, valueClass = 'text-zinc-300' }) {
 }
 
 function PlaceSummary({ place }) {
-  const fmtMD = (s) => { const d = new Date(s); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+  // 첫·최근 방문 timestamp 포맷 — 'M/D HhMMm' (HH:MM 콜론은 "그 시각부터 ~까지 쭉" 같은
+  // 연속 체류 인상을 주기 쉬워서 h/m 접미사 + 항목 사이 '~' 로 분리감 강조).
+  const fmtMD = (s) => {
+    const d = new Date(s);
+    return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}h${String(d.getMinutes()).padStart(2, '0')}m`;
+  };
   // 오래 머문 곳 (long-stay) vs 자주 가는 곳 (frequent) — dwell 필드 유무로 분기.
   const isLongStay = place.max_dwell_sec > 0 || place.avg_dwell_sec > 0;
   return (
@@ -321,7 +326,7 @@ function PlaceSummary({ place }) {
           {(place.first_visit || place.last_visit) && (
             <div className="mt-1 pl-5 text-[11px] text-zinc-500 tabular-nums">
               {place.first_visit && <span>{fmtMD(place.first_visit)}</span>}
-              {place.first_visit && place.last_visit && <span className="text-zinc-700 mx-1">→</span>}
+              {place.first_visit && place.last_visit && <span className="text-zinc-700 mx-1">~</span>}
               {place.last_visit && <span>{fmtMD(place.last_visit)}</span>}
             </div>
           )}
@@ -335,7 +340,7 @@ function PlaceSummary({ place }) {
           {(place.first_visit || place.last_visit) && (
             <div className="mt-1 pl-5 text-[11px] text-zinc-500 tabular-nums">
               {place.first_visit && <span>{fmtMD(place.first_visit)}</span>}
-              {place.first_visit && place.last_visit && <span className="text-zinc-700 mx-1">→</span>}
+              {place.first_visit && place.last_visit && <span className="text-zinc-700 mx-1">~</span>}
               {place.last_visit && <span>{fmtMD(place.last_visit)}</span>}
             </div>
           )}
