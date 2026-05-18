@@ -45,8 +45,8 @@ services:
     image: eclipse-mosquitto:2
     restart: always
     command: mosquitto -c /mosquitto-no-auth.conf
-    ports:
-      - 1883:1883
+    # 외부 호스트 포트 노출 제거 — teslamate/dashboard/hub 는 컴포즈 내부 네트워크로 접속.
+    # 과거 "1883:1883" 은 익명 허용 브로커가 host 에 LISTEN 하여 cloud FW 만으로 보호되던 구조.
     volumes:
       - mosquitto-conf:/mosquitto/config
       - mosquitto-data:/mosquitto/data
