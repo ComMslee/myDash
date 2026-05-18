@@ -96,7 +96,7 @@ export const ROUTES = [
   { path: '/api/pause-periods',        label: '휴무 모드',         desc: '날짜 범위 일시정지 등록 (apply_pause_mode 스케줄만 영향)', category: '자동화/외부' },
   { path: '/api/geofences',            label: '지오펜스',          desc: '집/회사 좌표 + 반경 (위치 자동화 기준점)', category: '자동화/외부' },
   { path: '/api/tesla/oauth/status',   label: 'Tesla 연결 상태',   desc: 'Fleet API 토큰 존재/만료/scope. DELETE 로 토큰 폐기 가능', category: '자동화/외부' },
-  { path: '/api/tesla-test/ping',      label: '테슬라 테스트',     desc: 'Fleet API vehicle_data 1회 호출 ($0.002 — ENABLED=false면 실호출 0). 토큰·vehicle id 누락 명시. Mock 모드는 즉시 회신.', category: '자동화/외부' },
+  { path: '/api/tesla-test/ping',      label: '테슬라 테스트',     desc: 'Fleet API vehicle_data 1회 호출 ($0.002 — ENABLED=false면 실호출 0). 토큰·vehicle id 누락 명시. Mock 모드는 즉시 회신.', category: '자동화/외부', costly: 'Fleet API vehicle_data — 호출당 $0.002 (ENABLED=true 일 때만 실청구)' },
   { path: '/api/usage/current-month',  label: '이번 달 사용량',    desc: '$10 크레딧 진행률 + 실제/예상 비용 + 카테고리별 호출 수', category: '자동화/외부' },
   { path: '/api/weather/test',         label: '기상청 테스트',     desc: 'KMA 단기예보 connectivity — apiKeyMissing/캐시상태 노출 (기본 서울시청 좌표). cached=true 면 1시간 캐시 hit.', category: '자동화/외부',
     params: [
@@ -120,6 +120,6 @@ export const ROUTES = [
     params: [
       { key: 'date', sample: '' },
     ] },
-  { path: '/api/tesla/vehicles',   label: 'Tesla 차량 목록', desc: 'Fleet API products 호출 결과 — OAuth 토큰 검증 + vehicle_id 진단 용', category: '자동화/외부' },
+  { path: '/api/tesla/vehicles',   label: 'Tesla 차량 목록', desc: 'Fleet API products 호출 결과 — OAuth 토큰 검증 + vehicle_id 진단 용', category: '자동화/외부', costly: 'Fleet API products 호출 (ENABLED=true 일 때 청구 대상)' },
   { path: '/api/tg',               label: '텔레그램 사용자', desc: '봇 권한·그룹·학습 로그 통합 (/v2/tg 페이지 소스)', category: '자동화/외부' },
 ];
