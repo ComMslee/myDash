@@ -52,9 +52,9 @@ export default function NowPanel({ onAfterRun }) {
     try {
       const r = await fetch('/api/tesla-test/ping');
       const j = await r.json();
-      setTestResult({ kind: 'status', ok: r.ok, data: j });
+      setTestResult({ kind: 'status', ok: r.ok, data: j, checkedAt: new Date() });
     } catch (e) {
-      setTestResult({ kind: 'status', ok: false, data: { error: e?.message } });
+      setTestResult({ kind: 'status', ok: false, data: { error: e?.message }, checkedAt: new Date() });
     } finally { setTesting(false); }
   };
 
@@ -63,31 +63,31 @@ export default function NowPanel({ onAfterRun }) {
     try {
       const r = await fetch('/api/tesla-test/wake', { method: 'POST' });
       const j = await r.json();
-      setTestResult({ kind: 'wake', ok: r.ok, data: j });
+      setTestResult({ kind: 'wake', ok: r.ok, data: j, checkedAt: new Date() });
     } catch (e) {
-      setTestResult({ kind: 'wake', ok: false, data: { error: e?.message } });
+      setTestResult({ kind: 'wake', ok: false, data: { error: e?.message }, checkedAt: new Date() });
     } finally { setTesting(false); }
   };
 
+  const fmtCheckedAt = (d) => d ? `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}` : '';
+
   return (
     <div className="space-y-3">
-      {/* 명령 그리드 */}
+      {/* 명령 — 한 줄에 1개씩 */}
       <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-zinc-500 font-semibold tracking-wide">즉시 실행</p>
-          {toast && (
+        {toast && (
+          <div className="flex justify-end">
             <span className={`text-[10px] px-2 py-0.5 rounded ${toast.ok ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
               {toast.msg}
             </span>
-          )}
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          </div>
+        )}
+        <div className="space-y-2">
           {ACTIONS.map((a) => (
             <div key={a.key} className="flex items-center gap-2">
-              <span className="text-sm w-20 truncate flex flex-col">
+              <span className="text-sm w-24 truncate flex flex-col">
                 <span>{a.icon} {a.label}</span>
                 <span className="text-[9px] text-zinc-500 leading-none">~${a.cost.toFixed(3)}/회</span>
-                {/* commands 단가 $0.001 — lib/queries/schedules.js::COST */}
               </span>
               <button
                 onClick={() => run(a.on)}
@@ -136,12 +136,13 @@ export default function NowPanel({ onAfterRun }) {
           <div className="p-2 rounded-lg bg-zinc-900/60 border border-white/[0.06] text-[11px] space-y-1">
             <p className="font-semibold text-zinc-300">차량 상태 {testResult.ok ? '✓' : '✗'}</p>
             {testResult.data?.state && (
-              <p className="text-zinc-400">
+              <p className="text-zinc-400 flex items-center gap-1.5 flex-wrap">
                 state: <span className={
                   testResult.data.state === 'online' ? 'text-emerald-300 font-semibold'
                   : testResult.data.state === 'asleep' ? 'text-blue-300 font-semibold'
                   : 'text-zinc-300 font-semibold'
                 }>{testResult.data.state}</span>
+                <span className="text-[10px] text-zinc-500 tabular-nums">@ {fmtCheckedAt(testResult.checkedAt)} KST</span>
                 {testResult.data.display_name && <span className="text-zinc-500"> · {testResult.data.display_name}</span>}
               </p>
             )}
@@ -165,7 +166,10 @@ export default function NowPanel({ onAfterRun }) {
 
         {testResult && testResult.kind === 'wake' && (
           <div className="p-2 rounded-lg bg-zinc-900/60 border border-white/[0.06] text-[11px] space-y-1">
-            <p className="font-semibold text-zinc-300">깨우기 {testResult.ok ? '✓' : '✗'}</p>
+            <p className="font-semibold text-zinc-300 flex items-center gap-1.5">
+              깨우기 {testResult.ok ? '✓' : '✗'}
+              <span className="text-[10px] text-zinc-500 tabular-nums">@ {fmtCheckedAt(testResult.checkedAt)} KST</span>
+            </p>
             <p className="text-zinc-400">상태: <span className="text-zinc-200">{testResult.data?.state || '—'}</span></p>
             {testResult.data?.note && <p className="text-zinc-500">{testResult.data.note}</p>}
             {testResult.data?.error && <p className="text-red-300">{testResult.data.error}</p>}

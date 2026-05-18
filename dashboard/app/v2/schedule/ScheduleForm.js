@@ -35,11 +35,16 @@ const WEATHER_PRECIP_OPTIONS = [
   { value: 'any',  label: '비 또는 눈' },
 ];
 
-const LOCATION_EVENT_OPTIONS = [
-  { value: 'at',    label: '머무는 동안' },
-  { value: 'enter', label: '도착 시' },
-  { value: 'exit',  label: '출발 시' },
-];
+// 장소는 시간 트리거의 '필터' 로만 사용 — 머무는 동안(at) 만 저장.
+
+// 'HH:MM' 을 5분 단위로 스냅. 잘못된 값/빈값이면 null.
+function snapToFiveMin(hhmm) {
+  if (!hhmm || !/^\d{1,2}:\d{1,2}$/.test(hhmm)) return null;
+  const [h, m] = hhmm.split(':').map(Number);
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+  const snapped = Math.round(m / 5) * 5 % 60;
+  return `${String(h).padStart(2, '0')}:${String(snapped).padStart(2, '0')}`;
+}
 
 // ─── 초기 상태 헬퍼 ─────────────────────────────────────────────────────────
 
@@ -52,16 +57,16 @@ function buildInitialState(initial) {
     action:          initial?.action          ?? 'sentry_on',
     chargePercent:   initial?.action_params?.percent ?? 80,
 
-    // 3축 트리거
-    timeEnabled:     !!tc.time,
-    timeHhmm:        tc.time?.hhmm           ?? '08:00',
+    // 시간 = 메인 트리거 (항상 활성). 장소/날씨 = 선택 조건(필터).
+    timeEnabled:     true,
+    // 5분 단위로 스냅 — 기존 데이터가 :03 같이 들어와도 :00 으로 정렬
+    timeHhmm:        snapToFiveMin(tc.time?.hhmm) ?? '08:00',
     timeDays:        tc.time?.days            ?? [],
     timeSkipHolidays: tc.time?.skip_holidays  ?? false,
     timeLead:        tc.time?.lead_minutes    ?? 0,
 
     locationEnabled: !!tc.location,
     locationPlace:   tc.location?.place       ?? 'home',
-    locationEvent:   tc.location?.event       ?? 'enter',
     locationDebounce: tc.debounce_minutes     ?? 5,
 
     weatherEnabled:  !!tc.weather,
@@ -202,14 +207,10 @@ function ErrorHint({ children }) {
 function validate(s) {
   const errors = {};
   if (!s.name.trim()) errors.name = '이름을 입력해 주세요.';
-  if (s.timeEnabled) {
-    if (!s.timeHhmm && s.timeDays.length === 0) {
-      errors.time = '시각 또는 요일 중 하나는 설정해 주세요.';
-    }
-  }
-  if (s.locationEnabled) {
-    if (!s.locationPlace) errors.location = '장소를 선택해 주세요.';
-    if (!s.locationEvent) errors.locationEvent = '이벤트를 선택해 주세요.';
+  // 시간은 항상 트리거 — 시각 필수
+  if (!s.timeHhmm) errors.time = '시각을 설정해 주세요.';
+  if (s.locationEnabled && !s.locationPlace) {
+    errors.location = '장소를 선택해 주세요.';
   }
   return errors;
 }
@@ -231,7 +232,7 @@ function buildPayload(s) {
   if (s.locationEnabled) {
     trigger_config.location = {
       place: s.locationPlace,
-      event: s.locationEvent,
+      event: 'at', // 시간 트리거의 위치 필터로만 사용
     };
     trigger_config.debounce_minutes = Number(s.locationDebounce) || 5;
   }
@@ -362,244 +363,201 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
         </button>
       </div>
 
-      {/* 이름 + 활성 토글 */}
+      {/* 이름 + 활성 토글 한 줄 */}
       <div className="space-y-2 pb-2 border-b border-white/[0.06]">
-        <FieldRow label="이름">
+        <div className="flex items-center gap-2">
           <InputBase
             type="text"
             placeholder="스케줄 이름"
             value={s.name}
             onChange={e => set({ name: e.target.value })}
+            className="flex-1"
           />
-          {touched && errors.name && <ErrorHint>{errors.name}</ErrorHint>}
-        </FieldRow>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">스케줄 활성</p>
-            <p className="text-[11px] text-zinc-600 mt-0.5">끄면 자동 실행이 멈춥니다</p>
-          </div>
-          <Toggle value={s.enabled} onChange={v => set({ enabled: v })} labelOn="켜기" labelOff="끄기" />
+          <Toggle value={s.enabled} onChange={v => set({ enabled: v })} labelOn="ON" labelOff="OFF" />
         </div>
+        {touched && errors.name && <ErrorHint>{errors.name}</ErrorHint>}
       </div>
 
-      {/* 액션 */}
+      {/* 액션 한 줄 */}
       <div className="space-y-2 pb-2 border-b border-white/[0.06]">
-        <FieldRow label="액션">
+        <div className="flex items-center gap-2">
+          <span className="text-sm w-6 text-center">▶</span>
           <SelectBase
             value={s.action}
             onChange={e => set({ action: e.target.value })}
+            className="flex-1"
           >
             {ACTION_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </SelectBase>
-        </FieldRow>
-
-        {s.action === 'set_charge_limit' && (
-          <FieldRow label="충전 한도 (%)">
+          {s.action === 'set_charge_limit' && (
             <InputBase
               type="number"
               min={50}
               max={100}
               value={s.chargePercent}
               onChange={e => set({ chargePercent: e.target.value })}
-              className="tabular-nums"
+              className="tabular-nums w-20 flex-shrink-0"
+              placeholder="80"
             />
-          </FieldRow>
-        )}
+          )}
+        </div>
       </div>
 
       {/* ── 시간 트리거 ── */}
       <div className="space-y-2 pb-2 border-b border-white/[0.06]">
-        <AxisHeader
-          icon="🕐"
-          title="시간"
-          enabled={s.timeEnabled}
-          onToggle={v => set({ timeEnabled: v })}
-        />
+        {/* 시각(시:분) 한 줄 */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm w-6 text-center">🕐</span>
+          <SelectBase
+            value={(s.timeHhmm || '08:00').split(':')[0]}
+            onChange={e => {
+              const mm = (s.timeHhmm || '08:00').split(':')[1] || '00';
+              set({ timeHhmm: `${e.target.value}:${mm}` });
+            }}
+            className="flex-1 tabular-nums"
+          >
+            {Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0')).map(hh => (
+              <option key={hh} value={hh}>{hh}시</option>
+            ))}
+          </SelectBase>
+          <SelectBase
+            value={(s.timeHhmm || '08:00').split(':')[1]}
+            onChange={e => {
+              const hh = (s.timeHhmm || '08:00').split(':')[0] || '08';
+              set({ timeHhmm: `${hh}:${e.target.value}` });
+            }}
+            className="flex-1 tabular-nums"
+          >
+            {Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0')).map(mm => (
+              <option key={mm} value={mm}>{mm}분</option>
+            ))}
+          </SelectBase>
+        </div>
 
-        {s.timeEnabled && (
-          <div className="pl-4 space-y-2">
-            {/* 시각 */}
-            <FieldRow label="시각">
-              <InputBase
-                type="time"
-                value={s.timeHhmm}
-                onChange={e => set({ timeHhmm: e.target.value })}
-              />
-            </FieldRow>
-
-            {/* 요일 */}
-            <div>
-              <SectionLabel>요일</SectionLabel>
-              <div className="flex gap-1.5 flex-wrap">
-                {DAY_LABELS.map(({ key, label }) => {
-                  const active = s.timeDays.includes(key);
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => toggleDay(key)}
-                      className={`w-7 h-7 rounded-md text-[11px] font-semibold border transition-colors ${
-                        active
-                          ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-                          : 'bg-zinc-800 text-zinc-500 border-white/[0.06]'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 공휴일 */}
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">공휴일에 건너뛰기</p>
-                <p className="text-[11px] text-zinc-600 mt-0.5">공휴일에는 이 스케줄을 실행하지 않습니다</p>
-              </div>
-              <Toggle
-                value={s.timeSkipHolidays}
-                onChange={v => set({ timeSkipHolidays: v })}
-                labelOn="켜기"
-                labelOff="끄기"
-              />
-            </div>
-
-            {/* 사전 분 */}
-            <FieldRow label="사전 실행 (분)">
-              <InputBase
-                type="number"
-                min={0}
-                max={120}
-                value={s.timeLead}
-                onChange={e => set({ timeLead: e.target.value })}
-                placeholder="0"
-                className="tabular-nums"
-              />
-            </FieldRow>
-
-            {touched && errors.time && <ErrorHint>{errors.time}</ErrorHint>}
+        {/* 요일 한 줄 — 7개 균등 */}
+        <div className="flex items-center gap-2">
+          <span className="w-6"></span>
+          <div className="flex-1 flex gap-1.5">
+            {DAY_LABELS.map(({ key, label }) => {
+              const active = s.timeDays.includes(key);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => toggleDay(key)}
+                  className={`flex-1 h-7 rounded-md text-[11px] font-semibold border transition-colors ${
+                    active
+                      ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                      : 'bg-zinc-800 text-zinc-500 border-white/[0.06]'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
-        )}
+        </div>
+
+        {/* 사전 실행 (분) — 옵션, 기본 0 */}
+        <div className="flex items-center gap-2">
+          <span className="w-6"></span>
+          <span className="text-[11px] text-zinc-500 flex-1">사전 실행 (분 일찍 발화)</span>
+          <InputBase
+            type="number"
+            min={0}
+            max={120}
+            value={s.timeLead}
+            onChange={e => set({ timeLead: e.target.value })}
+            placeholder="0"
+            className="tabular-nums w-16 flex-shrink-0 text-right"
+          />
+        </div>
+
+        {touched && errors.time && <ErrorHint>{errors.time}</ErrorHint>}
       </div>
 
-      {/* ── 장소 트리거 ── */}
+      {/* ── 추가 조건 (장소·날씨 필터) — 시간 매칭 시 추가로 충족돼야 발화 ── */}
       <div className="space-y-2 pb-2 border-b border-white/[0.06]">
-        <AxisHeader
-          icon="📍"
-          title="장소"
-          enabled={s.locationEnabled}
-          onToggle={v => set({ locationEnabled: v })}
-        />
+        {/* 장소 한 줄: 아이콘 + select (또는 OFF) + 토글 */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm w-6 text-center">📍</span>
+          {s.locationEnabled ? (
+            <SelectBase
+              value={s.locationPlace}
+              onChange={e => set({ locationPlace: e.target.value })}
+              className="flex-1"
+            >
+              {placeOptions.map(o => (
+                <option key={o.value} value={o.value}>{o.label}에 머물 때</option>
+              ))}
+            </SelectBase>
+          ) : (
+            <span className="flex-1 text-xs text-zinc-600">장소 조건 없음</span>
+          )}
+          <Toggle value={s.locationEnabled} onChange={v => set({ locationEnabled: v })} labelOn="ON" labelOff="OFF" />
+        </div>
+        {touched && errors.location && (
+          <div className="flex items-center gap-2"><span className="w-6"></span><ErrorHint>{errors.location}</ErrorHint></div>
+        )}
 
-        {s.locationEnabled && (
-          <div className="pl-4 space-y-2">
-            <FieldRow label="장소">
-              <SelectBase
-                value={s.locationPlace}
-                onChange={e => set({ locationPlace: e.target.value })}
-              >
-                {placeOptions.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </SelectBase>
-              {touched && errors.location && <ErrorHint>{errors.location}</ErrorHint>}
-            </FieldRow>
-
-            <FieldRow label="이벤트">
-              <SelectBase
-                value={s.locationEvent}
-                onChange={e => set({ locationEvent: e.target.value })}
-              >
-                {LOCATION_EVENT_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </SelectBase>
-              {touched && errors.locationEvent && <ErrorHint>{errors.locationEvent}</ErrorHint>}
-            </FieldRow>
-
-            <FieldRow label="디바운스 (분)">
+        {/* 날씨 한 줄: 아이콘 + 온도/강수 (또는 OFF) + 토글 */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm w-6 text-center">🌤</span>
+          {s.weatherEnabled ? (
+            <div className="flex-1 flex items-center gap-1.5">
               <InputBase
                 type="number"
-                min={0}
-                max={60}
-                value={s.locationDebounce}
-                onChange={e => set({ locationDebounce: e.target.value })}
-                placeholder="5"
-                className="tabular-nums"
+                value={s.weatherTempMin}
+                onChange={e => set({ weatherTempMin: e.target.value })}
+                placeholder="최저°"
+                className="tabular-nums flex-1 min-w-0"
               />
-            </FieldRow>
-          </div>
-        )}
-      </div>
-
-      {/* ── 날씨 트리거 ── */}
-      <div className="space-y-2 pb-2 border-b border-white/[0.06]">
-        <AxisHeader
-          icon="🌤"
-          title="날씨"
-          enabled={s.weatherEnabled}
-          onToggle={v => set({ weatherEnabled: v })}
-        />
-
-        {s.weatherEnabled && (
-          <div className="pl-4 space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <FieldRow label="외기온 최저 (°C)">
-                <InputBase
-                  type="number"
-                  value={s.weatherTempMin}
-                  onChange={e => set({ weatherTempMin: e.target.value })}
-                  placeholder="예: -5"
-                  className="tabular-nums"
-                />
-              </FieldRow>
-              <FieldRow label="외기온 최고 (°C)">
-                <InputBase
-                  type="number"
-                  value={s.weatherTempMax}
-                  onChange={e => set({ weatherTempMax: e.target.value })}
-                  placeholder="예: 35"
-                  className="tabular-nums"
-                />
-              </FieldRow>
-            </div>
-
-            <FieldRow label="강수">
+              <span className="text-zinc-600 text-[10px]">~</span>
+              <InputBase
+                type="number"
+                value={s.weatherTempMax}
+                onChange={e => set({ weatherTempMax: e.target.value })}
+                placeholder="최고°"
+                className="tabular-nums flex-1 min-w-0"
+              />
               <SelectBase
                 value={s.weatherPrecip}
                 onChange={e => set({ weatherPrecip: e.target.value })}
+                className="flex-1 min-w-0"
               >
                 {WEATHER_PRECIP_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.value} value={o.value}>{o.label === '없음' ? '강수 무관' : o.label}</option>
                 ))}
               </SelectBase>
-            </FieldRow>
-          </div>
-        )}
+            </div>
+          ) : (
+            <span className="flex-1 text-xs text-zinc-600">날씨 조건 없음</span>
+          )}
+          <Toggle value={s.weatherEnabled} onChange={v => set({ weatherEnabled: v })} labelOn="ON" labelOff="OFF" />
+        </div>
       </div>
 
-      {/* 유효 기간 */}
-      <div className="space-y-2 pb-2 border-b border-white/[0.06]">
+      {/* 유효 기간 한 줄 */}
+      <div className="space-y-1 pb-2 border-b border-white/[0.06]">
         <SectionLabel>유효 기간 (비워두면 무제한)</SectionLabel>
-        <div className="grid grid-cols-2 gap-2">
-          <FieldRow label="시작일">
+        <div className="flex items-center gap-1.5">
+          <div className="flex-1">
             <DatePicker
               value={s.validFrom}
               onChange={v => set({ validFrom: v })}
-              placeholder="시작일 선택"
+              placeholder="시작일"
             />
-          </FieldRow>
-          <FieldRow label="종료일">
+          </div>
+          <span className="text-zinc-600 text-[10px]">~</span>
+          <div className="flex-1">
             <DatePicker
               value={s.validUntil}
               onChange={v => set({ validUntil: v })}
-              placeholder="종료일 선택"
+              placeholder="종료일"
             />
-          </FieldRow>
+          </div>
         </div>
       </div>
 
@@ -646,18 +604,29 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
         )}
       </div>
 
-      {/* 휴무 모드 */}
-      <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
-        <div>
-          <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">휴무 모드 따르기</p>
-          <p className="text-xs text-zinc-600 mt-0.5">휴무 기간에는 이 스케줄을 실행하지 않습니다</p>
+      {/* 건너뛰기 — 공휴일 / 휴무 모드 한 줄 */}
+      <div className="space-y-1 pb-2 border-b border-white/[0.06]">
+        <SectionLabel>건너뛰기</SectionLabel>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex items-center justify-between gap-2 bg-zinc-900/30 border border-white/[0.04] rounded-lg px-2 py-1.5">
+            <span className="text-xs text-zinc-300">공휴일</span>
+            <Toggle
+              value={s.timeSkipHolidays}
+              onChange={v => set({ timeSkipHolidays: v })}
+              labelOn="ON"
+              labelOff="OFF"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2 bg-zinc-900/30 border border-white/[0.04] rounded-lg px-2 py-1.5">
+            <span className="text-xs text-zinc-300">휴무 모드</span>
+            <Toggle
+              value={s.applyPauseMode}
+              onChange={v => set({ applyPauseMode: v })}
+              labelOn="ON"
+              labelOff="OFF"
+            />
+          </div>
         </div>
-        <Toggle
-          value={s.applyPauseMode}
-          onChange={v => set({ applyPauseMode: v })}
-          labelOn="켜기"
-          labelOff="끄기"
-        />
       </div>
 
       {/* 하단 버튼 */}

@@ -15,6 +15,7 @@ const ACTION_LABEL = {
   lock: '잠금', unlock: '잠금해제',
   charge_start: '충전 시작', charge_stop: '충전 중지',
   set_charge_limit: '충전 한도', flash_lights: '라이트 점멸',
+  check_status: '🔍 차량 상태', wake_up: '⏰ 깨우기',
 };
 
 function fmtTs(s) {
@@ -41,7 +42,13 @@ export default function ExecutionLog({ schedules }) {
 
   const filtered = items.filter((e) => {
     if (filterStatus !== 'all' && e.status !== filterStatus) return false;
-    if (filterSchedule !== 'all' && String(e.schedule_id) !== filterSchedule) return false;
+    if (filterSchedule === 'manual') {
+      if (e.schedule_id != null) return false;
+    } else if (filterSchedule === 'scheduled') {
+      if (e.schedule_id == null) return false;
+    } else if (filterSchedule !== 'all' && String(e.schedule_id) !== filterSchedule) {
+      return false;
+    }
     return true;
   });
 
@@ -64,11 +71,12 @@ export default function ExecutionLog({ schedules }) {
           onChange={(e) => setFilterSchedule(e.target.value)}
           className="text-xs bg-zinc-900 border border-white/[0.06] rounded px-2 py-1 text-zinc-300 flex-1 min-w-0"
         >
-          <option value="all">전체 스케줄</option>
+          <option value="all">전체 (스케줄 + 즉시)</option>
+          <option value="scheduled">📅 스케줄만</option>
+          <option value="manual">⚡ 즉시 실행 / 테스트만</option>
           {schedules?.map((s) => (
-            <option key={s.id} value={String(s.id)}>{s.name}</option>
+            <option key={s.id} value={String(s.id)}>└ {s.name}</option>
           ))}
-          <option value="">즉시 실행 (manual)</option>
         </select>
         <span className="text-[10px] text-zinc-500 tabular-nums">{filtered.length}건</span>
       </div>
@@ -88,7 +96,7 @@ export default function ExecutionLog({ schedules }) {
                 <span className="text-[10px] text-zinc-500 tabular-nums w-16 flex-shrink-0">{fmtTs(e.triggered_at)}</span>
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${st.cls} flex-shrink-0`}>{st.label}</span>
                 <span className="text-zinc-300 truncate flex-1">
-                  {s ? s.name : '즉시'} · {ACTION_LABEL[e.action] || e.action}
+                  {s ? s.name : (e.trigger_source === 'manual_test' ? '진단' : '즉시')} · {ACTION_LABEL[e.action] || e.action}
                 </span>
                 {e.reason && <span className="text-[10px] text-zinc-500 truncate max-w-[160px]" title={e.reason}>{e.reason}</span>}
                 {Number(e.cost_estimate) > 0 && (

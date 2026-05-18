@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/auth-helper';
 import { callTeslaVehicleData, callTeslaVehicleSummary, listVehicles } from '@/lib/tesla-fleet';
 import { getConnectionStatus } from '@/lib/tesla-tokens';
+import { logExecution, calcCost } from '@/lib/queries/schedules';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,12 +40,26 @@ export async function GET() {
 
     // 자거나 오프라인이면 vehicle_data 호출 X — 차 안 깨움.
     if (state !== 'online') {
+      // 호출 2회 발생 (vehicles list + single summary) — 비용 0.004
+      const apiCalls = { vehicle_data: 2 };
+      const cost = calcCost(apiCalls);
+      await logExecution({
+        schedule_id: null,
+        trigger_source: 'manual_test',
+        action: 'check_status',
+        action_params: { state, vin },
+        status: 'success',
+        reason: state === 'asleep' ? 'sleep' : state === 'offline' ? 'offline' : state || 'unknown',
+        api_calls: apiCalls,
+        tesla_response: { state, vin, display_name: displayName, vehicles_count: vehicles?.response?.length || 0 },
+        cost_estimate: cost,
+      }).catch(() => null);
       return Response.json({
         enabled: true, tokenMissing: false,
         vehicles_count: vehicles?.response?.length || 0,
         ok: true, state, vin, display_name: displayName,
         summary: null,
-        cost_estimate: 0,
+        cost_estimate: cost,
         note: state === 'asleep' ? '차량 sleep 중 — "깨우기" 버튼 누른 후 다시 시도'
             : state === 'offline' ? '차량 offline (전원 차단/통신 두절)'
             : `차량 state=${state || 'unknown'} — vehicle_data 호출 안 함`,
@@ -61,11 +76,25 @@ export async function GET() {
       sentry_mode: body.vehicle_state?.sentry_mode,
       odometer: body.vehicle_state?.odometer,
     } : null;
+    // 호출 3회 (vehicles list + summary + vehicle_data) — 비용 0.006
+    const apiCalls = { vehicle_data: 3 };
+    const cost = calcCost(apiCalls);
+    await logExecution({
+      schedule_id: null,
+      trigger_source: 'manual_test',
+      action: 'check_status',
+      action_params: { state, vin },
+      status: r.ok ? 'success' : 'failed',
+      reason: r.ok ? null : `HTTP ${r.status}`,
+      api_calls: apiCalls,
+      tesla_response: { summary, vehicles_count: vehicles?.response?.length || 0 },
+      cost_estimate: cost,
+    }).catch(() => null);
     return Response.json({
       enabled: true, tokenMissing: false,
       vehicles_count: vehicles?.response?.length || 0,
       ok: r.ok, status: r.status, state, vin, display_name: displayName, summary,
-      cost_estimate: r.ok ? 0.002 : 0,
+      cost_estimate: cost,
     });
   } catch (e) {
     return Response.json({
