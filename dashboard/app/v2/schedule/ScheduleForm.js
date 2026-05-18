@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Icon } from '@/app/lib/Icons';
 
 // ─── 상수 ────────────────────────────────────────────────────────────────────
@@ -83,7 +83,7 @@ function buildInitialState(initial) {
 
 function SectionLabel({ children }) {
   return (
-    <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase mb-2">
+    <p className="text-[11px] text-zinc-500 font-semibold tracking-wide uppercase mb-1">
       {children}
     </p>
   );
@@ -91,7 +91,7 @@ function SectionLabel({ children }) {
 
 function FieldRow({ label, children }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-0.5">
       <SectionLabel>{label}</SectionLabel>
       {children}
     </div>
@@ -101,16 +101,49 @@ function FieldRow({ label, children }) {
 function InputBase({ className = '', ...props }) {
   return (
     <input
-      className={`bg-zinc-900 border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-zinc-200 w-full focus:outline-none focus:ring-1 focus:ring-blue-500/40 tabular-nums ${className}`}
+      className={`bg-zinc-900 border border-white/[0.06] rounded-md px-2 py-1.5 text-xs text-zinc-200 w-full focus:outline-none focus:ring-1 focus:ring-blue-500/40 tabular-nums ${className}`}
       {...props}
     />
+  );
+}
+
+// 명시적 native picker — 탭하면 연/월/일 선택 popup 이 뜬다.
+function DatePicker({ value, onChange, placeholder = '연-월-일 선택' }) {
+  const ref = useRef(null);
+  const open = () => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof el.showPicker === 'function') el.showPicker();
+    else el.click();
+  };
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={open}
+        className="w-full bg-zinc-900 border border-white/[0.06] rounded-md px-2 py-1.5 text-xs text-left flex items-center gap-1.5 hover:bg-zinc-800 transition-colors"
+      >
+        <span className="text-zinc-500">📅</span>
+        <span className={`flex-1 tabular-nums ${value ? 'text-zinc-200' : 'text-zinc-600'}`}>{value || placeholder}</span>
+        <span className="text-zinc-600 text-[10px]">▾</span>
+      </button>
+      <input
+        ref={ref}
+        type="date"
+        value={value || ''}
+        onChange={e => onChange(e.target.value)}
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
+      />
+    </div>
   );
 }
 
 function SelectBase({ className = '', children, ...props }) {
   return (
     <select
-      className={`bg-zinc-900 border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-zinc-200 w-full focus:outline-none focus:ring-1 focus:ring-blue-500/40 ${className}`}
+      className={`bg-zinc-900 border border-white/[0.06] rounded-md px-2 py-1.5 text-xs text-zinc-200 w-full focus:outline-none focus:ring-1 focus:ring-blue-500/40 ${className}`}
       {...props}
     >
       {children}
@@ -120,11 +153,11 @@ function SelectBase({ className = '', children, ...props }) {
 
 function Toggle({ value, onChange, labelOn = '켜기', labelOff = '끄기' }) {
   return (
-    <div className="flex rounded-lg overflow-hidden border border-white/[0.06] w-fit">
+    <div className="flex rounded-md overflow-hidden border border-white/[0.06] w-fit">
       <button
         type="button"
         onClick={() => onChange(true)}
-        className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+        className={`px-2 py-1 text-[11px] font-medium transition-colors ${
           value
             ? 'bg-blue-500/20 text-blue-400 border-r border-blue-500/30'
             : 'bg-zinc-800 text-zinc-500 border-r border-white/[0.06]'
@@ -135,7 +168,7 @@ function Toggle({ value, onChange, labelOn = '켜기', labelOff = '끄기' }) {
       <button
         type="button"
         onClick={() => onChange(false)}
-        className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+        className={`px-2 py-1 text-[11px] font-medium transition-colors ${
           !value
             ? 'bg-zinc-700 text-zinc-300'
             : 'bg-zinc-800 text-zinc-500'
@@ -312,25 +345,25 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
   // ─── 렌더 ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-4 space-y-4">
+    <div className="bg-[#161618] border border-white/[0.06] rounded-xl p-3 space-y-2.5">
 
       {/* 헤더 */}
-      <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
-        <h2 className="text-base font-semibold text-zinc-100">
+      <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
+        <h2 className="text-sm font-semibold text-zinc-100">
           {initial ? '스케줄 편집' : '새 스케줄'}
         </h2>
         <button
           type="button"
           onClick={onCancel}
-          className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors"
+          className="p-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors"
           aria-label="닫기"
         >
-          <Icon name="x" className="w-4 h-4" />
+          <Icon name="x" className="w-3.5 h-3.5" />
         </button>
       </div>
 
       {/* 이름 + 활성 토글 */}
-      <div className="space-y-3 pb-3 border-b border-white/[0.06]">
+      <div className="space-y-2 pb-2 border-b border-white/[0.06]">
         <FieldRow label="이름">
           <InputBase
             type="text"
@@ -342,13 +375,16 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
         </FieldRow>
 
         <div className="flex items-center justify-between">
-          <span className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">활성</span>
-          <Toggle value={s.enabled} onChange={v => set({ enabled: v })} labelOn="활성" labelOff="비활성" />
+          <div>
+            <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">스케줄 활성</p>
+            <p className="text-[11px] text-zinc-600 mt-0.5">끄면 자동 실행이 멈춥니다</p>
+          </div>
+          <Toggle value={s.enabled} onChange={v => set({ enabled: v })} labelOn="켜기" labelOff="끄기" />
         </div>
       </div>
 
       {/* 액션 */}
-      <div className="space-y-3 pb-3 border-b border-white/[0.06]">
+      <div className="space-y-2 pb-2 border-b border-white/[0.06]">
         <FieldRow label="액션">
           <SelectBase
             value={s.action}
@@ -375,7 +411,7 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
       </div>
 
       {/* ── 시간 트리거 ── */}
-      <div className="space-y-3 pb-3 border-b border-white/[0.06]">
+      <div className="space-y-2 pb-2 border-b border-white/[0.06]">
         <AxisHeader
           icon="🕐"
           title="시간"
@@ -384,7 +420,7 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
         />
 
         {s.timeEnabled && (
-          <div className="pl-6 space-y-3">
+          <div className="pl-4 space-y-2">
             {/* 시각 */}
             <FieldRow label="시각">
               <InputBase
@@ -405,7 +441,7 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
                       key={key}
                       type="button"
                       onClick={() => toggleDay(key)}
-                      className={`w-9 h-9 rounded-lg text-xs font-semibold border transition-colors ${
+                      className={`w-7 h-7 rounded-md text-[11px] font-semibold border transition-colors ${
                         active
                           ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
                           : 'bg-zinc-800 text-zinc-500 border-white/[0.06]'
@@ -420,12 +456,15 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
 
             {/* 공휴일 */}
             <div className="flex items-center justify-between">
-              <span className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">공휴일</span>
+              <div>
+                <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">공휴일에 건너뛰기</p>
+                <p className="text-[11px] text-zinc-600 mt-0.5">공휴일에는 이 스케줄을 실행하지 않습니다</p>
+              </div>
               <Toggle
-                value={!s.timeSkipHolidays}
-                onChange={v => set({ timeSkipHolidays: !v })}
-                labelOn="포함"
-                labelOff="제외"
+                value={s.timeSkipHolidays}
+                onChange={v => set({ timeSkipHolidays: v })}
+                labelOn="켜기"
+                labelOff="끄기"
               />
             </div>
 
@@ -448,7 +487,7 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
       </div>
 
       {/* ── 장소 트리거 ── */}
-      <div className="space-y-3 pb-3 border-b border-white/[0.06]">
+      <div className="space-y-2 pb-2 border-b border-white/[0.06]">
         <AxisHeader
           icon="📍"
           title="장소"
@@ -457,7 +496,7 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
         />
 
         {s.locationEnabled && (
-          <div className="pl-6 space-y-3">
+          <div className="pl-4 space-y-2">
             <FieldRow label="장소">
               <SelectBase
                 value={s.locationPlace}
@@ -498,7 +537,7 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
       </div>
 
       {/* ── 날씨 트리거 ── */}
-      <div className="space-y-3 pb-3 border-b border-white/[0.06]">
+      <div className="space-y-2 pb-2 border-b border-white/[0.06]">
         <AxisHeader
           icon="🌤"
           title="날씨"
@@ -507,7 +546,7 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
         />
 
         {s.weatherEnabled && (
-          <div className="pl-6 space-y-3">
+          <div className="pl-4 space-y-2">
             <div className="grid grid-cols-2 gap-2">
               <FieldRow label="외기온 최저 (°C)">
                 <InputBase
@@ -544,43 +583,42 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
       </div>
 
       {/* 유효 기간 */}
-      <div className="space-y-3 pb-3 border-b border-white/[0.06]">
+      <div className="space-y-2 pb-2 border-b border-white/[0.06]">
         <SectionLabel>유효 기간 (비워두면 무제한)</SectionLabel>
         <div className="grid grid-cols-2 gap-2">
           <FieldRow label="시작일">
-            <InputBase
-              type="date"
+            <DatePicker
               value={s.validFrom}
-              onChange={e => set({ validFrom: e.target.value })}
-              className="tabular-nums"
+              onChange={v => set({ validFrom: v })}
+              placeholder="시작일 선택"
             />
           </FieldRow>
           <FieldRow label="종료일">
-            <InputBase
-              type="date"
+            <DatePicker
               value={s.validUntil}
-              onChange={e => set({ validUntil: e.target.value })}
-              className="tabular-nums"
+              onChange={v => set({ validUntil: v })}
+              placeholder="종료일 선택"
             />
           </FieldRow>
         </div>
       </div>
 
       {/* 제외 날짜 */}
-      <div className="space-y-3 pb-3 border-b border-white/[0.06]">
+      <div className="space-y-2 pb-2 border-b border-white/[0.06]">
         <SectionLabel>제외 날짜</SectionLabel>
         <div className="flex gap-2">
-          <InputBase
-            type="date"
-            value={s.skipDateInput}
-            onChange={e => set({ skipDateInput: e.target.value })}
-            className="tabular-nums flex-1"
-          />
+          <div className="flex-1">
+            <DatePicker
+              value={s.skipDateInput}
+              onChange={v => set({ skipDateInput: v })}
+              placeholder="제외할 날짜 선택"
+            />
+          </div>
           <button
             type="button"
             onClick={addSkipDate}
             disabled={!s.skipDateInput}
-            className="px-3 py-2 rounded-lg text-xs font-medium bg-zinc-800 text-zinc-300 border border-white/[0.06] hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+            className="px-2.5 py-1.5 rounded-md text-[11px] font-medium bg-zinc-800 text-zinc-300 border border-white/[0.06] hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
           >
             추가
           </button>
@@ -611,24 +649,24 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
       {/* 휴무 모드 */}
       <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
         <div>
-          <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">휴무 모드 영향</p>
-          <p className="text-xs text-zinc-600 mt-0.5">휴무 모드 시 이 스케줄을 건너뜁니다</p>
+          <p className="text-xs text-zinc-500 font-semibold tracking-wide uppercase">휴무 모드 따르기</p>
+          <p className="text-xs text-zinc-600 mt-0.5">휴무 기간에는 이 스케줄을 실행하지 않습니다</p>
         </div>
         <Toggle
           value={s.applyPauseMode}
           onChange={v => set({ applyPauseMode: v })}
-          labelOn="적용"
-          labelOff="무시"
+          labelOn="켜기"
+          labelOff="끄기"
         />
       </div>
 
       {/* 하단 버튼 */}
-      <div className="flex gap-2 pt-1">
+      <div className="flex gap-1.5 pt-1">
         <button
           type="button"
           onClick={handleSave}
           disabled={!canSave}
-          className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors"
+          className="flex-1 py-2 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors"
         >
           {saving ? '저장 중…' : '저장'}
         </button>
@@ -638,16 +676,16 @@ export default function ScheduleForm({ initial = null, geofences = [], onSave, o
             type="button"
             onClick={handleTestRun}
             disabled={testing || saving}
-            className="px-4 py-2.5 rounded-xl text-sm font-medium bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-300 border border-white/[0.06] transition-colors whitespace-nowrap"
+            className="px-3 py-2 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-300 border border-white/[0.06] transition-colors whitespace-nowrap"
           >
-            {testing ? '실행 중…' : 'Dry-Run 1회'}
+            {testing ? '실행…' : 'Dry-Run'}
           </button>
         )}
 
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2.5 rounded-xl text-sm font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-white/[0.06] transition-colors"
+          className="px-3 py-2 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-white/[0.06] transition-colors"
         >
           취소
         </button>

@@ -43,6 +43,7 @@ docker compose build dashboard && docker compose up -d dashboard
 - 단일 차량 가정: `SELECT id FROM cars LIMIT 1`
 - 커밋: `<type>: <설명>` (`feat`, `fix`, `refactor`, `tune`, `ci`, `docs`, `chore`)
 - **함정 표시 파일 수정 전**: 파일 상단에 `⚠️  수정 전 필독: /docs/PITFALLS.md "..."` 주석이 있으면 [`docs/PITFALLS.md`](./docs/PITFALLS.md) 의 해당 항목을 먼저 읽고 작업.
+- **Tesla 자동화 (`/v2/schedule`)**: 실제 Fleet API 호출은 `TESLA_FLEET_API_ENABLED=true` 일 때만(기본 dry_run). **결제수단 미등록 권장** — $10 무료 한도 초과 시 자동 차단(청구 X). 단가는 `lib/queries/schedules.js::COST` 단일 소스. 지오펜스는 TeslaMate UI 단일 진실원, 대시보드는 read-only.
 
 ## 아키텍처 원칙 — 데이터 경로
 

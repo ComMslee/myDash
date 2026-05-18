@@ -76,7 +76,7 @@ const SETTINGS = [
   },
   {
     href: '/dev/api-status',
-    label: 'API 상태',
+    label: '서버 상태',
     desc: '라우트 헬스 + 폴링 진단',
     color: 'text-amber-400',
     icon: (
@@ -153,10 +153,7 @@ export default function BottomNavV2() {
   const [, setTick] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  // dev 도구 + tg 어드민에서는 탭 자체를 숨김 — 탐색 가치 없음
-  const hidden = pathname?.startsWith('/dev') || pathname?.startsWith('/tg');
-
-  // 1분 tick — 경과/시각 라벨 자동 갱신 (탭 숨김 시 정지)
+  // 1분 tick — 경과/시각 라벨 자동 갱신
   useEffect(() => {
     let id = null;
     const start = () => {
@@ -185,7 +182,6 @@ export default function BottomNavV2() {
   // 탭 숨김 시 폴링 정지, 복귀 시 즉시 1회 fetch + 인터벌 재개 (불필요한 백그라운드 요청 차단).
   const activeMockData = mockData || MOCK_DATA;
   useEffect(() => {
-    if (hidden) return;
     if (isMock) {
       setCar(activeMockData.car);
       setCharging(isMockCharging ? activeMockData.chargingStatus : null);
@@ -210,9 +206,7 @@ export default function BottomNavV2() {
     if (!document.hidden) start();
     document.addEventListener('visibilitychange', onVis);
     return () => { stop(); document.removeEventListener('visibilitychange', onVis); };
-  }, [hidden, isMock, isMockCharging, activeMockData]);
-
-  if (hidden) return null;
+  }, [isMock, isMockCharging, activeMockData]);
 
   // 상태 계산 — 헤더 로직 그대로 (확정 상태별 경과 시간/충전 진행/SOC fill)
   const isCharging = !!charging || car?.state === 'charging';
