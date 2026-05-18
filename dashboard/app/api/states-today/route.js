@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/auth-helper';
 import pool from '@/lib/db';
 import { getDefaultCar } from '@/lib/queries/car';
+import { KST_OFFSET_MS } from '@/lib/kst';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,12 +22,12 @@ export async function GET(request) {
     const url = new URL(request.url);
     const dateParam = url.searchParams.get('date');
     const nowMs = Date.now();
-    const kstNowMs = nowMs + 9 * 3600_000;
-    const todayKstStart = Math.floor(kstNowMs / 86400_000) * 86400_000 - 9 * 3600_000;
+    const kstNowMs = nowMs + KST_OFFSET_MS;
+    const todayKstStart = Math.floor(kstNowMs / 86400_000) * 86400_000 - KST_OFFSET_MS;
     let dayStartMs;
     if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
       const [y, m, d] = dateParam.split('-').map(Number);
-      dayStartMs = Date.UTC(y, m - 1, d) - 9 * 3600_000;
+      dayStartMs = Date.UTC(y, m - 1, d) - KST_OFFSET_MS;
     } else {
       dayStartMs = todayKstStart;
     }

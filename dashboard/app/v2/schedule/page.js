@@ -8,13 +8,14 @@ import ScheduleForm from './ScheduleForm';
 import PausePanel from './PausePanel';
 import ScheduleList from './ScheduleList';
 import ExecutionLog from './ExecutionLog';
+import { KST_OFFSET_MS } from '@/lib/kst';
 
 // 자동화 메인 — 캘린더 중심.
 // ⚙ 시트 = 즉시실행 · 지오펜스 · 실연동 체크 (드물게 쓰는 것만).
 // 메인 인라인 = 휴무 / 전체 스케줄 / 전체 이력 (자주 보는 것).
 
 function kstMonth(d = new Date()) {
-  const t = new Date(d.getTime() + 9 * 3600 * 1000);
+  const t = new Date(d.getTime() + KST_OFFSET_MS);
   return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
@@ -92,7 +93,7 @@ export default function SchedulePage() {
       const exMap = new Map();
       for (const e of ej?.executions || []) {
         const d = new Date(e.triggered_at);
-        const kst = new Date(d.getTime() + 9 * 3600 * 1000);
+        const kst = new Date(d.getTime() + KST_OFFSET_MS);
         const key = `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}-${String(kst.getUTCDate()).padStart(2, '0')}`;
         if (!exMap.has(key)) exMap.set(key, []);
         exMap.get(key).push(e);

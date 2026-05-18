@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth-helper';
 import { selectByYear, getMeta, replaceYear } from '@/lib/queries/holidays';
+import { KST_OFFSET_MS } from '@/lib/kst';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,7 @@ const FETCH_TIMEOUT_MS = 10_000;
 const STALE_THRESHOLD_MS = 30 * 24 * 3600 * 1000;
 
 function currentYearKst() {
-  const t = Date.now() + 9 * 3600 * 1000;
+  const t = Date.now() + KST_OFFSET_MS;
   return new Date(t).getUTCFullYear();
 }
 

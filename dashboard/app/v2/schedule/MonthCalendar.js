@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { KST_OFFSET_MS } from '@/lib/kst';
 
 // 커스텀 월 달력 모달 — [📅 더보기] 클릭 시 노출.
 // 각 셀에 실행 아이콘 + 개수만 간략히. 셀 탭 = 타임라인 그 날짜로 이동.
@@ -11,7 +12,7 @@ const DOW_KEYS   = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 function pad(n) { return String(n).padStart(2, '0'); }
 
 function todayStr() {
-  const t = new Date(Date.now() + 9 * 3600 * 1000);
+  const t = new Date(Date.now() + KST_OFFSET_MS);
   return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
 }
 

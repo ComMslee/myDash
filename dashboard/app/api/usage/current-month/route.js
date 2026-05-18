@@ -1,12 +1,13 @@
 import { requireAuth } from '@/lib/auth-helper';
 import { getMonthlyUsage } from '@/lib/queries/schedules';
+import { KST_OFFSET_MS } from '@/lib/kst';
 
 export const dynamic = 'force-dynamic';
 
 // GET /api/usage/current-month — 이번 달 API 사용량 + 예상치
 // 예상치 = 일평균 × 월 일수 (단순 선형 외삽). $10 무료 크레딧 대비 진행률 포함.
 function monthYmd(d = new Date()) {
-  const kst = new Date(d.getTime() + 9 * 3600 * 1000);
+  const kst = new Date(d.getTime() + KST_OFFSET_MS);
   return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
@@ -16,7 +17,7 @@ function daysInMonth(monthStr) {
 }
 
 function dayOfMonth(d = new Date()) {
-  const kst = new Date(d.getTime() + 9 * 3600 * 1000);
+  const kst = new Date(d.getTime() + KST_OFFSET_MS);
   return kst.getUTCDate();
 }
 

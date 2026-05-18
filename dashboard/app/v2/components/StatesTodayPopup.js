@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../../lib/Icons';
+import { KST_OFFSET_MS } from '@/lib/kst';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 function kstDateStr(ms) {
-  const d = new Date(ms + 9 * 3600_000);
+  const d = new Date(ms + KST_OFFSET_MS);
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 

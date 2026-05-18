@@ -6,11 +6,12 @@
 
 import { getAccessToken } from '@/lib/tesla-tokens';
 import { getSetting, setSetting, bumpMonthlyUsage } from '@/lib/queries/schedules';
+import { KST_OFFSET_MS } from '@/lib/kst';
 
 const TESLA_API_BASE = process.env.TESLA_FLEET_API_BASE || 'https://fleet-api.prd.na.vn.cloud.tesla.com';
 
 function monthYmd(d = new Date()) {
-  const kst = new Date(d.getTime() + 9 * 3600 * 1000);
+  const kst = new Date(d.getTime() + KST_OFFSET_MS);
   return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 

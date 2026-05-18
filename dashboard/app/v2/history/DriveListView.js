@@ -3,13 +3,14 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import { KWH_PER_KM } from '@/lib/constants';
 import { formatDuration, formatHm } from '@/lib/format';
+import { KST_OFFSET_MS } from '@/lib/kst';
 import { Icon } from '../../lib/Icons';
 
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
 // KST 기준 현재 'YYYY-MM' — 이번 달 펼침 기본값 계산용
 function currentMonthKey() {
-  const kst = new Date(Date.now() + 9 * 3600000);
+  const kst = new Date(Date.now() + KST_OFFSET_MS);
   return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
@@ -73,7 +74,7 @@ export default function DriveListView({
     const ys = new Set();
     for (const d of drives) {
       if (!d?.start_date) continue;
-      const t = new Date(d.start_date).getTime() + 9 * 3600 * 1000;
+      const t = new Date(d.start_date).getTime() + KST_OFFSET_MS;
       ys.add(new Date(t).getUTCFullYear());
     }
     return Array.from(ys).sort().join(',');
