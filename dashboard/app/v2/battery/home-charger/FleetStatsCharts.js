@@ -118,7 +118,7 @@ export function HeatmapChart({ heatmap }) {
         </div>
       ))}
       <div className="flex justify-between text-[9px] text-zinc-500 tabular-nums mt-1" style={{ paddingLeft: '18px' }}>
-        <span className="font-semibold">0시</span><span>6</span><span>12</span><span>18</span><span>23시</span>
+        <span className="font-semibold">0</span><span>6</span><span>12</span><span>18</span><span>23</span>
       </div>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1.5 text-[10px] text-zinc-500">
         <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-[1px]" style={{ background:'rgba(63,63,70,0.3)' }}/>미사용</span>
@@ -165,7 +165,7 @@ export function HourlyChart({ hourly }) {
         })}
       </div>
       <div className="flex justify-between mt-1.5 text-[10px] text-zinc-500 tabular-nums px-px">
-        <span className="font-semibold">0시</span><span>6</span><span>12</span><span>18</span><span>23시</span>
+        <span className="font-semibold">0</span><span>6</span><span>12</span><span>18</span><span>23</span>
       </div>
       {max > 0 && (
         <div className="mt-1.5 text-[10px] text-zinc-400 flex flex-wrap gap-x-2 gap-y-0.5 tabular-nums">

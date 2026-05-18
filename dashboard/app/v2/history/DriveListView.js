@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Fragment } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import { KWH_PER_KM } from '@/lib/constants';
 import { formatDuration, formatHm } from '@/lib/format';
 import { Icon } from '../../lib/Icons';
@@ -68,6 +68,34 @@ export default function DriveListView({
     return next;
   });
 
+  // 공휴일 — drives 에 등장하는 연도들만 /api/holidays?year= 으로 로드. KST 기준 YYYYMMDD.
+  const yearsKey = useMemo(() => {
+    const ys = new Set();
+    for (const d of drives) {
+      if (!d?.start_date) continue;
+      const t = new Date(d.start_date).getTime() + 9 * 3600 * 1000;
+      ys.add(new Date(t).getUTCFullYear());
+    }
+    return Array.from(ys).sort().join(',');
+  }, [drives]);
+  const [holidayMap, setHolidayMap] = useState(new Map());
+  useEffect(() => {
+    if (!yearsKey) return;
+    const years = yearsKey.split(',').filter(Boolean);
+    let alive = true;
+    Promise.all(years.map(y =>
+      fetch(`/api/holidays?year=${y}`).then(r => r.ok ? r.json() : null).catch(() => null)
+    )).then(results => {
+      if (!alive) return;
+      const map = new Map();
+      for (const data of results) {
+        for (const h of data?.holidays || []) map.set(h.dateymd, h.name);
+      }
+      setHolidayMap(map);
+    });
+    return () => { alive = false; };
+  }, [yearsKey]);
+
   if (loadingDrives) {
     return (
       <div className="flex items-center justify-center h-24">
@@ -122,7 +150,17 @@ export default function DriveListView({
 
   // 일 카드 — 24h 막대 + 시간 범위/운전·정차 시간/총량.
   const renderDayCard = (g) => {
-    const weekday = WEEKDAY_KO[g.firstDate.getDay()];
+    const dow = g.firstDate.getDay();
+    const weekday = WEEKDAY_KO[dow];
+    const ymd = g.dateStr.replace(/-/g, '');
+    const holidayName = holidayMap.get(ymd) || null;
+    const isHoliday = !!holidayName;
+    const isSun = dow === 0;
+    const isSat = dow === 6;
+    // 공휴일은 일요일과 동일 톤 (로즈). 평일 공휴일 강조용.
+    const useRose = isSun || isHoliday;
+    const dateCls = useRose ? 'text-rose-400' : isSat ? 'text-sky-400' : 'text-zinc-200';
+    const dowCls  = useRose ? 'text-rose-400/70' : isSat ? 'text-sky-400/70' : 'text-zinc-600';
     const visible = g.items.filter(d => !d.absorbed);
     if (!visible.length) return null;
     const driveCount = visible.length;
@@ -151,15 +189,21 @@ export default function DriveListView({
         key={g.key}
         type="button"
         onClick={() => onDayClick(g.dateStr)}
+        title={holidayName || undefined}
         className="relative w-full text-left flex flex-col gap-1 px-3 py-3 border-b border-white/[0.04] last:border-0 hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
       >
         <DayBgGradient items={visible} dayStart={dayStart} dayMs={dayMs} />
         <div className="relative flex items-center justify-between gap-2">
           <div className="flex items-baseline gap-2 min-w-0 flex-shrink">
-            <span className="text-sm font-bold text-zinc-200 tabular-nums flex-shrink-0">
+            <span className={`text-sm font-bold tabular-nums flex-shrink-0 ${dateCls}`}>
               {g.firstDate.getMonth() + 1}/{g.firstDate.getDate()}
-              <span className="text-[10px] text-zinc-600 font-normal ml-0.5">({weekday})</span>
+              <span className={`text-[10px] font-normal ml-0.5 ${dowCls}`}>({weekday})</span>
             </span>
+            {holidayName && (
+              <span className="text-[10px] text-rose-400/90 truncate" title={holidayName}>
+                {holidayName}
+              </span>
+            )}
             <span className="text-[11px] text-zinc-500 tabular-nums truncate">
               {isEarly && <Icon name="moon" className="w-4 h-4 inline-block align-middle mr-0.5" />}{fmt(first.start_date)} → {fmt(last.end_date || last.start_date)}{isLateEnd && <Icon name="moon" className="w-4 h-4 inline-block align-middle ml-0.5" />}
             </span>

@@ -2,7 +2,7 @@
 
 import { Icon } from '../lib/Icons';
 
-const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DOW_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 
 // 7×24 시간×요일 컬러 히트맵 — data: 7×24 number[][] (dow x hour, 단위: 10분 틱 카운트)
 // 셀별 색 농도(opacity)로 점유 빈도 강도 표현 — 피크(>0.75)는 amber 강조
@@ -57,11 +57,11 @@ export function HourDowHeatmap({ data, hexColor = '#3b82f6' }) {
         style={{ gridTemplateColumns: '24px repeat(24, 1fr)', gap: '1px' }}
       >
         <div />
-        <div className="font-semibold" style={{ gridColumn: 2 }}>0시</div>
+        <div className="font-semibold" style={{ gridColumn: 2 }}>0</div>
         <div style={{ gridColumn: 8 }}>6</div>
         <div style={{ gridColumn: 14 }}>12</div>
         <div style={{ gridColumn: 20 }}>18</div>
-        <div className="text-right" style={{ gridColumn: 25 }}>23시</div>
+        <div className="text-right" style={{ gridColumn: 25 }}>23</div>
       </div>
       {peakVal > 0 && (
         <div className="flex flex-wrap items-center gap-x-2 mt-1.5 text-[10px] text-zinc-500 tabular-nums">
