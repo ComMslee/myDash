@@ -52,7 +52,7 @@ flowchart LR
 
     Tesla   <-->|"polling · vehicle_data"| TM
     Scheduler -->|"commands ⚡ (Fleet API)"| Tesla
-    Gov     -->|"공공데이터"| Dashboard
+    Gov     -->|"충전소 · 축제 · 예보 · 공휴일"| Dashboard
     Kakao   -->|"geocoding"| Dashboard
     TG      <-->|"명령 ⇄ 알림"| Hub
     Browser -->|"HTTPS · PIN"| Caddy
