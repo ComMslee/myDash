@@ -34,7 +34,7 @@ flowchart LR
         subgraph App["⚙️ Application"]
             direction TB
             Dashboard["📦 dashboard<br/>Next.js · API GW"]
-            Scheduler["⏰ schedule-runner ⚡"]
+            Scheduler["⏰ schedule-runner ⚡<br/>(Tesla 명령 실행)"]
             Hub["🔗 telegram-hub"]
             TM["📡 teslamate"]
         end
