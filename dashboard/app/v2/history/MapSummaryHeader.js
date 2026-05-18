@@ -324,10 +324,14 @@ function PlaceSummary({ place }) {
           </div>
           {/* 메타 — 첫·최근 방문 (가장 작은 글씨) */}
           {(place.first_visit || place.last_visit) && (
-            <div className="mt-1 pl-5 text-[11px] text-zinc-500 tabular-nums">
-              {place.first_visit && <span>{fmtMD(place.first_visit)}</span>}
-              {place.first_visit && place.last_visit && <span className="text-zinc-700 mx-1">~</span>}
-              {place.last_visit && <span>{fmtMD(place.last_visit)}</span>}
+            <div className="mt-1 pl-5 text-[11px] text-zinc-500 tabular-nums flex items-center gap-2 flex-wrap">
+              {place.first_visit && (
+                <span><span className="text-zinc-600 mr-1">첫</span>{fmtMD(place.first_visit)}</span>
+              )}
+              {place.first_visit && place.last_visit && <span className="text-zinc-700">|</span>}
+              {place.last_visit && (
+                <span><span className="text-zinc-600 mr-1">최근</span>{fmtMD(place.last_visit)}</span>
+              )}
             </div>
           )}
         </>
@@ -338,10 +342,14 @@ function PlaceSummary({ place }) {
             {place.avg_duration > 0 && <StatPill value={formatDuration(place.avg_duration)} label="소요" valueClass="text-zinc-300" />}
           </div>
           {(place.first_visit || place.last_visit) && (
-            <div className="mt-1 pl-5 text-[11px] text-zinc-500 tabular-nums">
-              {place.first_visit && <span>{fmtMD(place.first_visit)}</span>}
-              {place.first_visit && place.last_visit && <span className="text-zinc-700 mx-1">~</span>}
-              {place.last_visit && <span>{fmtMD(place.last_visit)}</span>}
+            <div className="mt-1 pl-5 text-[11px] text-zinc-500 tabular-nums flex items-center gap-2 flex-wrap">
+              {place.first_visit && (
+                <span><span className="text-zinc-600 mr-1">첫</span>{fmtMD(place.first_visit)}</span>
+              )}
+              {place.first_visit && place.last_visit && <span className="text-zinc-700">|</span>}
+              {place.last_visit && (
+                <span><span className="text-zinc-600 mr-1">최근</span>{fmtMD(place.last_visit)}</span>
+              )}
             </div>
           )}
         </>
