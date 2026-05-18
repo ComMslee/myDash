@@ -38,9 +38,9 @@ function formatWeekRange(daysInWeek) {
   return `${fmt(first)} ~ ${fmt(last)}`;
 }
 
-// 강화된 통계 라인 (월/주 헤더 하단) — 회 / 운전시간 / 평균 km·회 / 효율 / 운행일수.
+// 강화된 통계 라인 (월/주 헤더 하단) — 회 / 운전시간 / 효율 / 운행일수.
 // km·kWh 은 일 카드처럼 헤더 우측 강조 영역으로 이동 — 여기엔 보조 메트릭만 표시.
-function StatsLine({ driveCount, durationMin, distance, dayCount, efficiency = null }) {
+function StatsLine({ driveCount, durationMin, dayCount, efficiency = null }) {
   const items = [];
   if (driveCount > 0) items.push({ k: 'cnt', node: (
     <span className="inline-flex items-baseline gap-0.5">
@@ -54,12 +54,6 @@ function StatsLine({ driveCount, durationMin, distance, dayCount, efficiency = n
       {formatHm(Math.round(durationMin))}
     </span>
   ) });
-  if (driveCount > 0 && distance > 0) {
-    const avg = distance / driveCount;
-    items.push({ k: 'avg', node: (
-      <span>{avg < 10 ? avg.toFixed(1) : Math.round(avg)}<span className="text-zinc-600 ml-0.5">km/회</span></span>
-    ) });
-  }
   if (efficiency != null) items.push({ k: 'eff', node: (
     <span className="text-amber-400/80">{Math.round(efficiency)}<span className="text-zinc-600 ml-0.5">Wh/km</span></span>
   ) });
@@ -402,7 +396,7 @@ export default function DriveListView({
                   <HeaderTotals distance={m.distance} kwh={m.kwh} usedPct={m.usedPct} />
                 </div>
                 <StatsLine
-                  driveCount={m.driveCount} durationMin={m.durationMin} distance={m.distance}
+                  driveCount={m.driveCount} durationMin={m.durationMin}
                   dayCount={m.days.length} efficiency={calcEff(m.kwh, m.distance)}
                 />
               </button>
@@ -437,8 +431,8 @@ export default function DriveListView({
                         <HeaderTotals distance={w.distance} kwh={w.kwh} usedPct={w.usedPct} />
                       </div>
                       <StatsLine
-                        driveCount={w.driveCount} durationMin={w.durationMin} distance={w.distance}
-                        dayCount={w.days.length} efficiency={calcEff(w.kwh, w.distance)}
+                        driveCount={w.driveCount} durationMin={w.durationMin}
+                        efficiency={calcEff(w.kwh, w.distance)}
                       />
                     </button>
                     <button
