@@ -17,7 +17,7 @@
 
 ```mermaid
 flowchart LR
-    Tesla["⚡ Tesla Fleet"]
+    Tesla["⚡ Tesla Cloud<br/>(Owner + Fleet API)"]
     Gov["📊 data.go.kr"]
     Kakao["🗺 Kakao"]
     TG["💬 Telegram"]
@@ -50,7 +50,8 @@ flowchart LR
         TM -. MQTT .-> DB
     end
 
-    Tesla   <-->|"data ⇄ commands"| Dashboard
+    Tesla   <-->|"polling · vehicle_data"| TM
+    Scheduler -->|"commands ⚡ (Fleet API)"| Tesla
     Gov     -->|"공공데이터"| Dashboard
     Kakao   -->|"geocoding"| Dashboard
     TG      <-->|"명령 ⇄ 알림"| Hub
