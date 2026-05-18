@@ -113,4 +113,11 @@ export const ROUTES = [
       { key: 'year', sample: '' },
       REFRESH_PARAM,
     ] },
+  { path: '/api/admin/agg-status', label: '사전집계 상태',  desc: 'dash_* 6 테이블 rows/freshness + server-cache 메모리 — 집계 탭과 동일 소스 (requireAuth)', category: '자동화/외부' },
+  { path: '/api/states-today',     label: '오늘 상태',      desc: '특정 일자(KST) state 타임라인(online/asleep/offline + drive/charge 서브구간) — StatesTodayPopup 소스', category: '차량',
+    params: [
+      { key: 'date', sample: '' },
+    ] },
+  { path: '/api/tesla/vehicles',   label: 'Tesla 차량 목록', desc: 'Fleet API products 호출 결과 — OAuth 토큰 검증 + vehicle_id 진단 용', category: '자동화/외부' },
+  { path: '/api/tg',               label: '텔레그램 사용자', desc: '봇 권한·그룹·학습 로그 통합 (/v2/tg 페이지 소스)', category: '자동화/외부' },
 ];

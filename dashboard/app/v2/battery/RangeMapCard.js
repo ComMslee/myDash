@@ -22,7 +22,12 @@ export default function RangeMapCard() {
 
   useEffect(() => {
     if (!data?.available || typeof window === 'undefined') return;
+    // alive 플래그 + timeoutId: Leaflet 스크립트 로드 / setTimeout 이 unmount 후에도 실행되어
+    // 제거된 map 인스턴스에 invalidateSize/fitBounds 를 호출하는 race 방지.
+    let alive = true;
+    let timeoutId = null;
     loadLeaflet(() => {
+      if (!alive) return;
       const L = window.L;
       if (!containerRef.current) return;
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
@@ -54,13 +59,16 @@ export default function RangeMapCard() {
       // 초기 size 0 회피 — invalidateSize + animate:false fitBounds (DriveMap 함정 패턴 차용)
       // 줌은 편도 원 × 0.75 영역에 맞춤 (전체 원 그대로 fit 하면 너무 멀리서 보임)
       const FIT_SCALE = 0.5;
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
+        if (!alive) return;
         map.invalidateSize();
         const fitBounds = L.latLng(lat, lng).toBounds(oneWayM * FIT_SCALE * 2);
         map.fitBounds(fitBounds, { padding: [10, 10], animate: false });
       }, 150);
     });
     return () => {
+      alive = false;
+      if (timeoutId) clearTimeout(timeoutId);
       mapRef.current?.remove();
       mapRef.current = null;
     };
