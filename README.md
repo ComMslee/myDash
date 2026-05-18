@@ -16,21 +16,26 @@
 ## 아키텍처
 
 ```mermaid
-flowchart LR
-    Tesla["⚡ Tesla Cloud<br/>(Owner + Fleet API)"]
-    Gov["📊 data.go.kr"]
-    Kakao["🗺 Kakao"]
-    TG["💬 Telegram"]
-    Browser["🌐 Browser"]
-    GHA["🚀 GitHub Actions"]
+flowchart TD
+    subgraph EXT["🌐 External"]
+        direction LR
+        Tesla["⚡ Tesla Cloud<br/>(Owner + Fleet)"]
+        Gov["📊 data.go.kr"]
+        Kakao["🗺 Kakao"]
+        TG["💬 Telegram"]
+    end
+
+    subgraph CLI["👤 Clients"]
+        direction LR
+        Browser["🌐 Browser"]
+        GHA["🚀 GitHub Actions"]
+    end
 
     subgraph LS["☁️ AWS Lightsail · Seoul · 1 GB"]
         direction TB
-
         subgraph Edge["🚪 Edge / Auth"]
-            Caddy["🛡 Caddy<br/>:80 / :443<br/>HSTS · forward_auth"]
+            Caddy["🛡 Caddy :80/:443<br/>HSTS · forward_auth"]
         end
-
         subgraph App["⚙️ Application"]
             direction TB
             Dashboard["📦 dashboard<br/>Next.js · API GW"]
@@ -38,11 +43,9 @@ flowchart LR
             Hub["🔗 telegram-hub"]
             TM["📡 teslamate"]
         end
-
         subgraph Data["💾 Data"]
             DB[("🗄 Postgres")]
         end
-
         Caddy --> Dashboard
         Dashboard --> Scheduler
         Hub --> Dashboard
@@ -51,7 +54,7 @@ flowchart LR
     end
 
     Tesla   <-->|"polling · vehicle_data"| TM
-    Scheduler -->|"commands ⚡ (Fleet API)"| Tesla
+    Scheduler -->|"commands ⚡"| Tesla
     Gov     -->|"충전소 · 축제 · 예보 · 공휴일"| Dashboard
     Kakao   -->|"geocoding"| Dashboard
     TG      <-->|"명령 ⇄ 알림"| Hub
@@ -64,6 +67,8 @@ flowchart LR
     class Tesla,Gov,Kakao,TG ext
     class Caddy,Dashboard,Scheduler,Hub,TM,DB ls
     class Browser,GHA cli
+    style EXT fill:#0f172a,stroke:#1e40af,color:#dbeafe
+    style CLI fill:#1c1917,stroke:#78716c,color:#e7e5e4
     style LS fill:#022c22,stroke:#059669,color:#a7f3d0
     style Edge fill:#0c4a6e,stroke:#0ea5e9,color:#e0f2fe
     style App fill:#14532d,stroke:#22c55e,color:#dcfce7
