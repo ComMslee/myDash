@@ -45,22 +45,26 @@ Next.js 14 · JavaScript(ESM) · Tailwind 3 · PostgreSQL 16(TeslaMate 스키마
 ```
                        외부 API (HTTPS, outbound)
            Tesla Fleet · 환경공단 EV · Kakao · TourAPI · 기상청
-                                   ▲
-                                   │
-   브라우저 ─HTTPS─┐                │                ┌─ 텔레그램
-                  ▼                │                ▼
+                          ▲           ▲
+                          │ OAuth2    │ REST
+                          │ + 명령    │
+   브라우저 ─HTTPS─┐       │           │            ┌─ 텔레그램
+                  ▼       │           │            ▼
    GitHub ─push/SSH─►   AWS Lightsail (Seoul · 1GB micro)
                   ┌──────────────────────────────────────────┐
-                  │  Caddy  :80/:443  (forward_auth)         │
+                  │  Caddy  :80/:443  (forward_auth · HSTS)  │
                   │    ├─► dashboard:5000 (Next.js · API)    │
-                  │    │      ├─ /api/*       ──► Postgres   │
-                  │    │      └─ schedule-runner ─► Fleet API│
+                  │    │      ├─ /api/*           ─► Postgres│
+                  │    │      ├─ /api/tesla/*     ─► Fleet ⚡│
+                  │    │      └─ schedule-runner  ─► Fleet ⚡│
                   │    └─► teslamate:4000 (보호 UI)          │
                   │                                          │
                   │  telegram-hub ──/api/*──► dashboard      │
                   │  teslamate    ─MQTT────► Postgres        │
                   └──────────────────────────────────────────┘
 ```
+
+**Tesla Fleet API (⚡)**: dashboard 가 HTTPS 로 직접 호출 — OAuth2 토큰(자동 refresh) + commands/vehicle_data/wakes. **유료 호출**이므로 `/v2/schedule` 자동화 + 즉시 실행 패널에서만 사용 (단가는 [`CLAUDE.md`](./CLAUDE.md#%F0%9F%9A%A8-tesla-fleet-api--%ED%98%B8%EC%B6%9C-%EB%B2%94%EC%9C%84%EB%B9%84%EC%9A%A9-%EC%A4%91%EC%9A%94) 참조). 그 외 페이지는 TeslaMate DB 직접 조회(무료).
 
 **데이터 경로 원칙**: UI·봇 등 모든 소비자는 `dashboard /api/*` 만 호출. 외부 DB 직접 접근 금지 — 비즈니스 로직(폴백 감지, 스키마 함정 회피)이 한 곳에 모인다. 신규 봇 명령 추가 시 필요한 API 가 없으면 **먼저 만들고** 호출.
 
