@@ -1,19 +1,81 @@
 # TeslaMate Custom Dashboard
 
-TeslaMate 위에 올린 Next.js 14 커스텀 대시보드. 주행·배터리·충전·집충전기 현황을 한국어 모바일 UI로 제공한다.
+오픈소스 [TeslaMate](https://github.com/teslamate-org/teslamate) 가 수집한 차량 데이터를 한국어 모바일 UI 로 재구성하고, **Tesla Fleet API · 공공데이터 · 텔레그램 봇**을 단일 게이트웨이 뒤로 통합한 개인 운영 대시보드.
 
-## 페이지 (하단 4탭 + 부속)
+단일 AWS Lightsail 인스턴스(1 GB · 월 $7) 위에 `docker-compose` 5개 서비스로 동작하며, master 푸시마다 GitHub Actions 가 SSH 로 무중단 배포한다.
 
-- **주행 (`/v2/drives`)** — 차량 KPI · 인사이트 · 시간×요일 패턴 · TOP50 · 연도별 월간/계절 효율 (`/` → 리다이렉트)
-- **이력 (`/v2/history`)** — 일 카드 리스트 → 일 상세 지도 / 월 합계 / 자주 가는 곳·오래 머문 곳 토글
-- **배터리 (`/v2/battery`)** — 건강 점수 · 대기 소모 24h 타임라인 · 충전 습관 · 월간/히트맵 · 급속·완속 기록
-- **충전소 (`/v2/chargers`)** — 집충전기 실시간(환경공단 API) + Top 순위 + 활용도 리포트 (인라인)
-- **자동화 (`/v2/schedule`)** — 센트리/공조 스케줄 · 즉시 실행 · 월 캘린더 · 실행 로그 · Tesla Fleet API 사용량/비용 (설정 시트 진입)
-- 부속: `/v2/chargers/report` (활용도 단독 페이지) · `/v2/tg` (텔레그램 봇 관리) · `/v2/dev/api-status` (라우트 헬스 + 진단) · `/v2/dev/auth` (PIN 변경)
+## 핵심 기능
 
-## 빠른 시작
+- **주행** — 차량 KPI · 시간×요일 패턴 · TOP 50 거리/효율 · 연도별 월간 · 계절 분석
+- **이력** — 월→주→일 3단 계층 카드 · 일 상세 지도 · 자주 가는 곳 / 오래 머문 곳 토글
+- **배터리** — 건강 점수 · 24h 대기 소모 타임라인 · 충전 습관 히트맵 · 급속/완속 위치 클러스터 지도
+- **충전소** — 환경공단 API 기반 집 충전기 실시간 + Top 순위 + 활용도 리포트
+- **자동화 (Tesla Fleet API)** — 센트리 · 공조 스케줄러 · 즉시 실행 · 월 캘린더 · 사용량 · 비용 대시보드
+- **텔레그램 봇 인터페이스** — 가족 명령 응답(차량 상태 · 충전 · 축제 등) + 푸시 알림(미운행 · 충전 완료 · 장기 주차 등)
 
-`.env` 생성 후 docker compose 실행:
+## 아키텍처
+
+```
+   ┌─────────────────────┐                                          ╔══════════════════════════╗
+   │  Tesla Fleet API ⚡ │  ── vehicle_data · OAuth2 토큰 ─────────► ║                          ║
+   │  (HTTPS · 양방향)   │  ◄── 차량 명령 (climate/sentry/wake) ──── ║                          ║
+   └─────────────────────┘                                          ║                          ║
+                                                                    ║                          ║
+   ┌─────────────────────┐                                          ║                          ║
+   │  환경공단 EV API    │  ── 충전소 · 실시간 충전기 ─────────────► ║                          ║
+   └─────────────────────┘                                          ║                          ║
+                                                                    ║                          ║
+   ┌─────────────────────┐                                          ║                          ║
+   │  한국관광공사 Tour  │  ── 축제 정보 ───────────────────────────► ║   AWS Lightsail          ║
+   └─────────────────────┘                                          ║   Seoul · t-micro        ║
+                                                                    ║                          ║
+   ┌─────────────────────┐                                          ║   Caddy → dashboard      ║
+   │  한국천문연구원     │  ── 공휴일 ──────────────────────────────► ║    (Next.js · API GW)    ║
+   └─────────────────────┘                                          ║                          ║
+                                                                    ║   Postgres ◄ MQTT        ║
+   ┌─────────────────────┐                                          ║   schedule-runner ⚡     ║
+   │  기상청 (KMA)       │  ── 단기 예보 ───────────────────────────► ║   telegram-hub           ║
+   └─────────────────────┘                                          ║   teslamate              ║
+                                                                    ║                          ║
+   ┌─────────────────────┐                                          ║                          ║
+   │  Kakao Maps         │  ── 좌표 ↔ 주소 (geocoding) ─────────────► ║                          ║
+   └─────────────────────┘                                          ║                          ║
+                                                                    ║                          ║
+   ┌─────────────────────┐                                          ║                          ║
+   │  Telegram Bot API   │  ── 가족 명령 수신 ──────────────────────► ║                          ║
+   │  (HTTPS · 양방향)   │  ◄── 푸시 알림 발신 ────────────────────── ║                          ║
+   └─────────────────────┘                                          ╚═════════▲════════════════╝
+                                                                              │
+   ┌─────────────────────┐                                                    │
+   │  브라우저 (가족)    │  ── HTTPS · PIN 인증 ───────────────────────────────┤
+   └─────────────────────┘                                                    │
+                                                                              │
+   ┌─────────────────────┐                                                    │
+   │  GitHub Actions     │  ── master push → SSH 자동 배포 ────────────────────┘
+   └─────────────────────┘
+```
+
+### 엔지니어링 하이라이트
+
+- **API gateway 단일 진실원** — UI · 텔레그램 봇 · 외부 소비자는 모두 `dashboard /api/*` 만 호출. 외부 DB 직접 접근 금지. 스키마 함정/폴백 로직이 한 곳에 모이고, 같은 데이터를 다른 소비자가 다른 쿼리로 보던 불일치를 제거.
+- **3단 캐시 전략** — 메모리 TTL(라우트별 15 s~600 s) → DB 사전 집계 테이블(`dash_*`, 매일 04:00 KST cron) → DB 영구 캐시(`kakao_address_cache` 등). 1 GB RAM 인스턴스에서도 12+ 페이지가 즉답.
+- **Tesla Fleet API 비용 차단 레이어** — 호출 1 회당 실제 청구(commands $0.001 / vehicle_data $0.002 / wakes $0.02). 사용 범위를 `/v2/schedule` 라우트로 한정, `teslaFetch` 가 path 분류로 자동 카운팅 → `dash_api_usage_monthly`. 결제 수단 미등록 + $10 무료 한도 초과 시 Tesla 측에서 자동 차단(과금 X).
+- **보안** — Caddy HSTS + 보안 헤더 / PIN 인증(IP 누적 10 회 실패 시 텔레그램 관리자 알람) / TeslaMate Phoenix UI 는 Caddy `forward_auth` 로 대시보드 인증 통과 시만 노출 / 대시보드 컨테이너 포트는 호스트 loopback 만 바인딩.
+- **무중단 자동 배포** — master push → GitHub-hosted runner → SSH → `docker compose up -d --build dashboard` 만 갱신. 다른 서비스는 유지, 빌드 캐시 활용.
+
+## 기술 스택
+
+| 영역 | 사용 |
+|---|---|
+| 프런트 | Next.js 14 (App Router) · Tailwind CSS 3 · Leaflet 1.9 · 인라인 SVG 아이콘 |
+| 백엔드 | Node 20 (ESM) · `pg` 직접 쿼리 · 메모리 LRU · node-cron |
+| 데이터 | PostgreSQL 16 (TeslaMate 스키마 + `dash_*` 사전 집계 + 외부 캐시 테이블) |
+| 외부 API | Tesla Fleet · 환경공단 · 한국관광공사 · 한국천문연 · 기상청 · Kakao |
+| 인프라 | AWS Lightsail (Seoul · t-micro) · Caddy 2 · docker-compose · GitHub Actions |
+
+## 빠른 시작 (로컬)
+
+`.env` 작성:
 
 ```env
 TM_DB_USER=teslamate
@@ -30,58 +92,10 @@ HOME_CHARGER_STAT_ID=<CHARGER_STAT_ID>   # 환경공단 충전소 통계 ID
 docker compose up -d
 ```
 
-TeslaMate 초기 연동은 `http://localhost:4000` → Tesla 계정 로그인.
+TeslaMate 초기 연동은 `http://localhost:4000` 에서 Tesla 계정 로그인.
 
-## 배포
+## 더 보기
 
-`master` push 시 GitHub Actions (GitHub-hosted `ubuntu-latest`)가 Lightsail로 SSH 접속해 자동 배포한다. 자세한 내용은 [`docs/DEPLOY.md`](./docs/DEPLOY.md).
-
-## 기술 스택
-
-Next.js 14 · JavaScript(ESM) · Tailwind 3 · PostgreSQL 16(TeslaMate 스키마, `pg` 직접 쿼리) · Leaflet 1.9 · Docker(node:20-alpine) · AWS Lightsail
-
-## 아키텍처
-
-```
-      ┌────────── Tesla Fleet API · HTTPS · 양방향 ⚡ ──────────┐
-      │  ⇣ vehicle_data · 차량 상태 · OAuth2 토큰              │
-      │  ⇡ commands (climate · sentry · wake) · 서명 명령      │
-      └──────────────────────────▲──────────────────────────────┘
-                                 │  ※ 유료 호출 — `/v2/schedule` 한정
-      ┌────────── 외부 데이터 (HTTPS · fetch ⇣) ──────────────────┐
-      │  공공데이터포털  ─┬─ 환경공단 EV     충전소 · 실시간 상태  │
-      │                  ├─ 한국관광공사    TourAPI · 축제        │
-      │                  ├─ 한국천문연구원  공휴일                │
-      │                  └─ 기상청          단기예보 (VilageFcst) │
-      │  상용 API        ─── Kakao Maps     좌표 ↔ 주소 geocoding │
-      └──────────────────────────▲──────────────────────────────┘
-                                 │
-   브라우저 ─HTTPS─┐               │             ┌─ 텔레그램
-                  ▼               │             ▼
-   GitHub ─push/SSH─►   AWS Lightsail (Seoul · 1GB micro)
-                  ┌──────────────────────────────────────────┐
-                  │  Caddy  :80/:443  (forward_auth · HSTS)  │
-                  │    ├─► dashboard:5000 (Next.js · API)    │
-                  │    │      ├─ /api/*           ─► Postgres│
-                  │    │      ├─ /api/tesla/*     ─► Fleet ⚡│
-                  │    │      └─ schedule-runner  ─► Fleet ⚡│
-                  │    └─► teslamate:4000 (보호 UI)          │
-                  │                                          │
-                  │  telegram-hub ──/api/*──► dashboard      │
-                  │  teslamate    ─MQTT────► Postgres        │
-                  └──────────────────────────────────────────┘
-```
-
-**Tesla Fleet API (⚡)**: dashboard 가 HTTPS 로 직접 호출 — OAuth2 토큰(자동 refresh) + commands/vehicle_data/wakes. **유료 호출**이므로 `/v2/schedule` 자동화 + 즉시 실행 패널에서만 사용 (단가는 [`CLAUDE.md`](./CLAUDE.md#%F0%9F%9A%A8-tesla-fleet-api--%ED%98%B8%EC%B6%9C-%EB%B2%94%EC%9C%84%EB%B9%84%EC%9A%A9-%EC%A4%91%EC%9A%94) 참조). 그 외 페이지는 TeslaMate DB 직접 조회(무료).
-
-**데이터 경로 원칙**: UI·봇 등 모든 소비자는 `dashboard /api/*` 만 호출. 외부 DB 직접 접근 금지 — 비즈니스 로직(폴백 감지, 스키마 함정 회피)이 한 곳에 모인다. 신규 봇 명령 추가 시 필요한 API 가 없으면 **먼저 만들고** 호출.
-
-**캐시 3단**:
-1. 메모리 TTL (`server-cache`) — 라우트별 15s~600s
-2. DB 사전 집계 (`dash_*`) — 매일 04:00 KST 갱신
-3. DB 영구 (`kakao_address_cache` 등) — 외부 API 결과 보존
-
-## 문서
-
-- 개발 규칙/구조 — [`CLAUDE.md`](./CLAUDE.md)
-- 인프라·운영 — [`docs/`](./docs/README.md) (접속/배포/운영/백업/트러블슈팅/Tailscale/공공 API)
+- 개발 규칙 · 코드 컨벤션 — [`CLAUDE.md`](./CLAUDE.md)
+- 인프라 · 운영 · 배포 · 트러블슈팅 — [`docs/`](./docs/README.md)
+- 알려진 함정 (수정 전 필독) — [`docs/PITFALLS.md`](./docs/PITFALLS.md)
