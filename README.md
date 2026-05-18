@@ -20,7 +20,7 @@ flowchart TD
     subgraph EXT["🌐 External"]
         direction LR
         Tesla["⚡ Tesla Cloud<br/>(Owner + Fleet)"]
-        Gov["📊 data.go.kr"]
+        Gov["📊 data.go.kr<br/>충전소 · 축제 · 예보 · 공휴일"]
         Kakao["🗺 Kakao"]
         TG["💬 Telegram"]
     end
@@ -55,7 +55,7 @@ flowchart TD
 
     Tesla   <-->|"polling · vehicle_data"| TM
     Scheduler -->|"commands ⚡"| Tesla
-    Gov     -->|"충전소 · 축제 · 예보 · 공휴일"| Dashboard
+    Gov     --> Dashboard
     Kakao   -->|"geocoding"| Dashboard
     TG      <-->|"명령 ⇄ 알림"| Hub
     Browser -->|"HTTPS · PIN"| Caddy
