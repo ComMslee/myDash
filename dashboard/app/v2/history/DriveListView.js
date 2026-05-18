@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, Fragment } from 'react';
+import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
 import { KWH_PER_KM } from '@/lib/constants';
 import { formatDuration, formatHm } from '@/lib/format';
 import { KST_OFFSET_MS, kstMondayStr } from '@/lib/kst';
@@ -38,14 +38,14 @@ function formatWeekRange(daysInWeek) {
   return `${fmt(first)} ~ ${fmt(last)}`;
 }
 
-// 강화된 통계 라인 — kWh / 총 운전시간 / 평균 거리·회 / 효율 / 운행일수.
-// 일 카드와 일관된 아이콘·색 (kWh 초록, 효율 앰버, 운전 road, 일 calendar).
-function StatsLine({ kwh, durationMin, distance, driveCount, dayCount, efficiency = null }) {
+// 강화된 통계 라인 (월/주 헤더 하단) — 회 / 운전시간 / 평균 km·회 / 효율 / 운행일수.
+// km·kWh 은 일 카드처럼 헤더 우측 강조 영역으로 이동 — 여기엔 보조 메트릭만 표시.
+function StatsLine({ driveCount, durationMin, distance, dayCount, efficiency = null }) {
   const items = [];
-  if (kwh > 0) items.push({ k: 'kwh', node: (
-    <span className="inline-flex items-baseline gap-0.5 text-green-400/90">
-      <Icon name="bolt" className="w-3 h-3 self-center" />
-      <span className="font-semibold">{kwh.toFixed(1)}</span><span className="text-zinc-600 ml-0.5">kWh</span>
+  if (driveCount > 0) items.push({ k: 'cnt', node: (
+    <span className="inline-flex items-baseline gap-0.5">
+      <Icon name="car" className="w-3 h-3 self-center" />
+      {driveCount}회
     </span>
   ) });
   if (durationMin > 0) items.push({ k: 'dur', node: (
@@ -79,6 +79,21 @@ function StatsLine({ kwh, durationMin, distance, driveCount, dayCount, efficienc
         </Fragment>
       ))}
     </span>
+  );
+}
+
+// 헤더 우측 강조 영역 — 일 카드와 동일한 km(파랑) + kWh(초록) 정렬.
+function HeaderTotals({ distance, kwh, usedPct }) {
+  return (
+    <div className="text-right tabular-nums flex-shrink-0 inline-flex items-baseline gap-2">
+      <span className="text-sm font-bold text-blue-400">{distance.toFixed(0)}<span className="text-[10px] text-zinc-600 ml-0.5">km</span></span>
+      {kwh > 0 && (
+        <span className="text-xs text-green-400/80">
+          {kwh.toFixed(1)}<span className="ml-0.5">kWh</span>
+          {usedPct > 0 && <span className="text-zinc-500 ml-1">({usedPct}%)</span>}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -145,6 +160,21 @@ export default function DriveListView({
     return next;
   });
   const todayWeekKey = useMemo(() => currentWeekKey(), []);
+
+  // 첫 drives 도착 시 — 이번 주가 비어있어도 보이도록 "최신 주" 도 자동 펼침.
+  // (drives 가 reverse-chronological 이므로 첫 번째 drive 의 KST 월요일 = 최신 주)
+  const latestWeekInitRef = useRef(false);
+  useEffect(() => {
+    if (latestWeekInitRef.current || !drives.length) return;
+    latestWeekInitRef.current = true;
+    const latestWk = kstMondayStr(`${driveDayStr(drives[0])}T00:00:00Z`);
+    setExpandedWeeks(prev => {
+      if (prev.has(latestWk)) return prev;
+      const next = new Set(prev);
+      next.add(latestWk);
+      return next;
+    });
+  }, [drives, driveDayStr]);
 
   // 공휴일 — drives 에 등장하는 연도들만 /api/holidays?year= 으로 로드. KST 기준 YYYYMMDD.
   const yearsKey = useMemo(() => {
@@ -287,7 +317,7 @@ export default function DriveListView({
         type="button"
         onClick={() => onDayClick(g.dateStr)}
         title={holidayName || undefined}
-        className="relative w-full text-left flex flex-col gap-1 px-3 py-3 border-b border-white/[0.04] last:border-0 hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
+        className="relative w-full text-left flex flex-col gap-1 pl-7 pr-3 py-3 border-b border-white/[0.04] border-l-2 border-l-white/[0.04] last:border-b-0 hover:bg-white/[0.025] active:bg-blue-500/10 transition-colors"
       >
         <DayBgGradient items={visible} dayStart={dayStart} dayMs={dayMs} />
         <div className="relative flex items-center justify-between gap-2">
@@ -360,35 +390,20 @@ export default function DriveListView({
         const expanded = expandedMonths.has(mk);
         return (
           <Fragment key={mk}>
-            {/* 월 헤더 — 좌 영역 = monthMode 지도/순위, 우 chevron = 펼치기. 2줄 (요약 + 강화 통계). */}
+            {/* 월 헤더 — 들여쓰기 0 (top-level). 좌 영역=monthMode, 우 chevron=토글. */}
             <div className="flex items-stretch border-t border-white/[0.10] bg-white/[0.04]">
               <button
                 onClick={() => (onMonthClick ? onMonthClick(mk) : toggleMonth(mk))}
-                className="flex-1 flex flex-col gap-0.5 px-3 py-2 hover:bg-white/[0.05] active:bg-white/[0.08] transition-colors text-left min-w-0"
+                className="flex-1 flex flex-col gap-0.5 pl-3 pr-3 py-2 hover:bg-white/[0.05] active:bg-white/[0.08] transition-colors text-left min-w-0"
                 title={onMonthClick ? '이 달 전체 지도/순위 보기' : (expanded ? '접기' : '펼치기')}
               >
-                <div className="flex items-baseline gap-2 min-w-0">
-                  <span className="text-xs font-bold text-zinc-300 flex-shrink-0 inline-flex items-center gap-1">
-                    <span className="text-[9px] px-1 py-px rounded bg-zinc-700/60 text-zinc-300">월</span>
-                    {formatMonthLabel(mk)}
-                  </span>
-                  <span className="text-[10px] text-zinc-600 tabular-nums flex items-center gap-1 truncate">
-                    <Icon name="car" className="w-3 h-3" />
-                    <span>{m.driveCount}회</span>
-                    <span className="text-zinc-700">·</span>
-                    <span className="text-blue-400 font-semibold">{m.distance.toFixed(0)}<span className="text-zinc-600 ml-0.5">km</span></span>
-                    {m.usedPct > 0 && (
-                      <>
-                        <span className="text-zinc-700">·</span>
-                        <span>{m.usedPct}%</span>
-                      </>
-                    )}
-                  </span>
+                <div className="flex items-center justify-between gap-2 min-w-0">
+                  <span className="text-sm font-bold text-zinc-200 flex-shrink-0">{formatMonthLabel(mk)}</span>
+                  <HeaderTotals distance={m.distance} kwh={m.kwh} usedPct={m.usedPct} />
                 </div>
                 <StatsLine
-                  kwh={m.kwh} durationMin={m.durationMin} distance={m.distance}
-                  driveCount={m.driveCount} dayCount={m.days.length}
-                  efficiency={calcEff(m.kwh, m.distance)}
+                  driveCount={m.driveCount} durationMin={m.durationMin} distance={m.distance}
+                  dayCount={m.days.length} efficiency={calcEff(m.kwh, m.distance)}
                 />
               </button>
               <button
@@ -405,37 +420,25 @@ export default function DriveListView({
               const isCurrentWeek = wk === todayWeekKey;
               return (
                 <Fragment key={`${mk}|${wk}`}>
-                  {/* 주 헤더 — 좌 영역 = weekMode 지도/순위, 우 chevron = 펼치기. 시각 구분 = 왼쪽 blue 액센트 바 + 들여쓰기. */}
-                  <div className="flex items-stretch bg-white/[0.02] border-t border-white/[0.05] border-l-2 border-l-blue-500/30">
+                  {/* 주 헤더 — 들여쓰기 1단 (pl-6) + blue 액센트 바. 라벨 색은 blue-300/80 (월=zinc, 주=blue 톤). */}
+                  <div className="flex items-stretch bg-white/[0.02] border-t border-white/[0.05]">
+                    <div className="w-1.5 bg-blue-500/30 flex-shrink-0" aria-hidden="true" />
                     <button
                       onClick={() => (onWeekClick ? onWeekClick(wk) : toggleWeek(wk))}
                       type="button"
-                      className="flex-1 flex flex-col gap-0.5 pl-4 pr-3 py-1.5 hover:bg-white/[0.04] active:bg-white/[0.05] transition-colors text-left min-w-0"
+                      className="flex-1 flex flex-col gap-0.5 pl-3 pr-3 py-1.5 hover:bg-white/[0.04] active:bg-white/[0.05] transition-colors text-left min-w-0"
                       title={onWeekClick ? '이 주 전체 지도/순위 보기' : (weekExpanded ? '접기' : '펼치기')}
                     >
-                      <div className="flex items-baseline gap-2 min-w-0">
-                        <span className="text-[11px] font-semibold text-zinc-400 flex-shrink-0 tabular-nums inline-flex items-center gap-1">
-                          <span className="text-[9px] px-1 py-px rounded bg-blue-500/20 text-blue-300/90 font-normal">주</span>
+                      <div className="flex items-center justify-between gap-2 min-w-0">
+                        <span className="text-[12px] font-semibold text-blue-300/80 flex-shrink-0 tabular-nums">
                           {formatWeekRange(w.days)}
                           {isCurrentWeek && <span className="text-[9px] text-blue-400 ml-1 font-normal align-middle">이번주</span>}
                         </span>
-                        <span className="text-[10px] text-zinc-600 tabular-nums flex items-center gap-1 truncate">
-                          <Icon name="car" className="w-3 h-3" />
-                          <span>{w.driveCount}회</span>
-                          <span className="text-zinc-700">·</span>
-                          <span className="text-blue-400 font-semibold">{w.distance.toFixed(0)}<span className="text-zinc-600 ml-0.5">km</span></span>
-                          {w.usedPct > 0 && (
-                            <>
-                              <span className="text-zinc-700">·</span>
-                              <span>{w.usedPct}%</span>
-                            </>
-                          )}
-                        </span>
+                        <HeaderTotals distance={w.distance} kwh={w.kwh} usedPct={w.usedPct} />
                       </div>
                       <StatsLine
-                        kwh={w.kwh} durationMin={w.durationMin} distance={w.distance}
-                        driveCount={w.driveCount} dayCount={w.days.length}
-                        efficiency={calcEff(w.kwh, w.distance)}
+                        driveCount={w.driveCount} durationMin={w.durationMin} distance={w.distance}
+                        dayCount={w.days.length} efficiency={calcEff(w.kwh, w.distance)}
                       />
                     </button>
                     <button
