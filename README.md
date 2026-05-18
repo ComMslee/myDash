@@ -26,12 +26,23 @@ flowchart LR
 
     subgraph LS["☁️ AWS Lightsail · Seoul · 1 GB"]
         direction TB
-        Caddy["🛡 Caddy<br/>:80 / :443"]
-        Dashboard["⚙️ dashboard<br/>Next.js · API GW"]
-        Scheduler["⏰ schedule-runner"]
-        Hub["🔗 telegram-hub"]
-        TM["📡 teslamate"]
-        DB[("🗄 Postgres")]
+
+        subgraph Edge["🚪 Edge / Auth"]
+            Caddy["🛡 Caddy<br/>:80 / :443<br/>HSTS · forward_auth"]
+        end
+
+        subgraph App["⚙️ Application"]
+            direction TB
+            Dashboard["📦 dashboard<br/>Next.js · API GW"]
+            Scheduler["⏰ schedule-runner ⚡"]
+            Hub["🔗 telegram-hub"]
+            TM["📡 teslamate"]
+        end
+
+        subgraph Data["💾 Data"]
+            DB[("🗄 Postgres")]
+        end
+
         Caddy --> Dashboard
         Dashboard --> Scheduler
         Hub --> Dashboard
@@ -53,6 +64,9 @@ flowchart LR
     class Caddy,Dashboard,Scheduler,Hub,TM,DB ls
     class Browser,GHA cli
     style LS fill:#022c22,stroke:#059669,color:#a7f3d0
+    style Edge fill:#0c4a6e,stroke:#0ea5e9,color:#e0f2fe
+    style App fill:#14532d,stroke:#22c55e,color:#dcfce7
+    style Data fill:#4c1d95,stroke:#a78bfa,color:#ede9fe
 ```
 
 `IN` = Lightsail 이 받는 데이터 / `OUT` = Lightsail 이 내보내는 데이터.
