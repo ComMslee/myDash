@@ -19,8 +19,16 @@ function clientIp(req) {
   return req.headers.get('x-real-ip') || 'unknown';
 }
 
+// 요청마다 window 만료 항목을 정리 — 다양한 IP 로부터 들어온 항목이 무한 누적되지 않도록.
+function sweepRlHits(now) {
+  for (const [ip, entry] of rlHits) {
+    if (now - entry.first > RL_WINDOW_MS) rlHits.delete(ip);
+  }
+}
+
 function rateLimited(ip) {
   const now = Date.now();
+  sweepRlHits(now);
   let entry = rlHits.get(ip);
   if (!entry || now - entry.first > RL_WINDOW_MS) {
     entry = { count: 0, first: now };

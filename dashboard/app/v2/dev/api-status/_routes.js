@@ -63,6 +63,8 @@ export const ROUTES = [
   { path: '/api/fast-charges',     label: '급속 기록',      desc: 'DC 급속(>50kW) 충전 세션 필터 (cache 180s)', category: '배터리/충전' },
   { path: '/api/slow-charges',     label: '완속 기록',      desc: 'AC 완속 충전 세션 필터 (cache 180s)', category: '배터리/충전' },
   { path: '/api/debug/charging',   label: '디버그 · 충전',  desc: '충전 감지 raw 신호 (positions.power, charges 행, states)', category: '배터리/충전' },
+  { path: '/api/charging-locations', label: '충전 위치',     desc: '충전 위치 클러스터링 — bin(0.001°) 그룹별 빈도·총 kWh·급속/완속 분포 (cache 300s)', category: '배터리/충전',
+    params: [REFRESH_PARAM] },
 
   // 집충전기 — 환경공단 API + 폴링
   { path: '/api/home-charger/groups', label: '충전기 그룹',  desc: '동별 그룹 카운트 (구성 = constants.js) — 봇 /chargers', category: '집충전기' },
@@ -94,7 +96,7 @@ export const ROUTES = [
   { path: '/api/pause-periods',        label: '휴무 모드',         desc: '날짜 범위 일시정지 등록 (apply_pause_mode 스케줄만 영향)', category: '자동화/외부' },
   { path: '/api/geofences',            label: '지오펜스',          desc: '집/회사 좌표 + 반경 (위치 자동화 기준점)', category: '자동화/외부' },
   { path: '/api/tesla/oauth/status',   label: 'Tesla 연결 상태',   desc: 'Fleet API 토큰 존재/만료/scope. DELETE 로 토큰 폐기 가능', category: '자동화/외부' },
-  { path: '/api/tesla-test/ping',      label: '테슬라 테스트',     desc: 'Fleet API vehicle_data 1회 호출 ($0.002 — ENABLED=false면 실호출 0). 토큰·vehicle id 누락 명시. Mock 모드는 즉시 회신.', category: '자동화/외부' },
+  { path: '/api/tesla-test/ping',      label: '테슬라 테스트',     desc: 'Fleet API vehicle_data 1회 호출 ($0.002 — ENABLED=false면 실호출 0). 토큰·vehicle id 누락 명시. Mock 모드는 즉시 회신.', category: '자동화/외부', costly: 'Fleet API vehicle_data — 호출당 $0.002 (ENABLED=true 일 때만 실청구)' },
   { path: '/api/usage/current-month',  label: '이번 달 사용량',    desc: '$10 크레딧 진행률 + 실제/예상 비용 + 카테고리별 호출 수', category: '자동화/외부' },
   { path: '/api/weather/test',         label: '기상청 테스트',     desc: 'KMA 단기예보 connectivity — apiKeyMissing/캐시상태 노출 (기본 서울시청 좌표). cached=true 면 1시간 캐시 hit.', category: '자동화/외부',
     params: [
@@ -113,4 +115,11 @@ export const ROUTES = [
       { key: 'year', sample: '' },
       REFRESH_PARAM,
     ] },
+  { path: '/api/admin/agg-status', label: '사전집계 상태',  desc: 'dash_* 6 테이블 rows/freshness + server-cache 메모리 — 집계 탭과 동일 소스 (requireAuth)', category: '자동화/외부' },
+  { path: '/api/states-today',     label: '오늘 상태',      desc: '특정 일자(KST) state 타임라인(online/asleep/offline + drive/charge 서브구간) — StatesTodayPopup 소스', category: '차량',
+    params: [
+      { key: 'date', sample: '' },
+    ] },
+  { path: '/api/tesla/vehicles',   label: 'Tesla 차량 목록', desc: 'Fleet API products 호출 결과 — OAuth 토큰 검증 + vehicle_id 진단 용', category: '자동화/외부', costly: 'Fleet API products 호출 (ENABLED=true 일 때 청구 대상)' },
+  { path: '/api/tg',               label: '텔레그램 사용자', desc: '봇 권한·그룹·학습 로그 통합 (/v2/tg 페이지 소스)', category: '자동화/외부' },
 ];

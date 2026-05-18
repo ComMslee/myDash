@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/auth-helper';
 import { selectByRange, countByRange, latestFetchedAt } from '@/lib/queries/family-festivals';
 import { roundCoord } from '@/lib/geo-privacy';
+import { KST_OFFSET_MS } from '@/lib/kst';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +12,7 @@ export const dynamic = 'force-dynamic';
 // 봇 /festivals + dashboard UI 공용.
 
 function ymdKst(date) {
-  const t = date.getTime() + 9 * 3600 * 1000;
+  const t = date.getTime() + KST_OFFSET_MS;
   const x = new Date(t);
   return `${x.getUTCFullYear()}${String(x.getUTCMonth() + 1).padStart(2, '0')}${String(x.getUTCDate()).padStart(2, '0')}`;
 }

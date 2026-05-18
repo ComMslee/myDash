@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMock } from '@/app/context/mock';
 import { formatDuration, shortAddr } from '@/lib/format';
-import { kstDateStr } from '@/lib/kst';
+import { kstDateStr, kstMondayStr } from '@/lib/kst';
 import DriveMap, { loadLeaflet } from '@/app/components/DriveMap';
 import RouteSparklines from '@/app/components/RouteSparklines';
 import DriveListView from '@/app/v2/history/DriveListView';
@@ -39,6 +39,8 @@ function HistoryInner() {
     dayRoutes,
     monthMode, setMonthMode,
     monthRoutes,
+    weekMode, setWeekMode,
+    weekRoutes,
     loadingDrives, loadingRoute,
     error,
   } = useDriveData({ isMock, refreshSignal, initialId, initialDate, driveDayStr });
@@ -89,7 +91,7 @@ function HistoryInner() {
   const selectedIdx = selectedDrive ? drives.findIndex(d => d.id === selectedDrive.id) : -1;
 
   const [selectedPosIdx, setSelectedPosIdx] = useState(null);
-  useEffect(() => { setSelectedPosIdx(null); }, [selectedDrive?.id, dayMode, monthMode]);
+  useEffect(() => { setSelectedPosIdx(null); }, [selectedDrive?.id, dayMode, monthMode, weekMode]);
   // dayMode 컴팩트 strip 에서 선택된 drive — 지도에서 해당 polyline 만 강조 + zoom.
   const [selectedDayDriveId, setSelectedDayDriveId] = useState(null);
   useEffect(() => { setSelectedDayDriveId(null); }, [dayMode]);
@@ -98,6 +100,9 @@ function HistoryInner() {
     if (monthMode && monthRoutes?.length) {
       return monthRoutes.filter(r => r.positions?.length >= 2).map(r => ({ positions: r.positions, startDate: r.startDate, color: r.color }));
     }
+    if (weekMode && weekRoutes?.length) {
+      return weekRoutes.filter(r => r.positions?.length >= 2).map(r => ({ positions: r.positions, startDate: r.startDate, color: r.color }));
+    }
     if (dayMode && dayRoutes?.length) {
       return dayRoutes.filter(r => r.positions?.length >= 2).map(r => ({ positions: r.positions, startDate: r.startDate, color: r.color }));
     }
@@ -105,7 +110,7 @@ function HistoryInner() {
       return [{ positions, startDate: selectedDrive.start_date, color: '#3b82f6' }];
     }
     return [];
-  }, [monthMode, monthRoutes, dayMode, dayRoutes, selectedDrive, positions]);
+  }, [monthMode, monthRoutes, weekMode, weekRoutes, dayMode, dayRoutes, selectedDrive, positions]);
 
   const highlightLatLng = useMemo(() => {
     if (selectedPosIdx == null) return null;
@@ -120,9 +125,10 @@ function HistoryInner() {
     return null;
   }, [selectedPosIdx, sparkRoutes]);
 
-  const goToDay = (dateStr) => { setDayMode(dateStr); setMonthMode(null); setSelectedPlace(null); setMapEverShown(true); setViewMode('map'); };
-  const goToMonth = (monthStr) => { setMonthMode(monthStr); setDayMode(null); setSelectedDrive(null); setSelectedPlace(null); setPositions([]); setMapEverShown(true); setViewMode('map'); };
-  const goToPlace = (p) => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMonthMode(null); setMapEverShown(true); setViewMode('map'); };
+  const goToDay = (dateStr) => { setDayMode(dateStr); setMonthMode(null); setWeekMode(null); setSelectedPlace(null); setMapEverShown(true); setViewMode('map'); };
+  const goToMonth = (monthStr) => { setMonthMode(monthStr); setDayMode(null); setWeekMode(null); setSelectedDrive(null); setSelectedPlace(null); setPositions([]); setMapEverShown(true); setViewMode('map'); };
+  const goToWeek = (weekKey) => { setWeekMode(weekKey); setMonthMode(null); setDayMode(null); setSelectedDrive(null); setSelectedPlace(null); setPositions([]); setMapEverShown(true); setViewMode('map'); };
+  const goToPlace = (p) => { setSelectedPlace(p); setSelectedDrive(null); setPositions([]); setMonthMode(null); setWeekMode(null); setMapEverShown(true); setViewMode('map'); };
 
   const uniqueDays = useMemo(() => {
     if (!drives.length) return [];
@@ -141,6 +147,15 @@ function HistoryInner() {
   const monthIdx = monthMode ? uniqueMonths.indexOf(monthMode) : -1;
   const goPrevMonth = () => { if (monthIdx > 0) setMonthMode(uniqueMonths[monthIdx - 1]); };
   const goNextMonth = () => { if (monthIdx >= 0 && monthIdx < uniqueMonths.length - 1) setMonthMode(uniqueMonths[monthIdx + 1]); };
+
+  const uniqueWeeks = useMemo(() => {
+    if (!drives.length) return [];
+    const set = new Set(drives.map(d => kstMondayStr(`${driveDayStr(d)}T00:00:00Z`)));
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [drives]);
+  const weekIdx = weekMode ? uniqueWeeks.indexOf(weekMode) : -1;
+  const goPrevWeek = () => { if (weekIdx > 0) setWeekMode(uniqueWeeks[weekIdx - 1]); };
+  const goNextWeek = () => { if (weekIdx >= 0 && weekIdx < uniqueWeeks.length - 1) setWeekMode(uniqueWeeks[weekIdx + 1]); };
 
   const goPrev = () => { if (selectedIdx > 0) { setSelectedDrive(drives[selectedIdx - 1]); setSelectedPlace(null); } };
   const goNext = () => { if (selectedIdx < drives.length - 1) { setSelectedDrive(drives[selectedIdx + 1]); setSelectedPlace(null); } };
@@ -185,6 +200,22 @@ function HistoryInner() {
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
                 </button>
               </div>
+            ) : weekMode ? (
+              <div className="flex items-center gap-3">
+                <button onClick={goPrevWeek} disabled={weekIdx <= 0} className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <span className="text-xs text-zinc-400 tabular-nums">{(() => {
+                  const m = new Date(weekMode + 'T00:00:00Z');
+                  const s = new Date(m.getTime() + 6 * 86400000);
+                  const fm = m.getUTCMonth() + 1, fd = m.getUTCDate();
+                  const lm = s.getUTCMonth() + 1, ld = s.getUTCDate();
+                  return fm === lm ? `${fm}/${fd} ~ ${ld}` : `${fm}/${fd} ~ ${lm}/${ld}`;
+                })()}<span className="text-zinc-600 ml-1">({weekRoutes.length}회)</span></span>
+                <button onClick={goNextWeek} disabled={weekIdx < 0 || weekIdx >= uniqueWeeks.length - 1} className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                </button>
+              </div>
             ) : dayMode ? (
               <div className="flex items-center gap-3">
                 <button onClick={goPrevDay} disabled={dayIdx <= 0} className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
@@ -211,6 +242,7 @@ function HistoryInner() {
           <div className="flex-1 min-h-0 flex flex-col bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden mb-4">
             <MapSummaryHeader
               monthMode={monthMode}
+              weekMode={weekMode}
               dayMode={dayMode}
               selectedDrive={selectedDrive}
               selectedPlace={selectedPlace}
@@ -309,8 +341,8 @@ function HistoryInner() {
               <>
                 <div className="flex-1 p-2">
                   <DriveMap
-                    positions={monthMode ? [] : positions}
-                    routes={monthMode ? monthRoutes : undefined}
+                    positions={(monthMode || weekMode) ? [] : positions}
+                    routes={monthMode ? monthRoutes : weekMode ? weekRoutes : undefined}
                     loading={loadingRoute}
                     placeMarker={selectedPlace}
                     visible={viewMode === 'map'}
@@ -335,6 +367,7 @@ function HistoryInner() {
               error={error}
               onDayClick={goToDay}
               onMonthClick={goToMonth}
+              onWeekClick={goToWeek}
               driveDayStr={driveDayStr}
             />
           </div>

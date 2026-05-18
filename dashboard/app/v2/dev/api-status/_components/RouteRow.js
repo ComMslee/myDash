@@ -39,6 +39,9 @@ export function RouteRow({ route, result, values, setValue, expanded, onToggleEx
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-2">
               <span className="text-[13px] font-medium text-zinc-100 truncate">{route.label}</span>
+              {route.costly && (
+                <span className="text-[9px] px-1 py-px rounded bg-rose-500/15 text-rose-400 font-bold shrink-0" title={route.costly}>$</span>
+              )}
               <span className="text-[10px] font-mono text-zinc-600 truncate">{route.path}</span>
             </div>
             {route.desc && (

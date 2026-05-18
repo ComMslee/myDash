@@ -11,6 +11,26 @@ export function formatDuration(minutes) {
 /** formatDuration 의 별칭 — 기존 코드 호환 */
 export const formatHm = formatDuration;
 
+/** 초 → "초/분/h시간/일/주" 자동 스케일. 체류시간(dwell) 표기용. formatDuration 은 분 단위라 별도. */
+export function formatDwellSec(sec) {
+  if (sec == null) return '—';
+  if (sec < 60) return `${Math.floor(sec)}초`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}분`;
+  if (sec < 86400) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    return m === 0 ? `${h}시간` : `${h}h${m}m`;
+  }
+  if (sec < 7 * 86400) {
+    const d = Math.floor(sec / 86400);
+    const h = Math.floor((sec % 86400) / 3600);
+    return h === 0 ? `${d}일` : `${d}일 ${h}h`;
+  }
+  const w = Math.floor(sec / (7 * 86400));
+  const d = Math.floor((sec % (7 * 86400)) / 86400);
+  return d === 0 ? `${w}주` : `${w}주 ${d}일`;
+}
+
 /** 시간(소수 가능) → "Xh Ym" 또는 "Ym" (1시간 미만은 분 단위) */
 export function formatHours(hours) {
   if (hours == null) return '—';
@@ -80,13 +100,22 @@ export function formatBytes(n) {
   return `${(n / 1024 / 1024).toFixed(1)}M`;
 }
 
-/** ISO 시각 → "N초/분/시간/일 전" (한국어 상대시간) */
-export function formatRelativeTime(iso) {
-  if (!iso) return '—';
-  const ageMs = Date.now() - new Date(iso).getTime();
-  if (ageMs < 0) return '방금';
+/**
+ * ISO 시각 → "N초/분/시간/일 전" (한국어 상대시간).
+ * opts:
+ *   futureLabel — 미래 시각에 표시할 라벨 (기본 '방금', 진단용 '미래?')
+ *   hourUnit   — 시간 단위 표기 (기본 '시간', 컴팩트 'h')
+ *   nullLabel  — null/undefined 입력 시 라벨 (기본 '—', 빈 표시 '')
+ */
+export function formatRelativeTime(iso, opts = {}) {
+  const { futureLabel = '방금', hourUnit = '시간', nullLabel = '—' } = opts;
+  if (!iso) return nullLabel;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return nullLabel;
+  const ageMs = Date.now() - t;
+  if (ageMs < 0) return futureLabel;
   if (ageMs < 60_000) return `${Math.floor(ageMs / 1000)}초 전`;
   if (ageMs < 3_600_000) return `${Math.floor(ageMs / 60_000)}분 전`;
-  if (ageMs < 86_400_000) return `${Math.floor(ageMs / 3_600_000)}시간 전`;
+  if (ageMs < 86_400_000) return `${Math.floor(ageMs / 3_600_000)}${hourUnit} 전`;
   return `${Math.floor(ageMs / 86_400_000)}일 전`;
 }

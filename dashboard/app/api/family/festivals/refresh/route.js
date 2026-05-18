@@ -1,5 +1,6 @@
 import { requireAuth, assertSameOrigin } from '@/lib/auth-helper';
 import { upsertMany, cleanupExpired } from '@/lib/queries/family-festivals';
+import { KST_OFFSET_MS } from '@/lib/kst';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +20,7 @@ const FETCH_TIMEOUT_MS = 12_000;
 const HORIZON_DAYS = 90;
 
 function ymdKst(date) {
-  const t = date.getTime() + 9 * 3600 * 1000;
+  const t = date.getTime() + KST_OFFSET_MS;
   const x = new Date(t);
   return `${x.getUTCFullYear()}${String(x.getUTCMonth() + 1).padStart(2, '0')}${String(x.getUTCDate()).padStart(2, '0')}`;
 }

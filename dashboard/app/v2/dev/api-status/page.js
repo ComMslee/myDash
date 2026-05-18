@@ -122,6 +122,11 @@ export default function ApiStatusPage() {
   }, [results]);
 
   async function runOne(route) {
+    // Tesla Fleet API 등 호출당 청구 라우트는 confirm 게이트 (의도치 않은 누적 청구 방지)
+    if (route.costly && typeof window !== 'undefined') {
+      const ok = window.confirm(`⚠️ ${route.label}\n\n${route.costly}\n\n실행하시겠습니까?`);
+      if (!ok) return;
+    }
     const myRun = ++runIdRef.current;
     setResults(prev => ({ ...prev, [route.path]: { state: 'running' } }));
 
@@ -152,7 +157,19 @@ export default function ApiStatusPage() {
 
   async function runAll() {
     setLastRun(Date.now());
-    await Promise.allSettled(ROUTES.map(r => runOne(r)));
+    // 청구 라우트는 기본 제외 — 사용자가 명시적으로 동의해야 포함 (N건 일괄 confirm 폭주 방지)
+    const costly = ROUTES.filter(r => r.costly);
+    let includeCostly = false;
+    if (costly.length && typeof window !== 'undefined') {
+      const lines = costly.map(r => `• ${r.label} — ${r.costly}`).join('\n');
+      includeCostly = window.confirm(`⚠️ 청구 대상 라우트 ${costly.length}건 포함 여부\n\n${lines}\n\n[확인]=포함  [취소]=건너뜀`);
+    }
+    const targets = includeCostly ? ROUTES : ROUTES.filter(r => !r.costly);
+    await Promise.allSettled(targets.map(r => {
+      // 이미 일괄 동의를 받았으므로 runOne 내부 confirm 우회 위해 costly 플래그 임시 제거한 사본으로 호출
+      const route = r.costly && includeCostly ? { ...r, costly: null } : r;
+      return runOne(route);
+    }));
   }
 
   return (

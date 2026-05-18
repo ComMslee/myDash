@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import MonthCalendar from './MonthCalendar';
+import { formatRelativeTime } from '@/lib/format';
+import { KST_OFFSET_MS } from '@/lib/kst';
 
 // 세로 타임라인 — 월 grid 제거. 위: 과거 이력 · 가운데: 오늘 · 아래: 미래 예약.
 // 진입 시 오늘 row 가 viewport 중앙으로 자동 스크롤.
@@ -19,7 +21,7 @@ const ACTION_LABEL = {
 };
 
 function kstDateStr(d) {
-  const t = new Date(d.getTime() + 9 * 3600 * 1000);
+  const t = new Date(d.getTime() + KST_OFFSET_MS);
   return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
 }
 
@@ -107,7 +109,7 @@ export default function Calendar({
   const containerRef = useRef(null);
 
   const nowKstHHMM = useMemo(() => {
-    const t = new Date(Date.now() + 9 * 3600 * 1000);
+    const t = new Date(Date.now() + KST_OFFSET_MS);
     return `${String(t.getUTCHours()).padStart(2, '0')}:${String(t.getUTCMinutes()).padStart(2, '0')}`;
   }, [refreshSignal]);
 
@@ -248,14 +250,14 @@ function HotBar({ next, last, today, onJump }) {
   const fmtLast = () => {
     if (!last) return null;
     // KST(UTC+9) 명시 변환 — 브라우저 로컬 TZ 에 의존하지 않도록.
-    const t = new Date(new Date(last.triggered_at).getTime() + 9 * 3600 * 1000);
+    const t = new Date(new Date(last.triggered_at).getTime() + KST_OFFSET_MS);
     const hh = String(t.getUTCHours()).padStart(2, '0');
     const mm = String(t.getUTCMinutes()).padStart(2, '0');
     const ymd = `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
     const sameDay = ymd === today;
     const dStr = sameDay ? '오늘' : ymd.slice(5).replace('-', '/');
-    const diffMin = Math.round((Date.now() - t.getTime()) / 60000);
-    const ago = diffMin < 60 ? `${diffMin}분 전` : diffMin < 1440 ? `${Math.round(diffMin / 60)}시간 전` : `${Math.round(diffMin / 1440)}일 전`;
+    // 경과시간은 원본 triggered_at (실제 epoch) 으로 계산 — t 는 KST 컴포넌트 읽기용 +9h shifted 라 시간차에 못 씀.
+    const ago = formatRelativeTime(last.triggered_at);
     return { dStr, time: `${hh}:${mm}`, status: last.status, action: last.action, ago };
   };
   const n = fmtNext();
@@ -323,7 +325,7 @@ function DayRow({ r, today, isTodayRow, isTarget, onAddSchedule, onEditSchedule,
             if (it.kind === 'exec') {
               const cls = CHIP_CLS[it.e.status] || CHIP_CLS.skipped;
               const mark = it.e.status === 'success' ? '✓' : it.e.status === 'failed' ? '✗' : '◎';
-              const t = new Date(new Date(it.e.triggered_at).getTime() + 9 * 3600 * 1000);
+              const t = new Date(new Date(it.e.triggered_at).getTime() + KST_OFFSET_MS);
               const tStr = `${String(t.getUTCHours()).padStart(2, '0')}:${String(t.getUTCMinutes()).padStart(2, '0')}`;
               return (
                 <span
@@ -389,7 +391,7 @@ function DayRow({ r, today, isTodayRow, isTarget, onAddSchedule, onEditSchedule,
           {items.map((it, i) => {
             if (it.kind === 'exec') {
               const cls = CHIP_CLS[it.e.status] || CHIP_CLS.skipped;
-              const t = new Date(new Date(it.e.triggered_at).getTime() + 9 * 3600 * 1000);
+              const t = new Date(new Date(it.e.triggered_at).getTime() + KST_OFFSET_MS);
               const tStr = `${String(t.getUTCHours()).padStart(2, '0')}:${String(t.getUTCMinutes()).padStart(2, '0')}`;
               return (
                 <div key={`e${i}`} className="flex items-center gap-2 px-1 text-[11px]">

@@ -7,6 +7,7 @@ import IdleDrainCard from '@/app/v2/battery/IdleDrainCard';
 import MonthlyChargeCard from '@/app/v2/battery/MonthlyChargeCard';
 import FastChargeCard from '@/app/v2/battery/FastChargeCard';
 import SlowChargeCard from '@/app/v2/battery/SlowChargeCard';
+import ChargingLocationsCard from '@/app/v2/battery/ChargingLocationsCard';
 import { Spinner } from '@/app/components/PageLayout';
 
 export default function V2BatteryPage() {
@@ -48,6 +49,7 @@ export default function V2BatteryPage() {
             <HealthScoreCard data={data.health} trend={trend} />
             <IdleDrainCard records={data.idle_drain} chargingSessions={data.charging_sessions} />
             <MonthlyChargeCard />
+            <ChargingLocationsCard />
             <FastChargeCard />
             <SlowChargeCard />
           </>

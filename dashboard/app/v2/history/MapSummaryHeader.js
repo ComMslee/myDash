@@ -2,8 +2,8 @@
 
 import { Icon } from '@/app/lib/Icons';
 import { KWH_PER_KM } from '@/lib/constants';
-import { formatDuration, formatHm, shortAddr } from '@/lib/format';
-import { formatTimeRange, kstDateStr } from '@/lib/kst';
+import { formatDuration, formatHm, shortAddr, formatDwellSec } from '@/lib/format';
+import { formatTimeRange, kstDateStr, kstMondayStr } from '@/lib/kst';
 
 function efficiency(d) {
   if (!d.start_rated_range_km || !d.end_rated_range_km || !d.distance) return null;
@@ -13,6 +13,88 @@ function efficiency(d) {
   const kwh = (usedKm * KWH_PER_KM).toFixed(1);
   const perKm = ((usedKm * KWH_PER_KM * 1000) / dist).toFixed(0);
   return { kwh, perKm };
+}
+
+function WeekSummary({ drives, weekMode }) {
+  const wDrives = drives
+    .filter(d => kstMondayStr(`${kstDateStr(d.start_date)}T00:00:00Z`) === weekMode)
+    .slice()
+    .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+  if (wDrives.length === 0) return null;
+  const totalKm = wDrives.reduce((s, d) => s + (parseFloat(d.distance) || 0), 0);
+  const totalMin = wDrives.reduce((s, d) => s + (parseFloat(d.duration_min) || 0), 0);
+  const totalKwh = wDrives.reduce((s, d) => {
+    if (d.start_rated_range_km && d.end_rated_range_km) {
+      const usedKm = parseFloat(d.start_rated_range_km) - parseFloat(d.end_rated_range_km);
+      if (usedKm > 0) return s + usedKm * KWH_PER_KM;
+    }
+    return s;
+  }, 0);
+  const usedPct = wDrives.reduce((s, d) => (d.start_battery_level != null && d.end_battery_level != null) ? s + Math.max(0, d.start_battery_level - d.end_battery_level) : s, 0);
+  const perKm = totalKm > 0 && totalKwh > 0 ? Math.round((totalKwh * 1000) / totalKm) : null;
+  const dayCount = new Set(wDrives.map(d => kstDateStr(d.start_date))).size;
+  const destMap = new Map();
+  const SKIP_DESTS = new Set(['집', '회사']);
+  for (const d of wDrives) {
+    const key = shortAddr(d.end_address) || '?';
+    if (SKIP_DESTS.has(key)) continue;
+    destMap.set(key, (destMap.get(key) || 0) + 1);
+  }
+  const topDests = Array.from(destMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const weekLabel = (() => {
+    const mon = new Date(weekMode + 'T00:00:00Z');
+    const sun = new Date(mon.getTime() + 6 * 86400000);
+    const todayMonKey = kstMondayStr(Date.now());
+    const diff = Math.round((new Date(todayMonKey + 'T00:00:00Z').getTime() - mon.getTime()) / (7 * 86400000));
+    const tag = diff === 0 ? '이번 주' : diff === 1 ? '지난 주' : `${diff}주 전`;
+    const fm = mon.getUTCMonth() + 1, fd = mon.getUTCDate();
+    const lm = sun.getUTCMonth() + 1, ld = sun.getUTCDate();
+    const range = fm === lm ? `${fm}/${fd} ~ ${ld}` : `${fm}/${fd} ~ ${lm}/${ld}`;
+    return `${tag} (${range})`;
+  })();
+
+  return (
+    <div className="px-4 py-1.5 border-b border-white/[0.06] flex flex-col gap-0.5 flex-shrink-0">
+      <p className="text-sm text-zinc-500 tabular-nums flex items-center gap-1.5 flex-wrap">
+        <span className="text-zinc-300 font-semibold">{weekLabel}</span>
+        <span className="text-zinc-700">·</span>
+        <span title="주행" className="inline-flex items-center gap-0.5"><Icon name="car" />{wDrives.length}회</span>
+        <span className="text-zinc-700">·</span>
+        <span title="운행일" className="inline-flex items-center gap-0.5"><Icon name="calendar" />{dayCount}일</span>
+        {totalMin > 0 && (
+          <>
+            <span className="text-zinc-700">·</span>
+            <span title="운전" className="inline-flex items-center gap-0.5"><Icon name="road" />{formatHm(Math.round(totalMin))}</span>
+          </>
+        )}
+      </p>
+      <p className="text-xs tabular-nums flex items-center gap-1.5 flex-wrap">
+        <span className="font-bold text-blue-400">{totalKm.toFixed(0)}<span className="text-zinc-600 ml-0.5">km</span></span>
+        {totalKwh > 0 && (
+          <>
+            <span className="text-zinc-700">·</span>
+            <span className="font-semibold text-green-400">{totalKwh.toFixed(1)}<span className="text-zinc-600 ml-0.5">kWh</span>{usedPct > 0 && <span className="text-zinc-500 ml-1">({usedPct}%)</span>}</span>
+          </>
+        )}
+        {perKm != null && (
+          <>
+            <span className="text-zinc-700">·</span>
+            <span className="text-amber-400">{perKm}<span className="text-zinc-600 ml-0.5">Wh/km</span></span>
+          </>
+        )}
+      </p>
+      {topDests.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+          <Icon name="star" className="w-4 h-4 flex-shrink-0 text-amber-400" />
+          {topDests.map(([addr, n], i) => (
+            <span key={addr} className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 truncate max-w-[140px]">
+              <span className="text-zinc-600 mr-1">{i + 1}</span>{addr}<span className="text-zinc-500 ml-1 tabular-nums">{n}</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function MonthSummary({ drives, monthMode }) {
@@ -193,21 +275,86 @@ function DriveSummary({ drive }) {
   );
 }
 
+// 인라인 stat 그룹 — 큰 값 + 작은 라벨 (라벨/값 좌우 분리 그리드보다 시각 정리)
+function StatPill({ value, label, valueClass = 'text-zinc-300' }) {
+  return (
+    <div className="flex items-baseline gap-1">
+      <span className={`text-sm font-semibold tabular-nums ${valueClass}`}>{value}</span>
+      <span className="text-zinc-600 text-[10px]">{label}</span>
+    </div>
+  );
+}
+
 function PlaceSummary({ place }) {
-  const fmtMD = (s) => { const d = new Date(s); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+  // 첫·최근 방문 timestamp 포맷 — 'M/D HhMMm' (HH:MM 콜론은 "그 시각부터 ~까지 쭉" 같은
+  // 연속 체류 인상을 주기 쉬워서 h/m 접미사 + 항목 사이 '~' 로 분리감 강조).
+  const fmtMD = (s) => {
+    const d = new Date(s);
+    return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}h${String(d.getMinutes()).padStart(2, '0')}m`;
+  };
+  // 오래 머문 곳 (long-stay) vs 자주 가는 곳 (frequent) — dwell 필드 유무로 분기.
+  const isLongStay = place.max_dwell_sec > 0 || place.avg_dwell_sec > 0;
   return (
     <div className="px-4 py-2.5 border-b border-white/[0.06] flex-shrink-0">
-      <div className="flex items-center gap-3 mb-2">
+      {/* 헤더 — 장소명 + headline metric (큰 글씨) */}
+      <div className="flex items-center gap-3">
         <span className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
-        <p className="text-base text-zinc-300 truncate flex-1">{place.label}</p>
-        <span className="text-amber-400 text-sm font-bold tabular-nums flex-shrink-0">{place.visit_count}회 방문</span>
+        <p className="text-base text-zinc-200 truncate flex-1">{place.label}</p>
+        {isLongStay ? (
+          <div className="text-right flex-shrink-0 leading-none">
+            <div className="text-amber-400 text-base font-bold tabular-nums">{formatDwellSec(place.max_dwell_sec)}</div>
+            <div className="text-zinc-600 text-[10px] mt-0.5">일 최대</div>
+          </div>
+        ) : (
+          <div className="text-right flex-shrink-0 leading-none">
+            <div className="text-amber-400 text-base font-bold tabular-nums">{place.visit_count}회</div>
+            <div className="text-zinc-600 text-[10px] mt-0.5">방문</div>
+          </div>
+        )}
       </div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 pl-5 text-xs">
-        {place.first_visit && <div className="flex justify-between"><span className="text-zinc-600">첫 방문</span><span className="text-zinc-400 tabular-nums">{fmtMD(place.first_visit)}</span></div>}
-        {place.last_visit && <div className="flex justify-between"><span className="text-zinc-600">최근 방문</span><span className="text-zinc-400 tabular-nums">{fmtMD(place.last_visit)}</span></div>}
-        {place.avg_distance > 0 && <div className="flex justify-between"><span className="text-zinc-600">이동 평균</span><span className="text-blue-400/80 font-semibold tabular-nums">{place.avg_distance}km</span></div>}
-        {place.avg_duration > 0 && <div className="flex justify-between"><span className="text-zinc-600">소요시간</span><span className="text-zinc-400 font-semibold tabular-nums">{formatDuration(place.avg_duration)}</span></div>}
-      </div>
+
+      {isLongStay ? (
+        <>
+          {/* 보조 dwell 통계 — 인라인 (라벨/값 분리 안 함) */}
+          <div className="mt-2 pl-5 flex items-baseline gap-3 flex-wrap">
+            {place.min_dwell_sec > 0 && <StatPill value={formatDwellSec(place.min_dwell_sec)} label="최소" valueClass="text-amber-400/60" />}
+            {place.avg_dwell_sec > 0 && <StatPill value={formatDwellSec(place.avg_dwell_sec)} label="평균" valueClass="text-amber-400/80" />}
+            {place.total_dwell_sec > 0 && <StatPill value={formatDwellSec(place.total_dwell_sec)} label="총" valueClass="text-zinc-300" />}
+            {place.visit_count > 0 && <StatPill value={`${place.visit_count}회`} label="방문" valueClass="text-zinc-300" />}
+          </div>
+          {/* 메타 — 첫·최근 방문 (가장 작은 글씨) */}
+          {(place.first_visit || place.last_visit) && (
+            <div className="mt-1 pl-5 text-[11px] text-zinc-500 tabular-nums flex items-center gap-2 flex-wrap">
+              {place.first_visit && (
+                <span><span className="text-zinc-600 mr-1">첫</span>{fmtMD(place.first_visit)}</span>
+              )}
+              {place.first_visit && place.last_visit && <span className="text-zinc-700">|</span>}
+              {place.last_visit && (
+                <span><span className="text-zinc-600 mr-1">최근</span>{fmtMD(place.last_visit)}</span>
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="mt-2 pl-5 flex items-baseline gap-3 flex-wrap">
+            {place.avg_distance > 0 && <StatPill value={`${place.avg_distance}km`} label="이동 평균" valueClass="text-blue-400/80" />}
+            {place.avg_duration > 0 && <StatPill value={formatDuration(place.avg_duration)} label="소요" valueClass="text-zinc-300" />}
+          </div>
+          {(place.first_visit || place.last_visit) && (
+            <div className="mt-1 pl-5 text-[11px] text-zinc-500 tabular-nums flex items-center gap-2 flex-wrap">
+              {place.first_visit && (
+                <span><span className="text-zinc-600 mr-1">첫</span>{fmtMD(place.first_visit)}</span>
+              )}
+              {place.first_visit && place.last_visit && <span className="text-zinc-700">|</span>}
+              {place.last_visit && (
+                <span><span className="text-zinc-600 mr-1">최근</span>{fmtMD(place.last_visit)}</span>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
       {place.origins?.length > 0 && (
         <div className="flex items-center gap-1 mt-2 pl-5 text-[11px]">
           <span className="text-zinc-600">주요 출발지</span>
@@ -218,9 +365,10 @@ function PlaceSummary({ place }) {
   );
 }
 
-// 지도 모드 상단 요약 헤더 — month/day/drive/place 4-case dispatcher.
-export default function MapSummaryHeader({ monthMode, dayMode, selectedDrive, selectedPlace, drives }) {
+// 지도 모드 상단 요약 헤더 — month/week/day/drive/place 5-case dispatcher.
+export default function MapSummaryHeader({ monthMode, weekMode, dayMode, selectedDrive, selectedPlace, drives }) {
   if (monthMode) return <MonthSummary drives={drives} monthMode={monthMode} />;
+  if (weekMode) return <WeekSummary drives={drives} weekMode={weekMode} />;
   if (dayMode) return <DaySummary drives={drives} dayMode={dayMode} />;
   if (selectedDrive) return <DriveSummary drive={selectedDrive} />;
   if (selectedPlace) return <PlaceSummary place={selectedPlace} />;

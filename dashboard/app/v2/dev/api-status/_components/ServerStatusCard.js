@@ -1,4 +1,8 @@
+import { formatRelativeTime } from '@/lib/format';
 import { Sparkline } from './Sparkline';
+
+// 진단용: 미래 시각은 '미래?' 라벨, 컴팩트 'h' 단위로 — DB 시계 어긋남 즉시 가시화.
+const fmtAgo = (iso) => formatRelativeTime(iso, { futureLabel: '미래?', hourUnit: 'h' });
 
 export function ServerStatusCard({ data, latencyMs, history }) {
   const fmtUptime = (sec) => {
@@ -16,15 +20,6 @@ export function ServerStatusCard({ data, latencyMs, history }) {
   };
   const fmtMB = (b) => b == null ? '—' : `${(b / 1024 / 1024).toFixed(0)}MB`;
   const fmtGB = (b) => b == null ? '—' : `${(b / 1024 / 1024 / 1024).toFixed(1)}GB`;
-  const fmtAgo = (iso) => {
-    if (!iso) return '—';
-    const ms = Date.now() - new Date(iso).getTime();
-    if (ms < 0) return '미래?';
-    if (ms < 60_000) return `${Math.floor(ms / 1000)}초 전`;
-    if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}분 전`;
-    if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h 전`;
-    return `${Math.floor(ms / 86_400_000)}일 전`;
-  };
   // 센서 데이터 freshness — 차량이 sleep 이면 수 시간 갭은 정상이라 임계 완화.
   // 12h 넘어가야 빨강 (실제 polling 문제 시그널).
   const freshColor = (iso) => {

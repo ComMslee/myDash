@@ -5,10 +5,9 @@ import { KWH_PER_KM } from '@/lib/constants';
 import { withCache } from '@/lib/server-cache';
 import { TTL_120S } from '@/lib/cache-ttls';
 import { ensureSchema, bootstrapIfEmpty } from '@/lib/dash-agg';
+import { KST_OFFSET_MS } from '@/lib/kst';
 
 export const dynamic = 'force-dynamic';
-
-const KST_OFFSET_MS = 9 * 3600 * 1000;
 
 function kstStartOfTodayUtc() {
   const nowKst = new Date(Date.now() + KST_OFFSET_MS);

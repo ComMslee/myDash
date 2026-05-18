@@ -3,10 +3,14 @@
 // 단순화: 사용자 좌표 1개 (집/회사 무관 가까운 격자) — 자동화 평가 시점의 외기.
 // 캐시 TTL = 1시간 (단기예보 발표 간격에 맞춤).
 
+import { KST_OFFSET_MS } from '@/lib/kst';
+
 const KMA_ENDPOINT = 'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst';
 
 const cache = new Map(); // key: "lat,lng" → { fetchedAt, data }
 const TTL_MS = 60 * 60 * 1000;
+// 좌표는 사용자 입력에 의해 사실상 무제한 — size cap 으로 메모리 누수 차단.
+const CACHE_MAX = 200;
 
 // 위경도 → 기상청 격자(nx, ny) 변환 (LCC 투영)
 // 출처: 기상청 공식 변환 알고리즘.
@@ -44,7 +48,7 @@ export function toGrid(lat, lng) {
 
 // 기상청 발표 시각 라운딩 — 매시 정각에서 30분 전후 (안전하게 10분 전 시각)
 function latestObsTime(d = new Date()) {
-  const kst = new Date(d.getTime() + 9 * 3600 * 1000);
+  const kst = new Date(d.getTime() + KST_OFFSET_MS);
   // 10분 마진
   const t = new Date(kst.getTime() - 10 * 60 * 1000);
   const yyyy = t.getUTCFullYear();
@@ -60,6 +64,7 @@ export async function getWeatherAt(lat, lng) {
   const key = `${lat.toFixed(3)},${lng.toFixed(3)}`;
   const cached = cache.get(key);
   if (cached && Date.now() - cached.fetchedAt < TTL_MS) return { ok: true, ...cached.data, cached: true };
+  if (cached) cache.delete(key); // 만료분 즉시 제거
 
   const { nx, ny } = toGrid(lat, lng);
   const { baseDate, baseTime } = latestObsTime();
@@ -97,6 +102,11 @@ export async function getWeatherAt(lat, lng) {
     fetchedAt: Date.now(),
     baseDate, baseTime, nx, ny,
   };
+  if (cache.size >= CACHE_MAX) {
+    // 가장 오래 전에 삽입된 entry 1건 제거 (FIFO eviction)
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
   cache.set(key, { fetchedAt: Date.now(), data });
   return { ok: true, ...data, cached: false };
 }

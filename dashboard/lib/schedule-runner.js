@@ -1,5 +1,6 @@
 import { logExecution, bumpMonthlyUsage, calcCost, getMonthlyUsage, COST_HARD_CAP_USD } from '@/lib/queries/schedules';
 import { callTeslaCommand } from '@/lib/tesla-fleet';
+import { KST_OFFSET_MS } from '@/lib/kst';
 
 // Tesla 자동화 — 액션 1건 실행기.
 // 1) Tesla Fleet API 호출 (mock or real — ENV 게이팅)
@@ -23,7 +24,7 @@ export const ACTION_TO_COMMAND = {
 };
 
 function monthYmd(d = new Date()) {
-  const kst = new Date(d.getTime() + 9 * 3600 * 1000);
+  const kst = new Date(d.getTime() + KST_OFFSET_MS);
   return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 

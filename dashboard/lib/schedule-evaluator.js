@@ -1,13 +1,14 @@
 import pool from '@/lib/db';
 import { listSchedules, isPausedOn, listGeofences } from '@/lib/queries/schedules';
 import { getWeatherAt } from '@/lib/weather';
+import { KST_OFFSET_MS } from '@/lib/kst';
 
 // 시간 = 트리거, 장소·날씨 = 필터.
 // 매분 1회 평가: 시간 매칭 시 → 장소 필터 통과 → 날씨 필터 통과 → executeAction.
 // 장소는 '머무는 동안(at)' 필터만 (이전 enter/exit 이벤트 모드는 제거).
 
 function kstNow() {
-  return new Date(Date.now() + 9 * 3600 * 1000);
+  return new Date(Date.now() + KST_OFFSET_MS);
 }
 
 function kstDateStr(d = kstNow()) {

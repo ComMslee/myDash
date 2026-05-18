@@ -1,5 +1,7 @@
 // 집충전기 카드 순수 함수 — 랭크 계산, 시각 포맷, 툴팁 빌더
 
+import { formatRelativeTime } from '@/lib/format';
+
 // 순위 기반 링크 등급: 1위 → 'top1', 2~3위 → 'top3', 4~10위 → 'top10'
 // 11위 이후 → null. 동점은 같은 rank 번호를 공유.
 // 반환: Map<id, { tier: 'top1'|'top3'|'top10', rank: number }>
@@ -44,18 +46,13 @@ export function buildTtlTooltip(ttlInfo) {
   return lines.join('\n');
 }
 
+// 카드용: 빈 fallback + 10초 미만은 '방금' (라이브 폴링 화면이라 0초 전 깜빡임 회피).
 export function timeAgoKo(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
-  if (s < 10) return '방금';
-  if (s < 60) return `${s}초 전`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}분 전`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}시간 전`;
-  return `${Math.floor(h / 24)}일 전`;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return '';
+  if (Date.now() - t < 10_000) return '방금';
+  return formatRelativeTime(iso, { nullLabel: '' });
 }
 
 // "YYYYMMDDHHMMSS" (KST 포맷) → ms (UTC epoch)
