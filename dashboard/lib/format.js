@@ -1,28 +1,23 @@
 // 공유 포맷 유틸 — 여러 페이지에서 동일한 함수를 중복 정의하지 않도록 단일 소스 유지
 
-/** 분 → "X시간 Y분" 또는 "Y분" */
+/** 분 → "Xh Ym" 또는 "Ym" (h/m 단축 표기 — 전체 통일) */
 export function formatDuration(minutes) {
-  if (!minutes) return '—';
-  const h = Math.floor(minutes / 60);
-  const m = Math.round(minutes % 60);
-  return h === 0 ? `${m}분` : `${h}시간 ${m}분`;
-}
-
-/** 분 → "Xh Ym" 또는 "Ym" (h/m 단축 표기) */
-export function formatHm(minutes) {
   if (!minutes) return '—';
   const h = Math.floor(minutes / 60);
   const m = Math.round(minutes % 60);
   return h === 0 ? `${m}m` : `${h}h ${m}m`;
 }
 
-/** 시간(소수 가능) → "X시간 Y분" 또는 "Y분" (1시간 미만은 분 단위) */
+/** formatDuration 의 별칭 — 기존 코드 호환 */
+export const formatHm = formatDuration;
+
+/** 시간(소수 가능) → "Xh Ym" 또는 "Ym" (1시간 미만은 분 단위) */
 export function formatHours(hours) {
   if (hours == null) return '—';
-  if (hours < 1) return `${Math.round(hours * 60)}분`;
+  if (hours < 1) return `${Math.round(hours * 60)}m`;
   const h = Math.floor(hours);
   const m = Math.round((hours - h) * 60);
-  return m > 0 ? `${h}시간 ${m}분` : `${h}시간`;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
 /** ISO 날짜 문자열 → "M월 D일 HH:MM" */

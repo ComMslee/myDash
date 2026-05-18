@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Icon } from '../../lib/Icons';
 
 // 즉시 실행 패널 — 센트리/공조/잠금/충전 on·off + 차량 상태/깨우기 테스트.
 // 명령 클릭 → /api/now-command (Mock=dry_run, ENABLED=실호출).
@@ -12,9 +13,9 @@ const COST_WAKE = 0.02;
 const COST_VEHICLE_DATA = 0.002;
 
 const ACTIONS = [
-  { key: 'sentry', label: '센트리', on: 'sentry_on', off: 'sentry_off', icon: '🛡', cost: COST_COMMAND },
-  { key: 'climate', label: '공조', on: 'climate_on', off: 'climate_off', icon: '❄️', cost: COST_COMMAND },
-  { key: 'lock', label: '잠금', on: 'lock', off: 'unlock', icon: '🔒', cost: COST_COMMAND },
+  { key: 'sentry', label: '센트리', on: 'sentry_on', off: 'sentry_off', icon: 'shield', cost: COST_COMMAND },
+  { key: 'climate', label: '공조', on: 'climate_on', off: 'climate_off', icon: 'climate', cost: COST_COMMAND },
+  { key: 'lock', label: '잠금', on: 'lock', off: 'unlock', icon: 'bulb', cost: COST_COMMAND },
 ];
 
 export default function NowPanel({ onAfterRun }) {
@@ -86,7 +87,7 @@ export default function NowPanel({ onAfterRun }) {
           {ACTIONS.map((a) => (
             <div key={a.key} className="flex items-center gap-2">
               <span className="text-sm w-24 truncate flex flex-col">
-                <span>{a.icon} {a.label}</span>
+                <span className="inline-flex items-center gap-1"><Icon name={a.icon} className="w-4 h-4" /> {a.label}</span>
                 <span className="text-[9px] text-zinc-500 leading-none">~${a.cost.toFixed(3)}/회</span>
               </span>
               <button
@@ -117,7 +118,7 @@ export default function NowPanel({ onAfterRun }) {
             disabled={testing}
             className="flex flex-col items-center justify-center py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 disabled:opacity-50"
           >
-            <span className="text-sm">🔍 차량 상태</span>
+            <span className="text-sm inline-flex items-center gap-1"><Icon name="search" className="w-4 h-4" /> 차량 상태</span>
             <span className="text-[9px] text-zinc-500">~${COST_VEHICLE_DATA.toFixed(3)}/회 (online 일 때만)</span>
           </button>
           <button
@@ -125,7 +126,7 @@ export default function NowPanel({ onAfterRun }) {
             disabled={testing}
             className="flex flex-col items-center justify-center py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 disabled:opacity-50"
           >
-            <span className="text-sm">⏰ 깨우기</span>
+            <span className="text-sm inline-flex items-center gap-1"><Icon name="clock" className="w-4 h-4" /> 깨우기</span>
             <span className="text-[9px] text-amber-400/70">~${COST_WAKE.toFixed(3)}/회 · 약 30초 소요</span>
           </button>
         </div>
