@@ -23,7 +23,7 @@ ENCRYPTION_KEY=<openssl rand -hex 32>
 # 선택 — 없으면 일부 기능 비활성
 KAKAO_REST_API_KEY=...
 EV_CHARGER_API_KEY=...
-HOME_CHARGER_STAT_ID=PI795111
+HOME_CHARGER_STAT_ID=<CHARGER_STAT_ID>   # 환경공단 충전소 통계 ID
 ```
 
 ```bash
@@ -43,20 +43,28 @@ Next.js 14 · JavaScript(ESM) · Tailwind 3 · PostgreSQL 16(TeslaMate 스키마
 ## 아키텍처
 
 ```
-   GitHub  ──push/cron──►  AWS Lightsail
-                          ┌──────────────────────────────┐
-                          │  teslamate  ─►  Postgres     │
-                          │                  ▲           │
-                          │  dashboard ──────┤           │
-                          │                  ▲           │
-                          │  telegram-hub ───┘           │
-                          └──────────────────────────────┘
-                              ▲                    ▲
-                              │ HTTPS              │ Telegram
-                           브라우저               가족 (봇)
+                       외부 API (HTTPS, outbound)
+           Tesla Fleet · 환경공단 EV · Kakao · TourAPI · 기상청
+                                   ▲
+                                   │
+   브라우저 ─HTTPS─┐                │                ┌─ 가족 (Telegram)
+                  ▼                │                ▼
+   GitHub ─push/SSH─►   AWS Lightsail (Seoul · 1GB micro)
+                  ┌──────────────────────────────────────────┐
+                  │  Caddy  :80/:443  (forward_auth)         │
+                  │    ├─► dashboard:5000 (Next.js · API)    │
+                  │    │      ├─ /api/*       ──► Postgres   │
+                  │    │      └─ schedule-runner ─► Fleet API│
+                  │    └─► teslamate:4000 (보호 UI)          │
+                  │                                          │
+                  │  telegram-hub ──/api/*──► dashboard      │
+                  │  teslamate    ─MQTT────► Postgres        │
+                  └──────────────────────────────────────────┘
 ```
 
-캐시 3단:
+**데이터 경로 원칙**: UI·봇 등 모든 소비자는 `dashboard /api/*` 만 호출. 외부 DB 직접 접근 금지 — 비즈니스 로직(폴백 감지, 스키마 함정 회피)이 한 곳에 모인다. 신규 봇 명령 추가 시 필요한 API 가 없으면 **먼저 만들고** 호출.
+
+**캐시 3단**:
 1. 메모리 TTL (`server-cache`) — 라우트별 15s~600s
 2. DB 사전 집계 (`dash_*`) — 매일 04:00 KST 갱신
 3. DB 영구 (`kakao_address_cache` 등) — 외부 API 결과 보존
