@@ -3,7 +3,7 @@
 import { Icon } from '@/app/lib/Icons';
 import { KWH_PER_KM } from '@/lib/constants';
 import { formatDuration, formatHm, shortAddr } from '@/lib/format';
-import { formatTimeRange, kstDateStr } from '@/lib/kst';
+import { formatTimeRange, kstDateStr, kstMondayStr } from '@/lib/kst';
 
 function efficiency(d) {
   if (!d.start_rated_range_km || !d.end_rated_range_km || !d.distance) return null;
@@ -13,6 +13,85 @@ function efficiency(d) {
   const kwh = (usedKm * KWH_PER_KM).toFixed(1);
   const perKm = ((usedKm * KWH_PER_KM * 1000) / dist).toFixed(0);
   return { kwh, perKm };
+}
+
+function WeekSummary({ drives, weekMode }) {
+  const wDrives = drives
+    .filter(d => kstMondayStr(`${kstDateStr(d.start_date)}T00:00:00Z`) === weekMode)
+    .slice()
+    .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+  if (wDrives.length === 0) return null;
+  const totalKm = wDrives.reduce((s, d) => s + (parseFloat(d.distance) || 0), 0);
+  const totalMin = wDrives.reduce((s, d) => s + (parseFloat(d.duration_min) || 0), 0);
+  const totalKwh = wDrives.reduce((s, d) => {
+    if (d.start_rated_range_km && d.end_rated_range_km) {
+      const usedKm = parseFloat(d.start_rated_range_km) - parseFloat(d.end_rated_range_km);
+      if (usedKm > 0) return s + usedKm * KWH_PER_KM;
+    }
+    return s;
+  }, 0);
+  const usedPct = wDrives.reduce((s, d) => (d.start_battery_level != null && d.end_battery_level != null) ? s + Math.max(0, d.start_battery_level - d.end_battery_level) : s, 0);
+  const perKm = totalKm > 0 && totalKwh > 0 ? Math.round((totalKwh * 1000) / totalKm) : null;
+  const dayCount = new Set(wDrives.map(d => kstDateStr(d.start_date))).size;
+  const destMap = new Map();
+  const SKIP_DESTS = new Set(['집', '회사']);
+  for (const d of wDrives) {
+    const key = shortAddr(d.end_address) || '?';
+    if (SKIP_DESTS.has(key)) continue;
+    destMap.set(key, (destMap.get(key) || 0) + 1);
+  }
+  const topDests = Array.from(destMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const weekLabel = (() => {
+    const mon = new Date(weekMode + 'T00:00:00Z');
+    const sun = new Date(mon.getTime() + 6 * 86400000);
+    const todayMonKey = kstMondayStr(Date.now());
+    const diff = Math.round((new Date(todayMonKey + 'T00:00:00Z').getTime() - mon.getTime()) / (7 * 86400000));
+    const tag = diff === 0 ? '이번 주' : diff === 1 ? '지난 주' : `${diff}주 전`;
+    return `${tag} (${mon.getUTCMonth() + 1}/${mon.getUTCDate()} ~ ${sun.getUTCMonth() + 1}/${sun.getUTCDate()})`;
+  })();
+
+  return (
+    <div className="px-4 py-1.5 border-b border-white/[0.06] flex flex-col gap-0.5 flex-shrink-0">
+      <p className="text-sm text-zinc-500 tabular-nums flex items-center gap-1.5 flex-wrap">
+        <span className="text-zinc-300 font-semibold">{weekLabel}</span>
+        <span className="text-zinc-700">·</span>
+        <span title="주행" className="inline-flex items-center gap-0.5"><Icon name="car" />{wDrives.length}회</span>
+        <span className="text-zinc-700">·</span>
+        <span title="운행일" className="inline-flex items-center gap-0.5"><Icon name="calendar" />{dayCount}일</span>
+        {totalMin > 0 && (
+          <>
+            <span className="text-zinc-700">·</span>
+            <span title="운전" className="inline-flex items-center gap-0.5"><Icon name="road" />{formatHm(Math.round(totalMin))}</span>
+          </>
+        )}
+      </p>
+      <p className="text-xs tabular-nums flex items-center gap-1.5 flex-wrap">
+        <span className="font-bold text-blue-400">{totalKm.toFixed(0)}<span className="text-zinc-600 ml-0.5">km</span></span>
+        {totalKwh > 0 && (
+          <>
+            <span className="text-zinc-700">·</span>
+            <span className="font-semibold text-green-400">{totalKwh.toFixed(1)}<span className="text-zinc-600 ml-0.5">kWh</span>{usedPct > 0 && <span className="text-zinc-500 ml-1">({usedPct}%)</span>}</span>
+          </>
+        )}
+        {perKm != null && (
+          <>
+            <span className="text-zinc-700">·</span>
+            <span className="text-amber-400">{perKm}<span className="text-zinc-600 ml-0.5">Wh/km</span></span>
+          </>
+        )}
+      </p>
+      {topDests.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+          <Icon name="star" className="w-4 h-4 flex-shrink-0 text-amber-400" />
+          {topDests.map(([addr, n], i) => (
+            <span key={addr} className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 truncate max-w-[140px]">
+              <span className="text-zinc-600 mr-1">{i + 1}</span>{addr}<span className="text-zinc-500 ml-1 tabular-nums">{n}</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function MonthSummary({ drives, monthMode }) {
@@ -218,9 +297,10 @@ function PlaceSummary({ place }) {
   );
 }
 
-// 지도 모드 상단 요약 헤더 — month/day/drive/place 4-case dispatcher.
-export default function MapSummaryHeader({ monthMode, dayMode, selectedDrive, selectedPlace, drives }) {
+// 지도 모드 상단 요약 헤더 — month/week/day/drive/place 5-case dispatcher.
+export default function MapSummaryHeader({ monthMode, weekMode, dayMode, selectedDrive, selectedPlace, drives }) {
   if (monthMode) return <MonthSummary drives={drives} monthMode={monthMode} />;
+  if (weekMode) return <WeekSummary drives={drives} weekMode={weekMode} />;
   if (dayMode) return <DaySummary drives={drives} dayMode={dayMode} />;
   if (selectedDrive) return <DriveSummary drive={selectedDrive} />;
   if (selectedPlace) return <PlaceSummary place={selectedPlace} />;

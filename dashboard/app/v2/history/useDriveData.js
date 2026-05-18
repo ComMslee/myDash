@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { MOCK_DATA } from '@/app/context/mock';
+import { kstMondayStr } from '@/lib/kst';
 
 // 동시 요청 상한 헬퍼 — N개 워커가 cursor를 공유하며 items 소비
 async function fetchInChunks(items, fn, concurrency = 6) {
@@ -69,9 +70,12 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
   const [dayRoutes, setDayRoutes] = useState([]);
   const [monthMode, setMonthMode] = useState(null); // 'YYYY-MM' or null
   const [monthRoutes, setMonthRoutes] = useState([]);
+  const [weekMode, setWeekMode] = useState(null); // 'YYYY-MM-DD' (Mon) or null
+  const [weekRoutes, setWeekRoutes] = useState([]);
   const abortRef = useRef(null);
   const dayAbortRef = useRef(null);
   const monthAbortRef = useRef(null);
+  const weekAbortRef = useRef(null);
 
   // 진입 쿼리(id/date)에 맞는 주행을 선택 — id > date > 첫 항목
   const pickPreselect = (list) => {
@@ -120,7 +124,7 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
 
   // 단일 주행 경로 로드
   useEffect(() => {
-    if (dayMode || monthMode) return; // 일/월 모드에서는 단일 경로 미로딩
+    if (dayMode || monthMode || weekMode) return; // 일/월/주 모드에서는 단일 경로 미로딩
     if (!selectedDrive) return;
     if (isMock) {
       setPositions(MOCK_DATA.routePositions);
@@ -162,7 +166,7 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
       setLoadingRoute(false);
     })();
     return () => { controller.abort(); };
-  }, [selectedDrive?.id, isMock, refreshSignal, dayMode, monthMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedDrive?.id, isMock, refreshSignal, dayMode, monthMode, weekMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 일 모드 — 해당 일의 모든 주행 경로 병렬 로드
   useEffect(() => {
@@ -223,6 +227,35 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
     return () => { monthAbortRef.current?.abort(); };
   }, [monthMode, isMock, drives]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 주 모드 — ISO 월~일 주의 모든 주행 경로 병렬 로드 (월 mode 와 동일 구조, detail=light)
+  useEffect(() => {
+    if (!weekMode || isMock || drives.length === 0) { setWeekRoutes([]); return; }
+    const weekDrives = drives
+      .filter(d => kstMondayStr(`${driveDayStr(d)}T00:00:00Z`) === weekMode)
+      .slice()
+      .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+    if (weekDrives.length === 0) { setWeekRoutes([]); return; }
+    setLoadingRoute(true);
+    if (weekAbortRef.current) weekAbortRef.current.abort();
+    weekAbortRef.current = new AbortController();
+    const palette = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7', '#84cc16', '#f43f5e'];
+    fetchInChunks(weekDrives, (d, idx) =>
+      fetchRouteMap(`/api/route-map?driveId=${d.id}&detail=light`, weekAbortRef.current.signal)
+        .then(data => ({
+          positions: data.positions || [],
+          color: palette[idx % palette.length],
+          id: d.id,
+          startDate: d.start_date,
+        }))
+        .catch(() => null)
+    , 6).then(results => {
+      const valid = results.filter(r => r && r.positions.length >= 2);
+      setWeekRoutes(valid);
+      setLoadingRoute(false);
+    });
+    return () => { weekAbortRef.current?.abort(); };
+  }, [weekMode, isMock, drives]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return {
     drives,
     places,
@@ -234,6 +267,8 @@ export function useDriveData({ isMock, refreshSignal, initialId, initialDate, dr
     dayRoutes,
     monthMode, setMonthMode,
     monthRoutes,
+    weekMode, setWeekMode,
+    weekRoutes,
     loadingDrives, loadingRoute,
     error,
   };
