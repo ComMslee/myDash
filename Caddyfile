@@ -1,13 +1,15 @@
 # Caddy — dashboard 외부 진입점 + teslamate UI 게이트.
 #
 # 구성:
-#   :80                            — raw IP HTTP (43.202.133.239 직접 접근).
+#   :80                            — raw IP HTTP (public IP 직접 접근, 캐시/북마크 호환용).
 #   liam-my-dash.duckdns.org       — HTTPS (Let's Encrypt 자동) + Tesla Fleet API public key 서빙.
 #   :4000                          — TeslaMate Phoenix UI 게이트 (dashboard 쿠키 인증 통과해야 접속).
+#
+# Let's Encrypt 계정 이메일: 익명 계정 사용 (개인정보 노출 회피). 필요 시
+# 컨테이너 env 로 ACME_EMAIL 주입하고 `email {$ACME_EMAIL}` 한 줄을 글로벌 블록에 추가.
 
 {
 	admin off
-	email liam@litbig.com
 }
 
 (dashboard_proxy) {

@@ -7,23 +7,11 @@
 
 ## 동작 원리
 
-```
-git push master
-   │
-   ▼
-GitHub-hosted Ubuntu runner (무료)
-   │
-   ├─ SSH 접속 (appleboy/ssh-action)
-   │  - LIGHTSAIL_HOST  : <LIGHTSAIL_IP>
-   │  - LIGHTSAIL_USER  : ubuntu
-   │  - LIGHTSAIL_SSH_KEY : lightsail-seoul.pem 내용
-   ▼
-서버에서 실행:
-  cd ~/myDash
-  git fetch --all --prune
-  git reset --hard origin/master       # 로컬 변경 폐기 — 서버는 read-only 트리
-  docker compose build dashboard
-  docker compose up -d dashboard
+```mermaid
+flowchart TD
+    A["git push master"] --> B["GitHub-hosted Ubuntu runner (무료)"]
+    B --> C["SSH 접속 (appleboy/ssh-action)\n- LIGHTSAIL_HOST: &lt;LIGHTSAIL_IP&gt;\n- LIGHTSAIL_USER: ubuntu\n- LIGHTSAIL_SSH_KEY: lightsail-seoul.pem 내용"]
+    C --> D["서버에서 실행\ncd ~/myDash\ngit fetch --all --prune\ngit reset --hard origin/master\ndocker compose build dashboard\ndocker compose up -d dashboard"]
 ```
 
 **GHA는 AWS API를 직접 호출하지 않습니다.** SSH로 서버에 접속해 명령만 실행. IAM/AccessKey 같은 AWS 자격 증명은 GHA에 넣을 필요 없음.
@@ -48,7 +36,7 @@ Get-Content C:\path\to\myDash\lightsail-seoul.pem | Set-Clipboard
 
 Git Bash:
 ```bash
-cat C:\path\to\myDash\lightsail-seoul.pem
+cat /c/path/to/myDash/lightsail-seoul.pem
 ```
 출력 전체 (`-----BEGIN RSA PRIVATE KEY-----` ~ `-----END RSA PRIVATE KEY-----`) 복사.
 
@@ -70,7 +58,7 @@ git commit --allow-empty -m "test: trigger deploy"
 git push origin master
 ```
 
-Actions 탭에서 로그 확인. 성공 시 ~2분 이내 서버 반영.
+> 💡 **팁:** Actions 탭에서 로그 확인. 성공 시 ~2분 이내 서버 반영.
 
 ## 배포 실패 시
 

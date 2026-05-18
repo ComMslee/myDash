@@ -4,21 +4,19 @@
 
 ## 전체 흐름
 
-```
-브라우저 ─fetch→ Next.js API 라우트 ─pg query→ TeslaMate Postgres
-                       │
-                       ├─ Kakao 역지오코딩 ───→ kakao_address_cache (DB · 30일 TTL)
-                       │                       └ miss → Kakao Local API
-                       │
-                       ├─ route-map 모듈 LRU (200, 휘발)
-                       │   └ miss → SELECT positions WHERE drive_id
-                       │
-                       └─ 집충전기 캐시 ──────→ home_charger_snapshot (DB · 콜드 복원)
-                                              ├ inflight dedup
-                                              └ TTL 만료 → 환경공단 EvCharger API
+```mermaid
+flowchart TD
+    Browser["브라우저"] -->|fetch| API["Next.js API 라우트"]
+    API -->|pg query| PG["TeslaMate Postgres"]
+    API -->|역지오코딩| KakaoCache["kakao_address_cache\n(DB · 30일 TTL)"]
+    KakaoCache -->|miss| KakaoAPI["Kakao Local API"]
+    API -->|LRU 200, 휘발| LRU["route-map 모듈 LRU"]
+    LRU -->|miss| PG
+    API -->|콜드 복원| Snapshot["home_charger_snapshot\n(DB)"]
+    Snapshot -->|inflight dedup| EvCharger["환경공단 EvCharger API"]
 ```
 
-서버 재시작 시 휘발성 캐시(route-map LRU, home-charger 메모리 cache 등)는 비워지고, DB 캐시 두 종(kakao, home_charger_snapshot)은 보존된다.
+> 📌 **NOTE:** 서버 재시작 시 휘발성 캐시(route-map LRU, home-charger 메모리 cache 등)는 비워지고, DB 캐시 두 종(kakao, home_charger_snapshot)은 보존된다.
 
 ## 서버 사이드 캐시
 
@@ -82,7 +80,9 @@
 - **TTL (정적)**: KST 시간대별 5~12분 (`CACHE_TIERS`). 저녁 피크(18~22시) 5분, 오후 12분 등
 - **TTL (동적, 옵션)**: `USE_DYNAMIC_TTL=true` 시 최근 90일 충전 패턴으로 24시간마다 학습 (현재 `false` 유지)
 - **콜드 스타트 복원**: 서버 재시작 직후 `home_charger_snapshot` 테이블의 가장 최근 payload 로 메모리 캐시 워밍업
-- **쿨다운**: 환경공단 일일 쿼터(1,000회) 보호 — 쿼터 초과 감지 시 `quotaCooldownUntil`, 일반 실패 시 `failureCooldownUntil` 10분
+
+> ⚠️ **주의:** 환경공단 일일 쿼터(1,000회) 보호 — 쿼터 초과 감지 시 `quotaCooldownUntil`, 일반 실패 시 `failureCooldownUntil` 10분
+
 - **백그라운드 폴링**: `instrumentation.js`에서 워밍 업 (별도 번들이라 모듈 상태가 갈라지므로 `globalThis['__homeChargerDiag__']` 싱글톤으로 진단 카운터 공유)
 - **부수 테이블**: `charger_usage` (statId×chgerId×hour 사용 카운트, 30분 쿨다운으로 중복 증가 차단). 스키마는 [`docs/DATABASE.md`](./DATABASE.md) 참조
 - **무효화**: `?refresh=1` 강제 갱신 또는 TTL 만료

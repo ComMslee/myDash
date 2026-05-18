@@ -1,6 +1,8 @@
 # 알려진 함정 (Pitfalls)
 
-코드 수정 시 회귀를 유발하기 쉬운 항목 모음. 함정 표시 파일 상단의 `⚠️ 수정 전 필독: /docs/PITFALLS.md "..."` 주석이 가리키는 항목을 먼저 읽고 작업한다.
+코드 수정 시 회귀를 유발하기 쉬운 항목 모음.
+
+> ⚠️ **주의:** 함정 표시 파일 상단의 `⚠️ 수정 전 필독: /docs/PITFALLS.md "..."` 주석이 가리키는 항목을 먼저 읽고 작업한다.
 
 ## 목차
 
@@ -38,7 +40,7 @@
 
 이 인스턴스 TeslaMate 엔 `charge_limit_soc` (`bb46127`), `time_to_full_charge` (`eb142e4`) 컬럼이 없음. `/api/charging-status` SELECT 에서 제외하고 응답에서는 `null` 로 반환.
 
-**증상이 까다로운 이유** — 충전 미진행 시엔 폴백 분기만 타서 안 터지다가, `charging_processes` 가 열리는 순간(=실제 충전 시작) active 분기 SELECT 가 `column does not exist` 500 으로 떨어지고 `BottomNavV2` 의 `.catch(() => null)` 이 에러를 삼켜 `charging=false` 로 보임 ("처음엔 됐는데 안 됨" 회귀 패턴). 즉 **충전 중일 때만 깨지므로 일반 동작 확인으론 안 잡힘**. `charges` 신규 컬럼 SELECT 추가 시 반드시 컬럼 존재 여부 확인. 디버그용 `/api/debug/charging` 엔드포인트로 raw 덤프 확인 가능.
+> ⚠️ **주의:** 충전 미진행 시엔 폴백 분기만 타서 안 터지다가, `charging_processes` 가 열리는 순간(=실제 충전 시작) active 분기 SELECT 가 `column does not exist` 500 으로 떨어지고 `BottomNavV2` 의 `.catch(() => null)` 이 에러를 삼켜 `charging=false` 로 보임 ("처음엔 됐는데 안 됨" 회귀 패턴). 즉 **충전 중일 때만 깨지므로 일반 동작 확인으론 안 잡힘**. `charges` 신규 컬럼 SELECT 추가 시 반드시 컬럼 존재 여부 확인. 디버그용 `/api/debug/charging` 엔드포인트로 raw 덤프 확인 가능.
 
 ## 프런트 `fetch().catch(() => null)` 가 500 무음 처리
 

@@ -23,7 +23,8 @@
 - 이 페이지가 같은 데이터를 한 곳에 통합. 새 라우트 추가 시 `dashboard/app/v2/dev/api-status/page.js` `ROUTES` 배열에도 등록.
 
 ## 컨테이너가 죽었다 (OOM)
-1GB RAM은 타이트 — Postgres가 자주 killed 될 수 있음.
+
+> ⚠️ **주의:** 1GB RAM은 타이트 — Postgres가 자주 killed 될 수 있음.
 
 ```bash
 # 스왑 사용량 확인
@@ -36,7 +37,7 @@ ssh -i lightsail-seoul.pem ubuntu@<LIGHTSAIL_IP> 'sudo dmesg -T | grep -i "kille
 ssh -i lightsail-seoul.pem ubuntu@<LIGHTSAIL_IP> 'cd myDash && sudo docker compose restart database'
 ```
 
-지속적 OOM이면 `$12 번들(2GB)` 업그레이드 고려 — 새 스냅샷 → $12로 복구 후 원본 삭제.
+> 💡 **팁:** 지속적 OOM이면 `$12 번들(2GB)` 업그레이드 고려 — 새 스냅샷 → $12로 복구 후 원본 삭제.
 
 ## 디스크가 가득참
 Docker 정리:
