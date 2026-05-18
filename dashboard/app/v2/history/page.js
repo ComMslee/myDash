@@ -205,7 +205,13 @@ function HistoryInner() {
                 <button onClick={goPrevWeek} disabled={weekIdx <= 0} className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
                 </button>
-                <span className="text-xs text-zinc-400 tabular-nums">{(() => { const m = new Date(weekMode + 'T00:00:00Z'); const s = new Date(m.getTime() + 6 * 86400000); return `${m.getUTCMonth()+1}/${m.getUTCDate()} ~ ${s.getUTCMonth()+1}/${s.getUTCDate()}`; })()}<span className="text-zinc-600 ml-1">({weekRoutes.length}회)</span></span>
+                <span className="text-xs text-zinc-400 tabular-nums">{(() => {
+                  const m = new Date(weekMode + 'T00:00:00Z');
+                  const s = new Date(m.getTime() + 6 * 86400000);
+                  const fm = m.getUTCMonth() + 1, fd = m.getUTCDate();
+                  const lm = s.getUTCMonth() + 1, ld = s.getUTCDate();
+                  return fm === lm ? `${fm}/${fd} ~ ${ld}` : `${fm}/${fd} ~ ${lm}/${ld}`;
+                })()}<span className="text-zinc-600 ml-1">({weekRoutes.length}회)</span></span>
                 <button onClick={goNextWeek} disabled={weekIdx < 0 || weekIdx >= uniqueWeeks.length - 1} className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
                 </button>

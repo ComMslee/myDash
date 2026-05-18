@@ -47,7 +47,10 @@ function WeekSummary({ drives, weekMode }) {
     const todayMonKey = kstMondayStr(Date.now());
     const diff = Math.round((new Date(todayMonKey + 'T00:00:00Z').getTime() - mon.getTime()) / (7 * 86400000));
     const tag = diff === 0 ? '이번 주' : diff === 1 ? '지난 주' : `${diff}주 전`;
-    return `${tag} (${mon.getUTCMonth() + 1}/${mon.getUTCDate()} ~ ${sun.getUTCMonth() + 1}/${sun.getUTCDate()})`;
+    const fm = mon.getUTCMonth() + 1, fd = mon.getUTCDate();
+    const lm = sun.getUTCMonth() + 1, ld = sun.getUTCDate();
+    const range = fm === lm ? `${fm}/${fd} ~ ${ld}` : `${fm}/${fd} ~ ${lm}/${ld}`;
+    return `${tag} (${range})`;
   })();
 
   return (

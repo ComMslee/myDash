@@ -67,7 +67,9 @@ export default function FastChargeCard() {
   const weekRange = (weekKey) => {
     const mon = new Date(weekKey + 'T00:00:00Z');
     const sun = new Date(mon.getTime() + 6 * 86400000);
-    return `${mon.getUTCMonth() + 1}/${mon.getUTCDate()} ~ ${sun.getUTCMonth() + 1}/${sun.getUTCDate()}`;
+    const fm = mon.getUTCMonth() + 1, fd = mon.getUTCDate();
+    const lm = sun.getUTCMonth() + 1, ld = sun.getUTCDate();
+    return fm === lm ? `${fm}/${fd} ~ ${ld}` : `${fm}/${fd} ~ ${lm}/${ld}`;
   };
 
   if (loading) {

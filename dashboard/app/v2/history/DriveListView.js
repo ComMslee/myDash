@@ -27,15 +27,19 @@ function formatMonthLabel(mk) {
   return `${yLabel}${parseInt(m)}월`;
 }
 
-// 주 헤더 라벨 — 월 안에서 보이는 일자 범위 'M/D ~ M/D' (단일 날짜면 'M/D').
+// 주 헤더 라벨 — 'M/D ~ M/D'. 같은 월이면 두 번째 월 생략 ('M/D ~ D'). 단일 날짜는 'M/D'.
 function formatWeekRange(daysInWeek) {
   if (!daysInWeek.length) return '';
   const sorted = [...daysInWeek].sort((a, b) => a.firstDate - b.firstDate);
   const first = sorted[0].firstDate;
   const last = sorted[sorted.length - 1].firstDate;
-  const fmt = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
-  if (first.toDateString() === last.toDateString()) return fmt(first);
-  return `${fmt(first)} ~ ${fmt(last)}`;
+  const fm = first.getMonth() + 1;
+  const fd = first.getDate();
+  const lm = last.getMonth() + 1;
+  const ld = last.getDate();
+  if (first.toDateString() === last.toDateString()) return `${fm}/${fd}`;
+  if (fm === lm) return `${fm}/${fd} ~ ${ld}`;
+  return `${fm}/${fd} ~ ${lm}/${ld}`;
 }
 
 // 강화된 통계 라인 (월/주 헤더 하단) — 회 / 운전시간 / 효율 / 운행일수.
