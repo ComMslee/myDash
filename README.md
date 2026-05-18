@@ -15,39 +15,57 @@
 
 ## 아키텍처
 
+```mermaid
+flowchart TB
+    subgraph Ext["외부 시스템"]
+        direction LR
+        Tesla["⚡ Tesla Fleet API<br/>OAuth2 · 양방향"]
+        Gov["📊 공공데이터포털 · data.go.kr<br/>환경공단 · 관광공사 · 기상청 · 천문연"]
+        Kakao["🗺 Kakao Maps"]
+        TG["💬 Telegram Bot API<br/>양방향"]
+    end
+
+    subgraph Ls["☁️ AWS Lightsail · Seoul · t-micro · $7/월"]
+        direction TB
+        Caddy["Caddy :80/:443<br/>HSTS · forward_auth"]
+        Dashboard["dashboard<br/>(Next.js · API gateway)"]
+        Scheduler["schedule-runner ⚡"]
+        Hub["telegram-hub"]
+        TM["teslamate"]
+        Postgres[("Postgres")]
+        Caddy --> Dashboard
+        Dashboard --> Postgres
+        Hub -- "/api/*" --> Dashboard
+        TM -- "MQTT" --> Postgres
+        Dashboard --> Scheduler
+    end
+
+    subgraph Cli["사용자 / 자동화"]
+        direction LR
+        Browser["🌐 브라우저 · PIN 인증"]
+        GHA["🤖 GitHub Actions · master push"]
+    end
+
+    Tesla   -- "IN · vehicle_data · OAuth2 토큰"            --> Dashboard
+    Scheduler -- "OUT · commands (climate/sentry/wake)"     --> Tesla
+    Gov     -- "IN · 충전소 · 축제 · 단기예보 · 공휴일"      --> Dashboard
+    Kakao   -- "IN · 좌표 ↔ 주소 (geocoding)"                --> Dashboard
+    TG      -- "IN · 사용자 명령 수신"                       --> Hub
+    Hub     -- "OUT · 푸시 알림 발신"                        --> TG
+    Browser -- "HTTPS 요청 / 응답"                           --> Caddy
+    GHA     -- "SSH 자동 배포"                               --> Ls
+
+    classDef ext fill:#1e293b,stroke:#475569,color:#f1f5f9
+    classDef ls fill:#0c4a6e,stroke:#0ea5e9,color:#f0f9ff
+    classDef cli fill:#1c1917,stroke:#78716c,color:#fafaf9
+    class Tesla,Gov,Kakao,TG ext
+    class Caddy,Dashboard,Scheduler,Hub,TM,Postgres ls
+    class Browser,GHA cli
+```
+
 `IN` = Lightsail 이 받는 데이터 / `OUT` = Lightsail 이 내보내는 데이터.
 
-```
-   ┌─────────────────────┐                                                ╔══════════════════════════╗
-   │  Tesla Fleet API ⚡ │  IN  ── vehicle_data · OAuth2 토큰 ─────────► ║                          ║
-   │  (HTTPS · 양방향)   │  OUT ◄── 차량 명령 (climate/sentry/wake) ──── ║                          ║
-   └─────────────────────┘                                                ║                          ║
-                                                                          ║                          ║
-   ┌─────────────────────┐  IN  ── 충전소·실시간 (환경공단 EV) ─────────► ║                          ║
-   │  공공데이터포털     │  IN  ── 축제 (한국관광공사 TourAPI) ─────────► ║   AWS Lightsail          ║
-   │     data.go.kr      │  IN  ── 단기예보 (기상청 KMA) ───────────────► ║   Seoul · t-micro        ║
-   │  (HTTPS · fetch)    │  IN  ── 공휴일 (한국천문연구원) ─────────────► ║                          ║
-   └─────────────────────┘                                                ║   Caddy → dashboard      ║
-                                                                          ║    (Next.js · API GW)    ║
-   ┌─────────────────────┐                                                ║                          ║
-   │  Kakao Maps         │  IN  ── 좌표 ↔ 주소 (geocoding 응답) ────────► ║   Postgres ◄ MQTT        ║
-   └─────────────────────┘                                                ║   schedule-runner ⚡     ║
-                                                                          ║   telegram-hub           ║
-   ┌─────────────────────┐  IN  ── 사용자 명령 수신 ────────────────────► ║   teslamate              ║
-   │  Telegram Bot API   │                                                ║                          ║
-   │  (HTTPS · 양방향)   │  OUT ◄── 푸시 알림 발신 ────────────────────── ║                          ║
-   └─────────────────────┘                                                ╚═════════▲════════════════╝
-                                                                                    │
-   ┌─────────────────────┐                                                          │
-   │  브라우저 (사용자)  │  IN  ── HTTPS 요청 · PIN 인증 ──────────────────────────►┤
-   └─────────────────────┘                                                          │
-                                                                                    │
-   ┌─────────────────────┐                                                          │
-   │  GitHub Actions     │  IN  ── master push → SSH 배포 명령 ──────────────────────┘
-   └─────────────────────┘
-```
-
-> 공공데이터 4종(환경공단·관광공사·기상청·천문연)은 조직은 별개지만 **공공데이터포털(`data.go.kr`)** 단일 게이트웨이를 통해 API 키·요청 형식이 통일된다.
+공공데이터 4종(환경공단 · 한국관광공사 · 기상청 · 한국천문연구원)은 조직은 별개지만 **공공데이터포털(`data.go.kr`)** 단일 게이트웨이를 통해 API 키·요청 형식이 통일된다.
 
 ### 엔지니어링 하이라이트
 
