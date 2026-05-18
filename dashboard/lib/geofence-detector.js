@@ -5,7 +5,11 @@ import { listGeofences, recordLocationEvent } from '@/lib/queries/schedules';
 // 이전 상태(in/out)와 비교하여 변화 시 dash_location_events INSERT.
 // 워커가 매분 1회 호출.
 
-let lastInside = null; // Map<geofence_id, lastInside:boolean>
+// Next.js 가 instrumentation-node 와 API route 를 별도 번들로 만들어 이 모듈 복사본이
+// 2개 이상 생길 수 있음 — `home-charger-cache.js` 의 globalThis[DIAG_KEY] 동일 패턴.
+// Map 참조를 globalThis 에 박아 두면 어느 번들에서 import 해도 동일 상태 공유.
+globalThis.__geofenceLastInside ??= new Map();
+const lastInside = globalThis.__geofenceLastInside; // Map<geofence_id, lastInside:boolean>
 
 function distMeters(a, b) {
   const R = 6371000;
@@ -28,7 +32,6 @@ export async function detectAndRecord() {
   if (!pos || pos.lat == null || pos.lng == null) return { events: 0 };
 
   const geofences = await listGeofences();
-  if (lastInside == null) lastInside = new Map();
 
   let events = 0;
   for (const g of geofences) {

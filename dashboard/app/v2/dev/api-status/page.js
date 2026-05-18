@@ -22,7 +22,28 @@ export default function ApiStatusPage() {
   const [serverLatency, setServerLatency] = useState(null);
   const [serverErr, setServerErr] = useState(null);
   const [tab, setTab] = useState('server');
+  // 카테고리 접힘 — localStorage 로 영속화. 기본 모두 접힘 (스크롤 길이 단축).
+  const [openCats, setOpenCats] = useState(() => new Set());
+  const [catsLoaded, setCatsLoaded] = useState(false);
   const runIdRef = useRef(0);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('apiStatus.openCats');
+      if (raw) setOpenCats(new Set(JSON.parse(raw)));
+    } catch {}
+    setCatsLoaded(true);
+  }, []);
+  useEffect(() => {
+    if (!catsLoaded) return;
+    try { localStorage.setItem('apiStatus.openCats', JSON.stringify([...openCats])); } catch {}
+  }, [openCats, catsLoaded]);
+
+  const toggleCat = (cat) => setOpenCats(prev => {
+    const next = new Set(prev);
+    if (next.has(cat)) next.delete(cat); else next.add(cat);
+    return next;
+  });
 
   // '서버' 탭 활성일 때만 30초 폴링 — 다른 탭에선 cleanup.
   // history 는 /api/server-status 응답의 ring buffer 그대로 사용.
@@ -174,27 +195,48 @@ export default function ApiStatusPage() {
 
         {tab === 'api' && CATEGORIES.map(cat => {
           const list = ROUTES.filter(r => r.category === cat);
+          const isOpen = openCats.has(cat);
+          const catCounts = list.reduce((acc, r) => {
+            const s = results[r.path]?.state || 'idle';
+            acc[s] = (acc[s] || 0) + 1;
+            return acc;
+          }, { ok: 0, slow: 0, fail: 0, idle: 0, running: 0 });
           return (
             <div key={cat} className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-              <div className="px-4 py-2 border-b border-white/[0.06]">
-                <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">{cat}</span>
-              </div>
-              <div>
-                {list.map(route => (
-                  <RouteRow
-                    key={route.path}
-                    route={route}
-                    result={results[route.path]}
-                    values={paramValues[route.path] || {}}
-                    setValue={(k, v) => setParamValues(prev => ({ ...prev, [route.path]: { ...(prev[route.path] || {}), [k]: v } }))}
-                    expanded={!!expanded[route.path]}
-                    onToggleExpand={() => setExpanded(prev => ({ ...prev, [route.path]: !prev[route.path] }))}
-                    editing={!!editing[route.path]}
-                    onToggleEdit={() => setEditing(prev => ({ ...prev, [route.path]: !prev[route.path] }))}
-                    onRun={() => runOne(route)}
-                  />
-                ))}
-              </div>
+              <button
+                onClick={() => toggleCat(cat)}
+                className="w-full px-4 py-2.5 flex items-center justify-between gap-2 active:bg-white/[0.02]"
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className={`text-zinc-600 text-base shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                  <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-300 truncate">{cat}</span>
+                  <span className="text-[10px] text-zinc-600 tabular-nums shrink-0">· {list.length}</span>
+                </span>
+                <span className="flex items-center gap-2 text-[10px] tabular-nums shrink-0">
+                  {catCounts.fail > 0 && <span className="text-rose-400">✕ {catCounts.fail}</span>}
+                  {catCounts.slow > 0 && <span className="text-amber-400">! {catCounts.slow}</span>}
+                  {catCounts.ok > 0 && <span className="text-emerald-400/80">✓ {catCounts.ok}</span>}
+                  {catCounts.running > 0 && <span className="text-blue-400">● {catCounts.running}</span>}
+                </span>
+              </button>
+              {isOpen && (
+                <div className="border-t border-white/[0.06]">
+                  {list.map(route => (
+                    <RouteRow
+                      key={route.path}
+                      route={route}
+                      result={results[route.path]}
+                      values={paramValues[route.path] || {}}
+                      setValue={(k, v) => setParamValues(prev => ({ ...prev, [route.path]: { ...(prev[route.path] || {}), [k]: v } }))}
+                      expanded={!!expanded[route.path]}
+                      onToggleExpand={() => setExpanded(prev => ({ ...prev, [route.path]: !prev[route.path] }))}
+                      editing={!!editing[route.path]}
+                      onToggleEdit={() => setEditing(prev => ({ ...prev, [route.path]: !prev[route.path] }))}
+                      onRun={() => runOne(route)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}

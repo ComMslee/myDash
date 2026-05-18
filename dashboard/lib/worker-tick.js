@@ -2,6 +2,7 @@ import pool from '@/lib/db';
 import { evaluateAll } from '@/lib/schedule-evaluator';
 import { detectAndRecord } from '@/lib/geofence-detector';
 import { executeAction, skipExecution } from '@/lib/schedule-runner';
+import { getAutomationEnabled } from '@/lib/queries/schedules';
 
 // 1분 1회 tick — instrumentation.js 에서 setInterval 로 호출.
 // 1) 지오펜스 변화 감지 (positions → dash_location_events)
@@ -14,21 +15,28 @@ export async function tick() {
   if (running) return { skipped: 'already running' };
   running = true;
   try {
+    // 자동화 마스터 스위치 OFF — geofence 감지/스케줄 평가/실행 모두 스킵 (완전 정지).
+    const enabled = await getAutomationEnabled().catch(() => true);
+    if (!enabled) return { fired: 0, skipped: 0, evaluated: 0, paused: true };
     const geo = await detectAndRecord().catch((e) => ({ events: 0, error: e?.message }));
     const ev = await evaluateAll().catch((e) => ({ error: e?.message, decisions: [] }));
     let fired = 0, skipped = 0;
     for (const d of (ev.decisions || [])) {
       if (d.fire) {
-        await executeAction({
+        const result = await executeAction({
           schedule_id: d.s.id,
           action: d.s.action,
           action_params: d.s.action_params,
           trigger_source: d.trigger_source,
         });
-        await pool.query(
-          `UPDATE dash_schedules SET last_run_at = NOW() WHERE id = $1`,
-          [d.s.id],
-        );
+        // last_run_at 은 success/dry_run 시에만 갱신 — failed 는 디바운스 미발동으로
+        // 다음 tick(1분 후) 재시도 허용. 무한 재시도는 COST_HARD_CAP_USD 가드가 차단.
+        if (result?.status === 'success' || result?.status === 'dry_run') {
+          await pool.query(
+            `UPDATE dash_schedules SET last_run_at = NOW() WHERE id = $1`,
+            [d.s.id],
+          );
+        }
         fired++;
       } else if (d.reason) {
         await skipExecution({

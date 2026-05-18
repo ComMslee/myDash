@@ -1,5 +1,6 @@
 import { cookies, headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { timingSafeEqual as cryptoTimingSafeEqual } from 'node:crypto';
 import { readAuth } from './auth-store.js';
 
 export const COOKIE = 'myDash_auth';
@@ -21,7 +22,7 @@ export async function requireAuth() {
     return NextResponse.json({ error: 'NEED_SETUP' }, { status: 412 });
   }
   const c = cookies().get(COOKIE)?.value;
-  if (!c || c !== auth.token) {
+  if (!c || !timingSafeEqual(c, auth.token)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   return null;
@@ -47,9 +48,12 @@ export function assertSameOrigin(req) {
   return null;
 }
 
+// node:crypto 의 상수-시간 비교 위임 — 입력은 string (PIN/토큰).
+// 길이 다르면 즉시 false (timingSafeEqual 자체는 같은 길이 요구).
 export function timingSafeEqual(a, b) {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const ab = Buffer.from(a, 'utf8');
+  const bb = Buffer.from(b, 'utf8');
+  if (ab.length !== bb.length) return false;
+  return cryptoTimingSafeEqual(ab, bb);
 }

@@ -76,6 +76,18 @@ export async function GET(req) {
   const zscode = searchParams.get('zscode') || '';
   const addrFilter = (searchParams.get('addr') || '').trim();
   const nameFilter = (searchParams.get('name') || '').trim();
+
+  // 입력 검증 — 외부 공공데이터 API 호출로 흘러가는 값들. 길이/형식 1차 방어.
+  // 정규식 XML 파서(parseItems) 는 그대로 두되, 입력 길이 제한으로 ReDoS·과대 트래픽 차단.
+  if (addrFilter.length > 64 || nameFilter.length > 64) {
+    return jsonUtf8({ error: 'invalid_query' }, { status: 400 });
+  }
+  if (zscode && !/^\d{1,5}$/.test(zscode)) {
+    return jsonUtf8({ error: 'invalid_query' }, { status: 400 });
+  }
+  if (!/^\d{1,5}$/.test(zcode)) {
+    return jsonUtf8({ error: 'invalid_query' }, { status: 400 });
+  }
   let manualLat = Number(searchParams.get('lat'));
   let manualLng = Number(searchParams.get('lng'));
   let gpsSource = 'param';

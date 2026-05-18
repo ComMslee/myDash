@@ -32,6 +32,8 @@ export default function SchedulePage() {
   const [editing, setEditing] = useState(null);
   const [prefillDate, setPrefillDate] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [automationEnabled, setAutomationEnabled] = useState(null);
+  const [savingEnabled, setSavingEnabled] = useState(false);
 
   const bump = () => setRefreshSignal((n) => n + 1);
 
@@ -99,12 +101,47 @@ export default function SchedulePage() {
     } catch {}
   }, []);
 
+  const fetchAutomationEnabled = useCallback(async () => {
+    try {
+      const r = await fetch('/api/automation-enabled');
+      if (r.ok) {
+        const j = await r.json();
+        setAutomationEnabled(j.enabled !== false);
+      }
+    } catch {}
+  }, []);
+
+  const toggleAutomationEnabled = async () => {
+    if (savingEnabled || automationEnabled === null) return;
+    const next = !automationEnabled;
+    setSavingEnabled(true);
+    setAutomationEnabled(next);
+    try {
+      const r = await fetch('/api/automation-enabled', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: next }),
+      });
+      if (!r.ok) {
+        setAutomationEnabled(!next);
+        const err = await r.json().catch(() => ({}));
+        alert('변경 실패: ' + (err.error || r.statusText));
+      }
+    } catch (e) {
+      setAutomationEnabled(!next);
+      alert('변경 실패: ' + (e?.message || 'unknown'));
+    } finally {
+      setSavingEnabled(false);
+    }
+  };
+
   useEffect(() => {
     fetchUsage();
     fetchSchedules();
     fetchGeofences();
     fetchPause();
-  }, [fetchUsage, fetchSchedules, fetchGeofences, fetchPause]);
+    fetchAutomationEnabled();
+  }, [fetchUsage, fetchSchedules, fetchGeofences, fetchPause, fetchAutomationEnabled]);
 
   useEffect(() => { fetchCalendarData(calMonth); }, [calMonth, fetchCalendarData, refreshSignal]);
 
@@ -205,7 +242,31 @@ export default function SchedulePage() {
       <div className="max-w-2xl mx-auto px-4 pt-3 space-y-3">
         <header className="flex items-center justify-between py-1">
           <h1 className="text-base font-bold text-zinc-100">자동화</h1>
-          <button
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleAutomationEnabled}
+              disabled={automationEnabled === null || savingEnabled}
+              className={`flex items-center gap-1.5 h-8 px-2.5 rounded-lg border text-xs font-semibold transition-colors disabled:opacity-50 ${
+                automationEnabled
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
+                  : 'bg-zinc-800 border-white/[0.06] text-zinc-400 hover:bg-zinc-700'
+              }`}
+              title={automationEnabled ? '자동화 ON — 클릭하면 전체 일시정지' : '자동화 OFF — 클릭하면 다시 활성화'}
+            >
+              <span
+                className={`inline-block w-7 h-4 rounded-full relative transition-colors ${
+                  automationEnabled ? 'bg-emerald-500/70' : 'bg-zinc-600'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${
+                    automationEnabled ? 'left-3.5' : 'left-0.5'
+                  }`}
+                />
+              </span>
+              <span>{automationEnabled === null ? '…' : automationEnabled ? 'ON' : 'OFF'}</span>
+            </button>
+            <button
             onClick={() => setShowSettings(true)}
             className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 flex items-center justify-center"
             title="설정 — 즉시실행/지오펜스/실연동 체크"
@@ -215,6 +276,7 @@ export default function SchedulePage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </button>
+          </div>
         </header>
 
         <UsageCard usage={usage} />
@@ -224,12 +286,8 @@ export default function SchedulePage() {
           executionsByDate={executionsByDate}
           holidayMap={holidayMap}
           pausePeriods={pausePeriods}
-          month={calMonth}
-          onChangeMonth={setCalMonth}
           onAddSchedule={openNewFormForDate}
           onEditSchedule={(s) => { setEditing(s); setPrefillDate(null); setShowForm(true); }}
-          onDeleteSchedule={onDelete}
-          onToggleEnabled={onToggle}
           onRunNow={onRunNow}
           onToggleSkip={onToggleSkip}
           refreshSignal={refreshSignal}

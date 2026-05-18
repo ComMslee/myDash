@@ -34,6 +34,9 @@ export async function ensureSchema() {
       created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    -- wake_policy 제거 — 항상 깨워서 실행 (스케줄 본래 의도).
+    -- wake 비용은 Fleet API 응답의 wake_required 로 사후 추적 (schedule-runner.js).
+    ALTER TABLE dash_schedules DROP COLUMN IF EXISTS wake_policy;
     CREATE INDEX IF NOT EXISTS idx_dash_schedules_enabled_next
       ON dash_schedules(enabled, next_run_at);
 
@@ -82,6 +85,12 @@ export async function ensureSchema() {
       until_date DATE NOT NULL,
       reason     TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS dash_settings (
+      key        TEXT PRIMARY KEY,
+      value      JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS dash_location_events (
@@ -174,11 +183,22 @@ export async function createSchedule(input) {
   return r.rows[0];
 }
 
+// 화이트리스트 — last_run_*/next_run_at/created_at 등 워커가 set 한 필드 보호.
+// patch[field] === undefined 면 cur 값 유지 (부분 PATCH 안전).
+const UPDATABLE_FIELDS = [
+  'name', 'enabled', 'mode', 'action',
+  'action_params', 'trigger_config', 'skip_dates',
+  'valid_from', 'valid_until', 'apply_pause_mode',
+];
+
 export async function updateSchedule(id, patch) {
   await ensureSchema();
   const cur = await getSchedule(id);
   if (!cur) return null;
-  const merged = { ...cur, ...patch };
+  const merged = { ...cur };
+  for (const k of UPDATABLE_FIELDS) {
+    if (patch[k] !== undefined) merged[k] = patch[k];
+  }
   const r = await pool.query(
     `UPDATE dash_schedules SET
         name=$2, enabled=$3, mode=$4, action=$5,
@@ -275,6 +295,10 @@ const COST = {
   streaming_signals: 0.0001,
 };
 
+// $10 무료 한도 — 누적 estimated_cost 가 이 값 이상이면 실호출 차단 (CLAUDE.md 약속).
+// 결제수단 미등록 시 외부에서도 차단되지만, 코드 레벨에서도 동일 가드를 둠.
+export const COST_HARD_CAP_USD = 10;
+
 export function calcCost(calls = {}) {
   return (
     (calls.commands || 0) * COST.commands +
@@ -348,6 +372,37 @@ export async function isPausedOn(dateStr) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// Global settings (key/value) — 자동화 마스터 스위치 등.
+
+export async function getSetting(key, fallback = null) {
+  await ensureSchema();
+  const r = await pool.query(`SELECT value FROM dash_settings WHERE key=$1`, [key]);
+  if (!r.rowCount) return fallback;
+  return r.rows[0].value;
+}
+
+export async function setSetting(key, value) {
+  await ensureSchema();
+  await pool.query(
+    `INSERT INTO dash_settings (key, value, updated_at)
+     VALUES ($1, $2::jsonb, NOW())
+     ON CONFLICT (key) DO UPDATE
+       SET value = EXCLUDED.value, updated_at = NOW()`,
+    [key, JSON.stringify(value)],
+  );
+}
+
+// 자동화 마스터 스위치 — 기본 ON. false 면 워커가 evaluate/execute 스킵.
+export async function getAutomationEnabled() {
+  const v = await getSetting('automation_enabled', true);
+  return v !== false;
+}
+
+export async function setAutomationEnabled(enabled) {
+  await setSetting('automation_enabled', !!enabled);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Location events (지오펜스 진입·이탈 — 워커가 INSERT)
 
 export async function recordLocationEvent({ geofence_id, event_type, lat, lng }) {
@@ -361,11 +416,12 @@ export async function recordLocationEvent({ geofence_id, event_type, lat, lng })
 
 export async function recentLocationEvents({ since_minutes = 5 } = {}) {
   await ensureSchema();
+  const mins = Math.max(1, Math.min(1440, parseInt(since_minutes, 10) || 5));
   const r = await pool.query(
     `SELECT * FROM dash_location_events
-      WHERE occurred_at >= NOW() - ($1 || ' minutes')::interval
+      WHERE occurred_at >= NOW() - make_interval(mins => $1::int)
       ORDER BY occurred_at DESC`,
-    [String(since_minutes)],
+    [mins],
   );
   return r.rows;
 }

@@ -1,9 +1,11 @@
-import { requireAuth } from '@/lib/auth-helper';
+import { requireAuth, assertSameOrigin } from '@/lib/auth-helper';
 import { deletePausePeriod } from '@/lib/queries/schedules';
 
 export const dynamic = 'force-dynamic';
 
-export async function DELETE(_req, { params }) {
+export async function DELETE(req, { params }) {
+  const csrf = assertSameOrigin(req);
+  if (csrf) return csrf;
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
   const id = parseInt(params.id, 10);

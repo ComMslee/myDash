@@ -1,4 +1,4 @@
-import { requireAuth } from '@/lib/auth-helper';
+import { requireAuth, assertSameOrigin } from '@/lib/auth-helper';
 import { getDefaultCar } from '@/lib/queries/car';
 import {
   ensureSchema,
@@ -18,7 +18,10 @@ export const dynamic = 'force-dynamic';
 // Body/query: days (default 7), carId, scope (default 'all'), monthsBack (default 24)
 //
 // 매일 KST 04:00 GHA cron 으로 호출 (refresh-aggs.yml). scope=all 이면 4 테이블 모두 갱신.
+// 브라우저 same-origin 강제 — cron(x-hub-secret) 호출은 assertSameOrigin 내부의 isHubCall() 우회로 통과.
 export async function POST(request) {
+  const csrf = assertSameOrigin(request);
+  if (csrf) return csrf;
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
 

@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth-helper';
 import { selectByRange, countByRange, latestFetchedAt } from '@/lib/queries/family-festivals';
+import { roundCoord } from '@/lib/geo-privacy';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,8 +57,15 @@ export async function GET(req) {
   const fetchedAtMs = fetchedAt ? new Date(fetchedAt).getTime() : null;
   const stale = !fetchedAtMs || (Date.now() - fetchedAtMs) > STALE_THRESHOLD_MS;
 
+  // family/SNS 채널 — 좌표 ±100m 라운딩 (개인정보 보호).
+  const sanitized = festivals.map((f) => ({
+    ...f,
+    lat: roundCoord(f.lat, 3),
+    lng: roundCoord(f.lng, 3),
+  }));
+
   return Response.json({
-    festivals,
+    festivals: sanitized,
     totalCount,
     from,
     to,

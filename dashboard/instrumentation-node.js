@@ -12,9 +12,14 @@ const run = () => {
   warmIfNeeded().catch(e => console.warn('[instrumentation] warm failed:', e.message));
 };
 
-run();
-setInterval(run, KEEP_WARM_INTERVAL_MS);
-console.log('[instrumentation] warm loop started (interval 2min)');
+// 핫리로드/번들 중복 import 시 setInterval 이 N개 생성되어 외부 API 호출이 N배가 되는 것 차단.
+// (tesla-scheduler 와 동일 globalThis 가드 패턴)
+if (!globalThis.__homeChargerWarmStarted) {
+  globalThis.__homeChargerWarmStarted = true;
+  run();
+  setInterval(run, KEEP_WARM_INTERVAL_MS);
+  console.log('[instrumentation] warm loop started (interval 2min)');
+}
 
 // Tesla 자동화 워커 — 부팅 5초 후 첫 평가, 그 뒤 60초마다.
 if (!globalThis.__teslaSchedulerStarted) {

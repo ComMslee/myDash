@@ -91,7 +91,7 @@ const today = await pool.query(`SELECT ... FROM drives WHERE start_date >= date_
 4. master push → 자동 배포 → 응답 시간 측정
 
 ### PR2 (Tier 2 핵심 3개) — 다음 주 — ✅ 완료
-1. `dash_daily_*` 테이블 자체 마이그레이션 (`dashboard/lib/dash-agg.js` `ensureSchema()` — `kakao-geo.js` 처럼 모듈 플래그 idempotent CREATE TABLE IF NOT EXISTS)
+1. `dash_daily_*` 테이블 자체 마이그레이션 (`dashboard/lib/dash-agg/schema.js` `ensureSchema()` — `kakao-geo.js` 처럼 모듈 플래그 idempotent CREATE TABLE IF NOT EXISTS)
 2. `/api/admin/refresh-aggs` POST 라우트 — HUB_SHARED_SECRET (requireAuth 통과). 최근 7일 항상 upsert (멱등 self-heal).
 3. GHA cron 등록 — `.github/workflows/refresh-aggs.yml`, 매일 04:00 KST = UTC 19:00.
 4. insights / charge-all-time 핸들러 = 과거(`readHourDow` 테이블 합산) + 오늘(기존 `generate_series` 쿼리 `start_date >= KST today 00:00` 제한) 머지. monthly-history 는 후속.

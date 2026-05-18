@@ -65,6 +65,8 @@ export async function GET(request) {
       driveId = parsed;
     }
 
+    let driveInProgress = false;
+
     if (driveId == null) {
       const carResult = await getDefaultCar();
       if (!carResult) {
@@ -73,20 +75,31 @@ export async function GET(request) {
       const carId = carResult.id;
 
       const lastDrive = await pool.query(
-        `SELECT id FROM drives WHERE car_id = $1 ORDER BY start_date DESC LIMIT 1`,
+        `SELECT id, end_date FROM drives WHERE car_id = $1 ORDER BY start_date DESC LIMIT 1`,
         [carId]
       );
       if (lastDrive.rows.length === 0) {
         return Response.json({ positions: [], driveId: null });
       }
       driveId = lastDrive.rows[0].id;
+      driveInProgress = lastDrive.rows[0].end_date == null;
+    } else {
+      // 명시 driveId — 진행 중(end_date IS NULL) 여부 확인. 진행 중이면 캐시 우회
+      // (positions 가 계속 추가되므로 첫 응답을 영구 보관하면 stale).
+      const driveMeta = await pool.query(
+        `SELECT end_date FROM drives WHERE id = $1`,
+        [driveId]
+      );
+      driveInProgress = driveMeta.rows[0]?.end_date == null;
     }
 
-    // 캐시 조회 — driveId가 확정된 후
+    // 캐시 조회 — driveId 확정 후. 진행 중 drive 는 캐시 GET/SET 둘 다 우회.
     const cacheKey = `${driveId}|${detail}`;
-    const cached = cacheGet(cacheKey);
-    if (cached) {
-      return Response.json(cached);
+    if (!driveInProgress) {
+      const cached = cacheGet(cacheKey);
+      if (cached) {
+        return Response.json(cached);
+      }
     }
 
     const posResult = await pool.query(
@@ -134,7 +147,7 @@ export async function GET(request) {
     }
 
     const payload = { driveId, positions, maxSpeedKmh, speedBands };
-    cacheSet(cacheKey, payload);
+    if (!driveInProgress) cacheSet(cacheKey, payload);
     return Response.json(payload);
   } catch (err) {
     console.error('/api/route-map error:', err);

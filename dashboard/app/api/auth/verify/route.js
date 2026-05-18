@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { timingSafeEqual as cryptoTimingSafeEqual } from 'node:crypto';
 import { readAuth } from '@/lib/auth-store';
 import { COOKIE } from '@/lib/auth-helper';
 
@@ -11,8 +12,12 @@ export const runtime = 'nodejs';
 export async function GET(req) {
   const auth = await readAuth();
   const token = cookies().get(COOKIE)?.value;
-  if (auth && token && token === auth.token) {
-    return new Response(null, { status: 200 });
+  if (auth && token) {
+    // 타이밍 공격 방지 — 길이 다르면 false, 같으면 상수 시간 비교.
+    const a = Buffer.from(token, 'utf8');
+    const b = Buffer.from(auth.token, 'utf8');
+    const ok = a.length === b.length && cryptoTimingSafeEqual(a, b);
+    if (ok) return new Response(null, { status: 200 });
   }
 
   const proto = req.headers.get('x-forwarded-proto') || 'http';

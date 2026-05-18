@@ -75,7 +75,7 @@ function Row({ label, g, kind }) {
     <div className={`flex items-center gap-2 px-2 py-1.5 rounded border ${cls}`}>
       <span className={`text-xs font-semibold w-12 flex-shrink-0`}>{KIND_LABEL[kind]}</span>
       <span className="text-xs text-zinc-300 truncate">{g.name}</span>
-      <span className="text-[10px] text-zinc-500 tabular-nums truncate ml-auto flex-shrink-0">{g.lat.toFixed(5)}, {g.lng.toFixed(5)} · {g.radius_m}m</span>
+      <span className="text-[10px] text-zinc-500 tabular-nums truncate ml-auto flex-shrink-0">{Number(g.lat).toFixed(5)}, {Number(g.lng).toFixed(5)} · {g.radius_m}m</span>
     </div>
   );
 }

@@ -25,6 +25,8 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+      # Tesla Fleet API public key 정적 서빙 (.well-known 경로). private key 는 마운트 X.
+      - /etc/tesla-keys/com.tesla.3p.public-key.pem:/tesla-keys/com.tesla.3p.public-key.pem:ro
     depends_on:
       - teslamate
       - dashboard
@@ -67,13 +69,27 @@ services:
       - TELEGRAM_HUB_URL=${TELEGRAM_HUB_URL:-http://telegram-hub:3000}
       - HUB_SHARED_SECRET=${HUB_SHARED_SECRET:-}
       - DASHBOARD_PUBLIC_URL=${DASHBOARD_PUBLIC_URL:-}
+      # Tesla Fleet API — 토큰 발급 후에도 ENABLED=false 면 dry_run 유지.
+      - TESLA_FLEET_API_ENABLED=${TESLA_FLEET_API_ENABLED:-false}
+      - TESLA_FLEET_API_BASE=${TESLA_FLEET_API_BASE:-https://fleet-api.prd.na.vn.cloud.tesla.com}
+      - TESLA_FLEET_OAUTH_BASE=${TESLA_FLEET_OAUTH_BASE:-https://auth.tesla.com/oauth2/v3}
+      - TESLA_FLEET_AUDIENCE=${TESLA_FLEET_AUDIENCE:-https://fleet-api.prd.na.vn.cloud.tesla.com}
+      - TESLA_FLEET_CLIENT_ID=${TESLA_FLEET_CLIENT_ID:-}
+      - TESLA_FLEET_CLIENT_SECRET=${TESLA_FLEET_CLIENT_SECRET:-}
+      - TESLA_FLEET_REDIRECT_URI=${TESLA_FLEET_REDIRECT_URI:-}
+      - TESLA_FLEET_PRIVATE_KEY_PATH=${TESLA_FLEET_PRIVATE_KEY_PATH:-/app/tesla-keys/tesla-private.pem}
+      - TESLA_TOKEN_ENC_KEY=${TESLA_TOKEN_ENC_KEY:-}
+      - TESLA_VEHICLE_ID=${TESLA_VEHICLE_ID:-}
     volumes:
       - dashboard-data:/data
       - /var/run/docker.sock:/var/run/docker.sock:ro  # 컨테이너별 stats 조회용 (api-status 페이지)
+      # Tesla Fleet API private key — 명령 서명용. read-only, dashboard 컨테이너만 접근.
+      - /etc/tesla-keys/tesla-private.pem:/app/tesla-keys/tesla-private.pem:ro
     # 외부 80/443 은 teslamate-auth (Caddy) 가 담당. 내부 컨테이너 통신은 dashboard:5000.
-    # 5000 호스트 직접 노출은 디버그/우회용 (curl localhost:5000 으로 Caddy 우회 진단).
+    # 호스트 127.0.0.1 만 바인딩 — 외부 인터넷 노출 차단 (Caddy 우회 차단).
+    # 디버그는 `curl localhost:5000` 으로 SSH 후 호스트 내부에서만 가능.
     ports:
-      - 5000:5000
+      - "127.0.0.1:5000:5000"
     depends_on:
       - database
 

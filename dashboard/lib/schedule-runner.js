@@ -1,4 +1,4 @@
-import { logExecution, bumpMonthlyUsage, calcCost } from '@/lib/queries/schedules';
+import { logExecution, bumpMonthlyUsage, calcCost, getMonthlyUsage, COST_HARD_CAP_USD } from '@/lib/queries/schedules';
 import { callTeslaCommand } from '@/lib/tesla-fleet';
 
 // Tesla 자동화 — 액션 1건 실행기.
@@ -7,7 +7,7 @@ import { callTeslaCommand } from '@/lib/tesla-fleet';
 // 3) dash_api_usage_monthly 누적
 // 워커(setInterval) · 수동 실행 · 즉시 명령 모두 이 함수를 통과.
 
-const ACTION_TO_COMMAND = {
+export const ACTION_TO_COMMAND = {
   sentry_on: { command: 'set_sentry_mode', params: { on: true } },
   sentry_off: { command: 'set_sentry_mode', params: { on: false } },
   climate_on: { command: 'auto_conditioning_start', params: {} },
@@ -44,6 +44,20 @@ export async function executeAction({ schedule_id, action, action_params, trigge
   const params = { ...map.params, ...(action_params || {}) };
   const enabled = process.env.TESLA_FLEET_API_ENABLED === 'true';
 
+  // 비용 가드 — $10 무료 한도 초과 시 실호출 차단 (CLAUDE.md 약속). Mock 은 누적만, 차단 안 함.
+  if (enabled) {
+    const usage = await getMonthlyUsage(monthYmd());
+    const used = Number(usage?.estimated_cost || 0);
+    if (used >= COST_HARD_CAP_USD) {
+      const reason = `monthly_budget_exceeded ($${used.toFixed(4)} >= $${COST_HARD_CAP_USD})`;
+      const row = await logExecution({
+        schedule_id, trigger_source, action, action_params,
+        status: 'skipped', reason, api_calls: {}, cost_estimate: 0,
+      });
+      return { id: row.id, status: 'skipped', reason, cost_estimate: 0 };
+    }
+  }
+
   let status, reason = null, tesla_response = null, api_calls = {};
   try {
     if (enabled) {
@@ -69,8 +83,11 @@ export async function executeAction({ schedule_id, action, action_params, trigge
     schedule_id, trigger_source, action, action_params,
     status, reason, api_calls, tesla_response, cost_estimate,
   });
-  // 비용 누적 — Mock 도 추정치 누적 (UI 에서 예상 사용량 보기 위해)
-  await bumpMonthlyUsage(monthYmd(), api_calls);
+  // Mock 인 경우만 dash_api_usage_monthly 누적 — 실호출은 lib/tesla-fleet.js::teslaFetch 가 자동 카운팅.
+  // 이렇게 분리해야 ENABLED=true 일 때 schedule + tesla-test/* + now-command 모든 경로가 단일 진실원으로 모임.
+  if (!enabled) {
+    await bumpMonthlyUsage(monthYmd(), api_calls);
+  }
   return { id: row.id, status, reason, cost_estimate };
 }
 
