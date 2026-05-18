@@ -57,6 +57,7 @@ export async function GET(request) {
            SUM(dw.dwell_sec)::float AS total_dwell_sec,
            AVG(dw.dwell_sec)::float AS avg_dwell_sec,
            MAX(dw.dwell_sec)::float AS max_dwell_sec,
+           MIN(dw.dwell_sec)::float AS min_dwell_sec,
            COUNT(*)::int AS visit_count,
            MAX(dw.end_date) AS last_visit,
            MIN(dw.end_date) AS first_visit
@@ -97,6 +98,7 @@ export async function GET(request) {
         total_dwell_sec: Math.round(p.total_dwell_sec),
         avg_dwell_sec: Math.round(p.avg_dwell_sec),
         max_dwell_sec: Math.round(p.max_dwell_sec),
+        min_dwell_sec: Math.round(p.min_dwell_sec),
         visit_count: p.visit_count,
         last_visit: p.last_visit || null,
         first_visit: p.first_visit || null,

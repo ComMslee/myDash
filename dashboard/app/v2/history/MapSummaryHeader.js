@@ -295,6 +295,8 @@ function PlaceSummary({ place }) {
       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 pl-5 text-xs">
         {isLongStay ? (
           <>
+            {place.max_dwell_sec > 0 && <div className="flex justify-between"><span className="text-zinc-600">일 최대</span><span className="text-amber-400 font-semibold tabular-nums">{formatDwellSec(place.max_dwell_sec)}</span></div>}
+            {place.min_dwell_sec > 0 && <div className="flex justify-between"><span className="text-zinc-600">일 최소</span><span className="text-amber-400/60 font-semibold tabular-nums">{formatDwellSec(place.min_dwell_sec)}</span></div>}
             {place.avg_dwell_sec > 0 && <div className="flex justify-between"><span className="text-zinc-600">평균 체류</span><span className="text-amber-400/80 font-semibold tabular-nums">{formatDwellSec(place.avg_dwell_sec)}</span></div>}
             {place.total_dwell_sec > 0 && <div className="flex justify-between"><span className="text-zinc-600">총 체류</span><span className="text-zinc-400 font-semibold tabular-nums">{formatDwellSec(place.total_dwell_sec)}</span></div>}
             {place.visit_count > 0 && <div className="flex justify-between"><span className="text-zinc-600">방문</span><span className="text-zinc-400 font-semibold tabular-nums">{place.visit_count}회</span></div>}
