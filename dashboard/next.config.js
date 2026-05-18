@@ -4,7 +4,7 @@
 // 1) redirect: 기존/내부 /v2/* 링크가 클릭되면 영구 리디렉트로 깨끗한 URL 로
 // 2) rewrite : 새 깨끗한 URL 로 들어온 요청을 내부적으로 /v2/* 파일에 매핑
 // 새 v2 서브라우트 추가 시 V2_SUBROUTES 에만 추가.
-const V2_SUBROUTES = ['drives', 'history', 'battery', 'chargers', 'tg', 'dev'];
+const V2_SUBROUTES = ['drives', 'history', 'battery', 'chargers', 'tg', 'dev', 'schedule'];
 
 const nextConfig = {
   experimental: {

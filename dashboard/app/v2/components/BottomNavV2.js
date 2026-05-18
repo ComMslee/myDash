@@ -50,8 +50,19 @@ const tabs = [
   },
 ];
 
-// ⚙️ 설정 시트 — 텔레그램/API상태/인증 어드민 진입점
+// ⚙️ 설정 시트 — 자동화/텔레그램/API상태/인증 어드민 진입점
 const SETTINGS = [
+  {
+    href: '/schedule',
+    label: '자동화',
+    desc: '센트리 · 공조 스케줄 / 사용량',
+    color: 'text-emerald-400',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
   {
     href: '/tg',
     label: '텔레그램',
