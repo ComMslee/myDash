@@ -47,7 +47,7 @@ Next.js 14 · JavaScript(ESM) · Tailwind 3 · PostgreSQL 16(TeslaMate 스키마
            Tesla Fleet · 환경공단 EV · Kakao · TourAPI · 기상청
                                    ▲
                                    │
-   브라우저 ─HTTPS─┐                │                ┌─ 가족 (Telegram)
+   브라우저 ─HTTPS─┐                │                ┌─ 텔레그램
                   ▼                │                ▼
    GitHub ─push/SSH─►   AWS Lightsail (Seoul · 1GB micro)
                   ┌──────────────────────────────────────────┐
