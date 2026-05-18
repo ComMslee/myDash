@@ -43,13 +43,21 @@ Next.js 14 · JavaScript(ESM) · Tailwind 3 · PostgreSQL 16(TeslaMate 스키마
 ## 아키텍처
 
 ```
-                       외부 API (HTTPS, outbound)
-           Tesla Fleet · 환경공단 EV · Kakao · TourAPI · 기상청
-                          ▲           ▲
-                          │ OAuth2    │ REST
-                          │ + 명령    │
-   브라우저 ─HTTPS─┐       │           │            ┌─ 텔레그램
-                  ▼       │           │            ▼
+      ┌────────── Tesla Fleet API · HTTPS · 양방향 ⚡ ──────────┐
+      │  ⇣ vehicle_data · 차량 상태 · OAuth2 토큰              │
+      │  ⇡ commands (climate · sentry · wake) · 서명 명령      │
+      └──────────────────────────▲──────────────────────────────┘
+                                 │  ※ 유료 호출 — `/v2/schedule` 한정
+      ┌────────── 외부 데이터 (HTTPS · fetch ⇣) ──────────────────┐
+      │  공공데이터포털  ─┬─ 환경공단 EV     충전소 · 실시간 상태  │
+      │                  ├─ 한국관광공사    TourAPI · 축제        │
+      │                  ├─ 한국천문연구원  공휴일                │
+      │                  └─ 기상청          단기예보 (VilageFcst) │
+      │  상용 API        ─── Kakao Maps     좌표 ↔ 주소 geocoding │
+      └──────────────────────────▲──────────────────────────────┘
+                                 │
+   브라우저 ─HTTPS─┐               │             ┌─ 텔레그램
+                  ▼               │             ▼
    GitHub ─push/SSH─►   AWS Lightsail (Seoul · 1GB micro)
                   ┌──────────────────────────────────────────┐
                   │  Caddy  :80/:443  (forward_auth · HSTS)  │
