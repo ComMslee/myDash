@@ -76,15 +76,17 @@ function StatsLine({ driveCount, durationMin, dayCount, efficiency = null }) {
   );
 }
 
-// 헤더 우측 강조 영역 — 일 카드와 동일한 km(파랑) + kWh(초록) 정렬.
+// 헤더 우측 강조 영역 — km(파랑) + kWh(초록) 정렬. 일 카드보다 한 단계 톤다운
+// (집계 레벨이라 시각적 무게를 낮춤 — 일 카드: blue-400 bold/green-400-80,
+//                                       헤더:    blue-400/70 semibold/green-400/60).
 function HeaderTotals({ distance, kwh, usedPct }) {
   return (
     <div className="text-right tabular-nums flex-shrink-0 inline-flex items-baseline gap-2">
-      <span className="text-sm font-bold text-blue-400">{distance.toFixed(0)}<span className="text-[10px] text-zinc-600 ml-0.5">km</span></span>
+      <span className="text-sm font-semibold text-blue-400/70">{distance.toFixed(0)}<span className="text-[10px] text-zinc-600 ml-0.5">km</span></span>
       {kwh > 0 && (
-        <span className="text-xs text-green-400/80">
+        <span className="text-xs text-green-400/60">
           {kwh.toFixed(1)}<span className="ml-0.5">kWh</span>
-          {usedPct > 0 && <span className="text-zinc-500 ml-1">({usedPct}%)</span>}
+          {usedPct > 0 && <span className="text-zinc-600 ml-1">({usedPct}%)</span>}
         </span>
       )}
     </div>
