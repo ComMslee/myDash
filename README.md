@@ -16,51 +16,46 @@
 ## 아키텍처
 
 ```mermaid
-flowchart TB
-    subgraph Ext["외부 시스템"]
-        direction LR
-        Tesla["⚡ Tesla Fleet API<br/>OAuth2 · 양방향"]
-        Gov["📊 공공데이터포털 · data.go.kr<br/>환경공단 · 관광공사 · 기상청 · 천문연"]
-        Kakao["🗺 Kakao Maps"]
-        TG["💬 Telegram Bot API<br/>양방향"]
-    end
+flowchart TD
+    Tesla["⚡ Tesla Fleet API"]
+    Gov["📊 data.go.kr"]
+    Kakao["🗺 Kakao Maps"]
+    TG["💬 Telegram Bot"]
 
-    subgraph Ls["☁️ AWS Lightsail · Seoul · t-micro · $7/월"]
-        direction TB
-        Caddy["Caddy :80/:443<br/>HSTS · forward_auth"]
-        Dashboard["dashboard<br/>(Next.js · API gateway)"]
-        Scheduler["schedule-runner ⚡"]
-        Hub["telegram-hub"]
-        TM["teslamate"]
-        Postgres[("Postgres")]
+    subgraph LS["☁️ AWS Lightsail · Seoul · 1 GB"]
+        direction LR
+        Caddy["🛡 Caddy"]
+        Dashboard["⚙️ dashboard"]
+        Hub["🔗 telegram-hub"]
+        Scheduler["⏰ schedule-runner"]
+        TM["📡 teslamate"]
+        DB[("🗄 Postgres")]
         Caddy --> Dashboard
-        Dashboard --> Postgres
-        Hub -- "/api/*" --> Dashboard
-        TM -- "MQTT" --> Postgres
+        Dashboard --> DB
         Dashboard --> Scheduler
+        Hub --> Dashboard
+        TM -. MQTT .-> DB
     end
 
-    subgraph Cli["사용자 / 자동화"]
-        direction LR
-        Browser["🌐 브라우저 · PIN 인증"]
-        GHA["🤖 GitHub Actions · master push"]
-    end
+    Browser["🌐 Browser"]
+    GHA["🚀 GitHub Actions"]
 
-    Tesla   -- "IN · vehicle_data · OAuth2 토큰"            --> Dashboard
-    Scheduler -- "OUT · commands (climate/sentry/wake)"     --> Tesla
-    Gov     -- "IN · 충전소 · 축제 · 단기예보 · 공휴일"      --> Dashboard
-    Kakao   -- "IN · 좌표 ↔ 주소 (geocoding)"                --> Dashboard
-    TG      -- "IN · 사용자 명령 수신"                       --> Hub
-    Hub     -- "OUT · 푸시 알림 발신"                        --> TG
-    Browser -- "HTTPS 요청 / 응답"                           --> Caddy
-    GHA     -- "SSH 자동 배포"                               --> Ls
+    Tesla -- "vehicle_data, OAuth2" --> Dashboard
+    Scheduler -- "commands" --> Tesla
+    Gov -- "충전소·축제·예보·공휴일" --> Dashboard
+    Kakao -- "좌표 ↔ 주소" --> Dashboard
+    TG -- "사용자 명령" --> Hub
+    Hub -- "푸시 알림" --> TG
+    Browser -- "HTTPS · PIN" --> Caddy
+    GHA -- "master push · SSH" --> Caddy
 
-    classDef ext fill:#1e293b,stroke:#475569,color:#f1f5f9
-    classDef ls fill:#0c4a6e,stroke:#0ea5e9,color:#f0f9ff
-    classDef cli fill:#1c1917,stroke:#78716c,color:#fafaf9
+    classDef ext fill:#1e3a8a,stroke:#60a5fa,color:#eff6ff
+    classDef ls fill:#065f46,stroke:#34d399,color:#ecfdf5
+    classDef cli fill:#44403c,stroke:#a8a29e,color:#fafaf9
     class Tesla,Gov,Kakao,TG ext
-    class Caddy,Dashboard,Scheduler,Hub,TM,Postgres ls
+    class Caddy,Dashboard,Hub,Scheduler,TM,DB ls
     class Browser,GHA cli
+    style LS fill:#022c22,stroke:#059669,color:#a7f3d0
 ```
 
 `IN` = Lightsail 이 받는 데이터 / `OUT` = Lightsail 이 내보내는 데이터.
