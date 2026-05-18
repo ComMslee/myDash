@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import { KWH_PER_KM } from '@/lib/constants';
 import { formatDuration, formatHm } from '@/lib/format';
-import { KST_OFFSET_MS } from '@/lib/kst';
+import { KST_OFFSET_MS, kstMondayStr } from '@/lib/kst';
 import { Icon } from '../../lib/Icons';
 
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
@@ -14,12 +14,57 @@ function currentMonthKey() {
   return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
+// KST 기준 현재 주의 월요일 'YYYY-MM-DD' — 이번 주 펼침 기본값
+function currentWeekKey() {
+  return kstMondayStr(Date.now());
+}
+
 // 'YYYY-MM' → '24/03 (3월)' 라벨 (현재 연도면 연도 생략)
 function formatMonthLabel(mk) {
   const [y, m] = mk.split('-');
   const currentYear = new Date().getFullYear();
   const yLabel = parseInt(y) === currentYear ? '' : `${y.slice(2)}년 `;
   return `${yLabel}${parseInt(m)}월`;
+}
+
+// 주 헤더 라벨 — 월 안에서 보이는 일자 범위 'M/D ~ M/D' (단일 날짜면 'M/D').
+function formatWeekRange(daysInWeek) {
+  if (!daysInWeek.length) return '';
+  const sorted = [...daysInWeek].sort((a, b) => a.firstDate - b.firstDate);
+  const first = sorted[0].firstDate;
+  const last = sorted[sorted.length - 1].firstDate;
+  const fmt = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+  if (first.toDateString() === last.toDateString()) return fmt(first);
+  return `${fmt(first)} ~ ${fmt(last)}`;
+}
+
+// 강화된 통계 라인 — kWh / 총 운전시간 / 평균 거리·회 / 운행일수.
+// 값이 0/null 인 항목은 생략. 모바일 너비에 맞게 tabular-nums + 작은 글자.
+function StatsLine({ kwh, durationMin, distance, driveCount, dayCount, efficiency = null }) {
+  const parts = [];
+  if (kwh > 0) parts.push(`${kwh.toFixed(1)}kWh`);
+  if (durationMin > 0) parts.push(formatHm(Math.round(durationMin)));
+  if (driveCount > 0 && distance > 0) {
+    const avg = distance / driveCount;
+    parts.push(`${avg < 10 ? avg.toFixed(1) : Math.round(avg)}km/회`);
+  }
+  if (efficiency != null) parts.push(`${Math.round(efficiency)}Wh/km`);
+  if (dayCount > 0) parts.push(`${dayCount}일`);
+  if (!parts.length) return null;
+  return (
+    <span className="text-[10px] text-zinc-600 tabular-nums truncate">
+      {parts.join(' · ')}
+    </span>
+  );
+}
+
+// Chevron — 월/주 공통 (크기만 다름)
+function Chevron({ expanded, size = 'w-4 h-4' }) {
+  return (
+    <svg className={`${size} transition-transform ${expanded ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  );
 }
 
 // 카드 풀배경 그라데이션 — 06~23h 윈도우. 운행 구간만 아래쪽이 짙고 위로 페이드.
@@ -53,9 +98,10 @@ function DayBgGradient({ items, dayStart, dayMs }) {
 }
 
 /**
- * 월 그룹 → 일 카드 (스캔용 상단 리스트).
- * 일 카드 탭 → onDayClick(dateStr) — page.js 가 dayMode 진입 (지도+컴팩트 strip).
- * 월 헤더 탭 → onMonthClick(mk) (있으면 monthMode 진입), 우측 chevron 은 펼침 토글.
+ * 월 그룹 → 주 그룹 → 일 카드 (3단 계층).
+ * - 월 헤더: 좌측 영역 onMonthClick(monthMode 지도) · 우측 chevron toggle
+ * - 주 헤더: 전체 영역 toggle (월 안에서 보이는 일자 범위만 표시)
+ * - 일 카드 탭 → onDayClick(dateStr) — dayMode 지도+컴팩트 strip 진입
  */
 export default function DriveListView({
   drives, loadingDrives, error,
@@ -63,11 +109,18 @@ export default function DriveListView({
   driveDayStr,
 }) {
   const [expandedMonths, setExpandedMonths] = useState(() => new Set([currentMonthKey()]));
+  const [expandedWeeks, setExpandedWeeks] = useState(() => new Set([currentWeekKey()]));
   const toggleMonth = (mk) => setExpandedMonths(prev => {
     const next = new Set(prev);
     if (next.has(mk)) next.delete(mk); else next.add(mk);
     return next;
   });
+  const toggleWeek = (wk) => setExpandedWeeks(prev => {
+    const next = new Set(prev);
+    if (next.has(wk)) next.delete(wk); else next.add(wk);
+    return next;
+  });
+  const todayWeekKey = useMemo(() => currentWeekKey(), []);
 
   // 공휴일 — drives 에 등장하는 연도들만 /api/holidays?year= 으로 로드. KST 기준 YYYYMMDD.
   const yearsKey = useMemo(() => {
@@ -114,13 +167,14 @@ export default function DriveListView({
     const dt = new Date(d.start_date);
     const key = dt.toDateString();
     if (key !== currentKey) {
-      groups.push({ key, dateStr: driveDayStr(d), firstDate: dt, items: [], distance: 0, kwh: 0, usedPct: 0 });
+      groups.push({ key, dateStr: driveDayStr(d), firstDate: dt, items: [], distance: 0, kwh: 0, usedPct: 0, durationMin: 0 });
       currentKey = key;
     }
     const g = groups[groups.length - 1];
     g.items.push(d);
     if (!d.absorbed) {
       g.distance += parseFloat(d.distance) || 0;
+      g.durationMin += parseFloat(d.duration_min) || 0;
       if (d.start_rated_range_km && d.end_rated_range_km) {
         const usedKm = parseFloat(d.start_rated_range_km) - parseFloat(d.end_rated_range_km);
         if (usedKm > 0) g.kwh += usedKm * KWH_PER_KM;
@@ -131,14 +185,18 @@ export default function DriveListView({
     }
   });
 
-  // 월별 묶음 (순서 보존)
+  // 월별 묶음 + 월 내부 주별 묶음 (kstMondayStr 기준, ISO 월~일)
   const monthOrder = [];
   const monthMap = new Map();
   groups.forEach(g => {
     const mk = g.dateStr.slice(0, 7);
+    const wk = kstMondayStr(`${g.dateStr}T00:00:00Z`);
     let m = monthMap.get(mk);
     if (!m) {
-      m = { mk, days: [], distance: 0, kwh: 0, usedPct: 0, driveCount: 0 };
+      m = {
+        mk, days: [], distance: 0, kwh: 0, usedPct: 0, driveCount: 0, durationMin: 0,
+        weekOrder: [], weekMap: new Map(),
+      };
       monthMap.set(mk, m);
       monthOrder.push(mk);
     }
@@ -147,6 +205,20 @@ export default function DriveListView({
     m.kwh += g.kwh;
     m.usedPct += g.usedPct;
     m.driveCount += g.items.filter(d => !d.absorbed).length;
+    m.durationMin += g.durationMin;
+
+    let w = m.weekMap.get(wk);
+    if (!w) {
+      w = { weekKey: wk, days: [], distance: 0, kwh: 0, usedPct: 0, driveCount: 0, durationMin: 0 };
+      m.weekMap.set(wk, w);
+      m.weekOrder.push(wk);
+    }
+    w.days.push(g);
+    w.distance += g.distance;
+    w.kwh += g.kwh;
+    w.usedPct += g.usedPct;
+    w.driveCount += g.items.filter(d => !d.absorbed).length;
+    w.durationMin += g.durationMin;
   });
 
   // 일 카드 — 24h 막대 + 시간 범위/운전·정차 시간/총량.
@@ -254,6 +326,9 @@ export default function DriveListView({
     );
   };
 
+  // 효율 (Wh/km) 계산 — 0 으로 나누기 방지
+  const calcEff = (kwh, dist) => (kwh > 0 && dist > 0) ? (kwh * 1000 / dist) : null;
+
   return (
     <>
       {monthOrder.map(mk => {
@@ -261,37 +336,79 @@ export default function DriveListView({
         const expanded = expandedMonths.has(mk);
         return (
           <Fragment key={mk}>
-            {/* 월 헤더 — 큰 영역=상세보기 / 우측 chevron=펼치기 */}
+            {/* 월 헤더 — 큰 영역=상세보기 / 우측 chevron=펼치기. 2줄 (요약 + 강화 통계) */}
             <div className="flex items-stretch border-t border-white/[0.10] bg-white/[0.04]">
               <button
                 onClick={() => (onMonthClick ? onMonthClick(mk) : toggleMonth(mk))}
-                className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-white/[0.05] active:bg-white/[0.08] transition-colors text-left min-w-0"
+                className="flex-1 flex flex-col gap-0.5 px-3 py-2 hover:bg-white/[0.05] active:bg-white/[0.08] transition-colors text-left min-w-0"
                 title={onMonthClick ? '이 달 전체 지도/순위 보기' : (expanded ? '접기' : '펼치기')}
               >
-                <span className="text-xs font-bold text-zinc-300 flex-shrink-0">{formatMonthLabel(mk)}</span>
-                <span className="text-[10px] text-zinc-600 tabular-nums truncate">
-                  {m.driveCount}회 · {m.distance.toFixed(0)}km
-                  {m.usedPct > 0 && <span className="text-zinc-700"> · {m.usedPct}%</span>}
-                </span>
+                <div className="flex items-baseline gap-2 min-w-0">
+                  <span className="text-xs font-bold text-zinc-300 flex-shrink-0">{formatMonthLabel(mk)}</span>
+                  <span className="text-[10px] text-zinc-600 tabular-nums truncate">
+                    {m.driveCount}회 · {m.distance.toFixed(0)}km
+                    {m.usedPct > 0 && <span className="text-zinc-700"> · {m.usedPct}%</span>}
+                  </span>
+                </div>
+                <StatsLine
+                  kwh={m.kwh} durationMin={m.durationMin} distance={m.distance}
+                  driveCount={m.driveCount} dayCount={m.days.length}
+                  efficiency={calcEff(m.kwh, m.distance)}
+                />
               </button>
               <button
                 onClick={() => toggleMonth(mk)}
                 className="px-3 flex items-center text-zinc-500 border-l border-white/[0.06] hover:bg-white/[0.05] active:bg-white/[0.08] transition-colors"
                 title={expanded ? '접기' : '펼치기'}
               >
-                <svg className={`w-4 h-4 transition-transform ${expanded ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+                <Chevron expanded={expanded} />
               </button>
             </div>
-            {expanded && m.days.flatMap((g, idx) => {
-              const nextDay = idx + 1 < m.days.length ? m.days[idx + 1] : null;
-              const nodes = [renderDayCard(g)];
-              if (nextDay) {
-                const gapNode = renderCrossDayGap(g, nextDay, g.key + '-xgap');
-                if (gapNode) nodes.push(gapNode);
-              }
-              return nodes;
+            {expanded && m.weekOrder.map(wk => {
+              const w = m.weekMap.get(wk);
+              const weekExpanded = expandedWeeks.has(wk);
+              const isCurrentWeek = wk === todayWeekKey;
+              return (
+                <Fragment key={`${mk}|${wk}`}>
+                  {/* 주 헤더 — 전체 영역 toggle. 월 안에서 보이는 일자 범위만 표시. */}
+                  <button
+                    onClick={() => toggleWeek(wk)}
+                    type="button"
+                    className="w-full text-left flex items-center gap-2 px-3 py-1.5 bg-white/[0.02] hover:bg-white/[0.04] active:bg-white/[0.05] transition-colors border-t border-white/[0.05]"
+                    title={weekExpanded ? '접기' : '펼치기'}
+                  >
+                    <span className="text-zinc-600 flex-shrink-0">
+                      <Chevron expanded={weekExpanded} size="w-3 h-3" />
+                    </span>
+                    <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                      <div className="flex items-baseline gap-2 min-w-0">
+                        <span className="text-[11px] font-semibold text-zinc-400 flex-shrink-0 tabular-nums">
+                          {formatWeekRange(w.days)}
+                          {isCurrentWeek && <span className="text-[9px] text-blue-400 ml-1 font-normal align-middle">이번주</span>}
+                        </span>
+                        <span className="text-[10px] text-zinc-600 tabular-nums truncate">
+                          {w.driveCount}회 · {w.distance.toFixed(0)}km
+                          {w.usedPct > 0 && <span className="text-zinc-700"> · {w.usedPct}%</span>}
+                        </span>
+                      </div>
+                      <StatsLine
+                        kwh={w.kwh} durationMin={w.durationMin} distance={w.distance}
+                        driveCount={w.driveCount} dayCount={w.days.length}
+                        efficiency={calcEff(w.kwh, w.distance)}
+                      />
+                    </div>
+                  </button>
+                  {weekExpanded && w.days.flatMap((g, idx) => {
+                    const nextDay = idx + 1 < w.days.length ? w.days[idx + 1] : null;
+                    const nodes = [renderDayCard(g)];
+                    if (nextDay) {
+                      const gapNode = renderCrossDayGap(g, nextDay, g.key + '-xgap');
+                      if (gapNode) nodes.push(gapNode);
+                    }
+                    return nodes;
+                  })}
+                </Fragment>
+              );
             })}
           </Fragment>
         );
