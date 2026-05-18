@@ -1,27 +1,7 @@
 'use client';
 
 import { Icon } from '@/app/lib/Icons';
-import { shortAddr } from '@/lib/format';
-
-// 체류 시간 포맷 — 초 단위 → 분/시간/일/주 자동 스케일.
-function fmtDwell(sec) {
-  if (sec == null) return '—';
-  if (sec < 60) return `${Math.floor(sec)}초`;
-  if (sec < 3600) return `${Math.floor(sec / 60)}분`;
-  if (sec < 86400) {
-    const h = Math.floor(sec / 3600);
-    const m = Math.floor((sec % 3600) / 60);
-    return m === 0 ? `${h}시간` : `${h}h${m}m`;
-  }
-  if (sec < 7 * 86400) {
-    const d = Math.floor(sec / 86400);
-    const h = Math.floor((sec % 86400) / 3600);
-    return h === 0 ? `${d}일` : `${d}일 ${h}h`;
-  }
-  const w = Math.floor(sec / (7 * 86400));
-  const d = Math.floor((sec % (7 * 86400)) / 86400);
-  return d === 0 ? `${w}주` : `${w}주 ${d}일`;
-}
+import { shortAddr, formatDwellSec } from '@/lib/format';
 
 // 자주 가는 곳 / 오래 머문 곳 — 탭 토글로 메트릭 전환.
 // onSelectPlace(p): 부모가 selectedPlace 설정 + map view 전환 cascade 처리.
@@ -39,7 +19,7 @@ export default function PlacesPanel({
   if (displayPlaces.length === 0) return null;
   const titleIcon = isLong ? 'clock' : 'pin';
   const titleLabel = isLong ? '오래 머문 곳' : '자주 가는 곳';
-  const metric = (p) => isLong ? fmtDwell(p.max_dwell_sec) : `${p.visit_count}회`;
+  const metric = (p) => isLong ? formatDwellSec(p.max_dwell_sec) : `${p.visit_count}회`;
 
   return (
     <div className="flex-shrink-0 px-4 pt-2 pb-1.5">

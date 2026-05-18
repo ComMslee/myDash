@@ -11,6 +11,26 @@ export function formatDuration(minutes) {
 /** formatDuration 의 별칭 — 기존 코드 호환 */
 export const formatHm = formatDuration;
 
+/** 초 → "초/분/h시간/일/주" 자동 스케일. 체류시간(dwell) 표기용. formatDuration 은 분 단위라 별도. */
+export function formatDwellSec(sec) {
+  if (sec == null) return '—';
+  if (sec < 60) return `${Math.floor(sec)}초`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}분`;
+  if (sec < 86400) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    return m === 0 ? `${h}시간` : `${h}h${m}m`;
+  }
+  if (sec < 7 * 86400) {
+    const d = Math.floor(sec / 86400);
+    const h = Math.floor((sec % 86400) / 3600);
+    return h === 0 ? `${d}일` : `${d}일 ${h}h`;
+  }
+  const w = Math.floor(sec / (7 * 86400));
+  const d = Math.floor((sec % (7 * 86400)) / 86400);
+  return d === 0 ? `${w}주` : `${w}주 ${d}일`;
+}
+
 /** 시간(소수 가능) → "Xh Ym" 또는 "Ym" (1시간 미만은 분 단위) */
 export function formatHours(hours) {
   if (hours == null) return '—';

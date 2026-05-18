@@ -2,7 +2,7 @@
 
 import { Icon } from '@/app/lib/Icons';
 import { KWH_PER_KM } from '@/lib/constants';
-import { formatDuration, formatHm, shortAddr } from '@/lib/format';
+import { formatDuration, formatHm, shortAddr, formatDwellSec } from '@/lib/format';
 import { formatTimeRange, kstDateStr, kstMondayStr } from '@/lib/kst';
 
 function efficiency(d) {
@@ -277,18 +277,38 @@ function DriveSummary({ drive }) {
 
 function PlaceSummary({ place }) {
   const fmtMD = (s) => { const d = new Date(s); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+  // 오래 머문 곳 (long-stay) vs 자주 가는 곳 (frequent) — dwell 필드 유무로 분기.
+  const isLongStay = place.max_dwell_sec > 0 || place.avg_dwell_sec > 0;
   return (
     <div className="px-4 py-2.5 border-b border-white/[0.06] flex-shrink-0">
       <div className="flex items-center gap-3 mb-2">
         <span className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
         <p className="text-base text-zinc-300 truncate flex-1">{place.label}</p>
-        <span className="text-amber-400 text-sm font-bold tabular-nums flex-shrink-0">{place.visit_count}회 방문</span>
+        {isLongStay ? (
+          <span className="text-amber-400 text-sm font-bold tabular-nums flex-shrink-0">
+            {formatDwellSec(place.max_dwell_sec)}<span className="text-zinc-500 text-xs ml-1">최장</span>
+          </span>
+        ) : (
+          <span className="text-amber-400 text-sm font-bold tabular-nums flex-shrink-0">{place.visit_count}회 방문</span>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 pl-5 text-xs">
-        {place.first_visit && <div className="flex justify-between"><span className="text-zinc-600">첫 방문</span><span className="text-zinc-400 tabular-nums">{fmtMD(place.first_visit)}</span></div>}
-        {place.last_visit && <div className="flex justify-between"><span className="text-zinc-600">최근 방문</span><span className="text-zinc-400 tabular-nums">{fmtMD(place.last_visit)}</span></div>}
-        {place.avg_distance > 0 && <div className="flex justify-between"><span className="text-zinc-600">이동 평균</span><span className="text-blue-400/80 font-semibold tabular-nums">{place.avg_distance}km</span></div>}
-        {place.avg_duration > 0 && <div className="flex justify-between"><span className="text-zinc-600">소요시간</span><span className="text-zinc-400 font-semibold tabular-nums">{formatDuration(place.avg_duration)}</span></div>}
+        {isLongStay ? (
+          <>
+            {place.avg_dwell_sec > 0 && <div className="flex justify-between"><span className="text-zinc-600">평균 체류</span><span className="text-amber-400/80 font-semibold tabular-nums">{formatDwellSec(place.avg_dwell_sec)}</span></div>}
+            {place.total_dwell_sec > 0 && <div className="flex justify-between"><span className="text-zinc-600">총 체류</span><span className="text-zinc-400 font-semibold tabular-nums">{formatDwellSec(place.total_dwell_sec)}</span></div>}
+            {place.visit_count > 0 && <div className="flex justify-between"><span className="text-zinc-600">방문</span><span className="text-zinc-400 font-semibold tabular-nums">{place.visit_count}회</span></div>}
+            {place.last_visit && <div className="flex justify-between"><span className="text-zinc-600">최근 방문</span><span className="text-zinc-400 tabular-nums">{fmtMD(place.last_visit)}</span></div>}
+            {place.first_visit && <div className="flex justify-between"><span className="text-zinc-600">첫 방문</span><span className="text-zinc-400 tabular-nums">{fmtMD(place.first_visit)}</span></div>}
+          </>
+        ) : (
+          <>
+            {place.first_visit && <div className="flex justify-between"><span className="text-zinc-600">첫 방문</span><span className="text-zinc-400 tabular-nums">{fmtMD(place.first_visit)}</span></div>}
+            {place.last_visit && <div className="flex justify-between"><span className="text-zinc-600">최근 방문</span><span className="text-zinc-400 tabular-nums">{fmtMD(place.last_visit)}</span></div>}
+            {place.avg_distance > 0 && <div className="flex justify-between"><span className="text-zinc-600">이동 평균</span><span className="text-blue-400/80 font-semibold tabular-nums">{place.avg_distance}km</span></div>}
+            {place.avg_duration > 0 && <div className="flex justify-between"><span className="text-zinc-600">소요시간</span><span className="text-zinc-400 font-semibold tabular-nums">{formatDuration(place.avg_duration)}</span></div>}
+          </>
+        )}
       </div>
       {place.origins?.length > 0 && (
         <div className="flex items-center gap-1 mt-2 pl-5 text-[11px]">
