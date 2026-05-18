@@ -16,46 +16,45 @@
 ## 아키텍처
 
 ```mermaid
-flowchart TD
-    Tesla["⚡ Tesla Fleet API"]
-    Gov["📊 data.go.kr"]
-    Kakao["🗺 Kakao Maps"]
-    TG["💬 Telegram Bot"]
-
-    subgraph LS["☁️ AWS Lightsail · Seoul · 1 GB"]
-        direction LR
-        Caddy["🛡 Caddy"]
-        Dashboard["⚙️ dashboard"]
-        Hub["🔗 telegram-hub"]
-        Scheduler["⏰ schedule-runner"]
-        TM["📡 teslamate"]
-        DB[("🗄 Postgres")]
-        Caddy --> Dashboard
-        Dashboard --> DB
-        Dashboard --> Scheduler
-        Hub --> Dashboard
-        TM -. MQTT .-> DB
+flowchart LR
+    subgraph EXT["🌐 External"]
+        direction TB
+        Tesla["⚡ Tesla Fleet"]
+        Gov["📊 data.go.kr"]
+        Kakao["🗺 Kakao"]
+        TG["💬 Telegram"]
     end
 
-    Browser["🌐 Browser"]
-    GHA["🚀 GitHub Actions"]
+    subgraph LS["☁️ AWS Lightsail"]
+        direction TB
+        Caddy["🛡 Caddy"]
+        Dashboard["⚙️ dashboard<br/>(API · schedule · hub)"]
+        DB[("🗄 Postgres ← teslamate")]
+        Caddy --> Dashboard --> DB
+    end
 
-    Tesla -- "vehicle_data, OAuth2" --> Dashboard
-    Scheduler -- "commands" --> Tesla
-    Gov -- "충전소·축제·예보·공휴일" --> Dashboard
-    Kakao -- "좌표 ↔ 주소" --> Dashboard
-    TG -- "사용자 명령" --> Hub
-    Hub -- "푸시 알림" --> TG
-    Browser -- "HTTPS · PIN" --> Caddy
-    GHA -- "master push · SSH" --> Caddy
+    subgraph CLI["👤 Clients"]
+        direction TB
+        Browser["🌐 Browser"]
+        GHA["🚀 GitHub Actions"]
+    end
+
+    Tesla <-->|"data ⇄ commands"| Dashboard
+    Gov -->|"공공데이터"| Dashboard
+    Kakao -->|"geocoding"| Dashboard
+    TG <-->|"명령 ⇄ 알림"| Dashboard
+    Browser -->|"HTTPS · PIN"| Caddy
+    GHA -->|"SSH 배포"| Caddy
 
     classDef ext fill:#1e3a8a,stroke:#60a5fa,color:#eff6ff
     classDef ls fill:#065f46,stroke:#34d399,color:#ecfdf5
     classDef cli fill:#44403c,stroke:#a8a29e,color:#fafaf9
     class Tesla,Gov,Kakao,TG ext
-    class Caddy,Dashboard,Hub,Scheduler,TM,DB ls
+    class Caddy,Dashboard,DB ls
     class Browser,GHA cli
+    style EXT fill:#0f172a,stroke:#1e40af,color:#dbeafe
     style LS fill:#022c22,stroke:#059669,color:#a7f3d0
+    style CLI fill:#1c1917,stroke:#78716c,color:#e7e5e4
 ```
 
 `IN` = Lightsail 이 받는 데이터 / `OUT` = Lightsail 이 내보내는 데이터.
