@@ -12,7 +12,7 @@ TeslaMate 4000 포트는 `teslamate-auth`(Caddy) 컨테이너가 dashboard 의 `
 ## SSH
 
 ### Windows (PowerShell/CMD/Git Bash)
-```bash
+```powershell
 ssh -i C:\path\to\myDash\lightsail-seoul.pem ubuntu@<LIGHTSAIL_IP>
 ```
 

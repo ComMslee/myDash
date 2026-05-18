@@ -42,7 +42,7 @@ TeslaMate가 관리하는 PostgreSQL 16 스키마. 직접 쿼리만 사용 (ORM 
 | `dash_location_events` | 지오펜스 진입·이탈 이벤트 `(id, geofence_id, event_type, occurred_at, lat, lng)` · 워커가 INSERT (TeslaMate `geofences.id` 직접 참조, FK 없음) | `lib/queries/schedules.js::ensureSchema()` |
 | `dash_holidays` / `dash_holidays_meta` | KASI 특일정보 캐시 — `dash_holidays(year, dateymd, name, is_holiday)` PK `(year, dateymd, name)` + `dash_holidays_meta(year PK, fetched_at)` · `/api/holidays?year=YYYY` 가 30일 TTL lazy refresh (`dash_holidays_meta.fetched_at`) · 캘린더·이력 일자 색상 + `schedule-evaluator` 의 `skip_holidays` 분기 공유 소스 | `lib/queries/holidays.js::ensureSchema()` |
 
-> 텔레그램 hub 가 자체 관리하는 `hub_users`, `hub_permissions`, `hub_unmatched_inputs`, `hub_categories` 는 `services/telegram-hub` 가 idempotent 로 생성한다 ([`telegram-bot/README.md`](./telegram-bot/README.md) 참조).
+> 📌 **NOTE:** 텔레그램 hub 가 자체 관리하는 `hub_users`, `hub_permissions`, `hub_unmatched_inputs`, `hub_categories` 는 `services/telegram-hub` 가 idempotent 로 생성한다 ([`telegram-bot/README.md`](./telegram-bot/README.md) 참조).
 
 ### `charger_usage` 스키마
 
@@ -73,8 +73,8 @@ TeslaMate가 관리하는 PostgreSQL 16 스키마. 직접 쿼리만 사용 (ORM 
 | `ENCRYPTION_KEY` | TeslaMate 암호화 키 |
 | `KAKAO_REST_API_KEY` | Kakao Local API 키 (역지오코딩). 없으면 DB 캐시만 사용 |
 | `EV_CHARGER_API_KEY` | 공공데이터포털 환경공단 EvCharger 일반 인증키 (64-hex). 없으면 집충전기 카드 비표시 — [EV_CHARGER_API.md](./EV_CHARGER_API.md) |
-| `HOME_CHARGER_STAT_ID` | 환경공단 단일 스테이션 ID (기본값: `PI795111`) |
-| `HOME_CHARGER_STAT_IDS` | 환경공단 멀티 스테이션 ID (쉼표 구분, 예: `PI795111,PI313299,PIH01089`) |
+| `HOME_CHARGER_STAT_ID` | 환경공단 단일 스테이션 ID (기본값: `<CHARGER_STAT_ID>`) |
+| `HOME_CHARGER_STAT_IDS` | 환경공단 멀티 스테이션 ID (쉼표 구분, 예: `<CHARGER_STAT_ID>,<CHARGER_STAT_ID2>,<CHARGER_STAT_ID3>`) |
 | `KMA_API_KEY` | 기상청 단기예보 API 키 — 자동화 스케줄러 날씨 트리거에 사용 |
 | `TESLA_FLEET_CLIENT_ID` / `_SECRET` | Tesla Developer 앱 OAuth 자격증명 (developer.tesla.com) |
 | `TESLA_FLEET_API_ENABLED` | `true` 일 때만 실제 Fleet API 호출. 기본 `false` (dry_run) — **결제수단 미등록 권장: $10 무료 한도 초과 시 자동 차단** |

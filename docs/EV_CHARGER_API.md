@@ -19,13 +19,15 @@
 
 `serviceKey`는 코드에 하드코딩 금지. `.env.local` 또는 docker-compose env에 저장:
 
-```
+```bash
 EV_CHARGER_API_KEY=<decoding 키>
 ```
 
-포털 제공 **Decoding 키**를 사용하고 `requests`/`fetch`에 그대로 넘기면 자동 인코딩됨.
+> 💡 포털 제공 **Decoding 키**를 사용하고 `requests`/`fetch`에 그대로 넘기면 자동 인코딩됨.
 
-## ⚠️ 호출 시 필수 조건 (실호출로 확인된 함정)
+## 호출 시 필수 조건
+
+> ⚠️ 아래 조건은 실호출로 확인된 함정. 하나라도 누락 시 401 또는 빈 응답.
 
 1. **HTTPS 필수** — `http://`는 401 Unauthorized
 2. **User-Agent 헤더 필수** — 기본 UA(`curl/*`, Node 기본 등)는 게이트웨이 차단. `Mozilla/5.0` 등 아무 값이라도 지정
@@ -50,11 +52,37 @@ EV_CHARGER_API_KEY=<decoding 키>
 
 ## 상태 코드 (`stat`)
 
-`1` 통신이상 · `2` 충전대기 · `3` 충전중 · `4` 운영중지 · `5` 점검중 · `9` 상태미확인
+| 코드 | 의미 |
+|---|---|
+| `1` | 통신이상 |
+| `2` | 충전대기 |
+| `3` | 충전중 |
+| `4` | 운영중지 |
+| `5` | 점검중 |
+| `9` | 상태미확인 |
 
-## 충전기 타입 코드 (`chgerType`) — 주요값
+## 충전기 타입 코드 (`chgerType`)
 
-`01` DC차데모 · `02` AC완속 · `03` DC차데모+AC3상 · `04` DC콤보 · `05` DC차데모+DC콤보 · `06` DC차데모+AC3상+DC콤보 · `07` AC3상 · `08` DC콤보(완속)
+| 코드 | 타입 |
+|---|---|
+| `01` | DC차데모 |
+| `02` | AC완속 |
+| `03` | DC차데모+AC3상 |
+| `04` | DC콤보 |
+| `05` | DC차데모+DC콤보 |
+| `06` | DC차데모+AC3상+DC콤보 |
+| `07` | AC3상 |
+| `08` | DC콤보(완속) |
+
+## 데이터 흐름
+
+```mermaid
+flowchart LR
+    A[공공데이터포털\napis.data.go.kr] -->|XML| B[Next.js API Route\n/api/ev-chargers]
+    B -->|getCache().data.stations| C[서버 캐시\ngetChargerInfo 결과]
+    C --> D[대시보드 UI\n충전소 오버레이]
+    C --> E[/api/home-charger/report\n등록 충전기 수 단일 진실원]
+```
 
 ## Next.js API 라우트 예시
 
@@ -82,9 +110,13 @@ export async function GET(req) {
 
 ## 실호출 검증 결과 (2026-04-20 기준)
 
-- `getChargerStatus?zcode=11` → `resultCode=00`, totalCount **1,221**
-- `getChargerInfo?zcode=11` → `resultCode=00`, totalCount **73,565** (전국 기준으로 반환됨 — zcode 필터 적용은 항목 레벨에서 확인 필요)
-- 첫 항목 예: 낙성대동주민센터 (`ME174013`), 서울 관악구 낙성대로4가길 5, 37.476296/126.9583876, 50kW AC3상
+| 오퍼레이션 | 파라미터 | resultCode | totalCount |
+|---|---|---|---|
+| `getChargerStatus` | `zcode=11` | `00` | 1,221 |
+| `getChargerInfo` | `zcode=11` | `00` | 73,565 |
+
+> 📌 `getChargerInfo?zcode=11` 은 전국 기준으로 반환됨 — zcode 필터 적용은 항목 레벨에서 확인 필요.
+> 첫 항목 예: 낙성대동주민센터 (`ME174013`), 서울 관악구 낙성대로4가길 5, 37.476296/126.9583876, 50kW AC3상
 
 ## 참고 문서
 

@@ -4,8 +4,10 @@
 
 ## 페이지
 
-- **`/v2/chargers`** — 하단 인라인 라이브 패널
-- **`/v2/chargers/report`** — 단독 페이지 (외부 캡처/공유)
+| 경로 | 설명 |
+|---|---|
+| `/v2/chargers` | 하단 인라인 라이브 패널 |
+| `/v2/chargers/report` | 단독 페이지 (외부 캡처/공유) |
 
 두 위치 모두 `dashboard/app/v2/chargers/_parts/ReportPanel.js` 단일 컴포넌트 재사용.
 
@@ -39,33 +41,66 @@
 
 ## API
 
-**`GET /api/home-charger/report`** (1분 자동 폴링)
+**`GET /api/home-charger/report`** — 1분 자동 폴링
 
-```jsonc
+```json
 {
-  meta: { observation_start, observation_end, days_observed,
-          total_chargers, observed_chargers, complex_name },
-  kpi: {
-    overall_pct,                               // 전체 기간 평균 가동률
-    daily_avg_pct, daily_peak_pct,             // 일별 가동률 평균/최대
-    weekly_avg_pct, weekly_peak_pct,           // 주별 (월요일 시작)
-    monthly_avg_pct, monthly_peak_pct,         // 월별 (캘린더)
-    trend_6m_delta_pp,                         // 최근 6달 평균 - 직전 6달 평균
+  "meta": {
+    "observation_start": "...",
+    "observation_end": "...",
+    "days_observed": 0,
+    "total_chargers": 0,
+    "observed_chargers": 0,
+    "complex_name": "..."
   },
-  weekly: [{ w_start, label('MM/DD'), sessions, days, occupancy_pct }],
-  by_dong: [{ key, title, favorite, total, sessions, occupancy_pct }],
+  "kpi": {
+    "overall_pct": 0,
+    "daily_avg_pct": 0,
+    "daily_peak_pct": 0,
+    "weekly_avg_pct": 0,
+    "weekly_peak_pct": 0,
+    "monthly_avg_pct": 0,
+    "monthly_peak_pct": 0,
+    "trend_6m_delta_pp": 0
+  },
+  "weekly": [
+    { "w_start": "...", "label": "MM/DD", "sessions": 0, "days": 0, "occupancy_pct": 0 }
+  ],
+  "by_dong": [
+    { "key": "...", "title": "...", "favorite": false, "total": 0, "sessions": 0, "occupancy_pct": 0 }
+  ]
 }
 ```
 
+### KPI 필드 설명
+
+| 필드 | 설명 |
+|---|---|
+| `overall_pct` | 전체 기간 평균 가동률 |
+| `daily_avg_pct` / `daily_peak_pct` | 일별 가동률 평균/최대 |
+| `weekly_avg_pct` / `weekly_peak_pct` | 주별 가동률 평균/최대 (월요일 시작) |
+| `monthly_avg_pct` / `monthly_peak_pct` | 월별 가동률 평균/최대 (캘린더) |
+| `trend_6m_delta_pp` | 최근 6달 평균 - 직전 6달 평균 (%p) |
+
 ## 산식
 
-- 가동률 % = `SUM(count) / (chargers × days × 48) × 100` (30분 슬롯 정규화)
-- 일별 가동률 = 그 날 가동률 (chargers × 48 분모)
-- 주별 / 월별 = 그 단위 가동률, JS 에서 row 별 % 계산 후 평균/최대
-- 동별 가동률 = `constants.js` (P1·P2·P3 매핑) 기준 동별 합산
+| 단위 | 산식 |
+|---|---|
+| 가동률 % | `SUM(count) / (chargers × days × 48) × 100` (30분 슬롯 정규화) |
+| 일별 가동률 | 그 날 가동률 (`chargers × 48` 분모) |
+| 주별 / 월별 | 그 단위 가동률, JS 에서 row 별 % 계산 후 평균/최대 |
+| 동별 가동률 | `constants.js` (P1·P2·P3 매핑) 기준 동별 합산 |
 
 ## 단일 진실원
 
-- 충전기 등록 갯수 → 환경공단 API 캐시 (`getCache().data.stations`)
-- 동별 그룹 매핑 → `dashboard/app/v2/battery/home-charger/constants.js`
-- 봇 `/chargers` 의 그룹 카운트도 같은 정의 사용 (`/api/home-charger/groups`)
+```mermaid
+flowchart LR
+    EVApi["환경공단 API\n(getChargerInfo 캐시)"] -->|등록 충전기 수| Report["/api/home-charger/report"]
+    Constants["constants.js\n동별 그룹 매핑 P1·P2·P3"] --> Report
+    Report --> Panel["ReportPanel.js\n/v2/chargers\n/v2/chargers/report"]
+    Constants --> Groups["/api/home-charger/groups\n봇 /chargers 그룹 카운트"]
+```
+
+> 📌 충전기 등록 갯수 → 환경공단 API 캐시 (`getCache().data.stations`)
+> 📌 동별 그룹 매핑 → `dashboard/app/v2/battery/home-charger/constants.js`
+> 📌 봇 `/chargers` 의 그룹 카운트도 같은 정의 사용 (`/api/home-charger/groups`)

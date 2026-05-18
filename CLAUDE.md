@@ -1,6 +1,6 @@
 # TeslaMate Custom Dashboard
 
-TeslaMate PostgreSQL 데이터를 시각화하는 Next.js 14 기반 모바일 우선 대시보드. 가족 텔레그램 봇용 API gateway 역할 겸함 — `/api/family/*`, `/api/sns/*` 가 차량 외 외부 API(축제·SNS 등) 래핑/저장 단일 진실원.
+TeslaMate PostgreSQL 데이터를 시각화하는 Next.js 14 기반 모바일 우선 대시보드. 텔레그램 봇용 API gateway 역할 겸함 — `/api/family/*`, `/api/sns/*` 가 차량 외 외부 API(축제·SNS 등) 래핑/저장 단일 진실원.
 
 ## 기술 스택
 

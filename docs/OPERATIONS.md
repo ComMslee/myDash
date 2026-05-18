@@ -24,6 +24,8 @@ aws --profile mydash lightsail reboot-instance --instance-name mydash-prod --reg
 ssh -i lightsail-seoul.pem ubuntu@<LIGHTSAIL_IP> 'sudo docker compose -f myDash/docker-compose.yml ps'
 ```
 
+> 💡 **팁:** 재부팅 후 2~3분 내 모든 컨테이너가 `Up` 상태이면 자동 복구 정상.
+
 ## 서비스 관리
 
 ### 컨테이너 상태
@@ -83,6 +85,8 @@ aws --profile mydash lightsail get-instance-metric-data \
     --granularity DAILY --metrics UnblendedCost
   ```
 - **90일 무료 종료 예상**: 2026년 7월 ~ (생성일 기준)
+
+> 📌 **NOTE:** Tesla Fleet API 호출 비용은 별도 — `dash_api_usage_monthly` 테이블에서 추적. `/v2/schedule` 페이지에서만 사용.
 
 ## 백업 & 인스턴스 라이프사이클
 

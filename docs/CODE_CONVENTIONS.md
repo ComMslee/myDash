@@ -63,7 +63,7 @@
 | `HomeChargerCard.js` | 상태 관리 + 레이아웃 조립 |
 
 **원칙**:
-- 하드코딩된 문자열/숫자 → 상수화 (예: `'PI795111'` → `MAIN_STATION_ID`)
+- 하드코딩된 문자열/숫자 → 상수화 (예: `'<CHARGER_STAT_ID>'` → `MAIN_STATION_ID`)
 - 2회 이상 반복되는 JSX 블록 → 공용 컴포넌트로 추출
 - 유사한 prop 묶음 → spread 객체 (`tileProps`)로 통합
 
@@ -74,7 +74,7 @@
 
 ## 커밋 스타일
 
-```
+```text
 <type>: <한글 또는 영문 설명>
 ```
 

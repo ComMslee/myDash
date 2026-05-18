@@ -18,13 +18,15 @@
 
 `serviceKey`는 코드 하드코딩 금지. `.env` 또는 docker-compose env에 저장:
 
-```
+```bash
 TOUR_API_KEY=<decoding 키>
 ```
 
-포털 제공 **Decoding 키**를 사용. `URLSearchParams.set()` 또는 `fetch` 가 자동 인코딩.
+> 💡 포털 제공 **Decoding 키**를 사용. `URLSearchParams.set()` 또는 `fetch` 가 자동 인코딩.
 
-## ⚠️ 호출 시 필수 조건 (EV_CHARGER_API 와 동일 함정)
+## 호출 시 필수 조건
+
+> ⚠️ EV_CHARGER_API 와 동일 함정. 누락 시 결과 0건 또는 에러.
 
 1. **HTTPS 필수**
 2. **User-Agent 헤더 필수** — Node 기본 UA 가 게이트웨이에서 차단될 수 있음. `Mozilla/5.0` 등 임의 값 지정.
@@ -101,48 +103,48 @@ TOUR_API_KEY=<decoding 키>
 }
 ```
 
-⚠️ `items.item` 이 결과 1건이면 **객체 1개**(배열 아님)로 응답. 정규화 시 `Array.isArray` 분기 필요.
+> ⚠️ `items.item` 이 결과 1건이면 **객체 1개**(배열 아님)로 응답. 정규화 시 `Array.isArray` 분기 필요.
 
 ## 본 프로젝트 라우트 — `dashboard /api/family/festivals`
 
-```
-GET  /api/family/festivals?from=YYYYMMDD&to=YYYYMMDD&areaCode=1&size=20
-POST /api/family/festivals/refresh   (HUB_SHARED_SECRET 인증)
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| `GET` | `/api/family/festivals?from=YYYYMMDD&to=YYYYMMDD&areaCode=1&size=20` | DB SELECT만 — TourAPI 직접 호출 없음 |
+| `POST` | `/api/family/festivals/refresh` | TourAPI 호출 후 DB upsert (HUB_SHARED_SECRET 인증) |
+
+### 데이터 흐름
+
+```mermaid
+flowchart TD
+    GHA["GHA cron\n(월·수·금 03:00 KST)"] -->|POST /refresh| TourAPI["TourAPI\n오늘~+90일, 전국"]
+    TourAPI --> upsert["upsertMany()\n+ cleanupExpired()"]
+    upsert --> DB[(family_festivals\nPostgres 테이블)]
+    DB -->|GET /api/family/festivals\nDB SELECT만| Bot["봇 /festivals"]
+    DB --> UI["대시보드 UI"]
 ```
 
-**아키텍처** — TourAPI 직접 호출 X. `family_festivals` Postgres 테이블만 SELECT.
+> 📌 외부 API 직접 호출은 `/refresh` 한 곳뿐 — TourAPI 장애가 GET 라우트에 전파되지 않는다. 대시보드/봇은 항상 DB 의 가장 최근 스냅샷을 본다.
 
-```
-GHA cron (월·수·금 03:00 KST) ──POST /refresh──► TourAPI (오늘~+90일, 전국)
-                                                    │
-                                                    ▼
-                              upsertMany() + cleanupExpired()
-                                                    │
-                                                    ▼
-                                       family_festivals 테이블
-                                                    ▲
-                              GET /api/family/festivals (DB SELECT 만)
-                                                    │
-                                       ├─ 봇 /festivals
-                                       └─ dashboard UI
-```
+### 동작 규칙
 
 - 폴링 워크플로: `.github/workflows/refresh-festivals.yml`
 - stale 임계: 4일 (마지막 `fetched_at` 기준 — 폴링 주 3회라 4일 이상이면 stale 표시)
-- `from`/`to` 미지정 시 `오늘 ~ +30일` (KST).
-- `areaCode` 미지정 시 전국.
+- `from`/`to` 미지정 시 `오늘 ~ +30일` (KST)
+- `areaCode` 미지정 시 전국
 - 응답: `{ festivals: [...정규화...], totalCount, fetchedAt, stale }`
-- 정규화 필드: `id, title, startDate, endDate, addr, areaCode, sigunguCode, lat, lng, image, thumbnail, tel`.
+- 정규화 필드: `id, title, startDate, endDate, addr, areaCode, sigunguCode, lat, lng, image, thumbnail, tel`
 
-> 외부 API 직접 호출은 `/refresh` 한 곳뿐 — TourAPI 장애가 GET 라우트에 전파되지 않는다. 대시보드/봇은 항상 DB 의 가장 최근 스냅샷을 본다. 테이블 스키마는 [`DATABASE.md`](./DATABASE.md#대시보드가-생성하는-테이블) 참조.
+테이블 스키마: [`DATABASE.md`](./DATABASE.md#대시보드가-생성하는-테이블)
 
 ## 봇 통합 — `/festivals` (가족 카테고리)
 
-- `/festivals` — 한 달 + 사용자 기본 지역(미설정 시 전국)
-- `/festivals weekend` — 이번 주말
-- `/festivals 서울` — 한 달 + 서울 (override)
-- `/festivals weekend 부산` — 주말 + 부산
-- `/festivals 전국` — 한 달 + 전국 (default 무시)
+| 명령 | 동작 |
+|---|---|
+| `/festivals` | 한 달 + 사용자 기본 지역 (미설정 시 전국) |
+| `/festivals weekend` | 이번 주말 |
+| `/festivals 서울` | 한 달 + 서울 (override) |
+| `/festivals weekend 부산` | 주말 + 부산 |
+| `/festivals 전국` | 한 달 + 전국 (default 무시) |
 
 기본 지역 설정: `/setarea 서울` · 해제: `/setarea 전국`. 컬럼: `hub_users.default_area_code`.
 
