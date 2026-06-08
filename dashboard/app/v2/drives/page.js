@@ -17,6 +17,7 @@ export default function V2DrivesPage() {
 
   const [insights, setInsights] = useState(null);
   const [car, setCar] = useState(null);
+  const [drivesSummary, setDrivesSummary] = useState(null);
   const [loading, setLoading] = useState({ insights: true, car: true });
 
   // 무거운 데이터: 펼칠 때 로드
@@ -38,6 +39,10 @@ export default function V2DrivesPage() {
     fetch('/api/car').then(r => r.json())
       .then(d => { setCar(d); setLoading(p => ({ ...p, car: false })); })
       .catch(() => setLoading(p => ({ ...p, car: false })));
+
+    fetch('/api/drives?summary=1').then(r => r.json())
+      .then(d => setDrivesSummary(d))
+      .catch(() => null);
   }, [isMock, refreshSignal]);
 
   // monthly-history 계산 (로드된 경우에만)
@@ -81,7 +86,7 @@ export default function V2DrivesPage() {
 
         {/* 1. 차량 요약 */}
         {loading.car || loading.insights ? <Spinner /> : (
-          <VehicleKpiCard car={car} insights={insights} drives={drivesLoader.data} />
+          <VehicleKpiCard car={car} insights={insights} drives={drivesSummary ?? drivesLoader.data} />
         )}
 
         {/* 2. 이번달 인사이트 */}

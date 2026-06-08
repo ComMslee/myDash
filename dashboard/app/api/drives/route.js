@@ -18,12 +18,63 @@ export async function GET(request) {
     const from = searchParams.get('from'); // 선택: YYYY-MM-DD 형식 시작일
     const to   = searchParams.get('to');   // 선택: YYYY-MM-DD 형식 종료일 (exclusive)
     const force = searchParams.get('refresh') === '1';
+    const isSummary = searchParams.get('summary') === '1';
 
     const car = await getDefaultCar();
     if (!car) {
       return Response.json({ error: 'No car found' }, { status: 404 });
     }
     const carId = car.id;
+
+    // ?summary=1 — 기간별 집계만 (geocoding 없음, 즉시 반환용)
+    if (isSummary) {
+      return Response.json(await withCache(`drives-summary:${carId}`, TTL_180S, async () => {
+        const now = new Date();
+        const KST = KST_OFFSET_MS;
+        const nowKST = new Date(now.getTime() + KST);
+        const ky = nowKST.getUTCFullYear(), km = nowKST.getUTCMonth(), kd = nowKST.getUTCDate();
+        const todayStart    = new Date(Date.UTC(ky, km, kd) - KST);
+        const weekStart     = new Date(todayStart.getTime() - 7  * 86400000);
+        const prevWeekEnd   = new Date(weekStart);
+        const prevWeekStart = new Date(todayStart.getTime() - 14 * 86400000);
+        const last4wStart   = new Date(todayStart.getTime() - 28 * 86400000);
+        const prev4wStart   = new Date(todayStart.getTime() - 56 * 86400000);
+        const prev4wEnd     = last4wStart;
+        const iso = (d) => d.toISOString();
+
+        const aggQuery = (start, end) => {
+          const params = end ? [carId, iso(start), iso(end)] : [carId, iso(start)];
+          const whereEnd = end ? ' AND start_date < $3' : '';
+          return pool.query(
+            `SELECT COALESCE(SUM(distance), 0)::float AS distance,
+                    COALESCE(SUM(CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
+                                      THEN (start_rated_range_km - end_rated_range_km) ELSE 0 END), 0)::float AS range_used
+             FROM drives WHERE car_id = $1 AND start_date >= $2${whereEnd}`,
+            params
+          );
+        };
+        const toKwh = (range_used) => parseFloat((range_used * KWH_PER_KM).toFixed(1));
+        const [r0, r1, r2, r3, r4] = await Promise.all([
+          aggQuery(todayStart),
+          aggQuery(weekStart),
+          aggQuery(prevWeekStart, prevWeekEnd),
+          aggQuery(last4wStart),
+          aggQuery(prev4wStart, prev4wEnd),
+        ]);
+        return {
+          today_distance:        parseFloat(r0.rows[0].distance.toFixed(1)),
+          today_energy_kwh:      toKwh(r0.rows[0].range_used),
+          week_distance:         parseFloat(r1.rows[0].distance.toFixed(1)),
+          week_energy_kwh:       toKwh(r1.rows[0].range_used),
+          prev_week_distance:    parseFloat(r2.rows[0].distance.toFixed(1)),
+          prev_week_energy_kwh:  toKwh(r2.rows[0].range_used),
+          month_distance:        parseFloat(r3.rows[0].distance.toFixed(1)),
+          month_energy_kwh:      toKwh(r3.rows[0].range_used),
+          prev_month_distance:   parseFloat(r4.rows[0].distance.toFixed(1)),
+          prev_month_energy_kwh: toKwh(r4.rows[0].range_used),
+        };
+      }, { force }));
+    }
 
     return Response.json(await withCache(`drives:${carId}:${from || ''}:${to || ''}`, TTL_180S, async () => {
 
