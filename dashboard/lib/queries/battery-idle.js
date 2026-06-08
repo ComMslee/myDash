@@ -40,7 +40,7 @@ export function queryIdleDrain(carId) {
         AND EXTRACT(EPOCH FROM idle_end - idle_start) > 1800
         AND soc_start IS NOT NULL AND soc_end IS NOT NULL
       ORDER BY idle_start DESC
-      LIMIT 20
+      LIMIT 50
     )
     SELECT f.idle_start, f.idle_end, f.soc_start, f.soc_end, f.next_type,
       f.soc_drop, f.idle_hours,
@@ -116,7 +116,7 @@ export function queryIdleDrain(carId) {
   `, [carId]);
 }
 
-/** 최근 14일 충전 세션 (idle 타임라인과 겹쳐 표시용) */
+/** 최근 30일 충전 세션 (idle 타임라인과 겹쳐 표시용) */
 export function queryChargingSessions(carId) {
   return pool.query(`
     SELECT start_date, end_date,
@@ -129,7 +129,7 @@ export function queryChargingSessions(carId) {
       AND end_date IS NOT NULL
       AND start_battery_level IS NOT NULL
       AND end_battery_level IS NOT NULL
-      AND end_date >= NOW() - INTERVAL '14 days'
+      AND end_date >= NOW() - INTERVAL '30 days'
     ORDER BY start_date DESC
   `, [carId]);
 }
