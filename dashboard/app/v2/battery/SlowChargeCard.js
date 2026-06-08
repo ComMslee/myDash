@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useState, useCallback } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { formatDuration, shortAddr } from '@/lib/format';
 import { kstDateStr, kstMondayStr, KST_OFFSET_MS } from '@/lib/kst';
 
@@ -12,9 +12,7 @@ function currentMonthKey() {
 export default function SlowChargeCard() {
   const [months, setMonths] = useState([]);
   const [records, setRecords] = useState([]);
-  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     fetch('/api/slow-charges')
@@ -22,24 +20,10 @@ export default function SlowChargeCard() {
       .then(d => {
         setMonths(d.months || []);
         setRecords(d.records || []);
-        setHasMore(d.has_more || false);
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, []);
-
-  const loadMore = useCallback(() => {
-    if (loadingMore) return;
-    setLoadingMore(true);
-    fetch(`/api/slow-charges?offset=${records.length}`)
-      .then(r => r.json())
-      .then(d => {
-        setRecords(prev => [...prev, ...(d.records || [])]);
-        setHasMore(d.has_more || false);
-        setLoadingMore(false);
-      })
-      .catch(() => setLoadingMore(false));
-  }, [records.length, loadingMore]);
 
   const totalKwh = useMemo(() => months.reduce((s, m) => s + m.total_kwh, 0), [months]);
   const avgKw = useMemo(() => {
@@ -214,22 +198,6 @@ export default function SlowChargeCard() {
         );
       })}
 
-      {/* 더 보기 */}
-      {hasMore && (
-        <div className="border-t border-white/[0.06] px-4 py-2">
-          <button
-            onClick={loadMore}
-            disabled={loadingMore}
-            className="w-full flex items-center justify-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors py-1 disabled:opacity-50"
-          >
-            {loadingMore
-              ? <span className="w-3 h-3 border border-zinc-500 border-t-transparent rounded-full animate-spin" />
-              : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-            }
-            {loadingMore ? '로딩 중...' : '더 보기'}
-          </button>
-        </div>
-      )}
     </div>
   );
 }

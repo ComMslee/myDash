@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import RangeMapCard from '@/app/v2/battery/RangeMapCard';
 import HealthScoreCard from '@/app/v2/battery/HealthScoreCard';
 import IdleDrainCard from '@/app/v2/battery/IdleDrainCard';
@@ -19,9 +19,7 @@ export default function V2BatteryPage() {
   // idle-drain records
   const [idleRecords, setIdleRecords] = useState([]);
   const [idleCharging, setIdleCharging] = useState([]);
-  const [idleHasMore, setIdleHasMore] = useState(false);
   const [idleLoading, setIdleLoading] = useState(true);
-  const [idleLoadingMore, setIdleLoadingMore] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -45,24 +43,10 @@ export default function V2BatteryPage() {
       .then(d => {
         setIdleRecords(d.idle_drain || []);
         setIdleCharging(d.charging_sessions || []);
-        setIdleHasMore(d.has_more || false);
         setIdleLoading(false);
       })
       .catch(() => setIdleLoading(false));
   }, []);
-
-  const loadIdleMore = useCallback(() => {
-    if (idleLoadingMore) return;
-    setIdleLoadingMore(true);
-    fetch(`/api/idle-drain?offset=${idleRecords.length}`)
-      .then(r => r.json())
-      .then(d => {
-        setIdleRecords(prev => [...prev, ...(d.idle_drain || [])]);
-        setIdleHasMore(d.has_more || false);
-        setIdleLoadingMore(false);
-      })
-      .catch(() => setIdleLoadingMore(false));
-  }, [idleRecords.length, idleLoadingMore]);
 
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white">
@@ -86,21 +70,6 @@ export default function V2BatteryPage() {
             ) : (
               <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
                 <IdleDrainCard records={idleRecords} chargingSessions={idleCharging} />
-                {idleHasMore && (
-                  <div className="border-t border-white/[0.06] px-4 py-2">
-                    <button
-                      onClick={loadIdleMore}
-                      disabled={idleLoadingMore}
-                      className="w-full flex items-center justify-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors py-1 disabled:opacity-50"
-                    >
-                      {idleLoadingMore
-                        ? <span className="w-3 h-3 border border-zinc-500 border-t-transparent rounded-full animate-spin" />
-                        : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                      }
-                      {idleLoadingMore ? '로딩 중...' : '더 보기'}
-                    </button>
-                  </div>
-                )}
               </div>
             )}
 

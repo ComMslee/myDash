@@ -7,8 +7,6 @@ import { TTL_180S } from '@/lib/cache-ttls';
 
 export const dynamic = 'force-dynamic';
 
-const LIMIT = 20;
-
 function mapIdleRow(r) {
   return {
     idle_start: r.idle_start,
@@ -35,8 +33,6 @@ export async function GET(req) {
 
   const sp = new URL(req.url).searchParams;
   const isSummary = sp.get('summary') === '1';
-  const isMore = sp.has('offset');
-  const offset = Math.max(0, parseInt(sp.get('offset') || '0', 10));
 
   try {
     const car = await getDefaultCar();
@@ -92,10 +88,9 @@ export async function GET(req) {
       }));
     }
 
-    // 상세 records — 초기(no offset) 또는 더보기(?offset=N)
-    const cacheKey = `idle-drain:${carId}:${offset}`;
+    // 상세 records
     const [idleRes, sessRes] = await Promise.all([
-      withCache(cacheKey, TTL_180S, async () => {
+      withCache(`idle-drain:${carId}`, TTL_180S, async () => {
         const result = await pool.query(
           `WITH timeline AS (
              SELECT start_date AS ts, end_date AS te,
@@ -126,7 +121,6 @@ export async function GET(req) {
                AND EXTRACT(EPOCH FROM idle_end - idle_start) > 1800
                AND soc_start IS NOT NULL AND soc_end IS NOT NULL
              ORDER BY idle_start DESC
-             LIMIT $2 OFFSET $3
            )
            SELECT f.idle_start, f.idle_end, f.soc_start, f.soc_end, f.next_type,
              f.soc_drop, f.idle_hours,
@@ -176,20 +170,18 @@ export async function GET(req) {
              WHERE seg_end > seg_start
            ) o ON true
            ORDER BY f.idle_start DESC`,
-          [carId, LIMIT + 1, offset]
+          [carId]
         );
         return result.rows;
       }),
-      isMore ? Promise.resolve(null) : queryChargingSessions(carId),
+      queryChargingSessions(carId),
     ]);
 
     const rows = Array.isArray(idleRes) ? idleRes : [];
-    const has_more = rows.length > LIMIT;
 
     return Response.json({
-      idle_drain: rows.slice(0, LIMIT).map(mapIdleRow),
-      has_more,
-      offset,
+      idle_drain: rows.map(mapIdleRow),
+      has_more: false,
       ...(sessRes && {
         charging_sessions: sessRes.rows.map(r => ({
           start: r.start_date,

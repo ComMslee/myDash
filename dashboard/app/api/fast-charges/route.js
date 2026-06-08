@@ -6,8 +6,6 @@ import { TTL_180S } from '@/lib/cache-ttls';
 
 export const dynamic = 'force-dynamic';
 
-const RECORDS_PER_PAGE = 20;
-
 function mapRecord(r) {
   return {
     id: r.id,
@@ -29,43 +27,12 @@ export async function GET(request) {
   if (__unauth) return __unauth;
   const sp = new URL(request.url).searchParams;
   const force = sp.get('refresh') === '1';
-  const isMore = sp.has('offset');
-  const offset = Math.max(0, parseInt(sp.get('offset') || '0', 10));
 
   try {
     const car = await getDefaultCar();
     if (!car) return Response.json({ months: [], records: [], has_more: false });
     const carId = car.id;
 
-    // "더 보기" 요청 — 추가 records만 반환
-    if (isMore) {
-      return Response.json(await withCache(`fast-charges:${carId}:${offset}`, TTL_180S, async () => {
-        const result = await pool.query(
-          `SELECT cp.id, cp.start_date, cp.end_date, cp.charge_energy_added, cp.duration_min,
-                  COALESCE(a.name, a.road, a.display_name) AS location,
-                  sub.min_power, sub.max_power, sub.avg_power, sub.charger_brand, sub.charger_type
-           FROM charging_processes cp
-           LEFT JOIN addresses a ON a.id = cp.address_id
-           JOIN (
-             SELECT c.charging_process_id,
-               MIN(c.charger_power) FILTER (WHERE c.charger_power > 0)::float AS min_power,
-               MAX(c.charger_power)::float AS max_power,
-               AVG(c.charger_power) FILTER (WHERE c.charger_power > 0)::float AS avg_power,
-               MAX(c.fast_charger_brand) AS charger_brand,
-               MAX(c.fast_charger_type) AS charger_type
-             FROM charges c WHERE c.fast_charger_present = true GROUP BY c.charging_process_id
-           ) sub ON sub.charging_process_id = cp.id
-           WHERE cp.car_id = $1
-           ORDER BY cp.start_date DESC
-           LIMIT $2 OFFSET $3`,
-          [carId, RECORDS_PER_PAGE + 1, offset]
-        );
-        const rows = result.rows;
-        return { records: rows.slice(0, RECORDS_PER_PAGE).map(mapRecord), has_more: rows.length > RECORDS_PER_PAGE };
-      }, { force }));
-    }
-
-    // 초기 로드 — 월별 집계 + 최근 records
     return Response.json(await withCache(`fast-charges-init:${carId}`, TTL_180S, async () => {
       const [monthRes, recordRes] = await Promise.all([
         pool.query(
@@ -99,13 +66,11 @@ export async function GET(request) {
              FROM charges c WHERE c.fast_charger_present = true GROUP BY c.charging_process_id
            ) sub ON sub.charging_process_id = cp.id
            WHERE cp.car_id = $1
-           ORDER BY cp.start_date DESC
-           LIMIT $2`,
-          [carId, RECORDS_PER_PAGE + 1]
+           ORDER BY cp.start_date DESC`,
+          [carId]
         ),
       ]);
 
-      const rows = recordRes.rows;
       return {
         months: monthRes.rows.map(r => ({
           month: r.month,
@@ -113,8 +78,8 @@ export async function GET(request) {
           total_kwh: parseFloat(parseFloat(r.total_kwh).toFixed(1)),
           peak_kw: r.peak_kw ? parseFloat(parseFloat(r.peak_kw).toFixed(1)) : null,
         })),
-        records: rows.slice(0, RECORDS_PER_PAGE).map(mapRecord),
-        has_more: rows.length > RECORDS_PER_PAGE,
+        records: recordRes.rows.map(mapRecord),
+        has_more: false,
       };
     }, { force }));
   } catch (err) {
