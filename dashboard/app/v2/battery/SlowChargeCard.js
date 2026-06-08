@@ -1,38 +1,49 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState, useCallback } from 'react';
 import { formatDuration, shortAddr } from '@/lib/format';
 import { kstDateStr, kstMondayStr, kstDayOfWeek } from '@/lib/kst';
 
 export default function SlowChargeCard() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [summary, setSummary] = useState(null);
+  const [records, setRecords] = useState([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [detailState, setDetailState] = useState('idle'); // idle | loading | loaded | error
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
-    fetch('/api/slow-charges')
+    fetch('/api/slow-charges?summary=1')
       .then(r => r.json())
-      .then(d => { setData(d); setLoading(false); })
-      .catch(() => { setError(true); setLoading(false); });
+      .then(d => setSummary(d))
+      .catch(() => setSummary(null));
   }, []);
 
-  const records = data?.records || [];
+  const loadDetail = useCallback(() => {
+    if (detailState !== 'idle') return;
+    setDetailState('loading');
+    fetch('/api/slow-charges?offset=0')
+      .then(r => r.json())
+      .then(d => {
+        setRecords(d.records || []);
+        setHasMore(d.has_more || false);
+        setDetailState('loaded');
+      })
+      .catch(() => setDetailState('error'));
+  }, [detailState]);
 
-  // 상단 요약 — 총 kWh / 평균 kW
-  const summary = useMemo(() => {
-    if (!records.length) return null;
-    const totalKwh = records.reduce((s, r) => s + (Number(r.energy_kwh) || 0), 0);
-    const withPower = records.filter(r => r.avg_power);
-    const avgKw = withPower.length
-      ? withPower.reduce((s, r) => s + Number(r.avg_power), 0) / withPower.length
-      : null;
-    return {
-      totalKwh: Math.round(totalKwh * 10) / 10,
-      avgKw: avgKw != null ? Math.round(avgKw * 10) / 10 : null,
-    };
-  }, [records]);
+  const loadMore = useCallback(() => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    fetch(`/api/slow-charges?offset=${records.length}`)
+      .then(r => r.json())
+      .then(d => {
+        setRecords(prev => [...prev, ...(d.records || [])]);
+        setHasMore(d.has_more || false);
+        setLoadingMore(false);
+      })
+      .catch(() => setLoadingMore(false));
+  }, [records.length, loadingMore]);
 
-  // 주(월~일) 단위 집계 — IdleDrainCard와 동일 규칙
   const weeks = useMemo(() => {
     const weekMap = new Map();
     const weekOrder = [];
@@ -50,7 +61,6 @@ export default function SlowChargeCard() {
     return weekOrder.map(wk => weekMap.get(wk));
   }, [records]);
 
-  // 기본 모두 접힘 — 사용자가 원하는 주만 펼침
   const [expandedWeeks, setExpandedWeeks] = useState(() => new Set());
   const toggleWeek = (wk) => setExpandedWeeks(prev => {
     const next = new Set(prev);
@@ -75,120 +85,144 @@ export default function SlowChargeCard() {
     return fm === lm ? `${fm}/${fd} ~ ${ld}` : `${fm}/${fd} ~ ${lm}/${ld}`;
   };
 
-  if (loading) {
-    return (
-      <div className="bg-[#161618] border border-white/[0.06] rounded-2xl flex items-center justify-center py-10">
-        <div className="w-5 h-5 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
-      </div>
-    );
-  }
-  if (error) {
-    return (
-      <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-6 text-center">
-        <p className="text-zinc-500 text-sm">데이터를 불러올 수 없습니다</p>
-      </div>
-    );
-  }
-  if (!records.length) {
-    return (
-      <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-6 text-center">
-        <p className="text-zinc-600 text-sm">완속 충전 기록이 없습니다</p>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
+      {/* 헤더 — 요약 즉시 표시 */}
       <div className="px-4 py-2 border-b border-white/[0.06] flex items-center justify-between gap-2 tabular-nums">
         <span className="flex items-baseline gap-1.5 min-w-0">
           <span className="text-xs font-bold text-zinc-200 shrink-0">완속 충전 기록</span>
-          <span className="text-[11px] text-zinc-600 shrink-0">{records.length}건</span>
+          {summary && <span className="text-[11px] text-zinc-600 shrink-0">{summary.total_count}건</span>}
         </span>
         {summary && (
           <span className="flex items-baseline gap-2 text-[11px] shrink-0">
             <span className="text-emerald-400 font-bold">
-              {summary.totalKwh}<span className="text-zinc-600 ml-0.5">kWh</span>
+              {summary.total_kwh}<span className="text-zinc-600 ml-0.5">kWh</span>
             </span>
-            {summary.avgKw != null && (
+            {summary.avg_kw != null && (
               <span className="text-emerald-400">
-                {summary.avgKw}<span className="text-zinc-600 ml-0.5">kW</span><span className="text-zinc-700 ml-0.5">평균</span>
+                {summary.avg_kw}<span className="text-zinc-600 ml-0.5">kW</span><span className="text-zinc-700 ml-0.5">평균</span>
               </span>
             )}
           </span>
         )}
+        {!summary && <div className="w-24 h-3 bg-white/[0.06] rounded animate-pulse" />}
       </div>
-      <div className="overflow-y-auto" style={{ maxHeight: '360px' }}>
-        {weeks.map(week => {
-          const expanded = expandedWeeks.has(week.weekKey);
-          return (
-            <Fragment key={week.weekKey}>
-              <button
-                onClick={() => toggleWeek(week.weekKey)}
-                className="w-full px-4 py-2 border-t border-white/[0.08] first:border-t-0 bg-white/[0.03] hover:bg-white/[0.06] flex items-center justify-between gap-2 text-left transition-colors"
-              >
-                <span className="flex items-center gap-2 min-w-0">
-                  <svg className={`w-3 h-3 text-zinc-500 flex-shrink-0 transition-transform ${expanded ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                  <span className="text-[10px] font-bold text-zinc-300">{weekLabel(week.weekKey)}</span>
-                  <span className="text-[10px] text-zinc-600 tabular-nums">{weekRange(week.weekKey)}</span>
-                </span>
-                <span className="flex items-center gap-2 tabular-nums flex-shrink-0">
-                  <span className="text-[10px] text-zinc-600">{week.items.length}건</span>
-                  <span className="text-[10px] font-bold text-emerald-400">
-                    {Math.round(week.totalKwh * 10) / 10}<span className="text-zinc-600 ml-0.5">kWh</span>
-                  </span>
-                </span>
-              </button>
-              {expanded && week.items.map(r => {
-                const dt = new Date(r.start_date);
-                const dateLabel = `${dt.getMonth()+1}/${dt.getDate()}`;
-                const fmtTime = (d) => `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-                const startTime = fmtTime(dt);
-                const endTime = r.duration_min
-                  ? fmtTime(new Date(dt.getTime() + r.duration_min * 60000))
-                  : null;
-                const socDelta = (r.soc_start != null && r.soc_end != null)
-                  ? r.soc_end - r.soc_start : null;
-                const tipParts = [
-                  shortAddr(r.location),
-                  endTime ? `${startTime}~${endTime}` : startTime,
-                  r.duration_min ? formatDuration(r.duration_min) : null,
-                  (r.soc_start != null && r.soc_end != null) ? `${r.soc_start}→${r.soc_end}%` : null,
-                  `${r.energy_kwh}kWh`,
-                  r.avg_power ? `평균 ${r.avg_power}kW` : null,
-                  r.max_power ? `최대 ${r.max_power}` : null,
-                  r.min_power ? `최소 ${r.min_power}` : null,
-                ].filter(Boolean);
 
-                return (
-                  <div
-                    key={r.id}
-                    className="px-4 py-2 border-t border-white/[0.04] flex items-center gap-1.5 text-[11px] tabular-nums"
-                    title={tipParts.join(' · ')}
+      {/* 상세 기록 — 펼칠 때 로드 */}
+      {detailState === 'idle' || detailState === 'loading' ? (
+        <div className="px-4 py-3">
+          <button
+            onClick={loadDetail}
+            disabled={detailState === 'loading'}
+            className="w-full flex items-center justify-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors py-1 disabled:opacity-50"
+          >
+            {detailState === 'loading' ? (
+              <span className="w-3 h-3 border border-zinc-500 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            )}
+            {detailState === 'loading' ? '로딩 중...' : '기록 불러오기'}
+          </button>
+        </div>
+      ) : detailState === 'error' ? (
+        <div className="px-4 py-4 text-center text-zinc-500 text-xs">불러오기 실패</div>
+      ) : records.length === 0 ? (
+        <div className="px-4 py-4 text-center text-zinc-600 text-sm">완속 충전 기록이 없습니다</div>
+      ) : (
+        <>
+          <div className="overflow-y-auto" style={{ maxHeight: '360px' }}>
+            {weeks.map(week => {
+              const expanded = expandedWeeks.has(week.weekKey);
+              return (
+                <Fragment key={week.weekKey}>
+                  <button
+                    onClick={() => toggleWeek(week.weekKey)}
+                    className="w-full px-4 py-2 border-t border-white/[0.08] first:border-t-0 bg-white/[0.03] hover:bg-white/[0.06] flex items-center justify-between gap-2 text-left transition-colors"
                   >
-                    <span className="font-bold text-zinc-300 shrink-0">{dateLabel}</span>
-                    <span className="text-zinc-500 truncate min-w-0 flex-1">{shortAddr(r.location)}</span>
-                    <span className="text-zinc-400 shrink-0">{startTime}{endTime && `~${endTime}`}</span>
-                    {r.duration_min && <span className="text-zinc-600 shrink-0">{formatDuration(r.duration_min)}</span>}
-                    {socDelta != null && (
-                      <span className="text-sky-400 shrink-0">{socDelta >= 0 ? '+' : ''}{socDelta}%</span>
-                    )}
-                    <span className="text-emerald-400 font-bold shrink-0">
-                      {r.energy_kwh}<span className="text-zinc-600 ml-0.5">kWh</span>
+                    <span className="flex items-center gap-2 min-w-0">
+                      <svg className={`w-3 h-3 text-zinc-500 flex-shrink-0 transition-transform ${expanded ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <span className="text-[10px] font-bold text-zinc-300">{weekLabel(week.weekKey)}</span>
+                      <span className="text-[10px] text-zinc-600 tabular-nums">{weekRange(week.weekKey)}</span>
                     </span>
-                    {r.avg_power && (
-                      <span className="text-emerald-400 shrink-0">
-                        {r.avg_power}<span className="text-zinc-600 ml-0.5">kW</span>
+                    <span className="flex items-center gap-2 tabular-nums flex-shrink-0">
+                      <span className="text-[10px] text-zinc-600">{week.items.length}건</span>
+                      <span className="text-[10px] font-bold text-emerald-400">
+                        {Math.round(week.totalKwh * 10) / 10}<span className="text-zinc-600 ml-0.5">kWh</span>
                       </span>
-                    )}
-                  </div>
-                );
-              })}
-            </Fragment>
-          );
-        })}
-      </div>
+                    </span>
+                  </button>
+                  {expanded && week.items.map(r => {
+                    const dt = new Date(r.start_date);
+                    const dateLabel = `${dt.getMonth()+1}/${dt.getDate()}`;
+                    const fmtTime = (d) => `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                    const startTime = fmtTime(dt);
+                    const endTime = r.duration_min
+                      ? fmtTime(new Date(dt.getTime() + r.duration_min * 60000))
+                      : null;
+                    const socDelta = (r.soc_start != null && r.soc_end != null)
+                      ? r.soc_end - r.soc_start : null;
+                    const tipParts = [
+                      shortAddr(r.location),
+                      endTime ? `${startTime}~${endTime}` : startTime,
+                      r.duration_min ? formatDuration(r.duration_min) : null,
+                      (r.soc_start != null && r.soc_end != null) ? `${r.soc_start}→${r.soc_end}%` : null,
+                      `${r.energy_kwh}kWh`,
+                      r.avg_power ? `평균 ${r.avg_power}kW` : null,
+                      r.max_power ? `최대 ${r.max_power}` : null,
+                      r.min_power ? `최소 ${r.min_power}` : null,
+                    ].filter(Boolean);
+
+                    return (
+                      <div
+                        key={r.id}
+                        className="px-4 py-2 border-t border-white/[0.04] flex items-center gap-1.5 text-[11px] tabular-nums"
+                        title={tipParts.join(' · ')}
+                      >
+                        <span className="font-bold text-zinc-300 shrink-0">{dateLabel}</span>
+                        <span className="text-zinc-500 truncate min-w-0 flex-1">{shortAddr(r.location)}</span>
+                        <span className="text-zinc-400 shrink-0">{startTime}{endTime && `~${endTime}`}</span>
+                        {r.duration_min && <span className="text-zinc-600 shrink-0">{formatDuration(r.duration_min)}</span>}
+                        {socDelta != null && (
+                          <span className="text-sky-400 shrink-0">{socDelta >= 0 ? '+' : ''}{socDelta}%</span>
+                        )}
+                        <span className="text-emerald-400 font-bold shrink-0">
+                          {r.energy_kwh}<span className="text-zinc-600 ml-0.5">kWh</span>
+                        </span>
+                        {r.avg_power && (
+                          <span className="text-emerald-400 shrink-0">
+                            {r.avg_power}<span className="text-zinc-600 ml-0.5">kW</span>
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </Fragment>
+              );
+            })}
+          </div>
+          {hasMore && (
+            <div className="border-t border-white/[0.06] px-4 py-2">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="w-full flex items-center justify-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors py-1 disabled:opacity-50"
+              >
+                {loadingMore
+                  ? <span className="w-3 h-3 border border-zinc-500 border-t-transparent rounded-full animate-spin" />
+                  : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                }
+                {loadingMore ? '로딩 중...' : '더 보기'}
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
