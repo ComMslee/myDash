@@ -36,13 +36,16 @@ function getISOWeekNumber(mondayUTC) {
 export async function GET(request) {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
-  const force = new URL(request.url).searchParams.get('refresh') === '1';
+  const searchParams = new URL(request.url).searchParams;
+  const force = searchParams.get('refresh') === '1';
+  const isSummary = searchParams.get('summary') === '1';
   try {
     const car = await getDefaultCar();
     if (!car) return Response.json({ error: 'No car found' }, { status: 404 });
     const carId = car.id;
 
-    return Response.json(await withCache(`battery:${carId}`, TTL_180S, async () => {
+    const cacheKey = isSummary ? `battery-summary:${carId}` : `battery:${carId}`;
+    return Response.json(await withCache(cacheKey, TTL_180S, async () => {
 
     const KST = KST_OFFSET_MS;
     const now = new Date();
@@ -62,6 +65,30 @@ export async function GET(request) {
     // 최근 1달 / 6개월 필터
     const oneMonthAgoUTC = new Date(now.getTime() - 30 * 86400000);
     const sixMonthsAgoUTC = new Date(now.getTime() - 180 * 86400000);
+
+    const baseQueries = [
+      queryCapacityFromCharge(carId),
+      queryCapacityFromPositions(carId),
+      queryOdometer(carId),
+      queryTotalKwh(carId),
+      queryTotalDriveDischargeKm(carId),
+      queryFirstCharge(carId),
+      queryFirstDrive(carId),
+      queryThisWeekCharge(carId, curWeekMonUTC.toISOString()),
+      queryThisWeekDischarge(carId, curWeekMonUTC.toISOString()),
+      queryThisMonthCharge(carId, thisMonthStartUTC.toISOString()),
+      queryThisMonthDischarge(carId, thisMonthStartUTC.toISOString()),
+      queryWeeklyCharge(carId, twelveWeeksAgoUTC.toISOString()),
+      queryWeeklyDrive(carId, twelveWeeksAgoUTC.toISOString()),
+      queryChargeMatrix(carId),
+      queryHistStart(carId),
+      queryHistEnd(carId),
+      querySocDist(carId),
+    ];
+
+    const heavyQueries = isSummary
+      ? [Promise.resolve({ rows: [] }), Promise.resolve({ all: {}, month: {}, six_month: {} }), Promise.resolve({ rows: [] })]
+      : [queryIdleDrain(carId), queryAllDailyRecords(carId, { oneMonthAgo: oneMonthAgoUTC, sixMonthsAgo: sixMonthsAgoUTC }), queryChargingSessions(carId)];
 
     const [
       capacityFromChargeResult,
@@ -84,28 +111,7 @@ export async function GET(request) {
       idleDrainResult,
       dailyRecords,
       chargingSessionsResult,
-    ] = await Promise.all([
-      queryCapacityFromCharge(carId),
-      queryCapacityFromPositions(carId),
-      queryOdometer(carId),
-      queryTotalKwh(carId),
-      queryTotalDriveDischargeKm(carId),
-      queryFirstCharge(carId),
-      queryFirstDrive(carId),
-      queryThisWeekCharge(carId, curWeekMonUTC.toISOString()),
-      queryThisWeekDischarge(carId, curWeekMonUTC.toISOString()),
-      queryThisMonthCharge(carId, thisMonthStartUTC.toISOString()),
-      queryThisMonthDischarge(carId, thisMonthStartUTC.toISOString()),
-      queryWeeklyCharge(carId, twelveWeeksAgoUTC.toISOString()),
-      queryWeeklyDrive(carId, twelveWeeksAgoUTC.toISOString()),
-      queryChargeMatrix(carId),
-      queryHistStart(carId),
-      queryHistEnd(carId),
-      querySocDist(carId),
-      queryIdleDrain(carId),
-      queryAllDailyRecords(carId, { oneMonthAgo: oneMonthAgoUTC, sixMonthsAgo: sixMonthsAgoUTC }),
-      queryChargingSessions(carId),
-    ]);
+    ] = await Promise.all([...baseQueries, ...heavyQueries]);
 
     // 배터리 용량 (1순위 충전역산 → 2순위 positions 역산 → 3순위 상수)
     const batteryCapacity = computeBatteryCapacity(
@@ -243,7 +249,7 @@ export async function GET(request) {
         },
         tips: health.tips,
       },
-      idle_drain: idleDrainResult.rows.map(r => ({
+      idle_drain: isSummary ? null : idleDrainResult.rows.map(r => ({
         idle_start: r.idle_start,
         idle_end: r.idle_end,
         soc_start: parseInt(r.soc_start),
@@ -260,7 +266,7 @@ export async function GET(request) {
           ? r.online_spans.map(sp => ({ s: Number(sp.s), e: Number(sp.e) }))
           : [],
       })),
-      charging_sessions: chargingSessionsResult.rows.map(r => ({
+      charging_sessions: isSummary ? null : chargingSessionsResult.rows.map(r => ({
         start: r.start_date,
         end: r.end_date,
         soc_start: parseInt(r.soc_start),

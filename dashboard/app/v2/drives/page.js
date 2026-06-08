@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useMock, MOCK_DATA } from '@/app/context/mock';
 import { Spinner } from '@/app/components/PageLayout';
 import { HourDowHeatmap } from '@/app/components/ChartWidgets';
+import { useDetailLoader } from '@/lib/useDetailLoader';
+import ExpandableSection from '@/app/components/ExpandableSection';
 import VehicleKpiCard from './_parts/VehicleKpiCard';
 import MonthInsightsCard from './_parts/MonthInsightsCard';
 import RecordsCardV2 from './_parts/RecordsCardV2';
@@ -13,39 +15,33 @@ import SeasonalEffGrid from './_parts/SeasonalEffGrid';
 export default function V2DrivesPage() {
   const { isMock, refreshSignal } = useMock();
 
-  const [drives, setDrives] = useState(null);
   const [insights, setInsights] = useState(null);
-  const [monthlyHistory, setMonthlyHistory] = useState(null);
   const [car, setCar] = useState(null);
-  const [loading, setLoading] = useState({ drives: true, insights: true, history: true, car: true });
+  const [loading, setLoading] = useState({ insights: true, car: true });
+
+  // 무거운 데이터: 펼칠 때 로드
+  const drivesLoader = useDetailLoader('/api/drives');
+  const historyLoader = useDetailLoader('/api/monthly-history');
 
   useEffect(() => {
     if (isMock) {
-      setDrives(MOCK_DATA.drives);
       setInsights({ ...MOCK_DATA.insights, allTime: { ...MOCK_DATA.insights.sixMonth, avg_speed: 42.3, max_day_distance: 248.7, max_day_duration: 320 } });
-      setMonthlyHistory(MOCK_DATA.monthlyHistory || null);
       setCar(null);
-      setLoading({ drives: false, insights: false, history: false, car: false });
+      setLoading({ insights: false, car: false });
       return;
     }
-
-    fetch('/api/drives').then(r => r.json())
-      .then(d => { setDrives(d); setLoading(p => ({ ...p, drives: false })); })
-      .catch(() => setLoading(p => ({ ...p, drives: false })));
 
     fetch('/api/insights').then(r => r.json())
       .then(d => { setInsights(d); setLoading(p => ({ ...p, insights: false })); })
       .catch(() => setLoading(p => ({ ...p, insights: false })));
-
-    fetch('/api/monthly-history').then(r => r.json())
-      .then(d => { setMonthlyHistory(d); setLoading(p => ({ ...p, history: false })); })
-      .catch(() => setLoading(p => ({ ...p, history: false })));
 
     fetch('/api/car').then(r => r.json())
       .then(d => { setCar(d); setLoading(p => ({ ...p, car: false })); })
       .catch(() => setLoading(p => ({ ...p, car: false })));
   }, [isMock, refreshSignal]);
 
+  // monthly-history 계산 (로드된 경우에만)
+  const monthlyHistory = historyLoader.data;
   const months = monthlyHistory?.months || [];
   const driveDaysByYear = monthlyHistory?.driveDaysByYear || {};
   const seasonalEff = monthlyHistory?.seasonalEff || {};
@@ -83,16 +79,15 @@ export default function V2DrivesPage() {
     <main className="min-h-screen bg-[#0f0f0f] text-white">
       <div className="max-w-2xl mx-auto px-4 py-5 pb-3 space-y-5">
 
-        {/* 1. 차량 요약 — 누적·효율 + 기간별 통계
-            drives 는 점진 로드 — 카드는 즉시 렌더, 기간 표는 도착할 때 채워짐 */}
+        {/* 1. 차량 요약 */}
         {loading.car || loading.insights ? <Spinner /> : (
-          <VehicleKpiCard car={car} insights={insights} drives={drives} />
+          <VehicleKpiCard car={car} insights={insights} drives={drivesLoader.data} />
         )}
 
         {/* 2. 이번달 인사이트 */}
         {!loading.insights && <MonthInsightsCard insights={insights} />}
 
-        {/* 4. 주행 패턴 — 시간×요일 히트맵 */}
+        {/* 3. 주행 패턴 히트맵 */}
         {insights?.hour_dow && (
           <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
             <div className="px-3 py-2 border-b border-white/[0.06]">
@@ -104,26 +99,40 @@ export default function V2DrivesPage() {
           </div>
         )}
 
-        {/* 6. TOP 50 기록 (랭킹 시트) */}
+        {/* 4. TOP 50 기록 */}
         {!loading.insights && <RecordsCardV2 allTime={insights?.allTime} />}
 
-        {/* 7. 연도별 월간 통계 + 계절별 효율 */}
-        {loading.history ? <Spinner /> : months.length === 0 ? (
-          <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-6 text-center text-zinc-600 text-xs">
-            데이터가 없습니다
-          </div>
+        {/* 5. 연도별 월간 통계 — 펼칠 때 로드 */}
+        {historyLoader.isLoaded ? (
+          months.length === 0 ? (
+            <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-6 text-center text-zinc-600 text-xs">
+              데이터가 없습니다
+            </div>
+          ) : (
+            <>
+              <MonthlyHistoryByYear
+                years={years}
+                byYear={byYear}
+                yearTotals={yearTotals}
+                driveDaysByYear={driveDaysByYear}
+                curYear={curYear}
+                maxDist={maxDist}
+              />
+              <SeasonalEffGrid seasonalEff={seasonalEff} />
+            </>
+          )
         ) : (
-          <>
-            <MonthlyHistoryByYear
-              years={years}
-              byYear={byYear}
-              yearTotals={yearTotals}
-              driveDaysByYear={driveDaysByYear}
-              curYear={curYear}
-              maxDist={maxDist}
-            />
-            <SeasonalEffGrid seasonalEff={seasonalEff} />
-          </>
+          <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
+            <div className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">연도별 월간 통계</div>
+            <ExpandableSection
+              onExpand={historyLoader.load}
+              isLoading={historyLoader.isLoading}
+              isLoaded={false}
+              label="통계 불러오기"
+            >
+              {null}
+            </ExpandableSection>
+          </div>
         )}
       </div>
     </main>

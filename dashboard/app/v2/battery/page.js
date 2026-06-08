@@ -9,6 +9,8 @@ import FastChargeCard from '@/app/v2/battery/FastChargeCard';
 import SlowChargeCard from '@/app/v2/battery/SlowChargeCard';
 import ChargingLocationsCard from '@/app/v2/battery/ChargingLocationsCard';
 import { Spinner } from '@/app/components/PageLayout';
+import { useDetailLoader } from '@/lib/useDetailLoader';
+import ExpandableSection from '@/app/components/ExpandableSection';
 
 export default function V2BatteryPage() {
   const [data, setData] = useState(null);
@@ -16,10 +18,13 @@ export default function V2BatteryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // 대기 배터리 손실: 페이지 마운트 시 로드하지 않고 사용자가 펼칠 때 로드
+  const idleDrain = useDetailLoader('/api/idle-drain');
+
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetch('/api/battery').then(r => r.json()),
+      fetch('/api/battery?summary=1').then(r => r.json()),
       fetch('/api/battery-trend').then(r => r.json()),
     ])
       .then(([batteryData, trendData]) => {
@@ -47,7 +52,27 @@ export default function V2BatteryPage() {
           <>
             <RangeMapCard />
             <HealthScoreCard data={data.health} trend={trend} />
-            <IdleDrainCard records={data.idle_drain} chargingSessions={data.charging_sessions} />
+
+            {/* IdleDrainCard — 펼칠 때 로드 */}
+            {idleDrain.isLoaded && idleDrain.data ? (
+              <IdleDrainCard
+                records={idleDrain.data.idle_drain}
+                chargingSessions={idleDrain.data.charging_sessions}
+              />
+            ) : (
+              <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
+                <div className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">대기 배터리 손실</div>
+                <ExpandableSection
+                  onExpand={idleDrain.load}
+                  isLoading={idleDrain.isLoading}
+                  isLoaded={false}
+                  label="상세 데이터 로드"
+                >
+                  {null}
+                </ExpandableSection>
+              </div>
+            )}
+
             <MonthlyChargeCard />
             <ChargingLocationsCard />
             <FastChargeCard />
