@@ -20,7 +20,7 @@ function formatDateLabel(key) {
   return `${prefix}${parseInt(m)}/${parseInt(d)} (${dow})`;
 }
 
-export default function IdleDrainCard({ records, chargingSessions = [] }) {
+export default function IdleDrainCard({ records, chargingSessions = [], hideSummary = false }) {
   const { grouped, chargingByDay, stats } = useIdleDrainDays(records, chargingSessions);
 
   if (!stats) {
@@ -124,9 +124,9 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
   });
 
   return (
-    <div className="bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden">
-      {/* 요약 */}
-      <div className="grid grid-cols-2 border-b border-white/[0.06]">
+    <div className={hideSummary ? '' : 'bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden'}>
+      {/* 요약 — hideSummary=true면 page.js에서 이미 표시 */}
+      {!hideSummary && <div className="grid grid-cols-2 border-b border-white/[0.06]">
         <div className="text-center py-2 border-r border-white/[0.06]">
           <div className="text-[10px] text-zinc-600 mb-1">일평균 손실</div>
           <div className="text-sm font-extrabold tabular-nums text-amber-400">
@@ -148,7 +148,7 @@ export default function IdleDrainCard({ records, chargingSessions = [] }) {
           <div className="text-sm font-extrabold tabular-nums text-zinc-300">{formatHours(avgIdleHours)}</div>
           <div className="text-[9px] text-zinc-600 mt-0.5">{totalRecords}회 기준</div>
         </div>
-      </div>
+      </div>}
 
       {/* 주간 그룹 리스트 */}
       {weeks.map(week => {

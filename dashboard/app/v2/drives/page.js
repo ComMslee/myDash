@@ -1,16 +1,41 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useMock, MOCK_DATA } from '@/app/context/mock';
 import { Spinner } from '@/app/components/PageLayout';
 import { HourDowHeatmap } from '@/app/components/ChartWidgets';
 import { useDetailLoader } from '@/lib/useDetailLoader';
-import ExpandableSection from '@/app/components/ExpandableSection';
 import VehicleKpiCard from './_parts/VehicleKpiCard';
 import MonthInsightsCard from './_parts/MonthInsightsCard';
 import RecordsCardV2 from './_parts/RecordsCardV2';
 import MonthlyHistoryByYear from './_parts/MonthlyHistoryByYear';
 import SeasonalEffGrid from './_parts/SeasonalEffGrid';
+
+function buildYearData(months) {
+  const byYear = {};
+  for (const m of months) {
+    if (!byYear[m.year]) byYear[m.year] = [];
+    byYear[m.year].push(m);
+  }
+  const years = Object.keys(byYear).sort((a, b) => b - a);
+  const yearTotals = {};
+  for (const y of years) {
+    const ms = byYear[y];
+    const totalKm = parseFloat(ms.reduce((s, m) => s + Number(m.total_distance_km || 0), 0).toFixed(1));
+    const validWh = ms.filter(m => m.avg_wh_km != null).map(m => m.avg_wh_km);
+    yearTotals[y] = {
+      drive_count: ms.reduce((s, m) => s + Number(m.drive_count || 0), 0),
+      total_distance_km: totalKm,
+      total_duration_min: ms.reduce((s, m) => s + Number(m.total_duration_min || 0), 0),
+      charge_count: ms.reduce((s, m) => s + Number(m.charge_count || 0), 0),
+      total_energy_kwh: parseFloat(ms.reduce((s, m) => s + Number(m.total_energy_kwh || 0), 0).toFixed(1)),
+      avg_monthly_km: ms.length > 0 ? Math.round(totalKm / ms.length) : 0,
+      avg_wh_km: validWh.length > 0 ? validWh.reduce((s, v) => s + v, 0) / validWh.length : null,
+    };
+  }
+  const maxDist = months.length > 0 ? Math.max(...months.map(m => m.total_distance_km)) : 1;
+  return { byYear, years, yearTotals, maxDist };
+}
 
 export default function V2DrivesPage() {
   const { isMock, refreshSignal } = useMock();
@@ -18,10 +43,10 @@ export default function V2DrivesPage() {
   const [insights, setInsights] = useState(null);
   const [car, setCar] = useState(null);
   const [drivesSummary, setDrivesSummary] = useState(null);
+  const [historySummary, setHistorySummary] = useState(null); // 올해 요약
   const [loading, setLoading] = useState({ insights: true, car: true });
 
-  // 무거운 데이터: 펼칠 때 로드
-  const drivesLoader = useDetailLoader('/api/drives');
+  // 전체 이력 — 펼칠 때 로드
   const historyLoader = useDetailLoader('/api/monthly-history');
 
   useEffect(() => {
@@ -43,42 +68,25 @@ export default function V2DrivesPage() {
     fetch('/api/drives?summary=1').then(r => r.json())
       .then(d => setDrivesSummary(d))
       .catch(() => null);
+
+    fetch('/api/monthly-history?summary=1').then(r => r.json())
+      .then(d => setHistorySummary(d))
+      .catch(() => null);
   }, [isMock, refreshSignal]);
 
-  // monthly-history 계산 (로드된 경우에만)
-  const monthlyHistory = historyLoader.data;
-  const months = monthlyHistory?.months || [];
-  const driveDaysByYear = monthlyHistory?.driveDaysByYear || {};
-  const seasonalEff = monthlyHistory?.seasonalEff || {};
   const now = new Date();
   const curYear = now.getFullYear();
 
-  const byYear = {};
-  for (const m of months) {
-    if (!byYear[m.year]) byYear[m.year] = [];
-    byYear[m.year].push(m);
-  }
-  const years = Object.keys(byYear).sort((a, b) => b - a);
+  // 전체 이력 로드 후 → historySummary 대체
+  const activeHistory = historyLoader.data || historySummary;
 
-  const yearTotals = {};
-  for (const y of years) {
-    const ms = byYear[y];
-    const monthCount = ms.length;
-    const totalKm = parseFloat(ms.reduce((s, m) => s + Number(m.total_distance_km || 0), 0).toFixed(1));
-    const validWh = ms.filter(m => m.avg_wh_km != null).map(m => m.avg_wh_km);
-    const avgWhKm = validWh.length > 0 ? validWh.reduce((s, v) => s + v, 0) / validWh.length : null;
-    yearTotals[y] = {
-      drive_count: ms.reduce((s, m) => s + Number(m.drive_count || 0), 0),
-      total_distance_km: totalKm,
-      total_duration_min: ms.reduce((s, m) => s + Number(m.total_duration_min || 0), 0),
-      charge_count: ms.reduce((s, m) => s + Number(m.charge_count || 0), 0),
-      total_energy_kwh: parseFloat(ms.reduce((s, m) => s + Number(m.total_energy_kwh || 0), 0).toFixed(1)),
-      avg_monthly_km: monthCount > 0 ? Math.round(totalKm / monthCount) : 0,
-      avg_wh_km: avgWhKm,
-    };
-  }
-
-  const maxDist = months.length > 0 ? Math.max(...months.map(m => m.total_distance_km)) : 1;
+  const { byYear, years, yearTotals, maxDist } = useMemo(
+    () => buildYearData(activeHistory?.months || []),
+    [activeHistory]
+  );
+  const driveDaysByYear = activeHistory?.driveDaysByYear || {};
+  const seasonalEff = activeHistory?.seasonalEff || {};
+  const isSummaryOnly = !historyLoader.isLoaded;
 
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white">
@@ -86,7 +94,7 @@ export default function V2DrivesPage() {
 
         {/* 1. 차량 요약 */}
         {loading.car || loading.insights ? <Spinner /> : (
-          <VehicleKpiCard car={car} insights={insights} drives={drivesSummary ?? drivesLoader.data} />
+          <VehicleKpiCard car={car} insights={insights} drives={drivesSummary ?? historyLoader.data} />
         )}
 
         {/* 2. 이번달 인사이트 */}
@@ -107,36 +115,38 @@ export default function V2DrivesPage() {
         {/* 4. TOP 50 기록 */}
         {!loading.insights && <RecordsCardV2 allTime={insights?.allTime} />}
 
-        {/* 5. 연도별 월간 통계 — 펼칠 때 로드 */}
-        {historyLoader.isLoaded ? (
-          months.length === 0 ? (
-            <div className="bg-[#161618] border border-white/[0.06] rounded-2xl p-6 text-center text-zinc-600 text-xs">
-              데이터가 없습니다
-            </div>
-          ) : (
-            <>
-              <MonthlyHistoryByYear
-                years={years}
-                byYear={byYear}
-                yearTotals={yearTotals}
-                driveDaysByYear={driveDaysByYear}
-                curYear={curYear}
-                maxDist={maxDist}
-              />
-              <SeasonalEffGrid seasonalEff={seasonalEff} />
-            </>
-          )
+        {/* 5. 월간 통계 — 올해는 즉시, 이전 연도는 펼칠 때 로드 */}
+        {activeHistory ? (
+          <>
+            <MonthlyHistoryByYear
+              years={years}
+              byYear={byYear}
+              yearTotals={yearTotals}
+              driveDaysByYear={driveDaysByYear}
+              curYear={curYear}
+              maxDist={maxDist}
+            />
+            {/* 이전 연도 더보기 — 요약 모드(올해만)일 때 표시 */}
+            {isSummaryOnly && (
+              <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
+                <button
+                  onClick={historyLoader.load}
+                  disabled={historyLoader.isLoading}
+                  className="w-full flex items-center justify-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors py-1 disabled:opacity-50"
+                >
+                  {historyLoader.isLoading
+                    ? <span className="w-3 h-3 border border-zinc-500 border-t-transparent rounded-full animate-spin" />
+                    : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  }
+                  {historyLoader.isLoading ? '로딩 중...' : '이전 연도 통계 불러오기'}
+                </button>
+              </div>
+            )}
+            {!isSummaryOnly && <SeasonalEffGrid seasonalEff={seasonalEff} />}
+          </>
         ) : (
-          <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
-            <div className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">연도별 월간 통계</div>
-            <ExpandableSection
-              onExpand={historyLoader.load}
-              isLoading={historyLoader.isLoading}
-              isLoaded={false}
-              label="통계 불러오기"
-            >
-              {null}
-            </ExpandableSection>
+          <div className="bg-[#161618] border border-white/[0.06] rounded-2xl flex items-center justify-center py-6">
+            <div className="w-4 h-4 border-2 border-white/10 border-t-white/60 rounded-full animate-spin" />
           </div>
         )}
       </div>

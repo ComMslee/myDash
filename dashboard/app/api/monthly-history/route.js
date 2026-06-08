@@ -11,7 +11,9 @@ export const dynamic = 'force-dynamic';
 export async function GET(request) {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
-  const force = new URL(request.url).searchParams.get('refresh') === '1';
+  const sp = new URL(request.url).searchParams;
+  const force = sp.get('refresh') === '1';
+  const isSummary = sp.get('summary') === '1';
   try {
     const car = await getDefaultCar();
     if (!car) {
@@ -21,6 +23,75 @@ export async function GET(request) {
 
     await ensureSchema();
     await bootstrapIfEmpty(carId);
+
+    // ?summary=1 — 올해 월별만 반환 (즉시 표시용)
+    if (isSummary) {
+      return Response.json(await withCache(`monthly-history-summary:${carId}`, TTL_300S, async () => {
+        const now = new Date();
+        const curYear = now.getFullYear();
+        const curMonth = now.getMonth() + 1;
+        const curMonthStart = new Date(curYear, curMonth - 1, 1);
+        const nextMonthStart = new Date(curYear, curMonth, 1);
+        const yearStart = new Date(curYear, 0, 1);
+
+        const [pastRows, curDrive, curCharge, curEff] = await Promise.all([
+          pool.query(
+            `SELECT year, month, distance_km::float AS total_distance_km, drive_count,
+                    duration_min AS total_duration_min, used_km::float AS used_km,
+                    total_kwh::float AS total_energy_kwh, charge_count
+             FROM dash_monthly_insights
+             WHERE car_id = $1
+               AND year = $2
+               AND month < $3
+             ORDER BY month DESC`,
+            [carId, curYear, curMonth]
+          ),
+          pool.query(
+            `SELECT COALESCE(SUM(distance),0)::float AS total_distance_km, COUNT(*)::int AS drive_count,
+                    COALESCE(SUM(duration_min),0)::int AS total_duration_min,
+                    COALESCE(SUM(CASE WHEN start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL
+                                       AND (start_rated_range_km - end_rated_range_km) > 0
+                                      THEN (start_rated_range_km - end_rated_range_km) ELSE 0 END),0)::float AS used_km
+             FROM drives WHERE car_id=$1 AND start_date>=$2 AND start_date<$3`,
+            [carId, curMonthStart.toISOString(), nextMonthStart.toISOString()]
+          ),
+          pool.query(
+            `SELECT COUNT(*)::int AS charge_count, COALESCE(SUM(charge_energy_added),0)::float AS total_energy_kwh
+             FROM charging_processes WHERE car_id=$1 AND start_date>=$2 AND start_date<$3 AND charge_energy_added IS NOT NULL`,
+            [carId, curMonthStart.toISOString(), nextMonthStart.toISOString()]
+          ),
+          pool.query(
+            `SELECT AVG((start_rated_range_km-end_rated_range_km)*$4/NULLIF(distance,0)*1000)::float AS avg_wh_km
+             FROM drives WHERE car_id=$1 AND start_date>=$2 AND start_date<$3
+               AND distance>1 AND start_rated_range_km IS NOT NULL AND end_rated_range_km IS NOT NULL`,
+            [carId, curMonthStart.toISOString(), nextMonthStart.toISOString(), KWH_PER_KM]
+          ),
+        ]);
+
+        const buildMonth = (year, month, dist, dur, cnt, kwh, chargeCnt, used) => {
+          const distF = parseFloat(dist)||0, usedF = parseFloat(used)||0;
+          const avgWh = (distF>1&&usedF>0) ? (usedF*KWH_PER_KM/distF*1000) : null;
+          return { month_label:`${String(year).slice(2)}/${String(month).padStart(2,'0')}`, year, month,
+            drive_count:parseInt(cnt)||0, total_distance_km:parseFloat(distF.toFixed(1)),
+            total_duration_min:Math.round(parseFloat(dur)||0), charge_count:parseInt(chargeCnt)||0,
+            total_energy_kwh:parseFloat((parseFloat(kwh)||0).toFixed(1)),
+            avg_wh_km:avgWh!=null?parseFloat(avgWh.toFixed(1)):null };
+        };
+
+        const cd = curDrive.rows[0], cc = curCharge.rows[0];
+        const curWh = curEff.rows[0]?.avg_wh_km != null ? parseFloat(parseFloat(curEff.rows[0].avg_wh_km).toFixed(1)) : null;
+        const curMonthEntry = { month_label:`${String(curYear).slice(2)}/${String(curMonth).padStart(2,'0')}`,
+          year:curYear, month:curMonth, drive_count:cd.drive_count,
+          total_distance_km:parseFloat(parseFloat(cd.total_distance_km).toFixed(1)),
+          total_duration_min:cd.total_duration_min, charge_count:cc.charge_count,
+          total_energy_kwh:parseFloat(parseFloat(cc.total_energy_kwh).toFixed(1)), avg_wh_km:curWh };
+
+        const months = [curMonthEntry, ...pastRows.rows.map(r =>
+          buildMonth(r.year,r.month,r.total_distance_km,r.total_duration_min,r.drive_count,r.total_energy_kwh,r.charge_count,r.used_km)
+        )];
+        return { months, driveDaysByYear:{}, seasonalEff:{}, is_summary:true };
+      }, { force }));
+    }
 
     return Response.json(await withCache(`monthly-history:${carId}`, TTL_300S, async () => {
     const now = new Date();
