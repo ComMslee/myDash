@@ -2,13 +2,25 @@
 
 import { Fragment, useMemo, useState } from 'react';
 import { formatHours } from '@/lib/format';
-import { kstDateStr, kstMondayStr } from '@/lib/kst';
+import { kstDateStr, kstMondayStr, KST_OFFSET_MS } from '@/lib/kst';
 import { Icon } from '../../lib/Icons';
 import { useIdleDrainDays } from './useIdleDrainDays';
 import { dropSharePct, computeSentrySpans, sumSpansMin } from './idle-drain/compute';
 import { dropTextClass } from './idle-drain/colors';
 import WeekHeader from './idle-drain/WeekHeader';
 import DayTimeline from './idle-drain/DayTimeline';
+
+function currentMonthKey() {
+  const kst = new Date(Date.now() + KST_OFFSET_MS);
+  return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatMonthLabel(mk) {
+  const [y, m] = mk.split('-');
+  const currentYear = new Date().getFullYear();
+  const prefix = parseInt(y) !== currentYear ? `${y.slice(2)}년 ` : '';
+  return `${prefix}${parseInt(m)}월`;
+}
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -20,7 +32,7 @@ function formatDateLabel(key) {
   return `${prefix}${parseInt(m)}/${parseInt(d)} (${dow})`;
 }
 
-export default function IdleDrainCard({ records, chargingSessions = [], hideSummary = false }) {
+export default function IdleDrainCard({ records, chargingSessions = [] }) {
   const { grouped, chargingByDay, stats } = useIdleDrainDays(records, chargingSessions);
 
   if (!stats) {
@@ -123,10 +135,32 @@ export default function IdleDrainCard({ records, chargingSessions = [], hideSumm
     return next;
   });
 
+  // 월별 그룹 (주 → 월로 묶기)
+  const monthGroups = useMemo(() => {
+    const map = new Map();
+    const order = [];
+    for (const week of weeks) {
+      const mk = week.weekKey.slice(0, 7); // YYYY-MM (월요일 기준)
+      let m = map.get(mk);
+      if (!m) { m = { monthKey: mk, weeks: [], dayCount: 0, totalDrop: 0 }; map.set(mk, m); order.push(mk); }
+      m.weeks.push(week);
+      m.dayCount += week.dayKeys.length;
+      m.totalDrop += week.avgDrainPerDay * week.dayKeys.length;
+    }
+    return order.map(mk => map.get(mk));
+  }, [weeks]);
+
+  const [expandedMonths, setExpandedMonths] = useState(() => new Set([currentMonthKey()]));
+  const toggleMonth = (mk) => setExpandedMonths(prev => {
+    const next = new Set(prev);
+    if (next.has(mk)) next.delete(mk); else next.add(mk);
+    return next;
+  });
+
   return (
-    <div className={hideSummary ? '' : 'bg-[#161618] border border-white/[0.06] rounded-2xl overflow-hidden'}>
-      {/* 요약 — hideSummary=true면 page.js에서 이미 표시 */}
-      {!hideSummary && <div className="grid grid-cols-2 border-b border-white/[0.06]">
+    <>
+      {/* 요약 헤더 */}
+      <div className="grid grid-cols-2 border-b border-white/[0.06]">
         <div className="text-center py-2 border-r border-white/[0.06]">
           <div className="text-[10px] text-zinc-600 mb-1">일평균 손실</div>
           <div className="text-sm font-extrabold tabular-nums text-amber-400">
@@ -148,27 +182,51 @@ export default function IdleDrainCard({ records, chargingSessions = [], hideSumm
           <div className="text-sm font-extrabold tabular-nums text-zinc-300">{formatHours(avgIdleHours)}</div>
           <div className="text-[9px] text-zinc-600 mt-0.5">{totalRecords}회 기준</div>
         </div>
-      </div>}
+      </div>
 
-      {/* 주간 그룹 리스트 */}
-      {weeks.map(week => {
-        const expanded = expandedWeeks.has(week.weekKey);
+      {/* 월별 → 주별 그룹 */}
+      {monthGroups.map(mg => {
+        const monthExpanded = expandedMonths.has(mg.monthKey);
+        const monthAvgDrain = mg.dayCount > 0 ? Math.round(mg.totalDrop / mg.dayCount * 10) / 10 : 0;
         return (
-          <Fragment key={week.weekKey}>
-            <WeekHeader week={week} expanded={expanded} onToggle={toggleWeek} fmtDrop={fmtDrop} />
-            {expanded && week.dayKeys.map(key => (
-              <DayTimeline
-                key={key}
-                dayKey={key}
-                dayData={dayCompute.get(key)}
-                chargingSessions={chargingByDay[key]}
-                fmtDrop={fmtDrop}
-                formatDateLabel={formatDateLabel}
-              />
-            ))}
+          <Fragment key={mg.monthKey}>
+            {/* 월 헤더 */}
+            <button
+              onClick={() => toggleMonth(mg.monthKey)}
+              className="w-full px-4 py-2 border-t border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.06] flex items-center justify-between gap-2 text-left transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <svg className={`w-3 h-3 text-zinc-500 flex-shrink-0 transition-transform ${monthExpanded ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                <span className="text-[11px] font-bold text-zinc-200">{formatMonthLabel(mg.monthKey)}</span>
+              </span>
+              <span className="flex items-center gap-2 tabular-nums flex-shrink-0">
+                <span className="text-[10px] text-zinc-600">{mg.dayCount}일</span>
+                <span className="text-[10px] font-bold text-amber-400">{monthAvgDrain}%<span className="text-zinc-600 ml-0.5">/일</span></span>
+              </span>
+            </button>
+            {monthExpanded && mg.weeks.map(week => {
+              const weekExpanded = expandedWeeks.has(week.weekKey);
+              return (
+                <Fragment key={week.weekKey}>
+                  <WeekHeader week={week} expanded={weekExpanded} onToggle={toggleWeek} fmtDrop={fmtDrop} />
+                  {weekExpanded && week.dayKeys.map(key => (
+                    <DayTimeline
+                      key={key}
+                      dayKey={key}
+                      dayData={dayCompute.get(key)}
+                      chargingSessions={chargingByDay[key]}
+                      fmtDrop={fmtDrop}
+                      formatDateLabel={formatDateLabel}
+                    />
+                  ))}
+                </Fragment>
+              );
+            })}
           </Fragment>
         );
       })}
-    </div>
+    </>
   );
 }

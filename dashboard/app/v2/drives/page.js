@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { useMock, MOCK_DATA } from '@/app/context/mock';
 import { Spinner } from '@/app/components/PageLayout';
 import { HourDowHeatmap } from '@/app/components/ChartWidgets';
-import { useDetailLoader } from '@/lib/useDetailLoader';
 import VehicleKpiCard from './_parts/VehicleKpiCard';
 import MonthInsightsCard from './_parts/MonthInsightsCard';
 import RecordsCardV2 from './_parts/RecordsCardV2';
@@ -43,11 +42,8 @@ export default function V2DrivesPage() {
   const [insights, setInsights] = useState(null);
   const [car, setCar] = useState(null);
   const [drivesSummary, setDrivesSummary] = useState(null);
-  const [historySummary, setHistorySummary] = useState(null); // 올해 요약
+  const [monthlyHistory, setMonthlyHistory] = useState(null);
   const [loading, setLoading] = useState({ insights: true, car: true });
-
-  // 전체 이력 — 펼칠 때 로드
-  const historyLoader = useDetailLoader('/api/monthly-history');
 
   useEffect(() => {
     if (isMock) {
@@ -69,24 +65,20 @@ export default function V2DrivesPage() {
       .then(d => setDrivesSummary(d))
       .catch(() => null);
 
-    fetch('/api/monthly-history?summary=1').then(r => r.json())
-      .then(d => setHistorySummary(d))
+    fetch('/api/monthly-history').then(r => r.json())
+      .then(d => setMonthlyHistory(d))
       .catch(() => null);
   }, [isMock, refreshSignal]);
 
   const now = new Date();
   const curYear = now.getFullYear();
 
-  // 전체 이력 로드 후 → historySummary 대체
-  const activeHistory = historyLoader.data || historySummary;
-
   const { byYear, years, yearTotals, maxDist } = useMemo(
-    () => buildYearData(activeHistory?.months || []),
-    [activeHistory]
+    () => buildYearData(monthlyHistory?.months || []),
+    [monthlyHistory]
   );
-  const driveDaysByYear = activeHistory?.driveDaysByYear || {};
-  const seasonalEff = activeHistory?.seasonalEff || {};
-  const isSummaryOnly = !historyLoader.isLoaded;
+  const driveDaysByYear = monthlyHistory?.driveDaysByYear || {};
+  const seasonalEff = monthlyHistory?.seasonalEff || {};
 
   return (
     <main className="min-h-screen bg-[#0f0f0f] text-white">
@@ -94,7 +86,7 @@ export default function V2DrivesPage() {
 
         {/* 1. 차량 요약 */}
         {loading.car || loading.insights ? <Spinner /> : (
-          <VehicleKpiCard car={car} insights={insights} drives={drivesSummary ?? historyLoader.data} />
+          <VehicleKpiCard car={car} insights={insights} drives={drivesSummary} />
         )}
 
         {/* 2. 이번달 인사이트 */}
@@ -115,8 +107,8 @@ export default function V2DrivesPage() {
         {/* 4. TOP 50 기록 */}
         {!loading.insights && <RecordsCardV2 allTime={insights?.allTime} />}
 
-        {/* 5. 월간 통계 — 올해는 즉시, 이전 연도는 펼칠 때 로드 */}
-        {activeHistory ? (
+        {/* 5. 월간 통계 — 전체 연도 표시 */}
+        {monthlyHistory ? (
           <>
             <MonthlyHistoryByYear
               years={years}
@@ -126,23 +118,7 @@ export default function V2DrivesPage() {
               curYear={curYear}
               maxDist={maxDist}
             />
-            {/* 이전 연도 더보기 — 요약 모드(올해만)일 때 표시 */}
-            {isSummaryOnly && (
-              <div className="bg-[#161618] border border-white/[0.06] rounded-2xl px-4 py-3">
-                <button
-                  onClick={historyLoader.load}
-                  disabled={historyLoader.isLoading}
-                  className="w-full flex items-center justify-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors py-1 disabled:opacity-50"
-                >
-                  {historyLoader.isLoading
-                    ? <span className="w-3 h-3 border border-zinc-500 border-t-transparent rounded-full animate-spin" />
-                    : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                  }
-                  {historyLoader.isLoading ? '로딩 중...' : '이전 연도 통계 불러오기'}
-                </button>
-              </div>
-            )}
-            {!isSummaryOnly && <SeasonalEffGrid seasonalEff={seasonalEff} />}
+            <SeasonalEffGrid seasonalEff={seasonalEff} />
           </>
         ) : (
           <div className="bg-[#161618] border border-white/[0.06] rounded-2xl flex items-center justify-center py-6">

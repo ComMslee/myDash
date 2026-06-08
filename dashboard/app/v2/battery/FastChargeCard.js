@@ -2,7 +2,12 @@
 
 import { Fragment, useEffect, useMemo, useState, useCallback } from 'react';
 import { formatDuration, shortAddr } from '@/lib/format';
-import { kstDateStr, kstMondayStr } from '@/lib/kst';
+import { kstDateStr, kstMondayStr, KST_OFFSET_MS } from '@/lib/kst';
+
+function currentMonthKey() {
+  const kst = new Date(Date.now() + KST_OFFSET_MS);
+  return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}`;
+}
 
 export default function FastChargeCard() {
   const [months, setMonths] = useState([]);
@@ -39,22 +44,28 @@ export default function FastChargeCard() {
   const totalKwh = useMemo(() => months.reduce((s, m) => s + m.total_kwh, 0), [months]);
   const peakKw = useMemo(() => months.reduce((max, m) => m.peak_kw != null && m.peak_kw > max ? m.peak_kw : max, 0) || null, [months]);
 
-  const weeks = useMemo(() => {
-    const weekMap = new Map();
-    const weekOrder = [];
+  // 레코드를 월별 → 주별로 그룹핑
+  const recordsByMonth = useMemo(() => {
+    const map = new Map();
     for (const r of records) {
-      const weekKey = kstMondayStr(r.start_date);
-      let w = weekMap.get(weekKey);
-      if (!w) {
-        w = { weekKey, items: [], totalKwh: 0 };
-        weekMap.set(weekKey, w);
-        weekOrder.push(weekKey);
-      }
+      const mk = kstDateStr(r.start_date).slice(0, 7);
+      let weekMap = map.get(mk);
+      if (!weekMap) { weekMap = new Map(); map.set(mk, weekMap); }
+      const wk = kstMondayStr(r.start_date);
+      let w = weekMap.get(wk);
+      if (!w) { w = { weekKey: wk, items: [], totalKwh: 0 }; weekMap.set(wk, w); }
       w.items.push(r);
       w.totalKwh += Number(r.energy_kwh) || 0;
     }
-    return weekOrder.map(wk => weekMap.get(wk));
+    return map;
   }, [records]);
+
+  const [expandedMonths, setExpandedMonths] = useState(() => new Set([currentMonthKey()]));
+  const toggleMonth = (mk) => setExpandedMonths(prev => {
+    const next = new Set(prev);
+    if (next.has(mk)) next.delete(mk); else next.add(mk);
+    return next;
+  });
 
   const [expandedWeeks, setExpandedWeeks] = useState(() => new Set());
   const toggleWeek = (wk) => setExpandedWeeks(prev => {
@@ -78,6 +89,12 @@ export default function FastChargeCard() {
     const fm = mon.getUTCMonth() + 1, fd = mon.getUTCDate();
     const lm = sun.getUTCMonth() + 1, ld = sun.getUTCDate();
     return fm === lm ? `${fm}/${fd} ~ ${ld}` : `${fm}/${fd} ~ ${lm}/${ld}`;
+  };
+  const formatMonthLabel = (mk) => {
+    const [y, m] = mk.split('-');
+    const currentYear = new Date().getFullYear();
+    const prefix = parseInt(y) !== currentYear ? `${y.slice(2)}년 ` : '';
+    return `${prefix}${parseInt(m)}월`;
   };
 
   if (loading) {
@@ -115,75 +132,85 @@ export default function FastChargeCard() {
         </span>
       </div>
 
-      {/* 월별 집계 — 항상 표시 */}
-      <div className="border-b border-white/[0.06]">
-        {months.map(m => (
-          <div key={m.month} className="px-4 py-1.5 flex items-center justify-between text-[11px] tabular-nums border-t border-white/[0.04] first:border-t-0">
-            <span className="text-zinc-400">{m.month.replace('-', '년 ')}월</span>
-            <span className="flex items-center gap-2">
-              <span className="text-zinc-600">{m.count}건</span>
-              <span className="text-rose-400 font-bold">{m.total_kwh}<span className="text-zinc-600 ml-0.5">kWh</span></span>
-              {m.peak_kw != null && <span className="text-zinc-500">{m.peak_kw}<span className="text-zinc-600 ml-0.5">kW↑</span></span>}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {/* 주별 상세 — 초기 20건 바로 표시 */}
-      <div className="overflow-y-auto" style={{ maxHeight: '360px' }}>
-        {weeks.map(week => {
-          const expanded = expandedWeeks.has(week.weekKey);
-          return (
-            <Fragment key={week.weekKey}>
-              <button
-                onClick={() => toggleWeek(week.weekKey)}
-                className="w-full px-4 py-2 border-t border-white/[0.08] first:border-t-0 bg-white/[0.03] hover:bg-white/[0.06] flex items-center justify-between gap-2 text-left transition-colors"
-              >
-                <span className="flex items-center gap-2 min-w-0">
-                  <svg className={`w-3 h-3 text-zinc-500 flex-shrink-0 transition-transform ${expanded ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                  <span className="text-[10px] font-bold text-zinc-300">{weekLabel(week.weekKey)}</span>
-                  <span className="text-[10px] text-zinc-600 tabular-nums">{weekRange(week.weekKey)}</span>
-                </span>
-                <span className="flex items-center gap-2 tabular-nums flex-shrink-0">
-                  <span className="text-[10px] text-zinc-600">{week.items.length}건</span>
-                  <span className="text-[10px] font-bold text-rose-400">
-                    {Math.round(week.totalKwh * 10) / 10}<span className="text-zinc-600 ml-0.5">kWh</span>
-                  </span>
-                </span>
-              </button>
-              {expanded && week.items.map(r => {
-                const dt = new Date(r.start_date);
-                const dateLabel = `${dt.getMonth()+1}/${dt.getDate()}`;
-                const fmtTime = (d) => `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-                const startTime = fmtTime(dt);
-                const endTime = r.duration_min ? fmtTime(new Date(dt.getTime() + r.duration_min * 60000)) : null;
-                const brandLabel = r.charger_brand === 'Tesla' ? 'SC' : r.charger_type || '급속';
-                const tipParts = [
-                  shortAddr(r.location),
-                  endTime ? `${startTime}~${endTime}` : startTime,
-                  r.duration_min ? formatDuration(r.duration_min) : null,
-                  `${r.energy_kwh}kWh`,
-                  r.max_power ? `최대 ${r.max_power}kW` : null,
-                  r.avg_power ? `평균 ${r.avg_power}` : null,
-                ].filter(Boolean);
-                return (
-                  <div key={r.id} className="px-4 py-2 border-t border-white/[0.04] flex items-center gap-1.5 text-[11px] tabular-nums" title={tipParts.join(' · ')}>
-                    <span className="font-bold text-zinc-300 shrink-0">{dateLabel}</span>
-                    <span className="text-zinc-500 truncate min-w-0 flex-1">{shortAddr(r.location)}</span>
-                    <span className="text-zinc-400 shrink-0">{startTime}{endTime && `~${endTime}`}</span>
-                    {r.duration_min && <span className="text-zinc-600 shrink-0">{formatDuration(r.duration_min)}</span>}
-                    <span className="px-1 py-px rounded bg-rose-500/15 text-rose-400 text-[10px] font-semibold shrink-0">{brandLabel}</span>
-                    <span className="text-rose-400 font-bold shrink-0">{r.energy_kwh}<span className="text-zinc-600 ml-0.5">kWh</span></span>
-                    {r.max_power && <span className="text-rose-400 shrink-0">{r.max_power}<span className="text-zinc-600 ml-0.5">kW</span></span>}
-                  </div>
-                );
-              })}
-            </Fragment>
-          );
-        })}
-      </div>
+      {/* 월별 → 주별 → 건별 */}
+      {months.map(m => {
+        const monthExpanded = expandedMonths.has(m.month);
+        const monthWeekMap = recordsByMonth.get(m.month);
+        const monthWeeks = monthWeekMap ? Array.from(monthWeekMap.values()) : [];
+        return (
+          <Fragment key={m.month}>
+            {/* 월 헤더 */}
+            <button
+              onClick={() => toggleMonth(m.month)}
+              className="w-full px-4 py-2 border-t border-white/[0.10] bg-white/[0.03] hover:bg-white/[0.06] flex items-center justify-between gap-2 text-left transition-colors"
+            >
+              <span className="flex items-center gap-2 min-w-0">
+                <svg className={`w-3 h-3 text-zinc-500 flex-shrink-0 transition-transform ${monthExpanded ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                <span className="text-[11px] font-bold text-zinc-200">{formatMonthLabel(m.month)}</span>
+              </span>
+              <span className="flex items-center gap-2 tabular-nums flex-shrink-0">
+                <span className="text-[10px] text-zinc-600">{m.count}건</span>
+                <span className="text-[10px] font-bold text-rose-400">{m.total_kwh}<span className="text-zinc-600 ml-0.5">kWh</span></span>
+                {m.peak_kw != null && <span className="text-[10px] text-zinc-500">{m.peak_kw}<span className="text-zinc-600 ml-0.5">kW↑</span></span>}
+              </span>
+            </button>
+            {monthExpanded && monthWeeks.map(week => {
+              const weekExpanded = expandedWeeks.has(week.weekKey);
+              return (
+                <Fragment key={week.weekKey}>
+                  <button
+                    onClick={() => toggleWeek(week.weekKey)}
+                    className="w-full px-4 pl-8 py-1.5 border-t border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] flex items-center justify-between gap-2 text-left transition-colors"
+                  >
+                    <span className="flex items-center gap-2 min-w-0">
+                      <svg className={`w-3 h-3 text-zinc-600 flex-shrink-0 transition-transform ${weekExpanded ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <span className="text-[10px] font-semibold text-zinc-400">{weekLabel(week.weekKey)}</span>
+                      <span className="text-[10px] text-zinc-600 tabular-nums">{weekRange(week.weekKey)}</span>
+                    </span>
+                    <span className="flex items-center gap-2 tabular-nums flex-shrink-0">
+                      <span className="text-[10px] text-zinc-600">{week.items.length}건</span>
+                      <span className="text-[10px] font-bold text-rose-400">
+                        {Math.round(week.totalKwh * 10) / 10}<span className="text-zinc-600 ml-0.5">kWh</span>
+                      </span>
+                    </span>
+                  </button>
+                  {weekExpanded && week.items.map(r => {
+                    const dt = new Date(r.start_date);
+                    const dateLabel = `${dt.getMonth()+1}/${dt.getDate()}`;
+                    const fmtTime = (d) => `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                    const startTime = fmtTime(dt);
+                    const endTime = r.duration_min ? fmtTime(new Date(dt.getTime() + r.duration_min * 60000)) : null;
+                    const brandLabel = r.charger_brand === 'Tesla' ? 'SC' : r.charger_type || '급속';
+                    const tipParts = [
+                      shortAddr(r.location),
+                      endTime ? `${startTime}~${endTime}` : startTime,
+                      r.duration_min ? formatDuration(r.duration_min) : null,
+                      `${r.energy_kwh}kWh`,
+                      r.max_power ? `최대 ${r.max_power}kW` : null,
+                      r.avg_power ? `평균 ${r.avg_power}` : null,
+                    ].filter(Boolean);
+                    return (
+                      <div key={r.id} className="px-4 pl-10 py-2 border-t border-white/[0.04] flex items-center gap-1.5 text-[11px] tabular-nums" title={tipParts.join(' · ')}>
+                        <span className="font-bold text-zinc-300 shrink-0">{dateLabel}</span>
+                        <span className="text-zinc-500 truncate min-w-0 flex-1">{shortAddr(r.location)}</span>
+                        <span className="text-zinc-400 shrink-0">{startTime}{endTime && `~${endTime}`}</span>
+                        {r.duration_min && <span className="text-zinc-600 shrink-0">{formatDuration(r.duration_min)}</span>}
+                        <span className="px-1 py-px rounded bg-rose-500/15 text-rose-400 text-[10px] font-semibold shrink-0">{brandLabel}</span>
+                        <span className="text-rose-400 font-bold shrink-0">{r.energy_kwh}<span className="text-zinc-600 ml-0.5">kWh</span></span>
+                        {r.max_power && <span className="text-rose-400 shrink-0">{r.max_power}<span className="text-zinc-600 ml-0.5">kW</span></span>}
+                      </div>
+                    );
+                  })}
+                </Fragment>
+              );
+            })}
+          </Fragment>
+        );
+      })}
 
       {/* 더 보기 */}
       {hasMore && (

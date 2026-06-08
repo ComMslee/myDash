@@ -139,7 +139,7 @@ export async function GET(request) {
          LEFT JOIN positions ep ON ep.id = d.end_position_id
          WHERE d.car_id = $1${rangeClause}
          ORDER BY d.start_date DESC
-         LIMIT 200`,
+         LIMIT 600`,
         rangeParams
       ),
     ]);
