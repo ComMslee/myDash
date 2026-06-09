@@ -5,9 +5,6 @@ import { withCache } from '@/lib/server-cache';
 
 export const dynamic = 'force-dynamic';
 
-// 직선/도로 거리 보정 계수 — est 기반(이미 현실치) + 도로 우회 보정 0.75
-const ROAD_FACTOR = 0.75;
-
 // 현 위치 + 예상 주행거리(est_battery_range_km) → 잔여 주행 가능 반경 (편도/왕복).
 // est 결측 시 rated 폴백. 지도 오버레이용 — /v2/battery 최상단 카드에서 호출.
 export async function GET() {
@@ -47,18 +44,17 @@ export async function GET() {
       }
 
       const basis = r.est_km != null ? 'est' : 'rated';
-      const oneWayKm = baseKm * ROAD_FACTOR;
+      const oneWayKm = baseKm;
       const roundTripKm = oneWayKm / 2;
 
       return {
         available: true,
         position: { lat: r.lat, lng: r.lng, ts: r.pos_ts },
         soc: r.soc,
-        basis,                                  // 'est' | 'rated'
-        base_km: Math.round(baseKm),            // 계산 기준 km
+        basis,
+        base_km: Math.round(baseKm),
         est_km: r.est_km != null ? Math.round(Number(r.est_km)) : null,
         rated_km: r.rated_km != null ? Math.round(Number(r.rated_km)) : null,
-        road_factor: ROAD_FACTOR,
         one_way_km: Math.round(oneWayKm),
         round_trip_km: Math.round(roundTripKm),
         state: r.state || 'unknown',
