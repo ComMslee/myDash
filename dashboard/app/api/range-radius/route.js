@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 
 // 현 위치 + 예상 주행거리(est_battery_range_km) → 잔여 주행 가능 반경 (편도/왕복).
 // est 결측 시 rated 폴백. 지도 오버레이용 — /v2/battery 최상단 카드에서 호출.
+const ROAD_FACTOR = 0.85;
 export async function GET() {
   const __unauth = await requireAuth();
   if (__unauth) return __unauth;
@@ -44,7 +45,7 @@ export async function GET() {
       }
 
       const basis = r.est_km != null ? 'est' : 'rated';
-      const oneWayKm = baseKm;
+      const oneWayKm = baseKm * ROAD_FACTOR;
       const roundTripKm = oneWayKm / 2;
 
       return {
