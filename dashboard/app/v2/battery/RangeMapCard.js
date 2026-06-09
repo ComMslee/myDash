@@ -93,6 +93,7 @@ export default function RangeMapCard() {
         <span className="text-sm text-zinc-300 tabular-nums">· {data.base_km}km</span>
         <span className="text-[10px] text-zinc-500">{data.basis === 'est' ? '예상' : 'rated'}</span>
         {data.is_charging && <span className="text-[10px] text-amber-400 ml-1">⚡ 충전 중</span>}
+        <span className="ml-auto text-[10px] text-zinc-500">×0.85 도로 보정</span>
       </div>
       <div className="relative">
         <div ref={containerRef} className="w-full" style={{ height: '280px' }} />
