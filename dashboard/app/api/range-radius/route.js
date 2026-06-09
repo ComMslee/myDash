@@ -19,24 +19,22 @@ export async function GET() {
 
     return Response.json(await withCache(`range-radius:${car.id}`, 60_000, async () => {
       const carId = car.id;
+      // soc·est_km·rated_km 은 반드시 같은 positions 행에서 — 별도 서브쿼리면
+      // 충전 완료 후 슬립 중 range 컬럼 NULL 행이 쌓여 SOC 100% + 옛 270km 불일치 발생
       const { rows } = await pool.query(
         `SELECT
-           (SELECT latitude::float FROM positions
-              WHERE car_id=$1 AND latitude IS NOT NULL
-              ORDER BY date DESC LIMIT 1) AS lat,
-           (SELECT longitude::float FROM positions
-              WHERE car_id=$1 AND longitude IS NOT NULL
-              ORDER BY date DESC LIMIT 1) AS lng,
-           (SELECT battery_level FROM positions
-              WHERE car_id=$1 ORDER BY date DESC LIMIT 1) AS soc,
-           (SELECT rated_battery_range_km::float FROM positions
-              WHERE car_id=$1 AND rated_battery_range_km IS NOT NULL
-              ORDER BY date DESC LIMIT 1) AS rated_km,
-           (SELECT est_battery_range_km::float FROM positions
-              WHERE car_id=$1 AND est_battery_range_km IS NOT NULL
-              ORDER BY date DESC LIMIT 1) AS est_km,
-           (SELECT date FROM positions WHERE car_id=$1 ORDER BY date DESC LIMIT 1) AS pos_ts,
-           (SELECT state FROM states WHERE car_id=$1 ORDER BY start_date DESC LIMIT 1) AS state`,
+           p.latitude::float                 AS lat,
+           p.longitude::float                AS lng,
+           p.battery_level                   AS soc,
+           p.rated_battery_range_km::float   AS rated_km,
+           p.est_battery_range_km::float     AS est_km,
+           p.date                            AS pos_ts,
+           (SELECT state FROM states WHERE car_id=$1 ORDER BY start_date DESC LIMIT 1) AS state
+         FROM positions p
+         WHERE p.car_id=$1
+           AND (p.est_battery_range_km IS NOT NULL OR p.rated_battery_range_km IS NOT NULL)
+           AND p.latitude IS NOT NULL
+         ORDER BY p.date DESC LIMIT 1`,
         [carId]
       );
       const r = rows[0] || {};
